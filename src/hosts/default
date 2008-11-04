@@ -1,0 +1,31 @@
+#-------------------------------------------------------------------------------
+#
+# customize flags for MPI, OpenMP and with no parallelization
+#
+#-------------------------------------------------------------------------------
+#
+# parallelization: compile with MPI and/or OMP: Y or N
+#
+MPI           = N
+OMP           = N
+
+# compiler and linker setup
+#
+ifeq ($(MPI),Y)
+FC            = mpif90
+else
+FC            = ifort
+endif
+LD            = $(FC)
+
+# compiler and linker flags
+#
+FFLAGS        = -O2 -i4
+LDFLAGS       = $(FFLAGS)
+
+# libraries
+#
+LIBS          =
+
+#
+#-------------------------------------------------------------------------------
