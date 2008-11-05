@@ -26,6 +26,9 @@
 !
 program godunov
 
+! modules
+!
+  use blocks, only : init_blocks, clear_blocks
 !
 !----------------------------------------------------------------------
 !
@@ -34,11 +37,30 @@ program godunov
 !
 !----------------------------------------------------------------------
 !
+! print info message
+!
   write (*,"(1x,78('-'))")
   write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
   write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
   write (*,"(1x,78('-'))")
   write (*,*)
+
+! setup adaptive mesh structure, allocate first block, initialize its mesh and variables
+!
+
+! initialize block structure
+!
+  call init_blocks
+
+! fill the first block with initial conditions, check refinement, refine if necessary by creating more blocks, this should create the initial structure of domain
+!
+
+! write down the initial state
+!
+
+! finalize blocks structure
+!
+  call clear_blocks
 
 !----------------------------------------------------------------------
 !

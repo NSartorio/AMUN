@@ -299,8 +299,8 @@ name = godunov-amr
 
 default: $(name).x
 
-sources = driver.F90
-objects = driver.o
+sources = blocks.F90 driver.F90
+objects = blocks.o   driver.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
 $(name).x: $(objects)
@@ -317,6 +317,7 @@ clean-all:
 
 #-------------------------------------------------------------------------------
 
-driver.o        : driver.F90
+blocks.o        : blocks.F90
+driver.o        : driver.F90 blocks.o
 
 #-------------------------------------------------------------------------------
