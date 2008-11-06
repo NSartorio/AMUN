@@ -317,7 +317,7 @@ clean-all:
 
 #-------------------------------------------------------------------------------
 
-blocks.o        : blocks.F90
+blocks.o        : blocks.F90 config.o
 config.o        : config.F90 error.o
 driver.o        : driver.F90 blocks.o config.o
 error.o         : error.F90

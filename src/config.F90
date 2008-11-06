@@ -28,6 +28,10 @@ module config
 
   implicit none
 
+! dimensional variables
+!
+  integer(kind=4), save :: iblocks = 1, jblocks = 1, kblocks = 1
+
   contains
 !
 !======================================================================
@@ -84,6 +88,14 @@ module config
 ! substitute the parameter value
 !
     select case(name)
+    case("iblocks")
+      read(value, "(i9.9)") iblocks
+    case("jblocks")
+      read(value, "(i9.9)") jblocks
+#ifdef R3D
+    case("kblocks")
+      read(value, "(i9.9)") kblocks
+#endif /* R3D */
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
