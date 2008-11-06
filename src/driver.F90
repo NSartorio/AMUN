@@ -1,10 +1,10 @@
-!!**********************************************************************
+!!*****************************************************************************
 !!
 !! program: Godunov-AMR
 !!
 !! Copyright (C) 2008 Grzegorz Kowal <kowal@astro.wisc.edu>
 !!
-!!******************************************************************************
+!!*****************************************************************************
 !!
 !!  This file is part of Godunov-AMR.
 !!
@@ -21,7 +21,7 @@
 !!  You should have received a copy of the GNU General Public License
 !!  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !!
-!!******************************************************************************
+!!*****************************************************************************
 !!
 !
 program godunov
@@ -29,6 +29,7 @@ program godunov
 ! modules
 !
   use blocks, only : init_blocks, clear_blocks
+  use config, only : read_config
 !
 !----------------------------------------------------------------------
 !
@@ -44,6 +45,10 @@ program godunov
   write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
   write (*,"(1x,78('-'))")
   write (*,*)
+
+! read configuration file
+!
+  call read_config
 
 ! setup adaptive mesh structure, allocate first block, initialize its mesh and variables
 !
