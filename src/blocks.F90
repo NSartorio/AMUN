@@ -106,6 +106,15 @@ module blocks
 !
     allocate(pcurr)
 
+! fill block structure
+!
+    pcurr%id         =  1
+    pcurr%level      =  1
+    pcurr%parent     = -1
+
+    pcurr%neigh(:,:) = -1
+    pcurr%child(:,:) = -1
+
 ! nullify the prev and next fields
 !
     nullify(pcurr%prev)
