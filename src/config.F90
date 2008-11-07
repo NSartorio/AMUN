@@ -32,6 +32,10 @@ module config
 !
   integer(kind=4), save :: iblocks = 1, jblocks = 1, kblocks = 1
 
+! block dimensions, number of ghost zones
+!
+  integer(kind=4), save :: ncells = 8, nghost = 2, ngrids = 10
+
   contains
 !
 !======================================================================
@@ -96,6 +100,10 @@ module config
     case("kblocks")
       read(value, "(i9.9)") kblocks
 #endif /* R3D */
+    case("ncells")
+      read(value, "(i9.9)") ncells
+    case("nghost")
+      read(value, "(i9.9)") nghost
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
@@ -108,6 +116,13 @@ module config
 !
 20  continue
     close(1)
+
+! compute additional parameters
+!
+    ngrids = ncells + 2 * nghost
+
+! return before error messages
+!
     return
 
 ! print error if could not open file

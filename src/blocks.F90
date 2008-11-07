@@ -30,19 +30,10 @@ module blocks
 
 ! parameters
 !
-  integer(kind=4), parameter :: nghost =  2
-  integer(kind=4), parameter :: ncells = 12
-  integer(kind=4), parameter :: ngrids = ncells + 2*nghost
 #ifdef R3D
   integer(kind=4), parameter :: ndims  = 3
-  integer(kind=4), parameter :: ngridx = ngrids
-  integer(kind=4), parameter :: ngridy = ngrids
-  integer(kind=4), parameter :: ngridz = ngrids
 #else /* R3D */
   integer(kind=4), parameter :: ndims  = 2
-  integer(kind=4), parameter :: ngridx = ngrids
-  integer(kind=4), parameter :: ngridy = ngrids
-  integer(kind=4), parameter :: ngridz = 1
 #endif /* R3D */
   integer(kind=4), parameter :: nchild = 2**ndims
 
@@ -56,25 +47,120 @@ module blocks
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
-    real                 :: dn(ngridx,ngridy,ngridz)
-    real                 :: mx(ngridx,ngridy,ngridz)
-    real                 :: my(ngridx,ngridy,ngridz)
-    real                 :: mz(ngridx,ngridy,ngridz)
+    real, dimension(:,:,:), allocatable :: dn, mx, my, mz
 #ifndef ISO
-    real                 :: en(ngridx,ngridy,ngridz)
+    real, dimension(:,:,:), allocatable :: en
 #endif /* !ISO */
 #ifdef MHD
-    real                 :: bx(ngridx,ngridy,ngridz)
-    real                 :: by(ngridx,ngridy,ngridz)
-    real                 :: bz(ngridx,ngridy,ngridz)
+    real, dimension(:,:,:), allocatable :: bx, by, bz
 #endif /* MHD */
   end type block
 
 ! stored pointers
 !
   type(block), pointer, save :: pfirst, plast
+  integer(kind=4)     , save :: nblocks
 
   contains
+!
+!======================================================================
+!
+! allocate_block: subroutine allocates space for one block and returns
+!                 pointer to this block
+!
+!======================================================================
+!
+  subroutine allocate_block(pblock)
+
+    use config, only : ngrids
+
+    implicit none
+
+! output arguments
+!
+    type(block), pointer, intent(out) :: pblock
+!
+!----------------------------------------------------------------------
+!
+! allocate block structure
+!
+    allocate(pblock)
+
+! allocate space for variables
+!
+    if (ndims .eq. 2) then
+      allocate(pblock%dn(ngrids,ngrids,1))
+      allocate(pblock%mx(ngrids,ngrids,1))
+      allocate(pblock%my(ngrids,ngrids,1))
+      allocate(pblock%mz(ngrids,ngrids,1))
+#ifndef ISO
+      allocate(pblock%en(ngrids,ngrids,1))
+#endif /* ISO */
+#ifdef MHD
+      allocate(pblock%bx(ngrids,ngrids,1))
+      allocate(pblock%by(ngrids,ngrids,1))
+      allocate(pblock%bz(ngrids,ngrids,1))
+#endif /* MHD */
+    endif
+    if (ndims .eq. 3) then
+      allocate(pblock%dn(ngrids,ngrids,ngrids))
+      allocate(pblock%mx(ngrids,ngrids,ngrids))
+      allocate(pblock%my(ngrids,ngrids,ngrids))
+      allocate(pblock%mz(ngrids,ngrids,ngrids))
+#ifndef ISO
+      allocate(pblock%en(ngrids,ngrids,ngrids))
+#endif /* !ISO */
+#ifdef MHD
+      allocate(pblock%bx(ngrids,ngrids,ngrids))
+      allocate(pblock%by(ngrids,ngrids,ngrids))
+      allocate(pblock%bz(ngrids,ngrids,ngrids))
+#endif /* MHD */
+    endif
+
+!----------------------------------------------------------------------
+!
+  end subroutine allocate_block
+!
+!======================================================================
+!
+! deallocate_block: subroutine deallocates space ocuppied by a given
+!                   block
+!
+!======================================================================
+!
+  subroutine deallocate_block(pblock)
+
+    implicit none
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+!
+!----------------------------------------------------------------------
+!
+! deallocate variables
+!
+    deallocate(pblock%dn)
+    deallocate(pblock%mx)
+    deallocate(pblock%my)
+    deallocate(pblock%mz)
+#ifndef ISO
+    deallocate(pblock%en)
+#endif /* !ISO */
+#ifdef MHD
+    deallocate(pblock%bx)
+    deallocate(pblock%by)
+    deallocate(pblock%bz)
+#endif /* MHD */
+
+! free and nullify the block
+!
+    deallocate(pblock)
+    nullify(pblock)
+
+!----------------------------------------------------------------------
+!
+  end subroutine deallocate_block
 !
 !======================================================================
 !
@@ -83,6 +169,8 @@ module blocks
 !======================================================================
 !
   subroutine init_blocks
+
+    use config, only : iblocks, jblocks, kblocks
 
     implicit none
 
@@ -102,9 +190,13 @@ module blocks
 !
     nullify(pfirst)
 
+! reset number of blocks
+!
+    nblocks = 0
+
 ! create the first block
 !
-    allocate(pcurr)
+    call allocate_block(pcurr)
 
 ! fill block structure
 !
@@ -157,8 +249,7 @@ module blocks
 
 ! deallocate and nullify the current block
 !
-      deallocate(pfirst)
-      nullify(pfirst)
+      call deallocate_block(pfirst)
 
 ! assign pointer to the current chunk
 !
