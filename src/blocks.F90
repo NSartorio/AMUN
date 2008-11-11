@@ -1,6 +1,6 @@
 !!*****************************************************************************
 !!
-!! module: blocks - handling adaptive mesh structure
+!! module: blocks - handling block storage
 !!
 !! Copyright (C) 2008 Grzegorz Kowal <kowal@astro.wisc.edu>
 !!
@@ -42,6 +42,8 @@ module blocks
   type block
     type(block), pointer :: next, prev
 
+    logical              :: refine
+
     integer(kind=4)      :: id, level, parent
     integer(kind=4)      :: neigh(ndims,2), child(nchild)
 
@@ -61,7 +63,36 @@ module blocks
   type(block), pointer, save :: pfirst, plast
   integer(kind=4)     , save :: nblocks
 
+! stored last id (should always increase)
+!
+  integer(kind=4)     , save :: last_id
+
   contains
+!
+!======================================================================
+!
+! list_allocated: function checks if the block list is empty and
+!                 returns true or false
+!
+!======================================================================
+!
+  function list_allocated
+
+    implicit none
+
+! output arguments
+!
+    logical :: list_allocated
+!
+!----------------------------------------------------------------------
+!
+    list_allocated = associated(pfirst)
+
+    return
+
+!----------------------------------------------------------------------
+!
+  end function list_allocated
 !
 !======================================================================
 !
@@ -86,36 +117,43 @@ module blocks
 !
     allocate(pblock)
 
+! set unique ID
+!
+    pblock%id = increase_id()
+
+! reset neighbors
+!
+    pblock%neigh(:,:) = -1
+
 ! allocate space for variables
 !
-    if (ndims .eq. 2) then
-      allocate(pblock%dn(ngrids,ngrids,1))
-      allocate(pblock%mx(ngrids,ngrids,1))
-      allocate(pblock%my(ngrids,ngrids,1))
-      allocate(pblock%mz(ngrids,ngrids,1))
+#ifdef R3D
+    allocate(pblock%dn(ngrids,ngrids,1))
+    allocate(pblock%mx(ngrids,ngrids,1))
+    allocate(pblock%my(ngrids,ngrids,1))
+    allocate(pblock%mz(ngrids,ngrids,1))
 #ifndef ISO
-      allocate(pblock%en(ngrids,ngrids,1))
+    allocate(pblock%en(ngrids,ngrids,1))
 #endif /* ISO */
 #ifdef MHD
-      allocate(pblock%bx(ngrids,ngrids,1))
-      allocate(pblock%by(ngrids,ngrids,1))
-      allocate(pblock%bz(ngrids,ngrids,1))
+    allocate(pblock%bx(ngrids,ngrids,1))
+    allocate(pblock%by(ngrids,ngrids,1))
+    allocate(pblock%bz(ngrids,ngrids,1))
 #endif /* MHD */
-    endif
-    if (ndims .eq. 3) then
-      allocate(pblock%dn(ngrids,ngrids,ngrids))
-      allocate(pblock%mx(ngrids,ngrids,ngrids))
-      allocate(pblock%my(ngrids,ngrids,ngrids))
-      allocate(pblock%mz(ngrids,ngrids,ngrids))
+#else /* R3D */
+    allocate(pblock%dn(ngrids,ngrids,ngrids))
+    allocate(pblock%mx(ngrids,ngrids,ngrids))
+    allocate(pblock%my(ngrids,ngrids,ngrids))
+    allocate(pblock%mz(ngrids,ngrids,ngrids))
 #ifndef ISO
-      allocate(pblock%en(ngrids,ngrids,ngrids))
+    allocate(pblock%en(ngrids,ngrids,ngrids))
 #endif /* !ISO */
 #ifdef MHD
-      allocate(pblock%bx(ngrids,ngrids,ngrids))
-      allocate(pblock%by(ngrids,ngrids,ngrids))
-      allocate(pblock%bz(ngrids,ngrids,ngrids))
+    allocate(pblock%bx(ngrids,ngrids,ngrids))
+    allocate(pblock%by(ngrids,ngrids,ngrids))
+    allocate(pblock%bz(ngrids,ngrids,ngrids))
 #endif /* MHD */
-    endif
+#endif /* R3D */
 
 !----------------------------------------------------------------------
 !
@@ -164,15 +202,160 @@ module blocks
 !
 !======================================================================
 !
+! append_block: subroutine allocates space for one block and appends
+!               it to the list
+!
+!======================================================================
+!
+  subroutine append_block(pblock)
+
+    implicit none
+
+! output arguments
+!
+    type(block), pointer, intent(out) :: pblock
+!
+!----------------------------------------------------------------------
+!
+! allocate block
+!
+    call allocate_block(pblock)
+
+! add to the list
+!
+    if (list_allocated()) then
+      pblock%prev => plast
+      nullify(pblock%next)
+      plast%next => pblock
+
+      plast => pblock
+    else
+      pfirst => pblock
+      plast => pblock
+      nullify(pblock%prev)
+      nullify(pblock%next)
+    endif
+
+!----------------------------------------------------------------------
+!
+  end subroutine append_block
+!
+!======================================================================
+!
+! allocate_blocks: subroutine allocates a configuration of blocks
+!
+!======================================================================
+!
+  subroutine allocate_blocks(block_config, pgroup, xmn, xmx, ymn, ymx &
+                           , zmn, zmx)
+
+    use error, only : print_error
+
+    implicit none
+
+! input parameters
+!
+    character(len=1), intent(in) :: block_config
+    real            , intent(in) :: xmn, xmx, ymn, ymx, zmn, zmx
+
+! output arguments
+!
+    type(block), pointer, intent(out) :: pgroup
+
+! local pointers
+!
+    type(block), pointer :: pbl, pbr, ptl, ptr
+
+! local variables
+!
+    real :: xl, xc, xr, yl, yc, yr, zl, zc, zr
+!
+!----------------------------------------------------------------------
+!
+    select case(block_config)
+    case('n', 'N')
+
+! TODO: create 4 blocks in N configuration; set pointers, neighbors, etc.
+!       return pointer to the allocated chain
+
+! create bottom left block
+!
+      call append_block(pbl)
+      call append_block(ptl)
+      call append_block(ptr)
+      call append_block(pbr)
+
+! set neighbors
+!
+      pbl%neigh(1,2) = pbr%id
+      pbl%neigh(2,2) = ptl%id
+
+      pbr%neigh(1,1) = pbl%id
+      pbr%neigh(2,2) = ptr%id
+
+      ptl%neigh(1,2) = ptr%id
+      ptl%neigh(2,1) = pbl%id
+
+      ptr%neigh(1,1) = ptl%id
+      ptr%neigh(2,1) = pbr%id
+
+! set block bounds
+!
+      xl = xmn
+      xc = xmn + (xmx - xmn) / 2
+      xr = xmx
+      yl = ymn
+      yc = ymn + (ymx - ymn) / 2
+      yr = ymx
+
+      pbl%xmin = xl
+      pbl%xmax = xc
+      pbl%ymin = yl
+      pbl%ymax = yc
+
+      ptl%xmin = xl
+      ptl%xmax = xc
+      ptl%ymin = yc
+      ptl%ymax = yr
+
+      ptr%xmin = xc
+      ptr%xmax = xr
+      ptr%ymin = yc
+      ptr%ymax = yr
+
+      pbr%xmin = xc
+      pbr%xmax = xr
+      pbr%ymin = yl
+      pbr%ymax = yc
+
+    case default
+      call print_error("blocks::allocate_blocks","Configuration '" // block_config // "' not supported! Terminating!")
+    end select
+
+! copy pointer of the first block in chain
+!
+    pgroup => pbl
+
+!----------------------------------------------------------------------
+!
+  end subroutine allocate_blocks
+!
+!======================================================================
+!
 ! init_blocks: subroutine initializes the structure of blocks
 !
 !======================================================================
 !
-  subroutine init_blocks
+  subroutine init_blocks()
 
-    use config, only : iblocks, jblocks, kblocks
+    use config, only : ngrids, iblocks, jblocks, kblocks, nghost, ncells
+!     use problem, only : init_problem
 
     implicit none
+
+! local variables
+!
+    integer(kind=4) :: i, j, k
 
 ! pointers
 !
@@ -194,27 +377,9 @@ module blocks
 !
     nblocks = 0
 
-! create the first block
+! reset ID
 !
-    call allocate_block(pcurr)
-
-! fill block structure
-!
-    pcurr%id         =  1
-    pcurr%level      =  1
-    pcurr%parent     = -1
-
-    pcurr%neigh(:,:) = -1
-    pcurr%child(:)   = -1
-
-! nullify the prev and next fields
-!
-    nullify(pcurr%prev)
-    nullify(pcurr%next)
-
-! add the block to the list
-!
-    pfirst => pcurr
+    last_id = 0
 
 !----------------------------------------------------------------------
 !
@@ -240,6 +405,8 @@ module blocks
 !
     do while(associated(pfirst))
 
+      print *, pfirst%id, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
+
 ! assign temporary pointer to the next chunk
 !
       pcurr => pfirst%next
@@ -260,6 +427,36 @@ module blocks
 !----------------------------------------------------------------------
 !
   end subroutine clear_blocks
+!
+!======================================================================
+!
+! increase_id: function increases last ID by 1 and returns it
+!
+!======================================================================
+!
+  function increase_id
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: increase_id
+!
+!----------------------------------------------------------------------
+!
+! increase ID by 1
+!
+    last_id = last_id + 1
+
+! return ID
+!
+    increase_id = last_id
+
+    return
+
+!----------------------------------------------------------------------
+!
+  end function increase_id
 
 !======================================================================
 !

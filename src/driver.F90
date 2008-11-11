@@ -28,8 +28,8 @@ program godunov
 
 ! modules
 !
-  use blocks, only : init_blocks, clear_blocks
   use config, only : read_config
+  use mesh  , only : init_mesh, clear_mesh
 !
 !----------------------------------------------------------------------
 !
@@ -53,9 +53,9 @@ program godunov
 ! setup adaptive mesh structure, allocate first block, initialize its mesh and variables
 !
 
-! initialize block structure
+! initialize adaptive mesh and initial problem
 !
-  call init_blocks
+  call init_mesh
 
 ! fill the first block with initial conditions, check refinement, refine if necessary by creating more blocks, this should create the initial structure of domain
 !
@@ -63,9 +63,9 @@ program godunov
 ! write down the initial state
 !
 
-! finalize blocks structure
+! deallocate and reset mesh
 !
-  call clear_blocks
+  call clear_mesh
 
 !----------------------------------------------------------------------
 !

@@ -36,6 +36,12 @@ module config
 !
   integer(kind=4), save :: ncells = 8, nghost = 2, ngrids = 10
 
+! domain bounds
+!
+  real           , save :: xmin = 0.0, xmax = 1.0  &
+                         , ymin = 0.0, ymax = 1.0  &
+                         , zmin = 0.0, zmax = 1.0
+
   contains
 !
 !======================================================================
@@ -104,6 +110,18 @@ module config
       read(value, "(i9.9)") ncells
     case("nghost")
       read(value, "(i9.9)") nghost
+    case("xmin")
+      read(value,        *) xmin
+    case("xmax")
+      read(value,        *) xmax
+    case("ymin")
+      read(value,        *) ymin
+    case("ymax")
+      read(value,        *) ymax
+    case("zmin")
+      read(value,        *) zmin
+    case("zmax")
+      read(value,        *) zmax
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
