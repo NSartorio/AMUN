@@ -29,6 +29,7 @@ program godunov
 ! modules
 !
   use config, only : read_config
+  use io    , only : write_data
   use mesh  , only : init_mesh, clear_mesh
 !
 !----------------------------------------------------------------------
@@ -59,6 +60,10 @@ program godunov
 
 ! fill the first block with initial conditions, check refinement, refine if necessary by creating more blocks, this should create the initial structure of domain
 !
+
+! write down the initial state
+!
+  call write_data('r', 0, 0)
 
 ! deallocate and reset mesh
 !

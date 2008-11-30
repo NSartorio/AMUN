@@ -46,6 +46,10 @@ module config
                          , ymin = 0.0, ymax = 1.0  &
                          , zmin = 0.0, zmax = 1.0
 
+! data file type
+!
+  character      , save :: ftype
+
   contains
 !
 !======================================================================
@@ -70,6 +74,7 @@ module config
 !
     logical            :: info
     character(len=255) :: line, name, value
+    integer            :: l
 !
 !----------------------------------------------------------------------
 !
@@ -128,6 +133,9 @@ module config
       read(value,        *) zmin
     case("zmax")
       read(value,        *) zmax
+    case("ftype")
+      l = len_trim(value)
+      write(ftype, "(a1)") value(2:l-1)
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
