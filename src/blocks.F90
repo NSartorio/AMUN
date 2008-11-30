@@ -42,7 +42,7 @@ module blocks
   type block
     type(block), pointer :: next, prev
 
-    logical              :: refine
+    integer(kind=1)      :: refine
 
     integer(kind=4)      :: id, level, parent
     integer(kind=4)      :: neigh(ndims,2), child(nchild)

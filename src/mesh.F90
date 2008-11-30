@@ -40,17 +40,18 @@ module mesh
   subroutine init_mesh
 
     use config , only : iblocks, jblocks, kblocks                     &
-                      , xmin, xmax, ymin, ymax, zmin, zmax
+                      , xmin, xmax, ymin, ymax, zmin, zmax, maxlev
     use blocks , only : list_allocated, init_blocks, clear_blocks     &
                       , allocate_blocks, block
     use error  , only : print_info
-    use problem, only : init_problem
+    use problem, only : init_problem, check_ref
 
     implicit none
 
 ! local variables
 !
     type(block), pointer :: pgroup, pblock
+    integer(kind=4)      :: l
 
 !----------------------------------------------------------------------
 !
@@ -79,8 +80,8 @@ module mesh
 
 ! set level
 !
-      pblock%level  = 1
-      pblock%refine = .false.
+      pblock%level    = 1
+      pblock%refine   = 0
 
 ! set initial conditions
 !
@@ -88,8 +89,9 @@ module mesh
 
 ! TODO: for all allocated blocks check criterium
 !
+      pblock%refine = check_ref(pblock)
 
-! assign pointer to the current chunk
+! assign pointer to the next block
 !
       pblock => pblock%next
 
@@ -104,6 +106,34 @@ module mesh
 !       refinement too, to keep the level jump not larger then 2,
 !       refine blocks, set inital conditions at newly created block,
 !       and finally check the criterium
+!
+    do l = 2, maxlev
+      print *, 'level = ', l
+
+! iterate over all blocks
+!
+      pblock => pgroup
+      do while (associated(pblock))
+
+! check if block needs to be refined, if so, refine it
+!
+        if (pblock%refine .eq. 1) then
+
+! TODO: call refine_block
+! TODO: set the level of new blocks and reset refinement to 0
+! TODO: call init_problem
+! TODO: check refinement
+
+        endif
+
+! assign pointer to the next block
+!
+        pblock => pblock%next
+
+      end do
+
+    end do
+
 
 ! at this point the initial structure of blocks should be ready, and
 ! the problem should be set and refined

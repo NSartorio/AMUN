@@ -60,9 +60,6 @@ program godunov
 ! fill the first block with initial conditions, check refinement, refine if necessary by creating more blocks, this should create the initial structure of domain
 !
 
-! write down the initial state
-!
-
 ! deallocate and reset mesh
 !
   call clear_mesh

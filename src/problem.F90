@@ -41,7 +41,6 @@ module problem
 
     use blocks, only : block
     use config, only : ncells, ngrids, nghost
-!     use mesh  , only : x
 
 ! input arguments
 !
@@ -125,7 +124,87 @@ module problem
     deallocate(y)
     deallocate(z)
 
+!----------------------------------------------------------------------
+!
   end subroutine init_problem
+!
+!======================================================================
+!
+! check_ref: function checks refinement criterium and returns +1 if
+!            the criterium fullfiled and block is selected for
+!            refinement, 0 there is no need for refinement, and -1 if
+!            block is selected for refinement
+!
+!======================================================================
+!
+  function check_ref(pblock)
+
+    use blocks, only : block
+    use config, only : ncells, ngrids, nghost
+
+! input arguments
+!
+    type(block), pointer, intent(in) :: pblock
+
+! return variable
+!
+    integer(kind=1) :: check_ref
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: dpmax, dpdx, dpdy, dpdz
+!
+!----------------------------------------------------------------------
+!
+! get dimensions
+!
+    dm(1) = ngrids
+    dm(2) = ngrids
+#ifdef R3D
+    dm(3) = ngrids
+#else /* R3D */
+    dm(3) = 1
+#endif /* R3D */
+
+! check gradient of pressure
+!
+    dpmax = 0.0d0
+
+    do k = 1, dm(3)
+      do j = 2, dm(2)-1
+        do i = 2, dm(1)-1
+          dpdx = abs(pblock%en(i+1,j,k) - 2 * pblock%en(i,j,k) + pblock%en(i-1,j,k)) / &
+                 max(1.0e-8, (abs(pblock%en(i+1,j,k) - pblock%en(i,j,k)) + abs(pblock%en(i,j,k) - pblock%en(i-1,j,k)) + 1.0e-2 * (abs(pblock%en(i+1,j,k)) - 2 * abs(pblock%en(i,j,k)) + abs(pblock%en(i-1,j,k)))))
+          dpdy = abs(pblock%en(i,j+1,k) - 2 * pblock%en(i,j,k) + pblock%en(i,j-1,k)) / &
+                 max(1.e-8, (abs(pblock%en(i,j+1,k) - pblock%en(i,j,k)) + abs(pblock%en(i,j,k) - pblock%en(i,j-1,k)) + 1.0e-2 * (abs(pblock%en(i,j+1,k)) - 2 * abs(pblock%en(i,j,k)) + abs(pblock%en(i,j-1,k)))))
+
+!           dpdx = abs(pblock%en(i+1,j,k) - pblock%en(i-1,j,k))
+!           dpdy = abs(pblock%en(i,j+1,k) - pblock%en(i,j-1,k))
+
+          dpmax = max(dpmax, dpdx, dpdy)
+        end do
+      end do
+    end do
+
+! check condition
+!
+    check_ref = 0
+
+    if (dpmax .gt. 0.7) then
+      check_ref =  1
+    endif
+    if (dpmax .lt. 0.3) then
+      check_ref = -1
+    endif
+
+
+    return
+
+!----------------------------------------------------------------------
+!
+  end function check_ref
 
 !======================================================================
 !

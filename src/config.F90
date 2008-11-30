@@ -36,6 +36,10 @@ module config
 !
   integer(kind=4), save :: ncells = 8, nghost = 2, ngrids = 10
 
+! mesh refinement control
+!
+  integer(kind=4), save :: maxlev = 2
+
 ! domain bounds
 !
   real           , save :: xmin = 0.0, xmax = 1.0  &
@@ -110,6 +114,8 @@ module config
       read(value, "(i9.9)") ncells
     case("nghost")
       read(value, "(i9.9)") nghost
+    case("maxlev")
+      read(value, "(i9.9)") maxlev
     case("xmin")
       read(value,        *) xmin
     case("xmax")
