@@ -78,6 +78,11 @@ module io
 
       if (err .ge. 0) then
 
+! TODO: write all attributes
+! TODO: write coordinates for all refinement levels
+! TODO: iterate over all blocks and write complete structure of each of them
+!
+
 ! terminate access to the file
 !
         call h5fclose_f(fid, err)
