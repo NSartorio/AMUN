@@ -321,7 +321,7 @@ blocks.o        : blocks.F90 config.o
 config.o        : config.F90 error.o
 driver.o        : driver.F90 config.o io.o mesh.o
 error.o         : error.F90
-io.o            : io.F90 error.o
+io.o            : io.F90 blocks.o error.o
 mesh.o          : mesh.F90 blocks.o config.o error.o problem.o
 problem.o       : problem.F90 blocks.o
 
