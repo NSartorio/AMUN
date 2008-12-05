@@ -132,6 +132,10 @@ module blocks
     pblock%config = 'N'
     pblock%leaf   = 'F'
 
+! initialize refinement flag
+!
+    pblock%refine = 0
+
 ! reset neighbors
 !
     pblock%neigh(:,:,:) = -1
