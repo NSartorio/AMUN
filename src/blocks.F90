@@ -45,7 +45,7 @@ module blocks
 
   type block
     type(block), pointer :: next, prev, parent
-    type(bpointer)       :: child(nchild)
+    type(bpointer)       :: child(nchild), pneigh(ndims,2,2)
 
     character            :: config, leaf
     integer(kind=1)      :: refine
@@ -116,6 +116,10 @@ module blocks
 ! output arguments
 !
     type(block), pointer, intent(out) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
 !
 !----------------------------------------------------------------------
 !
@@ -139,6 +143,13 @@ module blocks
 ! reset neighbors
 !
     pblock%neigh(:,:,:) = -1
+    do i = 1, ndims
+      do j = 1, 2
+        do k = 1, 2
+          nullify(pblock%pneigh(i,j,k)%p)
+        end do
+      end do
+    end do
 
 ! allocate space for variables
 !
@@ -327,6 +338,28 @@ module blocks
 
       ptr%neigh(1,1,:) = ptl%id
       ptr%neigh(2,1,:) = pbr%id
+
+! set neighbor pointers
+!
+      pbl%pneigh(1,2,1)%p => pbr
+      pbl%pneigh(1,2,2)%p => pbr
+      pbl%pneigh(2,2,1)%p => ptl
+      pbl%pneigh(2,2,2)%p => ptl
+
+      pbr%pneigh(1,1,1)%p => pbl
+      pbr%pneigh(1,1,2)%p => pbl
+      pbr%pneigh(2,2,1)%p => ptr
+      pbr%pneigh(2,2,2)%p => ptr
+
+      ptl%pneigh(1,2,1)%p => ptr
+      ptl%pneigh(1,2,2)%p => ptr
+      ptl%pneigh(2,1,1)%p => pbl
+      ptl%pneigh(2,1,2)%p => pbl
+
+      ptr%pneigh(1,1,1)%p => ptl
+      ptr%pneigh(1,1,2)%p => ptl
+      ptr%pneigh(2,1,1)%p => pbr
+      ptr%pneigh(2,1,2)%p => pbr
 
 ! set block bounds
 !
@@ -585,6 +618,42 @@ module blocks
       ptl%neigh(2,2,:) = pblock%neigh(2,2,1)
       ptr%neigh(1,2,:) = pblock%neigh(1,2,2)
       ptl%neigh(2,2,:) = pblock%neigh(2,2,2)
+
+! set neighbor pointers
+!
+      pbl%pneigh(1,2,1)%p => pbr
+      pbl%pneigh(1,2,2)%p => pbr
+      pbl%pneigh(2,2,1)%p => ptl
+      pbl%pneigh(2,2,2)%p => ptl
+      pbr%pneigh(1,1,1)%p => pbl
+      pbr%pneigh(1,1,2)%p => pbl
+      pbr%pneigh(2,2,1)%p => ptr
+      pbr%pneigh(2,2,2)%p => ptr
+      ptl%pneigh(1,2,1)%p => ptr
+      ptl%pneigh(1,2,2)%p => ptr
+      ptl%pneigh(2,1,1)%p => pbl
+      ptl%pneigh(2,1,2)%p => pbl
+      ptr%pneigh(1,1,1)%p => ptl
+      ptr%pneigh(1,1,2)%p => ptl
+      ptr%pneigh(2,1,1)%p => pbr
+      ptr%pneigh(2,1,2)%p => pbr
+
+      pbl%pneigh(1,1,1)%p => pblock%pneigh(1,1,1)%p
+      pbl%pneigh(1,1,2)%p => pblock%pneigh(1,1,1)%p
+      pbl%pneigh(2,1,1)%p => pblock%pneigh(2,1,1)%p
+      pbl%pneigh(2,1,2)%p => pblock%pneigh(2,1,1)%p
+      pbr%pneigh(1,2,1)%p => pblock%pneigh(1,2,1)%p
+      pbr%pneigh(1,2,2)%p => pblock%pneigh(1,2,1)%p
+      pbr%pneigh(2,1,1)%p => pblock%pneigh(2,1,2)%p
+      pbr%pneigh(2,1,2)%p => pblock%pneigh(2,1,2)%p
+      ptl%pneigh(1,1,1)%p => pblock%pneigh(1,1,2)%p
+      ptl%pneigh(1,1,2)%p => pblock%pneigh(1,1,2)%p
+      ptl%pneigh(2,2,1)%p => pblock%pneigh(2,2,1)%p
+      ptl%pneigh(2,2,2)%p => pblock%pneigh(2,2,1)%p
+      ptr%pneigh(1,2,1)%p => pblock%pneigh(1,2,2)%p
+      ptr%pneigh(1,2,2)%p => pblock%pneigh(1,2,2)%p
+      ptl%pneigh(2,2,1)%p => pblock%pneigh(2,2,2)%p
+      ptl%pneigh(2,2,2)%p => pblock%pneigh(2,2,2)%p
 
 ! unset leaf flaf for parent block
 !
