@@ -39,14 +39,19 @@ module blocks
 
 ! define block type
 !
+  type bpointer
+    type(block), pointer :: p
+  end type bpointer
+
   type block
     type(block), pointer :: next, prev, parent
+    type(bpointer)       :: child(nchild)
 
     character            :: config, leaf
     integer(kind=1)      :: refine
 
     integer(kind=4)      :: id, level
-    integer(kind=4)      :: neigh(ndims,2,2), child(nchild)
+    integer(kind=4)      :: neigh(ndims,2,2)!, child(nchild)
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -576,10 +581,10 @@ module blocks
 
 ! set children
 !
-      pblock%child(1) = pbl%id
-      pblock%child(2) = pbr%id
-      pblock%child(3) = ptl%id
-      pblock%child(4) = ptr%id
+      pblock%child(1)%p => pbl
+      pblock%child(2)%p => pbr
+      pblock%child(3)%p => ptl
+      pblock%child(4)%p => ptr
 
 ! depending on the configuration of the parent block
 !
