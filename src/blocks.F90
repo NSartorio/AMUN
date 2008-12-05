@@ -527,6 +527,13 @@ module blocks
       ptl%parent => pblock
       ptr%parent => pblock
 
+! set level
+!
+      pbl%level = pblock%level + 1
+      pbr%level = pbl%level
+      ptl%level = pbl%level
+      ptr%level = pbl%level
+
 ! set leaf flags
 !
       pbl%leaf   = 'T'
