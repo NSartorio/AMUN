@@ -434,7 +434,7 @@ module blocks
 !
     do while(associated(pfirst))
 
-      print *, pfirst%id, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
+      write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") pfirst%id, pfirst%level, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
 
 ! assign temporary pointer to the next chunk
 !
