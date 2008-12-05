@@ -51,7 +51,7 @@ module blocks
     integer(kind=1)      :: refine
 
     integer(kind=4)      :: id, level
-    integer(kind=4)      :: neigh(ndims,2,2)!, child(nchild)
+    integer(kind=4)      :: neigh(ndims,2,2)
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
