@@ -40,12 +40,13 @@ module blocks
 ! define block type
 !
   type block
-    type(block), pointer :: next, prev
+    type(block), pointer :: next, prev, parent
 
+    character            :: config, leaf
     integer(kind=1)      :: refine
 
-    integer(kind=4)      :: id, level, parent
-    integer(kind=4)      :: neigh(ndims,2), child(nchild)
+    integer(kind=4)      :: id, level
+    integer(kind=4)      :: neigh(ndims,2,2), child(nchild)
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -121,9 +122,14 @@ module blocks
 !
     pblock%id = increase_id()
 
+! set configuration and leaf flags
+!
+    pblock%config = 'N'
+    pblock%leaf   = 'F'
+
 ! reset neighbors
 !
-    pblock%neigh(:,:) = -1
+    pblock%neigh(:,:,:) = -1
 
 ! allocate space for variables
 !
@@ -285,19 +291,33 @@ module blocks
       call append_block(ptr)
       call append_block(pbr)
 
+! set configurations
+!
+      pbl%config = 'D'
+      ptl%config = 'N'
+      ptr%config = 'N'
+      pbr%config = 'C'
+
+! set leaf flags
+!
+      pbl%leaf   = 'T'
+      ptl%leaf   = 'T'
+      ptr%leaf   = 'T'
+      pbr%leaf   = 'T'
+
 ! set neighbors
 !
-      pbl%neigh(1,2) = pbr%id
-      pbl%neigh(2,2) = ptl%id
+      pbl%neigh(1,2,:) = pbr%id
+      pbl%neigh(2,2,:) = ptl%id
 
-      pbr%neigh(1,1) = pbl%id
-      pbr%neigh(2,2) = ptr%id
+      pbr%neigh(1,1,:) = pbl%id
+      pbr%neigh(2,2,:) = ptr%id
 
-      ptl%neigh(1,2) = ptr%id
-      ptl%neigh(2,1) = pbl%id
+      ptl%neigh(1,2,:) = ptr%id
+      ptl%neigh(2,1,:) = pbl%id
 
-      ptr%neigh(1,1) = ptl%id
-      ptr%neigh(2,1) = pbr%id
+      ptr%neigh(1,1,:) = ptl%id
+      ptr%neigh(2,1,:) = pbr%id
 
 ! set block bounds
 !
@@ -457,6 +477,241 @@ module blocks
 !----------------------------------------------------------------------
 !
   end function increase_id
+!
+!======================================================================
+!
+! refine_block: subroutine refines selected block
+!
+!======================================================================
+!
+  subroutine refine_block(pblock)
+
+    use error, only : print_error
+
+    implicit none
+
+! input parameters
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! pointers
+!
+    type(block), pointer :: pb, pbl, pbr, ptl, ptr
+!
+!----------------------------------------------------------------------
+!
+! check if pointer is associated
+!
+    if (associated(pblock)) then
+
+! assign pointer
+!
+      pb => pblock
+
+! create 4 blocks
+!
+      call allocate_block(pbl)
+      call allocate_block(ptl)
+      call allocate_block(ptr)
+      call allocate_block(pbr)
+
+! set parent
+!
+      pbl%parent => pblock
+      pbr%parent => pblock
+      ptl%parent => pblock
+      ptr%parent => pblock
+
+! set leaf flags
+!
+      pbl%leaf   = 'T'
+      ptl%leaf   = 'T'
+      ptr%leaf   = 'T'
+      pbr%leaf   = 'T'
+
+! set bounds
+!
+      pbl%xmin = pblock%xmin
+      pbl%xmax = 0.5 * (pblock%xmin + pblock%xmax)
+      pbl%ymin = pblock%ymin
+      pbl%ymax = 0.5 * (pblock%ymin + pblock%ymax)
+
+      pbr%xmin = pbl%xmax
+      pbr%xmax = pblock%xmax
+      pbr%ymin = pblock%ymin
+      pbr%ymax = pbl%ymax
+
+      ptl%xmin = pblock%xmin
+      ptl%xmax = pbl%xmax
+      ptl%ymin = pbl%ymax
+      ptl%ymax = pblock%ymax
+
+      ptr%xmin = ptl%xmax
+      ptr%xmax = pblock%xmax
+      ptr%ymin = ptl%ymin
+      ptr%ymax = pblock%ymax
+
+! set neighbors
+!
+      pbl%neigh(1,2,:) = pbr%id
+      pbl%neigh(2,2,:) = ptl%id
+      pbr%neigh(1,1,:) = pbl%id
+      pbr%neigh(2,2,:) = ptr%id
+      ptl%neigh(1,2,:) = ptr%id
+      ptl%neigh(2,1,:) = pbl%id
+      ptr%neigh(1,1,:) = ptl%id
+      ptr%neigh(2,1,:) = pbr%id
+      pbl%neigh(1,1,:) = pblock%neigh(1,1,1)
+      pbl%neigh(2,1,:) = pblock%neigh(2,1,1)
+      pbr%neigh(1,2,:) = pblock%neigh(1,2,1)
+      pbr%neigh(2,1,:) = pblock%neigh(2,1,2)
+      ptl%neigh(1,1,:) = pblock%neigh(1,1,2)
+      ptl%neigh(2,2,:) = pblock%neigh(2,2,1)
+      ptr%neigh(1,2,:) = pblock%neigh(1,2,2)
+      ptl%neigh(2,2,:) = pblock%neigh(2,2,2)
+
+! unset leaf flaf for parent block
+!
+      pblock%leaf = 'F'
+
+! set children
+!
+      pblock%child(1) = pbl%id
+      pblock%child(2) = pbr%id
+      pblock%child(3) = ptl%id
+      pblock%child(4) = ptr%id
+
+! depending on the configuration of the parent block
+!
+      select case(pblock%config)
+      case('n', 'N')
+
+! set blocks configurations
+!
+        pbl%config = 'D'
+        ptl%config = 'N'
+        ptr%config = 'N'
+        pbr%config = 'C'
+
+! connect blocks in a chain
+!
+        pbl%next => ptl
+        ptl%next => ptr
+        ptr%next => pbr
+
+        ptl%prev => pbl
+        ptr%prev => ptl
+        pbr%prev => ptr
+
+! insert this chain in the block list
+!
+        pb => pblock%prev
+        if (associated(pb)) then
+          pb%next => pbl
+          pbl%prev => pb
+        endif
+        pbr%next => pblock
+        pblock%prev => pbr
+
+      case('d', 'D')
+
+! set blocks configurations
+!
+        pbl%config = 'N'
+        pbr%config = 'D'
+        ptr%config = 'D'
+        ptl%config = 'U'
+
+! connect blocks in a chain
+!
+        pbl%next => pbr
+        pbr%next => ptr
+        ptr%next => ptl
+
+        pbr%prev => pbl
+        ptr%prev => pbr
+        ptl%prev => ptr
+
+! insert this chain in the block list
+!
+        pb => pblock%prev
+        if (associated(pb)) then
+          pb%next => pbl
+          pbl%prev => pb
+        endif
+        ptl%next => pblock%next
+        pblock%prev => ptl
+
+      case('c', 'C')
+
+! set blocks configurations
+!
+        ptr%config = 'U'
+        ptl%config = 'C'
+        pbl%config = 'C'
+        pbr%config = 'N'
+
+! connect blocks in a chain
+!
+        ptr%next => ptl
+        ptl%next => pbl
+        pbl%next => pbr
+
+        ptl%prev => ptr
+        pbl%prev => ptl
+        pbr%prev => pbl
+
+! insert this chain in the block list
+!
+        pb => pblock%prev
+        if (associated(pb)) then
+          pb%next => ptr
+          ptr%prev => pb
+        endif
+        pbr%next => pblock
+        pblock%prev => pbr
+
+      case('u', 'U')
+
+! set blocks configurations
+!
+        ptr%config = 'C'
+        pbr%config = 'U'
+        pbl%config = 'U'
+        ptl%config = 'D'
+
+! connect blocks in a chain
+!
+        ptr%next => pbr
+        pbr%next => pbl
+        pbl%next => ptl
+
+        pbr%prev => ptr
+        pbl%prev => pbr
+        ptl%prev => pbl
+
+! insert this chain in the block list
+!
+        pb => pblock%prev
+        if (associated(pb)) then
+          pb%next => ptr
+          ptr%prev => pb
+        endif
+        ptl%next => pblock
+        pblock%prev => ptl
+
+      end select
+
+    else
+
+! terminate program if the pointer passed by argument is not associated
+!
+      call print_error("blocks::refine_blocks","Input pointer is not associated! Terminating!")
+    endif
+
+!----------------------------------------------------------------------
+!
+  end subroutine refine_block
 
 !======================================================================
 !

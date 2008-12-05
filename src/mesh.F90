@@ -42,7 +42,7 @@ module mesh
     use config , only : iblocks, jblocks, kblocks                     &
                       , xmin, xmax, ymin, ymax, zmin, zmax, maxlev
     use blocks , only : list_allocated, init_blocks, clear_blocks     &
-                      , allocate_blocks, block
+                      , allocate_blocks, refine_block, block
     use error  , only : print_info
     use problem, only : init_problem, check_ref
 
@@ -120,6 +120,9 @@ module mesh
         if (pblock%refine .eq. 1) then
 
 ! TODO: call refine_block
+!
+          call refine_block(pblock)
+
 ! TODO: set the level of new blocks and reset refinement to 0
 ! TODO: call init_problem
 ! TODO: check refinement

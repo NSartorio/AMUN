@@ -45,7 +45,7 @@ module io
                      , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
                      , h5awrite_f, h5screate_simple_f, h5sclose_f           &
                      , hid_t, hsize_t, H5F_ACC_TRUNC_F                      &
-                     , H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
+                     , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
 
     implicit none
 
@@ -125,8 +125,21 @@ module io
           endif
           call h5aclose_f(aid, err)
 
+          call h5acreate_f(gid, 'config', H5T_NATIVE_CHARACTER, sid, aid, err)
+          call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pcurr%config, am, err)
+          call h5aclose_f(aid, err)
+
+          call h5acreate_f(gid, 'leaf', H5T_NATIVE_CHARACTER, sid, aid, err)
+          call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pcurr%leaf, am, err)
+          call h5aclose_f(aid, err)
+
+          ptemp => pcurr%parent
           call h5acreate_f(gid, 'parent', H5T_NATIVE_INTEGER, sid, aid, err)
-          call h5awrite_f(aid, H5T_NATIVE_INTEGER, pcurr%parent, am, err)
+          if (associated(ptemp)) then
+            call h5awrite_f(aid, H5T_NATIVE_INTEGER, ptemp%id, am, err)
+          else
+            call h5awrite_f(aid, H5T_NATIVE_INTEGER, -1, am, err)
+          endif
           call h5aclose_f(aid, err)
 
           call h5acreate_f(gid, 'level', H5T_NATIVE_INTEGER, sid, aid, err)
