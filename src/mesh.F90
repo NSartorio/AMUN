@@ -99,12 +99,12 @@ module mesh
 ! refinement according to the criterium fullfilment
 !
 ! TODO: iterate over all levels, set neighbors of refined blocks for
-!       refinement too, to keep the level jump not larger then 2,
+!       refinement too, to keep the level jump not larger then 1,
 !       refine blocks, set inital conditions at newly created block,
 !       and finally check the criterium
 !
     do l = 1, maxlev-1
-      print *, 'level = ', l
+      print *, 'refining level ', l, 'to', l+1
 
 ! iterate over all blocks and check refinement criterion
 !
