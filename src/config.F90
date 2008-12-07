@@ -40,11 +40,19 @@ module config
 !
   integer(kind=4), save :: maxlev = 2
 
+! the maximum number of iterations
+!
+  integer(kind=4), save :: nmax   = 1
+
 ! domain bounds
 !
   real           , save :: xmin = 0.0, xmax = 1.0  &
                          , ymin = 0.0, ymax = 1.0  &
                          , zmin = 0.0, zmax = 1.0
+
+! the maximum time and initial time step
+!
+  real           , save :: tmax = 1.0, dtini = 1.0e-8
 
 ! data file type
 !
@@ -136,6 +144,12 @@ module config
     case("ftype")
       l = len_trim(value)
       write(ftype, "(a1)") value(2:l-1)
+    case("nmax")
+      read(value, "(i9.9)") nmax
+    case("tmax")
+      read(value,        *) tmax
+    case("dtini")
+      read(value,        *) dtini
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select

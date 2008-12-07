@@ -28,7 +28,7 @@ program godunov
 
 ! modules
 !
-  use config, only : read_config
+  use config, only : read_config, nmax, tmax, dtini
   use io    , only : write_data
   use mesh  , only : init_mesh, clear_mesh
   use timer , only : init_timers, start_timer, stop_timer, get_timer &
@@ -39,7 +39,8 @@ program godunov
 ! local variables
 !
   character(len=60) :: fmt
-  real              :: tall
+  integer           :: n
+  real              :: t, dt, tall
 !
 !----------------------------------------------------------------------
 !
@@ -59,6 +60,12 @@ program godunov
 !
   call init_timers
 
+! reset number of iterations and time
+!
+  n  = 0
+  t  = 0.0
+  dt = dtini
+
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
 !
@@ -74,6 +81,28 @@ program godunov
 
 ! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
 ! TODO: get new time step, dump data, print info about the progress
+
+! print information
+!
+  write(*,*)
+  write(*,"(1x,a)"   ) "Evolving system:"
+
+! main loop
+!
+  do while((n .lt. nmax) .and. (t .le. tmax))
+
+! advance the iteration number and time
+!
+    t  = t + dt
+    n  = n + 1
+
+! print progress information
+!
+    if (mod(n, 50) .eq. 1) &
+      write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
+    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, 0.0, 0, 0, 0, 0!, dtn, ed, eh, em, es
+
+  end do
 
 ! deallocate and reset mesh
 !
