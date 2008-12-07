@@ -66,7 +66,7 @@ module blocks
 
 ! stored pointers
 !
-  type(block), pointer, save :: pfirst, plast
+  type(block), pointer, save :: plist, plast
   integer(kind=4)     , save :: nblocks
 
 ! stored last id (should always increase)
@@ -92,7 +92,7 @@ module blocks
 !
 !----------------------------------------------------------------------
 !
-    list_allocated = associated(pfirst)
+    list_allocated = associated(plist)
 
     return
 
@@ -262,7 +262,7 @@ module blocks
 
       plast => pblock
     else
-      pfirst => pblock
+      plist => pblock
       plast => pblock
       nullify(pblock%prev)
       nullify(pblock%next)
@@ -278,7 +278,7 @@ module blocks
 !
 !======================================================================
 !
-  subroutine allocate_blocks(block_config, pgroup, xmn, xmx, ymn, ymx &
+  subroutine allocate_blocks(block_config, xmn, xmx, ymn, ymx &
                            , zmn, zmx)
 
     use error, only : print_error
@@ -289,10 +289,6 @@ module blocks
 !
     character(len=1), intent(in) :: block_config
     real            , intent(in) :: xmn, xmx, ymn, ymx, zmn, zmx
-
-! output arguments
-!
-    type(block), pointer, intent(out) :: pgroup
 
 ! local pointers
 !
@@ -323,7 +319,7 @@ module blocks
 
 ! copy pointer of the first block in chain
 !
-      pgroup => pbl
+      plist => pbl
 
     case('n', 'N')
 
@@ -343,7 +339,7 @@ module blocks
 
 ! copy pointer of the first block in chain
 !
-      pgroup => pbl
+      plist => pbl
 
     case default
       call print_error("blocks::allocate_blocks","Configuration '" // block_config // "' not supported! Terminating!")
@@ -450,13 +446,13 @@ module blocks
 !
 ! first check if block list is empty
 !
-    if (associated(pfirst)) then
+    if (associated(plist)) then
       write(*,*) 'ERROR: Block list already associated!'
     endif
 
 ! nullify all pointers
 !
-    nullify(pfirst)
+    nullify(plist)
 
 ! reset number of blocks
 !
@@ -488,23 +484,23 @@ module blocks
 !
 ! until list is free, reiterate over all chunks
 !
-    do while(associated(pfirst))
+    do while(associated(plist))
 
 ! assign temporary pointer to the next chunk
 !
-      pcurr => pfirst%next
+      pcurr => plist%next
 
 ! deallocate the content of current block
 !
-!       write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") pfirst%id, pfirst%level, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
+!       write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") plist%id, plist%level, plist%xmin, plist%xmax, plist%ymin, plist%ymax
 
 ! deallocate and nullify the current block
 !
-      call deallocate_block(pfirst)
+      call deallocate_block(plist)
 
 ! assign pointer to the current chunk
 !
-      pfirst => pcurr
+      plist => pcurr
 
     end do
 

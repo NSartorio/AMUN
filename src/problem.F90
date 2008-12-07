@@ -107,8 +107,8 @@ module problem
       do j = 1, dm(2)
         do i = 1, dm(1)
 
-!           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          r = sqrt(x(i)**2 + y(j)**2)
+          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+!           r = sqrt(x(i)**2 + y(j)**2)
 
           if (r .le. 0.05) then
             pblock%en(i,j,k) = 25.0
@@ -116,7 +116,7 @@ module problem
             pblock%en(i,j,k) =  0.25
           endif
 
-!           if ((x(i)+y(j)) .le. 0.0) then
+!           if ((x(i)+y(j)) .le. -0.5) then
 !             pblock%en(i,j,k) = 25.0
 !           else
 !             pblock%en(i,j,k) =  0.25

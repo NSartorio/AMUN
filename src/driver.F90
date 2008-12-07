@@ -51,19 +51,17 @@ program godunov
 !
   call read_config
 
-! setup adaptive mesh structure, allocate first block, initialize its mesh and variables
-!
-
-! initialize adaptive mesh and initial problem
+! initialize our adaptive mesh, refine that mesh to the desired level
+! according to the initialized problem
 !
   call init_mesh
-
-! fill the first block with initial conditions, check refinement, refine if necessary by creating more blocks, this should create the initial structure of domain
-!
 
 ! write down the initial state
 !
   call write_data('r', 0, 0)
+
+! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
+! TODO: get new time step, dump data, print info about the progress
 
 ! deallocate and reset mesh
 !

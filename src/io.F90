@@ -39,7 +39,7 @@ module io
 !
   subroutine write_data(ftype, nfile, nproc)
 
-    use blocks, only : block, pfirst
+    use blocks, only : block, plist
     use error , only : print_error
     use hdf5  , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f         &
                      , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
@@ -90,9 +90,11 @@ module io
 ! TODO: write coordinates for all refinement levels
 ! TODO: iterate over all blocks and write complete structure of each of them
 !
-        pcurr => pfirst
+        pcurr => plist
 
         do while(associated(pcurr))
+
+          if (pcurr%leaf .eq. 'T') then
 
           write(gnm,"('blk',i8.8)") pcurr%id
 
@@ -176,8 +178,10 @@ module io
 
           call h5sclose_f(sid, err)
 
-          call h5gclose_f(gid, err)
+! TODO: write field data to file
 
+          call h5gclose_f(gid, err)
+          endif
           pcurr => pcurr.next
         end do
 

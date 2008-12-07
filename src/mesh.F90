@@ -39,10 +39,10 @@ module mesh
 !
   subroutine init_mesh
 
-    use config , only : iblocks, jblocks, kblocks                     &
+    use config , only : iblocks, jblocks, kblocks, ncells             &
                       , xmin, xmax, ymin, ymax, zmin, zmax, maxlev
     use blocks , only : list_allocated, init_blocks, clear_blocks     &
-                      , allocate_blocks, refine_block, block, nchild, ndims, pfirst
+                      , allocate_blocks, refine_block, block, nchild, ndims, plist, last_id
     use error  , only : print_info
     use problem, only : init_problem, check_ref
 
@@ -50,8 +50,9 @@ module mesh
 
 ! local variables
 !
-    type(block), pointer :: pgroup, pblock, pparent, pchild, pneigh
+    type(block), pointer :: pblock, pparent, pchild, pneigh
     integer(kind=4)      :: l, p, i, j, k, n
+    character(len=32)    :: bstr, tstr
 
 !----------------------------------------------------------------------
 !
@@ -63,19 +64,25 @@ module mesh
       call clear_blocks
     endif
 
+! print information
+!
+    write(*,"(1x,a)"   ) "Generating initial mesh:"
+    write(*,"(4x,a,1x,i6)") "refining to max. level =", maxlev
+    write(*,"(4x,a,1x,i6)") "effective resolution   =", ncells*2**maxlev
+
 ! allocate initial structure of blocks according the the defined geometry
 !
 ! TODO: by default we initiate 2x2=4 blocks in N configuration
 ! TODO: in the future allow user to define an arbitrary shape
 !
     call init_blocks
-    call allocate_blocks('N', pgroup, xmin, xmax, ymin, ymax, zmin, zmax)
+    call allocate_blocks('N', xmin, xmax, ymin, ymax, zmin, zmax)
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
 ! is done yet; we fill out these blocks with the initial condition
 !
-    pblock => pfirst
+    pblock => plist
     do while (associated(pblock))
 
 ! set level
@@ -103,12 +110,16 @@ module mesh
 !       refine blocks, set inital conditions at newly created block,
 !       and finally check the criterium
 !
+    write(*,"(4x,a,$)") "refining level         =    "
     do l = 1, maxlev-1
-      print *, 'refining level ', l, 'to', l+1
+
+! print information
+!
+      write(*,"(1x,i2,$)") l
 
 ! iterate over all blocks and check refinement criterion
 !
-      pblock => pfirst
+      pblock => plist
       do while (associated(pblock))
 
 ! check refinements criterion for the current block
@@ -128,7 +139,7 @@ module mesh
 ! iterate over all blocks and select the neighbors of refined blocks for refinement
 !
       do n = l, 2, -1
-        pblock => pfirst
+        pblock => plist
         do while (associated(pblock))
 
 ! check if block is a leaf and selected for refinement
@@ -170,7 +181,7 @@ module mesh
 ! iterate over all blocks and refine selected ones
 !
       do n = 1, l
-        pblock => pfirst
+        pblock => plist
         do while (associated(pblock))
 
 ! check if block needs to be refined and if it is a leaf
@@ -206,6 +217,12 @@ module mesh
 
     end do
 
+! print information
+!
+    write(bstr,"(i)") last_id
+    write(tstr,"(i)") (2**maxlev)**ndims
+    write(*,*)
+    write(*,"(4x,a,1x,a6,' / ',a,' = ',f7.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
 
 ! at this point the initial structure of blocks should be ready, and
 ! the problem should be set and refined
