@@ -31,11 +31,15 @@ program godunov
   use config, only : read_config
   use io    , only : write_data
   use mesh  , only : init_mesh, clear_mesh
+  use timer , only : init_timers, start_timer, stop_timer, get_timer &
+                   , get_timer_total
 !
 !----------------------------------------------------------------------
 !
 ! local variables
 !
+  character(len=60) :: fmt
+  real              :: tall
 !
 !----------------------------------------------------------------------
 !
@@ -51,14 +55,22 @@ program godunov
 !
   call read_config
 
+! initialize timers
+!
+  call init_timers
+
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
 !
+  call start_timer(1)
   call init_mesh
+  call stop_timer(1)
 
 ! write down the initial state
 !
+  call start_timer(2)
   call write_data('r', 0, 0)
+  call stop_timer(2)
 
 ! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
 ! TODO: get new time step, dump data, print info about the progress
@@ -66,6 +78,19 @@ program godunov
 ! deallocate and reset mesh
 !
   call clear_mesh
+
+! get total time
+!
+  tall = get_timer_total()
+
+! print info about execution times
+!
+  write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6, ".4,' secs = ',f7.3,' %')"
+
+  write (*,*)
+  write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
+  write (*,fmt) "Time for data output    : ", get_timer(2), 100.0*get_timer(2)/tall
+  write (*,fmt) "EXECUTION TIME          : ", tall, 100.0
 
 !----------------------------------------------------------------------
 !
