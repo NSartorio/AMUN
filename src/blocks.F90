@@ -48,7 +48,7 @@ module blocks
     type(bpointer)       :: child(nchild), pneigh(ndims,2,2)
 
     character            :: config, leaf
-    integer(kind=1)      :: refine
+    integer(kind=4)      :: refine
 
     integer(kind=4)      :: id, level
     integer(kind=4)      :: neigh(ndims,2,2)
@@ -139,6 +139,12 @@ module blocks
 ! initialize refinement flag
 !
     pblock%refine = 0
+
+! nullify pointers
+!
+    nullify(pblock%next)
+    nullify(pblock%prev)
+    nullify(pblock%parent)
 
 ! reset neighbors
 !
@@ -299,12 +305,29 @@ module blocks
 !----------------------------------------------------------------------
 !
     select case(block_config)
+    case('z', 'Z')
+
+! create root blocks
+!
+      call append_block(pbl)
+      call append_block(pbr)
+      call append_block(ptl)
+      call append_block(ptr)
+
+! set configurations
+!
+      pbl%config = 'Z'
+      pbr%config = 'Z'
+      ptl%config = 'Z'
+      ptr%config = 'Z'
+
+! copy pointer of the first block in chain
+!
+      pgroup => pbl
+
     case('n', 'N')
 
-! TODO: create 4 blocks in N configuration; set pointers, neighbors, etc.
-!       return pointer to the allocated chain
-
-! create bottom left block
+! create root blocks
 !
       call append_block(pbl)
       call append_block(ptl)
@@ -318,85 +341,85 @@ module blocks
       ptr%config = 'N'
       pbr%config = 'C'
 
-! set leaf flags
+! copy pointer of the first block in chain
 !
-      pbl%leaf   = 'T'
-      ptl%leaf   = 'T'
-      ptr%leaf   = 'T'
-      pbr%leaf   = 'T'
-
-! set neighbors
-!
-      pbl%neigh(1,2,:) = pbr%id
-      pbl%neigh(2,2,:) = ptl%id
-
-      pbr%neigh(1,1,:) = pbl%id
-      pbr%neigh(2,2,:) = ptr%id
-
-      ptl%neigh(1,2,:) = ptr%id
-      ptl%neigh(2,1,:) = pbl%id
-
-      ptr%neigh(1,1,:) = ptl%id
-      ptr%neigh(2,1,:) = pbr%id
-
-! set neighbor pointers
-!
-      pbl%pneigh(1,2,1)%p => pbr
-      pbl%pneigh(1,2,2)%p => pbr
-      pbl%pneigh(2,2,1)%p => ptl
-      pbl%pneigh(2,2,2)%p => ptl
-
-      pbr%pneigh(1,1,1)%p => pbl
-      pbr%pneigh(1,1,2)%p => pbl
-      pbr%pneigh(2,2,1)%p => ptr
-      pbr%pneigh(2,2,2)%p => ptr
-
-      ptl%pneigh(1,2,1)%p => ptr
-      ptl%pneigh(1,2,2)%p => ptr
-      ptl%pneigh(2,1,1)%p => pbl
-      ptl%pneigh(2,1,2)%p => pbl
-
-      ptr%pneigh(1,1,1)%p => ptl
-      ptr%pneigh(1,1,2)%p => ptl
-      ptr%pneigh(2,1,1)%p => pbr
-      ptr%pneigh(2,1,2)%p => pbr
-
-! set block bounds
-!
-      xl = xmn
-      xc = xmn + (xmx - xmn) / 2
-      xr = xmx
-      yl = ymn
-      yc = ymn + (ymx - ymn) / 2
-      yr = ymx
-
-      pbl%xmin = xl
-      pbl%xmax = xc
-      pbl%ymin = yl
-      pbl%ymax = yc
-
-      ptl%xmin = xl
-      ptl%xmax = xc
-      ptl%ymin = yc
-      ptl%ymax = yr
-
-      ptr%xmin = xc
-      ptr%xmax = xr
-      ptr%ymin = yc
-      ptr%ymax = yr
-
-      pbr%xmin = xc
-      pbr%xmax = xr
-      pbr%ymin = yl
-      pbr%ymax = yc
+      pgroup => pbl
 
     case default
       call print_error("blocks::allocate_blocks","Configuration '" // block_config // "' not supported! Terminating!")
     end select
 
-! copy pointer of the first block in chain
+! set leaf flags
 !
-    pgroup => pbl
+    pbl%leaf   = 'T'
+    pbr%leaf   = 'T'
+    ptl%leaf   = 'T'
+    ptr%leaf   = 'T'
+
+! set neighbors
+!
+    pbl%neigh(1,2,:) = pbr%id
+    pbl%neigh(2,2,:) = ptl%id
+
+    pbr%neigh(1,1,:) = pbl%id
+    pbr%neigh(2,2,:) = ptr%id
+
+    ptl%neigh(1,2,:) = ptr%id
+    ptl%neigh(2,1,:) = pbl%id
+
+    ptr%neigh(1,1,:) = ptl%id
+    ptr%neigh(2,1,:) = pbr%id
+
+! set neighbor pointers
+!
+    pbl%pneigh(1,2,1)%p => pbr  ! BL right  -> BR
+    pbl%pneigh(1,2,2)%p => pbr
+    pbl%pneigh(2,2,1)%p => ptl  ! BL top    -> TL
+    pbl%pneigh(2,2,2)%p => ptl
+
+    pbr%pneigh(1,1,1)%p => pbl  ! BR left   -> BL
+    pbr%pneigh(1,1,2)%p => pbl
+    pbr%pneigh(2,2,1)%p => ptr  ! BR top    -> TR
+    pbr%pneigh(2,2,2)%p => ptr
+
+    ptl%pneigh(1,2,1)%p => ptr  ! TL right  -> TR
+    ptl%pneigh(1,2,2)%p => ptr
+    ptl%pneigh(2,1,1)%p => pbl  ! TL bottom -> BL
+    ptl%pneigh(2,1,2)%p => pbl
+
+    ptr%pneigh(1,1,1)%p => ptl  ! TR left   -> TL
+    ptr%pneigh(1,1,2)%p => ptl
+    ptr%pneigh(2,1,1)%p => pbr  ! TR bottom -> BR
+    ptr%pneigh(2,1,2)%p => pbr
+
+! set block bounds
+!
+    xl = xmn
+    xc = xmn + (xmx - xmn) / 2
+    xr = xmx
+    yl = ymn
+    yc = ymn + (ymx - ymn) / 2
+    yr = ymx
+
+    pbl%xmin = xl
+    pbl%xmax = xc
+    pbl%ymin = yl
+    pbl%ymax = yc
+
+    ptl%xmin = xl
+    ptl%xmax = xc
+    ptl%ymin = yc
+    ptl%ymax = yr
+
+    ptr%xmin = xc
+    ptr%xmax = xr
+    ptr%ymin = yc
+    ptr%ymax = yr
+
+    pbr%xmin = xc
+    pbr%xmax = xr
+    pbr%ymin = yl
+    pbr%ymax = yc
 
 !----------------------------------------------------------------------
 !
@@ -467,14 +490,13 @@ module blocks
 !
     do while(associated(pfirst))
 
-      write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") pfirst%id, pfirst%level, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
-
 ! assign temporary pointer to the next chunk
 !
       pcurr => pfirst%next
 
 ! deallocate the content of current block
 !
+!       write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") pfirst%id, pfirst%level, pfirst%xmin, pfirst%xmax, pfirst%ymin, pfirst%ymax
 
 ! deallocate and nullify the current block
 !
@@ -538,7 +560,7 @@ module blocks
 
 ! pointers
 !
-    type(block), pointer :: pb, pbl, pbr, ptl, ptr
+    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
 !
 !----------------------------------------------------------------------
 !
@@ -546,16 +568,17 @@ module blocks
 !
     if (associated(pblock)) then
 
-! assign pointer
+! unset the refinement and leaf flags for the parent block
 !
-      pb => pblock
+      pblock%refine = 0
+      pblock%leaf   = 'F'
 
 ! create 4 blocks
 !
       call allocate_block(pbl)
+      call allocate_block(pbr)
       call allocate_block(ptl)
       call allocate_block(ptr)
-      call allocate_block(pbr)
 
 ! set parent
 !
@@ -574,9 +597,9 @@ module blocks
 ! set leaf flags
 !
       pbl%leaf   = 'T'
+      pbr%leaf   = 'T'
       ptl%leaf   = 'T'
       ptr%leaf   = 'T'
-      pbr%leaf   = 'T'
 
 ! set bounds
 !
@@ -600,64 +623,149 @@ module blocks
       ptr%ymin = ptl%ymin
       ptr%ymax = pblock%ymax
 
-! set neighbors
+! set neighbor pointers to the refined blocks
 !
-      pbl%neigh(1,2,:) = pbr%id
-      pbl%neigh(2,2,:) = ptl%id
-      pbr%neigh(1,1,:) = pbl%id
-      pbr%neigh(2,2,:) = ptr%id
-      ptl%neigh(1,2,:) = ptr%id
-      ptl%neigh(2,1,:) = pbl%id
-      ptr%neigh(1,1,:) = ptl%id
-      ptr%neigh(2,1,:) = pbr%id
-      pbl%neigh(1,1,:) = pblock%neigh(1,1,1)
-      pbl%neigh(2,1,:) = pblock%neigh(2,1,1)
-      pbr%neigh(1,2,:) = pblock%neigh(1,2,1)
-      pbr%neigh(2,1,:) = pblock%neigh(2,1,2)
-      ptl%neigh(1,1,:) = pblock%neigh(1,1,2)
-      ptl%neigh(2,2,:) = pblock%neigh(2,2,1)
-      ptr%neigh(1,2,:) = pblock%neigh(1,2,2)
-      ptl%neigh(2,2,:) = pblock%neigh(2,2,2)
-
-! set neighbor pointers
-!
-      pbl%pneigh(1,2,1)%p => pbr
+      pbl%pneigh(1,2,1)%p => pbr  ! BL right  -> BR
       pbl%pneigh(1,2,2)%p => pbr
-      pbl%pneigh(2,2,1)%p => ptl
+      pbl%pneigh(2,2,1)%p => ptl  ! BL top    -> TL
       pbl%pneigh(2,2,2)%p => ptl
-      pbr%pneigh(1,1,1)%p => pbl
+
+      pbr%pneigh(1,1,1)%p => pbl  ! BR left   -> BL
       pbr%pneigh(1,1,2)%p => pbl
-      pbr%pneigh(2,2,1)%p => ptr
+      pbr%pneigh(2,2,1)%p => ptr  ! BR top    -> TR
       pbr%pneigh(2,2,2)%p => ptr
-      ptl%pneigh(1,2,1)%p => ptr
+
+      ptl%pneigh(1,2,1)%p => ptr  ! TL right  -> TR
       ptl%pneigh(1,2,2)%p => ptr
-      ptl%pneigh(2,1,1)%p => pbl
+      ptl%pneigh(2,1,1)%p => pbl  ! TL bottom -> BL
       ptl%pneigh(2,1,2)%p => pbl
-      ptr%pneigh(1,1,1)%p => ptl
+
+      ptr%pneigh(1,1,1)%p => ptl  ! TR left   -> TL
       ptr%pneigh(1,1,2)%p => ptl
-      ptr%pneigh(2,1,1)%p => pbr
+      ptr%pneigh(2,1,1)%p => pbr  ! TR bottom -> BR
       ptr%pneigh(2,1,2)%p => pbr
 
-      pbl%pneigh(1,1,1)%p => pblock%pneigh(1,1,1)%p
-      pbl%pneigh(1,1,2)%p => pblock%pneigh(1,1,1)%p
-      pbl%pneigh(2,1,1)%p => pblock%pneigh(2,1,1)%p
-      pbl%pneigh(2,1,2)%p => pblock%pneigh(2,1,1)%p
-      pbr%pneigh(1,2,1)%p => pblock%pneigh(1,2,1)%p
-      pbr%pneigh(1,2,2)%p => pblock%pneigh(1,2,1)%p
-      pbr%pneigh(2,1,1)%p => pblock%pneigh(2,1,2)%p
-      pbr%pneigh(2,1,2)%p => pblock%pneigh(2,1,2)%p
-      ptl%pneigh(1,1,1)%p => pblock%pneigh(1,1,2)%p
-      ptl%pneigh(1,1,2)%p => pblock%pneigh(1,1,2)%p
-      ptl%pneigh(2,2,1)%p => pblock%pneigh(2,2,1)%p
-      ptl%pneigh(2,2,2)%p => pblock%pneigh(2,2,1)%p
-      ptr%pneigh(1,2,1)%p => pblock%pneigh(1,2,2)%p
-      ptr%pneigh(1,2,2)%p => pblock%pneigh(1,2,2)%p
-      ptl%pneigh(2,2,1)%p => pblock%pneigh(2,2,2)%p
-      ptl%pneigh(2,2,2)%p => pblock%pneigh(2,2,2)%p
-
-! unset leaf flaf for parent block
+! set pointer to the neighbors of the parent block
 !
-      pblock%leaf = 'F'
+      pneigh => pblock%pneigh(1,1,1)%p ! left lower neighbor
+      if (associated(pneigh)) then
+        pbl%pneigh(1,1,1)%p => pneigh
+        pbl%pneigh(1,1,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(1,2,1)%p => pbl
+          pneigh%pneigh(1,2,2)%p => ptl
+        endif
+        if (pneigh%level .eq. pbl%level) then
+          pneigh%pneigh(1,2,1)%p => pbl
+          pneigh%pneigh(1,2,2)%p => pbl
+        endif
+      endif
+
+      pneigh => pblock%pneigh(1,1,2)%p ! left upper neighbor
+      if (associated(pneigh)) then
+        ptl%pneigh(1,1,1)%p => pneigh
+        ptl%pneigh(1,1,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(1,2,1)%p => pbl
+          pneigh%pneigh(1,2,2)%p => ptl
+        endif
+        if (pneigh%level .eq. ptl%level) then
+          pneigh%pneigh(1,2,1)%p => ptl
+          pneigh%pneigh(1,2,2)%p => ptl
+        endif
+      endif
+
+      pneigh => pblock%pneigh(1,2,1)%p ! right lower neighbor
+      if (associated(pneigh)) then
+        pbr%pneigh(1,2,1)%p => pneigh
+        pbr%pneigh(1,2,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(1,1,1)%p => pbr
+          pneigh%pneigh(1,1,2)%p => ptr
+        endif
+        if (pneigh%level .eq. pbr%level) then
+          pneigh%pneigh(1,1,1)%p => pbr
+          pneigh%pneigh(1,1,2)%p => pbr
+        endif
+      endif
+
+      pneigh => pblock%pneigh(1,2,2)%p ! right upper neighbor
+      if (associated(pneigh)) then
+        ptr%pneigh(1,2,1)%p => pneigh
+        ptr%pneigh(1,2,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(1,1,1)%p => pbr
+          pneigh%pneigh(1,1,2)%p => ptr
+        endif
+        if (pneigh%level .eq. ptr%level) then
+          pneigh%pneigh(1,1,1)%p => ptr
+          pneigh%pneigh(1,1,2)%p => ptr
+        endif
+      endif
+
+      pneigh => pblock%pneigh(2,1,1)%p  ! bottom left neighbor
+      if (associated(pneigh)) then
+        pbl%pneigh(2,1,1)%p => pneigh
+        pbl%pneigh(2,1,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(2,2,1)%p => pbl
+          pneigh%pneigh(2,2,2)%p => pbr
+        endif
+        if (pneigh%level .eq. pbl%level) then
+          pneigh%pneigh(2,2,1)%p => pbl
+          pneigh%pneigh(2,2,2)%p => pbl
+        endif
+      endif
+
+      pneigh => pblock%pneigh(2,1,2)%p  ! bottom right neighbor
+      if (associated(pneigh)) then
+        pbr%pneigh(2,1,1)%p => pneigh
+        pbr%pneigh(2,1,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(2,2,1)%p => pbl
+          pneigh%pneigh(2,2,2)%p => pbr
+        endif
+        if (pneigh%level .eq. pbr%level) then
+          pneigh%pneigh(2,2,1)%p => pbr
+          pneigh%pneigh(2,2,2)%p => pbr
+        endif
+      endif
+
+      pneigh => pblock%pneigh(2,2,1)%p  ! top left neighbor
+      if (associated(pneigh)) then
+        ptl%pneigh(2,2,1)%p => pneigh
+        ptl%pneigh(2,2,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(2,1,1)%p => ptl
+          pneigh%pneigh(2,1,2)%p => ptr
+        endif
+        if (pneigh%level .eq. ptl%level) then
+          pneigh%pneigh(2,1,1)%p => ptl
+          pneigh%pneigh(2,1,2)%p => ptl
+        endif
+      endif
+
+      pneigh => pblock%pneigh(2,2,2)%p  ! top right neighbor
+      if (associated(pneigh)) then
+        ptr%pneigh(2,2,1)%p => pneigh
+        ptr%pneigh(2,2,2)%p => pneigh
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%pneigh(2,1,1)%p => ptl
+          pneigh%pneigh(2,1,2)%p => ptr
+        endif
+        if (pneigh%level .eq. ptr%level) then
+          pneigh%pneigh(2,1,1)%p => ptr
+          pneigh%pneigh(2,1,2)%p => ptr
+        endif
+      endif
 
 ! set children
 !
@@ -669,6 +777,40 @@ module blocks
 ! depending on the configuration of the parent block
 !
       select case(pblock%config)
+      case('z', 'Z')
+
+! set blocks configurations
+!
+        pbl%config = 'Z'
+        pbr%config = 'Z'
+        ptl%config = 'Z'
+        ptr%config = 'Z'
+
+! connect blocks in a chain
+!
+        pbl%next => pbr
+        pbr%next => ptl
+        ptl%next => ptr
+
+        pbr%prev => pbl
+        ptl%prev => pbr
+        ptr%prev => ptl
+
+! insert this chain after the parent block
+!
+        pb => pblock%next
+        if (associated(pb)) then
+          pb%prev => ptr
+          ptr%next => pb
+        else
+          plast => ptr
+          nullify(ptr%next)
+        endif
+        pblock%next => pbl
+        pbl%prev => pblock
+
+        pblock => ptr
+
       case('n', 'N')
 
 ! set blocks configurations
@@ -688,15 +830,17 @@ module blocks
         ptr%prev => ptl
         pbr%prev => ptr
 
-! insert this chain in the block list
+! insert this chain after the parent the block
 !
-        pb => pblock%prev
+        pb => pblock%next
         if (associated(pb)) then
-          pb%next => pbl
-          pbl%prev => pb
+          pb%prev => pbr
+          pbr%next => pb
         endif
-        pbr%next => pblock
-        pblock%prev => pbr
+        pbl%prev => pblock
+        pblock%next => pbl
+
+        pblock => pbr
 
       case('d', 'D')
 
@@ -719,13 +863,15 @@ module blocks
 
 ! insert this chain in the block list
 !
-        pb => pblock%prev
+        pb => pblock%next
         if (associated(pb)) then
-          pb%next => pbl
-          pbl%prev => pb
+          pb%prev => ptl
+          ptl%next => pb
         endif
-        ptl%next => pblock%next
-        pblock%prev => ptl
+        pbl%prev => pblock
+        pblock%next => pbl
+
+        pblock => ptl
 
       case('c', 'C')
 
@@ -748,13 +894,15 @@ module blocks
 
 ! insert this chain in the block list
 !
-        pb => pblock%prev
+        pb => pblock%next
         if (associated(pb)) then
-          pb%next => ptr
-          ptr%prev => pb
+          pb%prev => pbr
+          pbr%next => pb
         endif
-        pbr%next => pblock
-        pblock%prev => pbr
+        ptr%prev => pblock
+        pblock%next => ptr
+
+        pblock => pbr
 
       case('u', 'U')
 
@@ -777,13 +925,15 @@ module blocks
 
 ! insert this chain in the block list
 !
-        pb => pblock%prev
+        pb => pblock%next
         if (associated(pb)) then
-          pb%next => ptr
-          ptr%prev => pb
+          pb%prev => ptl
+          ptl%next => pb
         endif
-        ptl%next => pblock
-        pblock%prev => ptl
+        ptr%prev => pblock
+        pblock%next => ptr
+
+        pblock => ptl
 
       end select
 

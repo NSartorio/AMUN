@@ -107,6 +107,10 @@ module io
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pcurr%id, am, err)
           call h5aclose_f(aid, err)
 
+          call h5acreate_f(gid, 'refine', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5awrite_f(aid, H5T_NATIVE_INTEGER, pcurr%refine, am, err)
+          call h5aclose_f(aid, err)
+
           ptemp => pcurr%prev
           call h5acreate_f(gid, 'prev', H5T_NATIVE_INTEGER, sid, aid, err)
           if (associated(ptemp)) then

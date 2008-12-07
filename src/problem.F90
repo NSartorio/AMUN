@@ -106,14 +106,21 @@ module problem
     do k = 1, dm(3)
       do j = 1, dm(2)
         do i = 1, dm(1)
-          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 
-          if (r .le. 0.1) then
+!           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+          r = sqrt(x(i)**2 + y(j)**2)
+
+          if (r .le. 0.05) then
             pblock%en(i,j,k) = 25.0
           else
             pblock%en(i,j,k) =  0.25
           endif
 
+!           if ((x(i)+y(j)) .le. 0.0) then
+!             pblock%en(i,j,k) = 25.0
+!           else
+!             pblock%en(i,j,k) =  0.25
+!           endif
         end do
       end do
     end do
@@ -195,9 +202,9 @@ module problem
     if (dpmax .gt. 0.7) then
       check_ref =  1
     endif
-    if (dpmax .lt. 0.3) then
-      check_ref = -1
-    endif
+!     if (dpmax .lt. 0.3) then
+!       check_ref = -1
+!     endif
 
 
     return
