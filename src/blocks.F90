@@ -30,30 +30,28 @@ module blocks
 
 ! parameters
 !
-#ifdef R3D
-  integer(kind=4), parameter :: ndims  = 3
-#else /* R3D */
-  integer(kind=4), parameter :: ndims  = 2
-#endif /* R3D */
+  integer(kind=4), parameter :: ndims  = NDIMS
   integer(kind=4), parameter :: nchild = 2**ndims
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
+#ifdef HYDRO
+#ifdef ISO
+  integer(kind=4), parameter :: nvars  = 4
+#endif /* ISO */
+#ifdef ADI
+  integer(kind=4), parameter :: nvars  = 5
+  integer(kind=4), parameter :: ien = 5
+#endif /* ADI */
+#endif /* HYDRO */
 #ifdef MHD
 #ifdef ISO
   integer(kind=4), parameter :: nvars  = 7
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
   integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
-#else /* ISO */
+#endif /* ISO */
+#ifdef ADI
   integer(kind=4), parameter :: nvars  = 8
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4, ien = 5
+  integer(kind=4), parameter :: ien = 5
   integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
-#endif /* ISO */
-#else /* MHD */
-#ifdef ISO
-  integer(kind=4), parameter :: nvars  = 4
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
-#else /* ISO */
-  integer(kind=4), parameter :: nvars  = 5
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4, ien = 5
-#endif /* ISO */
+#endif /* ADI */
 #endif /* MHD */
 
 ! define block type
@@ -172,11 +170,11 @@ module blocks
 
 ! allocate space for variables
 !
-#ifdef R3D
+#if NDIMS == 3
     allocate(pblock%u(nvars,ngrids,ngrids,1))
-#else /* R3D */
+#else /* NDIMS == 3 */
     allocate(pblock%u(nvars,ngrids,ngrids,ngrids))
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 !----------------------------------------------------------------------
 !

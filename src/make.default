@@ -1,39 +1,38 @@
 #-------------------------------------------------------------------------------
 #
-# output data format (default HDF5)
-# compression method (NULL = no compression, GZIP = gzip, SZIP = szip)
+# compilation options:
 #
-HDF5          = Y
-HDF5COMPRESS  = GZIP
+#   PREC - arithmetic precision: 4 or 8 for single or double precision
+#
+PREC       = 4
 
-# double or single precision precision?
+# output data format: HDF5
 #
-DBLPREC       = N
+OUTPUT     = HDF5
 
 #-------------------------------------------------------------------------------
 #
-# physics:
-#
-#   MHD    - switch to N if your problem is hydrodynamic
-#   VPOT   - vector potential (Y) or magnetic field (N)
-#            should be use to solve the induction equation
-#   ISO    - Y for isothermal equation of state
-#
-MHD           = N
-VPOT          = N
-ISO           = N
-
 # geometry:
 #
-#   DIMS   - number of dimensions, D2, D2.5, D3
+#   NDIMS - number of dimensions, currently 2 or 3 are supported
 #
-DIMS          = D2
+NDIMS      = 2
 
-# method (higher order integration, scheme type)
+# physics:
+#
+#   EQS   - set of equations to solve: HD or MHD
+#   EOS   - equation of state: ADI of ISO for adiabatic or isothermal, resp.
+#
+EQS        = HYDRO
+EOS        = ADI
+
+# methods
 #
 #  TIME      - time integration: EULER, RK2, RK3
+#  FLUX      - flux approximation: HLL
 #
-TIME          = RK2
+TIME       = RK2
+FLUX       = HLL
 
 #
 #-------------------------------------------------------------------------------

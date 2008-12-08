@@ -9,8 +9,8 @@
 #   MPI = Y or N to enable or disable MPI parallelization
 #   OMP = Y or N to enable or disable OpenMP parallelization
 #
-MPI           = N
-OMP           = N
+MPI      = N
+OMP      = N
 
 # compilation options:
 #
@@ -18,43 +18,55 @@ OMP           = N
 #   STATIC  = Y or N to enable or disable static linking
 #   PROFILE = Y or N to enable or disable profiling
 #
-DEBUG         = N
-STATIC        = N
-PROFILE       = N
+DEBUG    = N
+STATIC   = N
+PROFILE  = N
 
 #-------------------------------------------------------------------------------
 #
 # compiler and linker setup
 #
 ifeq ($(MPI),Y)
-FC            = mpif90
+FC       = mpif90
 else
-FC            = f90
+FC       = f90
 endif
-LD            = $(FC)
+LD       = $(FC)
 
 # compiler and linker flags
 #
 ifeq ($(DEBUG),Y)
-FFLAGS        = -g -O2 -DDEBUG
+FFLAGS   = -g -O2 -DDEBUG
 else
-FFLAGS        = -O2 -i4
+FFLAGS   = -O2 -i4
 endif
 
-LDFLAGS       = $(FFLAGS)
+LDFLAGS  = $(FFLAGS)
 
 # libraries
 #
-LIBS          =
+LIBS     =
 
 #-------------------------------------------------------------------------------
 #
 ifeq ($(STATIC),Y)
-LDFLAGS      += -static
+LDFLAGS += -static
+endif
+
+ifeq ($(PREC),8)
+FFLAGS  += -r${PREC}
 endif
 
 ifeq ($(MPI),Y)
 FFLAGS  += -DMPI
+endif
+
+ifeq ($(OUTPUT),HDF5)
+FFLAGS  += -I${HDF5DIR}/lib
+LIBS    += -L${HDF5DIR}/lib -lhdf5_fortran -lhdf5 -lz
+else
+FFLAGS  += -I${HDF4DIR}/include
+LIBS    += -L${HDF4DIR}/lib -lmfhdf -ldf -ljpeg -lz
 endif
 #
 #-------------------------------------------------------------------------------

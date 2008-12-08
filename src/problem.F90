@@ -62,11 +62,11 @@ module problem
 !
     dm(1) = ngrids
     dm(2) = ngrids
-#ifdef R3D
+#if NDIMS == 3
     dm(3) = ngrids
-#else /* R3D */
+#else /* NDIMS == 3 */
     dm(3) = 1
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 ! allocate coordinates
 !
@@ -78,21 +78,21 @@ module problem
 !
     dx = (pblock%xmax - pblock%xmin) / ncells
     dy = (pblock%ymax - pblock%ymin) / ncells
-#ifdef R3D
+#if NDIMS == 3
     dz = (pblock%zmax - pblock%zmin) / ncells
-#else /* R3D */
+#else /* NDIMS == 3 */
     dz = 1.0
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
     x(:) = ((/(i, i = 1, dm(1))/) - nghost - 0.5) * dx + pblock%xmin
     y(:) = ((/(j, j = 1, dm(2))/) - nghost - 0.5) * dy + pblock%ymin
-#ifdef R3D
+#if NDIMS == 3
     z(:) = ((/(k, k = 1, dm(3))/) - nghost - 0.5) * dz + pblock%zmin
-#else /* R3D */
+#else /* NDIMS == 3 */
     z(1) = 0.0
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 ! set variables
 !
@@ -169,11 +169,11 @@ module problem
 !
     dm(1) = ngrids
     dm(2) = ngrids
-#ifdef R3D
+#if NDIMS == 3
     dm(3) = ngrids
-#else /* R3D */
+#else /* NDIMS == 3 */
     dm(3) = 1
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 ! check gradient of pressure
 !

@@ -34,83 +34,35 @@ endif
 
 #-------------------------------------------------------------------------------
 #
-# pass additional flags to compiler
+# pass additional flags to the compiler
 #
-ifeq ($(DBLPREC),Y)
-FFLAGS  += -r8 -DDBLPREC
-endif
+# number of dimensions
+#
+FFLAGS  += -DNDIMS=${NDIMS}
 
-ifeq ($(HDF5),Y)
-FFLAGS  += -DHDF5
-ifeq ($(HDF5COMPRESS),GZIP)
-FFLAGS  += -DHDF5GZIP
-endif
-FFLAGS  += -I${HDF5DIR}/lib
-LIBS    += -L${HDF5DIR}/lib -lhdf5_fortran -lhdf5 -lz
-else
-FFLAGS  += -I${HDF4DIR}/include
-LIBS    += -L${HDF4DIR}/lib -lmfhdf -ldf -ljpeg -lz
-endif
+# output data format
+#
+FFLAGS  += -D${OUTPUT}
 
-ifeq ($(MHD),Y)
-FFLAGS  += -DMHD
-else
-VPOT       = N
-endif
+# precision
+#
+FFLAGS  += -DPREC=${PREC}
 
-ifeq ($(VPOT),Y)
-FFLAGS  += -DVPOT
-endif
+# time integration method
+#
+FFLAGS  += -D${TIME}
 
-ifeq ($(ISO),Y)
-FFLAGS  += -DISO
-endif
+# set of equations
+#
+FFLAGS  += -D${EQS}
 
-ifeq ($(DIMS),D2)
-FFLAGS  += -DR2D
-endif
+# equation of state
+#
+FFLAGS  += -D${EOS}
 
-ifeq ($(DIMS),D2.5)
-FFLAGS  += -DR2D5
-endif
-
-ifeq ($(DIMS),D3)
-FFLAGS  += -DR3D
-endif
-
-ifeq ($(TIME),RK3)
-FFLAGS  += -DRK3
-else
-ifeq ($(TIME),EULER)
-FFLAGS  += -DEULER
-else
-FFLAGS  += -DRK2
-endif
-endif
-
-ifeq ($(FLUX),HLL)
-FFLAGS  += -DHLL
-endif
-
-ifeq ($(FLUX),HLLC)
-ifeq ($(MHD),Y)
-FFLAGS  += -DHLLD
-else
-ifeq ($(ISO),Y)
-FFLAGS  += -DHLL
-else
-FFLAGS  += -DHLLC
-endif
-endif
-endif
-
-ifeq ($(FLUX),HLLD)
-ifeq ($(MHD),Y)
-FFLAGS  += -DHLLD
-else
-FFLAGS  += -DHLLC
-endif
-endif
+# flux approximation method
+#
+FFLAGS  += -D${FLUX}
 
 #-------------------------------------------------------------------------------
 

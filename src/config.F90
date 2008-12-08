@@ -119,10 +119,10 @@ module config
       read(value, "(i9.9)") iblocks
     case("jblocks")
       read(value, "(i9.9)") jblocks
-#ifdef R3D
+#if NDIMS == 3
     case("kblocks")
       read(value, "(i9.9)") kblocks
-#endif /* R3D */
+#endif /* NDIMS == 3 */
     case("ncells")
       read(value, "(i9.9)") ncells
     case("nghost")
