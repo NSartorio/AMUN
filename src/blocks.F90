@@ -119,7 +119,7 @@ module blocks
 !
   subroutine allocate_block(pblock)
 
-    use config, only : ngrids
+    use config, only : igrids, jgrids, kgrids
 
     implicit none
 
@@ -169,11 +169,7 @@ module blocks
 
 ! allocate space for variables
 !
-#if NDIMS == 3
-    allocate(pblock%u(nvars,ngrids,ngrids,1))
-#else /* NDIMS == 3 */
-    allocate(pblock%u(nvars,ngrids,ngrids,ngrids))
-#endif /* NDIMS == 3 */
+    allocate(pblock%u(nvars,igrids,jgrids,kgrids))
 
 !----------------------------------------------------------------------
 !

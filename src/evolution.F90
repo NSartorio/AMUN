@@ -29,7 +29,7 @@ module evolution
   implicit none
 
   integer, save :: n
-  real   , save :: t, dt
+  real   , save :: t, dt, dtn
 
   contains
 !
@@ -59,8 +59,10 @@ module evolution
 
 ! check if this block is a leaf
 !
+#ifdef RK2
         if (pblock%leaf .eq. 'T') &
           call evolve_rk2(pblock)
+#endif /* RK2 */
 
 ! assign pointer to the next block
 !
@@ -69,11 +71,13 @@ module evolution
       end do
 
 ! TODO: boundary conditions
+! TODO: new time step
 !
 
 !----------------------------------------------------------------------
 !
   end subroutine evolve
+#ifdef RK2
 !
 !======================================================================
 !
@@ -83,23 +87,62 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks, only : block
+    use blocks, only : block, nvars
+    use config, only : igrids, jgrids, kgrids
+!     use scheme, only : update
 
     implicit none
 
 ! input arguments
 !
-    type(block), pointer, intent(in) :: pblock
+    type(block), pointer, intent(inout) :: pblock
 
 ! local variables
 !
+    integer :: q, i, j, k
+
+! local arrays
+!
+    real, dimension(nvars,igrids,jgrids,kgrids) :: u1, du
 !
 !----------------------------------------------------------------------
 !
+! 1st step of integration
+!
+!     call update(pblock%u, du)
+
+! update solution
+!
+    do k = 1, kgrids
+      do j = 1, jgrids
+        do i = 1, igrids
+          do q = 1, nvars
+            u1(q,i,j,k) = pblock%u(q,i,j,k) + dt*du(q,i,j,k)
+          end do
+        end do
+      end do
+    end do
+
+! 2nd step of integration
+!
+!     call update(u1, du)
+
+! update solution
+!
+    do k = 1, kgrids
+      do j = 1, jgrids
+        do i = 1, igrids
+          do q = 1, nvars
+            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) + dt*du(q,i,j,k))
+          end do
+        end do
+      end do
+    end do
 
 !----------------------------------------------------------------------
 !
   end subroutine evolve_rk2
+#endif /* RK2 */
 
 !======================================================================
 !

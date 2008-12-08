@@ -34,7 +34,8 @@ module config
 
 ! block dimensions, number of ghost zones
 !
-  integer(kind=4), save :: ncells = 8, nghost = 2, ngrids = 10
+  integer(kind=4), save :: ncells =  8, nghost =  2, ngrids = 10    &
+                         , igrids = 10, jgrids = 10, kgrids = 10
 
 ! mesh refinement control
 !
@@ -166,6 +167,14 @@ module config
 ! compute additional parameters
 !
     ngrids = ncells + 2 * nghost
+    igrids = ngrids
+    jgrids = ngrids
+#if NDIMS == 2
+    kgrids = 1
+#endif /* */
+#if NDIMS == 3
+    kgrids = ngrids
+#endif /* */
 
 ! return before error messages
 !

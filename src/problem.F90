@@ -40,7 +40,7 @@ module problem
   subroutine init_problem(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien
-    use config, only : ncells, ngrids, nghost
+    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost
 
 ! input arguments
 !
@@ -60,13 +60,9 @@ module problem
 !
 ! get dimensions
 !
-    dm(1) = ngrids
-    dm(2) = ngrids
-#if NDIMS == 3
-    dm(3) = ngrids
-#else /* NDIMS == 3 */
-    dm(3) = 1
-#endif /* NDIMS == 3 */
+    dm(1) = igrids
+    dm(2) = jgrids
+    dm(3) = kgrids
 
 ! allocate coordinates
 !
@@ -108,7 +104,6 @@ module problem
         do i = 1, dm(1)
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-!           r = sqrt(x(i)**2 + y(j)**2)
 
           if (r .le. 0.05) then
             pblock%u(ien,i,j,k) = 25.0
@@ -116,11 +111,6 @@ module problem
             pblock%u(ien,i,j,k) =  0.25
           endif
 
-!           if ((x(i)+y(j)) .le. -0.5) then
-!             pblock%en(i,j,k) = 25.0
-!           else
-!             pblock%en(i,j,k) =  0.25
-!           endif
         end do
       end do
     end do
@@ -147,7 +137,7 @@ module problem
   function check_ref(pblock)
 
     use blocks, only : block, ien
-    use config, only : ncells, ngrids, nghost
+    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost
 
 ! input arguments
 !
@@ -167,13 +157,9 @@ module problem
 !
 ! get dimensions
 !
-    dm(1) = ngrids
-    dm(2) = ngrids
-#if NDIMS == 3
-    dm(3) = ngrids
-#else /* NDIMS == 3 */
-    dm(3) = 1
-#endif /* NDIMS == 3 */
+    dm(1) = igrids
+    dm(2) = jgrids
+    dm(3) = kgrids
 
 ! check gradient of pressure
 !
@@ -199,9 +185,9 @@ module problem
     if (dpmax .gt. 0.7) then
       check_ref =  1
     endif
-!     if (dpmax .lt. 0.3) then
-!       check_ref = -1
-!     endif
+    if (dpmax .lt. 0.3) then
+      check_ref = -1
+    endif
 
 
     return
