@@ -28,19 +28,19 @@ program godunov
 
 ! modules
 !
-  use config, only : read_config, nmax, tmax, dtini
-  use io    , only : write_data
-  use mesh  , only : init_mesh, clear_mesh
-  use timer , only : init_timers, start_timer, stop_timer, get_timer &
-                   , get_timer_total
+  use config   , only : read_config, nmax, tmax, dtini
+  use evolution, only : evolve, n, t, dt
+  use io       , only : write_data
+  use mesh     , only : init_mesh, clear_mesh
+  use timer    , only : init_timers, start_timer, stop_timer          &
+                      , get_timer, get_timer_total
 !
 !----------------------------------------------------------------------
 !
 ! local variables
 !
   character(len=60) :: fmt
-  integer           :: n
-  real              :: t, dt, tall
+  real              :: tall
 !
 !----------------------------------------------------------------------
 !
@@ -75,9 +75,9 @@ program godunov
 
 ! write down the initial state
 !
-  call start_timer(2)
+  call start_timer(3)
   call write_data('r', 0, 0)
-  call stop_timer(2)
+  call stop_timer(3)
 
 ! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
 ! TODO: get new time step, dump data, print info about the progress
@@ -96,6 +96,12 @@ program godunov
     t  = t + dt
     n  = n + 1
 
+! performe one step evolution
+!
+    call start_timer(2)
+    call evolve
+    call stop_timer(2)
+
 ! print progress information
 !
     if (mod(n, 50) .eq. 1) &
@@ -106,7 +112,9 @@ program godunov
 
 ! deallocate and reset mesh
 !
+  call start_timer(1)
   call clear_mesh
+  call stop_timer(1)
 
 ! get total time
 !
@@ -118,7 +126,8 @@ program godunov
 
   write (*,*)
   write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
-  write (*,fmt) "Time for data output    : ", get_timer(2), 100.0*get_timer(2)/tall
+  write (*,fmt) "Time for evolution      : ", get_timer(2), 100.0*get_timer(2)/tall
+  write (*,fmt) "Time for data output    : ", get_timer(3), 100.0*get_timer(3)/tall
   write (*,fmt) "EXECUTION TIME          : ", tall, 100.0
 
 !----------------------------------------------------------------------
