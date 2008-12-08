@@ -39,7 +39,7 @@ module problem
 !
   subroutine init_problem(pblock)
 
-    use blocks, only : block
+    use blocks, only : block, idn, imx, imy, imz, ien
     use config, only : ncells, ngrids, nghost
 
 ! input arguments
@@ -96,10 +96,10 @@ module problem
 
 ! set variables
 !
-    pblock%dn(:,:,:) = 1.0d0
-    pblock%mx(:,:,:) = 0.0d0
-    pblock%my(:,:,:) = 0.0d0
-    pblock%mz(:,:,:) = 0.0d0
+    pblock%u(idn,:,:,:) = 1.0d0
+    pblock%u(imx,:,:,:) = 0.0d0
+    pblock%u(imy,:,:,:) = 0.0d0
+    pblock%u(imz,:,:,:) = 0.0d0
 
 ! set initial pressure
 !
@@ -111,9 +111,9 @@ module problem
 !           r = sqrt(x(i)**2 + y(j)**2)
 
           if (r .le. 0.05) then
-            pblock%en(i,j,k) = 25.0
+            pblock%u(ien,i,j,k) = 25.0
           else
-            pblock%en(i,j,k) =  0.25
+            pblock%u(ien,i,j,k) =  0.25
           endif
 
 !           if ((x(i)+y(j)) .le. -0.5) then
@@ -146,7 +146,7 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block
+    use blocks, only : block, ien
     use config, only : ncells, ngrids, nghost
 
 ! input arguments
@@ -182,13 +182,10 @@ module problem
     do k = 1, dm(3)
       do j = 2, dm(2)-1
         do i = 2, dm(1)-1
-          dpdx = abs(pblock%en(i+1,j,k) - 2 * pblock%en(i,j,k) + pblock%en(i-1,j,k)) / &
-                 max(1.0e-8, (abs(pblock%en(i+1,j,k) - pblock%en(i,j,k)) + abs(pblock%en(i,j,k) - pblock%en(i-1,j,k)) + 1.0e-2 * (abs(pblock%en(i+1,j,k)) - 2 * abs(pblock%en(i,j,k)) + abs(pblock%en(i-1,j,k)))))
-          dpdy = abs(pblock%en(i,j+1,k) - 2 * pblock%en(i,j,k) + pblock%en(i,j-1,k)) / &
-                 max(1.e-8, (abs(pblock%en(i,j+1,k) - pblock%en(i,j,k)) + abs(pblock%en(i,j,k) - pblock%en(i,j-1,k)) + 1.0e-2 * (abs(pblock%en(i,j+1,k)) - 2 * abs(pblock%en(i,j,k)) + abs(pblock%en(i,j-1,k)))))
-
-!           dpdx = abs(pblock%en(i+1,j,k) - pblock%en(i-1,j,k))
-!           dpdy = abs(pblock%en(i,j+1,k) - pblock%en(i,j-1,k))
+          dpdx = abs(pblock%u(ien,i+1,j,k) - 2 * pblock%u(ien,i,j,k) + pblock%u(ien,i-1,j,k)) / &
+                 max(1.0e-8, (abs(pblock%u(ien,i+1,j,k) - pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j,k) - pblock%u(ien,i-1,j,k)) + 1.0e-2 * (abs(pblock%u(ien,i+1,j,k)) - 2 * abs(pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i-1,j,k)))))
+          dpdy = abs(pblock%u(ien,i,j+1,k) - 2 * pblock%u(ien,i,j,k) + pblock%u(ien,i,j-1,k)) / &
+                 max(1.e-8, (abs(pblock%u(ien,i,j+1,k) - pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j,k) - pblock%u(ien,i,j-1,k)) + 1.0e-2 * (abs(pblock%u(ien,i,j+1,k)) - 2 * abs(pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j-1,k)))))
 
           dpmax = max(dpmax, dpdx, dpdy)
         end do

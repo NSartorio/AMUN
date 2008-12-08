@@ -36,6 +36,8 @@ module blocks
   integer(kind=4), parameter :: ndims  = 2
 #endif /* R3D */
   integer(kind=4), parameter :: nchild = 2**ndims
+  integer(kind=4), parameter :: nvars  = 5
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4, ien = 5
 
 ! define block type
 !
@@ -55,13 +57,7 @@ module blocks
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
-    real, dimension(:,:,:), allocatable :: dn, mx, my, mz
-#ifndef ISO
-    real, dimension(:,:,:), allocatable :: en
-#endif /* !ISO */
-#ifdef MHD
-    real, dimension(:,:,:), allocatable :: bx, by, bz
-#endif /* MHD */
+    real, dimension(:,:,:,:), allocatable :: u
   end type block
 
 ! stored pointers
@@ -160,31 +156,9 @@ module blocks
 ! allocate space for variables
 !
 #ifdef R3D
-    allocate(pblock%dn(ngrids,ngrids,1))
-    allocate(pblock%mx(ngrids,ngrids,1))
-    allocate(pblock%my(ngrids,ngrids,1))
-    allocate(pblock%mz(ngrids,ngrids,1))
-#ifndef ISO
-    allocate(pblock%en(ngrids,ngrids,1))
-#endif /* ISO */
-#ifdef MHD
-    allocate(pblock%bx(ngrids,ngrids,1))
-    allocate(pblock%by(ngrids,ngrids,1))
-    allocate(pblock%bz(ngrids,ngrids,1))
-#endif /* MHD */
+    allocate(pblock%u(nvars,ngrids,ngrids,1))
 #else /* R3D */
-    allocate(pblock%dn(ngrids,ngrids,ngrids))
-    allocate(pblock%mx(ngrids,ngrids,ngrids))
-    allocate(pblock%my(ngrids,ngrids,ngrids))
-    allocate(pblock%mz(ngrids,ngrids,ngrids))
-#ifndef ISO
-    allocate(pblock%en(ngrids,ngrids,ngrids))
-#endif /* !ISO */
-#ifdef MHD
-    allocate(pblock%bx(ngrids,ngrids,ngrids))
-    allocate(pblock%by(ngrids,ngrids,ngrids))
-    allocate(pblock%bz(ngrids,ngrids,ngrids))
-#endif /* MHD */
+    allocate(pblock%u(nvars,ngrids,ngrids,ngrids))
 #endif /* R3D */
 
 !----------------------------------------------------------------------
@@ -210,18 +184,7 @@ module blocks
 !
 ! deallocate variables
 !
-    deallocate(pblock%dn)
-    deallocate(pblock%mx)
-    deallocate(pblock%my)
-    deallocate(pblock%mz)
-#ifndef ISO
-    deallocate(pblock%en)
-#endif /* !ISO */
-#ifdef MHD
-    deallocate(pblock%bx)
-    deallocate(pblock%by)
-    deallocate(pblock%bz)
-#endif /* MHD */
+    deallocate(pblock%u)
 
 ! free and nullify the block
 !

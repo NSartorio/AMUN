@@ -68,6 +68,9 @@ module evolution
 
       end do
 
+! TODO: boundary conditions
+!
+
 !----------------------------------------------------------------------
 !
   end subroutine evolve
