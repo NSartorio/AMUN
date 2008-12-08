@@ -1,33 +1,10 @@
 #-------------------------------------------------------------------------------
 #
-# set PGI, INTEL or GNU
-#
-CVENDOR       = INTEL
-STATIC        = N
-DEBUG         = N
-PROFILE       = N
-EXCEPTIONS    = N
-SIGNALS       = N
-
-# parallelization: compile with MPI and/or OMP: Y or N
-#
-MPI           = N
-OMP           = N
-
-# output data format (default HDF4, HDF5 = N)
+# output data format (default HDF5)
 # compression method (NULL = no compression, GZIP = gzip, SZIP = szip)
 #
 HDF5          = Y
 HDF5COMPRESS  = GZIP
-
-# in 3D dumping all data may consume plenty of space, this
-# option turns on dumping of selected slices
-#
-SLICES        = N
-
-# user output statistics
-#
-USERINT       = N
 
 # double or single precision precision?
 #
@@ -37,79 +14,26 @@ DBLPREC       = N
 #
 # physics:
 #
-#   KMHD   - kinetic MHD
 #   MHD    - switch to N if your problem is hydrodynamic
 #   VPOT   - vector potential (Y) or magnetic field (N)
 #            should be use to solve the induction equation
 #   ISO    - Y for isothermal equation of state
 #
-KMHD          = N
 MHD           = N
 VPOT          = N
 ISO           = N
-KMHDEN        = N
 
 # geometry:
 #
 #   DIMS   - number of dimensions, D2, D2.5, D3
-#   SHAPE  - turns on the shape definition inside the box
 #
 DIMS          = D2
-SHAPE         = N
-MOVINGFRAME   = N
-ROTATEFRAME   = N
-
-# forcing:
-#
-#  FORCING - Y turns on the velocity driving
-#  SMALL   - Y is you need the small-scale forcing, otherwise large-scale forcing is used
-#  CHO     - Y if the Cho's forcing will be used, otherwise Alvelius is used
-#  STATS   - collect the amount of injected energy and velocity-force correlation
-#
-FORCING       = N
-LARGESCALE    = Y
-SUBVOL        = N
-CHO           = N
-FSTATS        = Y
-FCORR         = Y
-FORCERK       = N
-
-# source terms:
-#
-SOURCES       = N
-SOURCERK      = N
-VISCOSITY     = N
-RESISTIVITY   = N
-RESIST_ANOM   = N
-GRAVITY       = N
-SELFGRAVITY   = N
-
-# test particles
-#
-PARTICLES     = N
-NEAREST       = Y
-PACCEL        = N
 
 # method (higher order integration, scheme type)
 #
 #  TIME      - time integration: EULER, RK2, RK3
-#  FLUX      - set to HLL, HLLC or HLLD solver
-#  CONSRECON - reconstruction of conserved variables
-#  ORD3RD, ORD5TH - higher orders of reconstruction (+ 3rd order RK scheme for time integration)
-#  LIMITER   - 'LF' for Lax-Friedrich or 'MM' for minmod
-#  POSPRE    - reduces the order if positive variable has negative reconstruction
-#  LIMITMAX  - reduces the order of reconstruction for extrema
-#  CONSREC   - reconstruction from average values, otherwise from point values
 #
 TIME          = RK2
-FLUX          = HLL
-CONSRECON     = N
-ORD3RD        = N
-ORD5TH        = N
-LIMITER       = LF
-POSPRE        = N
-LIMITMAX      = N
-CONSREC       = N
 
 #
 #-------------------------------------------------------------------------------

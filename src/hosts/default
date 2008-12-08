@@ -4,28 +4,57 @@
 #
 #-------------------------------------------------------------------------------
 #
-# parallelization: compile with MPI and/or OMP: Y or N
+# parallelization:
+#
+#   MPI = Y or N to enable or disable MPI parallelization
+#   OMP = Y or N to enable or disable OpenMP parallelization
 #
 MPI           = N
 OMP           = N
 
+# compilation options:
+#
+#   DEBUG   = Y or N to enable or disable debugging
+#   STATIC  = Y or N to enable or disable static linking
+#   PROFILE = Y or N to enable or disable profiling
+#
+DEBUG         = N
+STATIC        = N
+PROFILE       = N
+
+#-------------------------------------------------------------------------------
+#
 # compiler and linker setup
 #
 ifeq ($(MPI),Y)
 FC            = mpif90
 else
-FC            = ifort
+FC            = f90
 endif
 LD            = $(FC)
 
 # compiler and linker flags
 #
+ifeq ($(DEBUG),Y)
+FFLAGS        = -g -O2 -DDEBUG
+else
 FFLAGS        = -O2 -i4
+endif
+
 LDFLAGS       = $(FFLAGS)
 
 # libraries
 #
 LIBS          =
 
+#-------------------------------------------------------------------------------
+#
+ifeq ($(STATIC),Y)
+LDFLAGS      += -static
+endif
+
+ifeq ($(MPI),Y)
+FFLAGS  += -DMPI
+endif
 #
 #-------------------------------------------------------------------------------

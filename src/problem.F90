@@ -1,6 +1,6 @@
 !!*****************************************************************************
 !!
-!! module: problem - handling initial problem definition
+!! module: problem - handling the initial problem definition
 !!
 !! Copyright (C) 2008 Grzegorz Kowal <kowal@astro.wisc.edu>
 !!

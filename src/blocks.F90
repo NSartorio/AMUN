@@ -36,8 +36,25 @@ module blocks
   integer(kind=4), parameter :: ndims  = 2
 #endif /* R3D */
   integer(kind=4), parameter :: nchild = 2**ndims
+#ifdef MHD
+#ifdef ISO
+  integer(kind=4), parameter :: nvars  = 7
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
+  integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
+#else /* ISO */
+  integer(kind=4), parameter :: nvars  = 8
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4, ien = 5
+  integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
+#endif /* ISO */
+#else /* MHD */
+#ifdef ISO
+  integer(kind=4), parameter :: nvars  = 4
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
+#else /* ISO */
   integer(kind=4), parameter :: nvars  = 5
   integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4, ien = 5
+#endif /* ISO */
+#endif /* MHD */
 
 ! define block type
 !
