@@ -38,19 +38,18 @@ module blocks
   integer(kind=4), parameter :: nvars  = 4
 #endif /* ISO */
 #ifdef ADI
-  integer(kind=4), parameter :: nvars  = 5
   integer(kind=4), parameter :: ien = 5
+  integer(kind=4), parameter :: nvars  = 5
 #endif /* ADI */
 #endif /* HYDRO */
 #ifdef MHD
 #ifdef ISO
-  integer(kind=4), parameter :: nvars  = 7
   integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
+  integer(kind=4), parameter :: nvars  = 7
 #endif /* ISO */
 #ifdef ADI
+  integer(kind=4), parameter :: ien = 5, ibx = 6, iby = 7, ibz = 8
   integer(kind=4), parameter :: nvars  = 8
-  integer(kind=4), parameter :: ien = 5
-  integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
 #endif /* ADI */
 #endif /* MHD */
 
