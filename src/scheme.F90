@@ -219,13 +219,13 @@ module scheme
 
 ! calculate primitive variables
 !
-!     call cons2prim(n,ul,ql)
-!     call cons2prim(n,ur,qr)
+    call cons2prim(m,n,ul,ql)
+    call cons2prim(m,n,ur,qr)
 #else /* CONREC */
 
 ! calculate primitive variables
 !
-!     call cons2prim(n,uc,qc)
+    call cons2prim(m,n,uc,qc)
 
 ! reconstruct left and right states of primitive variables
 !
@@ -235,8 +235,8 @@ module scheme
 
 ! calculate conservative variables at states
 !
-!     call prim2cons(n,ql,ul)
-!     call prim2cons(n,qr,ur)
+    call prim2cons(m,n,ql,ul)
+    call prim2cons(m,n,qr,ur)
 #endif /* CONREC */
 
 ! calculate fluxes and speeds
@@ -335,6 +335,88 @@ module scheme
 !----------------------------------------------------------------------
 !
   end subroutine fluxspeed
+!
+!===============================================================================
+!
+! cons2prim: subroutine to calculate primitive variables from conservative ones
+!
+!===============================================================================
+!
+  subroutine cons2prim(m, n, u, q)
+
+    use config   , only : gammam1
+
+    implicit none
+
+! input/output arguments
+!
+    integer             , intent(in)  :: m, n
+    real, dimension(m,n), intent(in)  :: u
+    real, dimension(m,n), intent(out) :: q
+
+! local variables
+!
+    integer :: i
+    real    :: dni
+!
+!----------------------------------------------------------------------
+!
+    do i = 1, n
+      dni    = 1.0 / u(1,i)
+
+      q(1,i) =     u(1,i)
+      q(2,i) = dni*u(2,i)
+      q(3,i) = dni*u(3,i)
+      q(4,i) = dni*u(4,i)
+#ifdef ADI
+      q(5,i) = u(5,i) &
+             - 0.5*(u(2,i)*q(2,i) + u(3,i)*q(3,i) + u(4,i)*q(4,i))
+      q(5,i) = gammam1*q(5,i)
+#endif /* ADI */
+    enddo
+
+!----------------------------------------------------------------------
+!
+  end subroutine cons2prim
+!
+!===============================================================================
+!
+! prim2cons: subroutine to calculate conservative variables from primitive ones
+!
+!===============================================================================
+!
+  subroutine prim2cons(m, n, q, u)
+
+    use config, only : gammam1i
+
+    implicit none
+
+! input/output arguments
+!
+    integer             , intent(in)  :: m, n
+    real, dimension(m,n), intent(in)  :: q
+    real, dimension(m,n), intent(out) :: u
+
+! local variables
+!
+    integer :: i
+!
+!----------------------------------------------------------------------
+!
+    do i = 1, n
+      u(1,i) = q(1,i)
+      u(2,i) = q(1,i)*q(2,i)
+      u(3,i) = q(1,i)*q(3,i)
+      u(4,i) = q(1,i)*q(4,i)
+#ifdef ADI
+      u(5,i) = gammam1i*q(5,i) &
+             + 0.5*(u(2,i)*q(2,i) + u(3,i)*q(3,i) + u(4,i)*q(4,i))
+#endif /* ADI */
+    enddo
+
+!----------------------------------------------------------------------
+!
+  end subroutine prim2cons
 
 !======================================================================
 !

@@ -61,7 +61,8 @@ module config
 
 ! equation of state parameters (gamma, sound speed)
 !
-  real           , save :: gamma = 1.001, csnd = 1.0, csnd2 = 1.0
+  real           , save :: gamma = 1.001, csnd = 1.0, csnd2 = 1.0  &
+                         , gammam1 = 0.001, gammam1i = 100.0
 
   contains
 !
@@ -184,7 +185,9 @@ module config
     kgrids = ngrids
 #endif /* */
 
-    csnd2 = csnd * csnd
+    gammam1  = gamma - 1.0
+    gammam1i = 1.0 / gammam1
+    csnd2    = csnd * csnd
 
 ! return before error messages
 !
