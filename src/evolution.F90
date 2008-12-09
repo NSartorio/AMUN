@@ -89,7 +89,7 @@ module evolution
 
     use blocks, only : block, nvars
     use config, only : igrids, jgrids, kgrids
-!     use scheme, only : update
+    use scheme, only : update
 
     implicit none
 
@@ -109,7 +109,7 @@ module evolution
 !
 ! 1st step of integration
 !
-!     call update(pblock%u, du)
+    call update(pblock%u, du)
 
 ! update solution
 !
@@ -125,7 +125,7 @@ module evolution
 
 ! 2nd step of integration
 !
-!     call update(u1, du)
+    call update(u1, du)
 
 ! update solution
 !
