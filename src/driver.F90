@@ -28,8 +28,8 @@ program godunov
 
 ! modules
 !
-  use config   , only : read_config, nmax, tmax, dtini, dtout, ftype
-  use evolution, only : evolve, n, t, dt
+  use config   , only : read_config, nmax, tmax, dtini, dtout, ftype, cfl
+  use evolution, only : evolve, n, t, dt, dtn
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use timer    , only : init_timers, start_timer, stop_timer          &
@@ -63,10 +63,11 @@ program godunov
 
 ! reset number of iterations and time, etc.
 !
-  n  = 0
-  t  = 0.0
-  dt = dtini
-  no = 0
+  n   = 0
+  t   = 0.0
+  dt  = cfl*dtini
+  dtn = dtini
+  no  = 0
 
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
@@ -93,6 +94,10 @@ program godunov
 !
   do while((n .lt. nmax) .and. (t .le. tmax))
 
+! compute new time step
+!
+    dt = min(cfl*dtn, 2.*dt)
+
 ! advance the iteration number and time
 !
     t  = t + dt
@@ -117,7 +122,7 @@ program godunov
 !
     if (mod(n, 50) .eq. 1) &
       write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
-    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, 0.0, 0, 0, 0, 0!, dtn, ed, eh, em, es
+    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, 0, 0, 0, 0!, ed, eh, em, es
 
   end do
 

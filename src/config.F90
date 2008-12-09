@@ -65,8 +65,16 @@ module config
 
 ! equation of state parameters (gamma, sound speed)
 !
-  real           , save :: gamma = 1.001, csnd = 1.0, csnd2 = 1.0  &
-                         , gammam1 = 0.001, gammam1i = 100.0
+  real           , save :: gamma = 5./3.  , csnd = 1.0, csnd2 = 1.0  &
+                         , gammam1 = 2./3., gammam1i = 1.5
+
+! CFL time step condition
+!
+  real           , save :: cfl = 0.6
+
+! initial values
+!
+  real           , save :: dens = 1.0, pres = 1.0
 
   contains
 !
@@ -166,6 +174,12 @@ module config
       read(value,        *) csnd
     case("dtout")
       read(value,        *) dtout
+    case("cfl")
+      read(value,        *) cfl
+    case("dens")
+      read(value,        *) dens
+    case("pres")
+      read(value,        *) pres
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select

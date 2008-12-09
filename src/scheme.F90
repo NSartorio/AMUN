@@ -415,6 +415,77 @@ module scheme
 !-------------------------------------------------------------------------------
 !
   end subroutine prim2cons
+!
+!===============================================================================
+!
+! maxspeed: function to calculate maximum speed in the system
+!
+!===============================================================================
+!
+  function maxspeed(u)
+
+    use blocks, only : nvars, idn, imx, imy, imz, ien
+    use config, only : igrids, jgrids, kgrids, nghost, gamma
+
+    implicit none
+
+! input arguments
+!
+    real, dimension(nvars,igrids,jgrids,kgrids), intent(in)  :: u
+
+! local variables
+!
+    integer :: i, j, k
+    real    :: vv, v, c
+    real    :: maxspeed
+
+! local arrays
+!
+    real, dimension(nvars,igrids) :: q
+!
+!----------------------------------------------------------------------
+!
+    maxspeed = 0.0
+
+! iterate over all points and calculate maximum speed
+!
+#if NDIMS == 3
+    do k = nghost, kgrids - nghost
+#else /* NDIMS == 3 */
+    k = 1
+#endif /* NDIMS == 3 */
+      do j = nghost, jgrids - nghost
+
+        call cons2prim(nvars,igrids,u(:,:,j,k),q(:,:))
+
+        do i = nghost, igrids - nghost
+
+! calculate the velocity
+!
+          vv = sum(q(imx:imz,i)**2)
+          v  = sqrt(vv)
+
+! calculate the maximum characteristic speed
+!
+#ifdef ADI
+          c = sqrt(gamma*q(ien,i)/q(idn,i))
+#endif /* ADI */
+#ifdef ISO
+          c = csnd
+#endif /* ISO */
+
+! calculate maximum of the speed
+!
+          maxspeed = max(maxspeed, v + c)
+        enddo
+      enddo
+#if NDIMS == 3
+    enddo
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed
 
 !===============================================================================
 !

@@ -43,36 +43,66 @@ module evolution
   subroutine evolve
 
     use blocks, only : block, plist
+    use mesh  , only : dx_min
+    use scheme, only : maxspeed
 
     implicit none
 
 ! local variables
 !
     type(block), pointer :: pblock
+    real                 :: cmax, cm
 !
 !-------------------------------------------------------------------------------
 !
 ! iterate over all blocks and perform one step of time evolution
 !
-      pblock => plist
-      do while (associated(pblock))
+    pblock => plist
+    do while (associated(pblock))
 
 ! check if this block is a leaf
 !
 #ifdef RK2
-        if (pblock%leaf .eq. 'T') &
-          call evolve_rk2(pblock)
+      if (pblock%leaf .eq. 'T') &
+        call evolve_rk2(pblock)
 #endif /* RK2 */
 
 ! assign pointer to the next block
 !
-        pblock => pblock%next
+      pblock => pblock%next
 
-      end do
+    end do
 
 ! TODO: boundary conditions
-! TODO: new time step
 !
+
+! reset maximum speed
+!
+    cmax = 1.0e-8
+
+! iterate over all blocks in order to find the maximum speed
+!
+    pblock => plist
+    do while (associated(pblock))
+
+! check if this block is a leaf
+!
+      if (pblock%leaf .eq. 'T') &
+        cm = maxspeed(pblock%u)
+
+! compare global and local maximum speeds
+!
+      cmax = max(cmax, cm)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! get maximum time step
+!
+    dtn = dx_min / max(cmax, 1.e-8)
 
 !-------------------------------------------------------------------------------
 !

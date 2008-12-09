@@ -40,7 +40,8 @@ module problem
   subroutine init_problem(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien
-    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost
+    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost &
+                     , dens, pres, gammam1i
 
 ! input arguments
 !
@@ -50,7 +51,7 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: r, dx, dy, dz
+    real                          :: r, dx, dy, dz, en, enamb
 
 ! local arrays
 !
@@ -58,6 +59,11 @@ module problem
 !
 !----------------------------------------------------------------------
 !
+! calculate parameters
+!
+    enamb = gammam1i * pres
+    en    = 100.0 * enamb
+
 ! get dimensions
 !
     dm(1) = igrids
@@ -92,7 +98,7 @@ module problem
 
 ! set variables
 !
-    pblock%u(idn,:,:,:) = 1.0d0
+    pblock%u(idn,:,:,:) = dens
     pblock%u(imx,:,:,:) = 0.0d0
     pblock%u(imy,:,:,:) = 0.0d0
     pblock%u(imz,:,:,:) = 0.0d0
@@ -105,10 +111,10 @@ module problem
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 
-          if (r .le. 0.05) then
-            pblock%u(ien,i,j,k) = 25.0
+          if (r .le. 0.1) then
+            pblock%u(ien,i,j,k) = en
           else
-            pblock%u(ien,i,j,k) =  0.25
+            pblock%u(ien,i,j,k) = enamb
           endif
 
         end do

@@ -28,6 +28,10 @@ module mesh
 
   implicit none
 
+! minimum grid step
+!
+  real, save :: dx_min = 1.0
+
 ! space steps for all levels of refinements
 !
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -256,6 +260,10 @@ module mesh
 #endif
       adzi(l) = 1.0 / adz(l)
     end do
+
+! get the minimum grid step
+!
+    dx_min = min(adx(maxlev), ady(maxlev), adz(maxlev))
 
 !----------------------------------------------------------------------
 !
