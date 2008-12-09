@@ -110,6 +110,12 @@ program godunov
 
   end do
 
+! write down the final state
+!
+  call start_timer(3)
+  call write_data('r', 1, 0)
+  call stop_timer(3)
+
 ! deallocate and reset mesh
 !
   call start_timer(1)
