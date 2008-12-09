@@ -40,10 +40,12 @@ module io
   subroutine write_data(ftype, nfile, nproc)
 
     use blocks, only : block, plist
+    use config, only : igrids, jgrids, kgrids
     use error , only : print_error
     use hdf5  , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f         &
                      , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
                      , h5awrite_f, h5screate_simple_f, h5sclose_f           &
+                     , h5dcreate_f, h5dwrite_f, h5dclose_f                  &
                      , hid_t, hsize_t, H5F_ACC_TRUNC_F                      &
                      , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
 
@@ -56,8 +58,8 @@ module io
 
 ! HDF5 variables
 !
-    integer(hid_t)    :: fid, gid, sid, aid
-    integer(hsize_t)  :: am(1)
+    integer(hid_t)    :: fid, gid, sid, aid, did
+    integer(hsize_t)  :: am(1), dm(3)
 
 ! local variables
 !
@@ -67,6 +69,10 @@ module io
 ! pointers
 !
     type(block), pointer :: pcurr, ptemp
+
+! local arrays
+!
+    real, dimension(igrids,jgrids,kgrids) :: tmp
 !
 !----------------------------------------------------------------------
 !
@@ -79,6 +85,12 @@ module io
 ! prepare filename
 !
       write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
+
+! prepare dimensions
+!
+      dm(1) = igrids
+      dm(2) = jgrids
+      dm(3) = kgrids
 
 ! create file
 !
@@ -179,6 +191,33 @@ module io
           call h5sclose_f(sid, err)
 
 ! TODO: write field data to file
+
+          call h5screate_simple_f(3, dm(1:3), sid, err)
+          tmp(:,:,:) = pcurr%u(1,:,:,:)
+          call h5dcreate_f(gid, 'dens', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, tmp, dm(1:3), err, sid)
+          call h5dclose_f(did, err)
+
+          tmp(:,:,:) = pcurr%u(2,:,:,:)
+          call h5dcreate_f(gid, 'momx', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, tmp, dm(1:3), err, sid)
+          call h5dclose_f(did, err)
+
+          tmp(:,:,:) = pcurr%u(3,:,:,:)
+          call h5dcreate_f(gid, 'momy', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, tmp, dm(1:3), err, sid)
+          call h5dclose_f(did, err)
+
+          tmp(:,:,:) = pcurr%u(4,:,:,:)
+          call h5dcreate_f(gid, 'momz', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, tmp, dm(1:3), err, sid)
+          call h5dclose_f(did, err)
+
+          tmp(:,:,:) = pcurr%u(5,:,:,:)
+          call h5dcreate_f(gid, 'ener', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, tmp, dm(1:3), err, sid)
+          call h5dclose_f(did, err)
+          call h5sclose_f(sid, err)
 
           call h5gclose_f(gid, err)
           endif
