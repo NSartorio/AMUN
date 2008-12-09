@@ -78,10 +78,10 @@ name = godunov-amr
 
 default: $(name).x
 
-sources = blocks.F90 config.F90 driver.F90 error.F90 evolution.F90 io.F90 \
-          mesh.F90 problem.F90 scheme.F90 timer.F90
-objects = blocks.o   config.o   driver.o   error.o   evolution.o   io.o   \
-          mesh.o   problem.o   scheme.o   timer.o
+sources = blocks.F90 config.F90 driver.F90 error.F90 evolution.F90             \
+          interpolation.F90 io.F90 mesh.F90 problem.F90 scheme.F90 timer.F90
+objects = blocks.o   config.o   driver.o   error.o   evolution.o               \
+          interpolation.o   io.o   mesh.o   problem.o   scheme.o   timer.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
 $(name).x: $(objects)
@@ -103,10 +103,11 @@ config.o        : config.F90 error.o
 driver.o        : driver.F90 config.o evolution.o io.o mesh.o timer.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o config.o mesh.o scheme.o
+interpolation.o : interpolation.F90
 io.o            : io.F90 blocks.o error.o
 mesh.o          : mesh.F90 blocks.o config.o error.o problem.o
 problem.o       : problem.F90 blocks.o
-scheme.o        : scheme.F90 blocks.o config.o
+scheme.o        : scheme.F90 blocks.o config.o interpolation.o
 timer.o         : timer.F90
 
 #-------------------------------------------------------------------------------

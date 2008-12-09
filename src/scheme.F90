@@ -188,7 +188,7 @@ module scheme
 !
   subroutine hll(m, n, uc, f)
 
-!     use interpolation, only : reconstruct, point2avg
+    use interpolation, only : reconstruct
 
     implicit none
 
@@ -205,8 +205,6 @@ module scheme
     real, dimension(m,n) :: fl, fr, fx
     real, dimension(n)   :: cl, cr
     real                 :: al, ar, ap, div
-
-    integer, parameter, dimension(6)    :: pos = (/ 1, 0, 0, 0, 1, 1 /)
 !
 !----------------------------------------------------------------------
 !
@@ -214,7 +212,7 @@ module scheme
 ! reconstruct left and right states of conserved variables
 !
     do p = 1, m
-!       call reconstruct(n,uc(p,:),ul(p,:),ur(p,:),pos(p))
+      call reconstruct(n,uc(p,:),ul(p,:),ur(p,:))
     enddo
 
 ! calculate primitive variables
@@ -230,7 +228,7 @@ module scheme
 ! reconstruct left and right states of primitive variables
 !
     do p = 1, m
-!       call reconstruct(n,qc(p,:),ql(p,:),qr(p,:),pos(p))
+      call reconstruct(n,qc(p,:),ql(p,:),qr(p,:))
     enddo
 
 ! calculate conservative variables at states
