@@ -82,7 +82,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-!         call hll(igrids, ul, fl)
+        call hll(igrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -119,7 +119,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-!         call hll(jgrids, ul, fl)
+        call hll(jgrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -157,7 +157,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-!         call hll(kgrids, ul, fl)
+        call hll(kgrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -175,7 +175,108 @@ module scheme
     end do
 #endif /* NDIMS == 3 */
 
+!----------------------------------------------------------------------
+!
   end subroutine update
+#ifdef HLL
+!
+!======================================================================
+!
+! hll: subroutine to compute flux approximated by HLL method
+!
+!======================================================================
+!
+  subroutine hll(n, uc, f)
+
+    use blocks, only : nvars
+!     use interpolation, only : reconstruct, point2avg
+
+    implicit none
+
+! input/output arguments
+!
+    integer                 , intent(in)  :: n
+    real, dimension(nvars,n), intent(in)  :: uc
+    real, dimension(nvars,n), intent(out) :: f
+
+! local variables
+!
+    integer                  :: p, i
+    real, dimension(nvars,n) :: ul, ur, ql, qr, qc
+    real, dimension(nvars,n) :: fl, fr, fx
+    real, dimension(n)       :: cl, cr
+    real                     :: al, ar, ap, div
+
+    integer, parameter, dimension(6)    :: pos = (/ 1, 0, 0, 0, 1, 1 /)
+!
+!----------------------------------------------------------------------
+!
+#ifdef CONREC
+! reconstruct left and right states of conserved variables
+!
+    do p = 1, nvars
+!       call reconstruct(n,uc(p,:),ul(p,:),ur(p,:),pos(p))
+    enddo
+
+! calculate primitive variables
+!
+!     call cons2prim(n,ul,ql)
+!     call cons2prim(n,ur,qr)
+#else /* CONREC */
+
+! calculate primitive variables
+!
+!     call cons2prim(n,uc,qc)
+
+! reconstruct left and right states of primitive variables
+!
+    do p = 1, nvars
+!       call reconstruct(n,qc(p,:),ql(p,:),qr(p,:),pos(p))
+    enddo
+
+! calculate conservative variables at states
+!
+!     call prim2cons(n,ql,ul)
+!     call prim2cons(n,qr,ur)
+#endif /* CONREC */
+
+! calculate fluxes and speeds
+!
+!     call fluxspeed(n,ql,ul,fl,cl)
+!     call fluxspeed(n,qr,ur,fr,cr)
+
+! iterate over all points
+!
+    do i = 1, n
+
+! calculate min and max and intermediate speeds: eq. (67)
+!
+      al = min(ql(2,i) - cl(i),qr(2,i) - cr(i))
+      ar = max(ql(2,i) + cl(i),qr(2,i) + cr(i))
+
+! calculate HLL flux
+!
+      if (al .ge. 0.0) then
+        fx(:,i) = fl(:,i)
+      else if (ar .le. 0.0) then
+        fx(:,i) = fr(:,i)
+      else
+        ap  = ar * al
+        div = 1.0/(ar - al)
+
+        fx(:,i) = div*(ar*fl(:,i) - al*fr(:,i) + ap*(ur(:,i) - ul(:,i)))
+      endif
+
+    enddo
+
+! calculate numerical flux
+!
+    f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
+
+!----------------------------------------------------------------------
+!
+  end subroutine hll
+#endif /* HLL */
 
 !======================================================================
 !
