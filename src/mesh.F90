@@ -28,6 +28,12 @@ module mesh
 
   implicit none
 
+! space steps for all levels of refinements
+!
+  real, dimension(:,:), allocatable, save :: ax  , ay  , az
+  real, dimension(:  ), allocatable, save :: adx , ady , adz
+  real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
+
   contains
 !
 !======================================================================
@@ -40,7 +46,7 @@ module mesh
   subroutine init_mesh
 
     use config , only : iblocks, jblocks, kblocks, ncells             &
-                      , xmin, xmax, ymin, ymax, zmin, zmax, maxlev
+                      , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
     use blocks , only : list_allocated, init_blocks, clear_blocks     &
                       , allocate_blocks, refine_block, block, nchild, ndims, plist, last_id
     use error  , only : print_info
@@ -224,8 +230,32 @@ module mesh
     write(*,*)
     write(*,"(4x,a,1x,a6,' / ',a,' = ',f7.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
 
-! at this point the initial structure of blocks should be ready, and
-! the problem should be set and refined
+! allocating space for coordinate variables
+!
+    allocate(ax  (maxlev, ngrids))
+    allocate(ay  (maxlev, ngrids))
+    allocate(az  (maxlev, ngrids))
+    allocate(adx (maxlev))
+    allocate(ady (maxlev))
+    allocate(adz (maxlev))
+    allocate(adxi(maxlev))
+    allocate(adyi(maxlev))
+    allocate(adzi(maxlev))
+
+! generating coordinates for all levels
+!
+    do l = 1, maxlev
+      adx (l) = (xmax - xmin) / (ncells*2**(l-1))
+      adxi(l) = 1.0 / adx(l)
+      ady (l) = (ymax - ymin) / (ncells*2**(l-1))
+      adyi(l) = 1.0 / ady(l)
+#if NDIMS == 3
+      adz (l) = (zmax - zmin) / (ncells*2**(l-1))
+#else
+      adz (l) = 1.0
+#endif
+      adzi(l) = 1.0 / adz(l)
+    end do
 
 !----------------------------------------------------------------------
 !
@@ -249,6 +279,18 @@ module mesh
 ! deallocate block structure
 !
     call clear_blocks
+
+! deallocating coordinate variables
+!
+    deallocate(ax)
+    deallocate(ay)
+    deallocate(az)
+    deallocate(adx)
+    deallocate(ady)
+    deallocate(adz)
+    deallocate(adxi)
+    deallocate(adyi)
+    deallocate(adzi)
 
 !----------------------------------------------------------------------
 !

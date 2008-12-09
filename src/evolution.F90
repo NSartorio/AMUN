@@ -89,6 +89,7 @@ module evolution
 
     use blocks, only : block, nvars
     use config, only : igrids, jgrids, kgrids
+    use mesh  , only : adxi, adyi, adzi
     use scheme, only : update
 
     implicit none
@@ -100,6 +101,7 @@ module evolution
 ! local variables
 !
     integer :: q, i, j, k
+    real    :: dxi, dyi, dzi
 
 ! local arrays
 !
@@ -107,9 +109,15 @@ module evolution
 !
 !----------------------------------------------------------------------
 !
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%level)
+    dyi = adyi(pblock%level)
+    dzi = adzi(pblock%level)
+
 ! 1st step of integration
 !
-    call update(pblock%u, du)
+    call update(pblock%u, du, dxi, dyi, dzi)
 
 ! update solution
 !
@@ -125,7 +133,7 @@ module evolution
 
 ! 2nd step of integration
 !
-    call update(u1, du)
+    call update(u1, du, dxi, dyi, dzi)
 
 ! update solution
 !
