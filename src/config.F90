@@ -59,6 +59,10 @@ module config
 !
   character      , save :: ftype
 
+! equation of state parameters (gamma, sound speed)
+!
+  real           , save :: gamma = 1.001, csnd = 1.0, csnd2 = 1.0
+
   contains
 !
 !======================================================================
@@ -151,6 +155,10 @@ module config
       read(value,        *) tmax
     case("dtini")
       read(value,        *) dtini
+    case("gamma")
+      read(value,        *) gamma
+    case("csnd")
+      read(value,        *) csnd
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
@@ -175,6 +183,8 @@ module config
 #if NDIMS == 3
     kgrids = ngrids
 #endif /* */
+
+    csnd2 = csnd * csnd
 
 ! return before error messages
 !

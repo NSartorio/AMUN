@@ -82,7 +82,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(igrids, ul, fl)
+        call hll(nvars, igrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -119,7 +119,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(jgrids, ul, fl)
+        call hll(nvars, jgrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -157,7 +157,7 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(kgrids, ul, fl)
+        call hll(nvars, kgrids, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
@@ -186,26 +186,25 @@ module scheme
 !
 !======================================================================
 !
-  subroutine hll(n, uc, f)
+  subroutine hll(m, n, uc, f)
 
-    use blocks, only : nvars
 !     use interpolation, only : reconstruct, point2avg
 
     implicit none
 
 ! input/output arguments
 !
-    integer                 , intent(in)  :: n
-    real, dimension(nvars,n), intent(in)  :: uc
-    real, dimension(nvars,n), intent(out) :: f
+    integer             , intent(in)  :: m, n
+    real, dimension(m,n), intent(in)  :: uc
+    real, dimension(m,n), intent(out) :: f
 
 ! local variables
 !
-    integer                  :: p, i
-    real, dimension(nvars,n) :: ul, ur, ql, qr, qc
-    real, dimension(nvars,n) :: fl, fr, fx
-    real, dimension(n)       :: cl, cr
-    real                     :: al, ar, ap, div
+    integer              :: p, i
+    real, dimension(m,n) :: ul, ur, ql, qr, qc
+    real, dimension(m,n) :: fl, fr, fx
+    real, dimension(n)   :: cl, cr
+    real                 :: al, ar, ap, div
 
     integer, parameter, dimension(6)    :: pos = (/ 1, 0, 0, 0, 1, 1 /)
 !
@@ -214,7 +213,7 @@ module scheme
 #ifdef CONREC
 ! reconstruct left and right states of conserved variables
 !
-    do p = 1, nvars
+    do p = 1, m
 !       call reconstruct(n,uc(p,:),ul(p,:),ur(p,:),pos(p))
     enddo
 
@@ -230,7 +229,7 @@ module scheme
 
 ! reconstruct left and right states of primitive variables
 !
-    do p = 1, nvars
+    do p = 1, m
 !       call reconstruct(n,qc(p,:),ql(p,:),qr(p,:),pos(p))
     enddo
 
@@ -242,8 +241,8 @@ module scheme
 
 ! calculate fluxes and speeds
 !
-!     call fluxspeed(n,ql,ul,fl,cl)
-!     call fluxspeed(n,qr,ur,fr,cr)
+    call fluxspeed(m,n,ql,ul,fl,cl)
+    call fluxspeed(m,n,qr,ur,fr,cr)
 
 ! iterate over all points
 !
@@ -277,6 +276,65 @@ module scheme
 !
   end subroutine hll
 #endif /* HLL */
+!
+!===============================================================================
+!
+! fluxspeed: subroutine to compute fluxes and speeds
+!
+!===============================================================================
+!
+  subroutine fluxspeed(m, n, q, u, f, c)
+
+    use config, only : gamma, csnd, csnd2
+
+    implicit none
+
+! input/output arguments
+!
+    integer             , intent(in)  :: m, n
+    real, dimension(m,n), intent(in)  :: q, u
+    real, dimension(m,n), intent(out) :: f
+    real, dimension(n)  , intent(out) :: c
+
+! local variables
+!
+    integer :: i
+    real    :: cs
+!
+!----------------------------------------------------------------------
+!
+! sweep over all points
+!
+    do i = 1, n
+
+! compute fluxes
+!
+      f(1,i) = u(2,i)
+#ifdef ADI
+      f(2,i) = q(2,i)*u(2,i) + q(5,i)
+#endif /* ADI */
+#ifdef ISO
+      f(2,i) = q(2,i)*u(2,i) + q(1,i)*csnd2
+#endif /* ISO */
+      f(3,i) = q(2,i)*u(3,i)
+      f(4,i) = q(2,i)*u(4,i)
+#ifdef ADI
+      f(5,i) = q(2,i)*(u(5,i) + q(5,i))
+#endif /* ADI */
+
+! compute speeds
+!
+#ifdef ADI
+      c(i) = sqrt(gamma*q(5,i)/q(1,i))
+#endif /* ADI */
+#ifdef ISO
+      c(i) = csnd
+#endif /* ISO */
+    enddo
+
+!----------------------------------------------------------------------
+!
+  end subroutine fluxspeed
 
 !======================================================================
 !
