@@ -33,12 +33,12 @@ module evolution
 
   contains
 !
-!======================================================================
+!===============================================================================
 !
-! evolve: subroutine sweeps over all leaf blocks and performes one step
-!         time evolution according to the selected integration scheme
+! evolve: subroutine sweeps over all leaf blocks and performs one step time
+!         evolution for each according to the selected integration scheme
 !
-!======================================================================
+!===============================================================================
 !
   subroutine evolve
 
@@ -50,7 +50,7 @@ module evolution
 !
     type(block), pointer :: pblock
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! iterate over all blocks and perform one step of time evolution
 !
@@ -74,16 +74,16 @@ module evolution
 ! TODO: new time step
 !
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine evolve
 #ifdef RK2
 !
-!======================================================================
+!===============================================================================
 !
-! evolve_rk2: subroutine evolves the current block using RK2 method
+! evolve_rk2: subroutine evolves the current block using RK2 integration
 !
-!======================================================================
+!===============================================================================
 !
   subroutine evolve_rk2(pblock)
 
@@ -107,7 +107,7 @@ module evolution
 !
     real, dimension(nvars,igrids,jgrids,kgrids) :: u1, du
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! prepare dxi, dyi, and dzi
 !
@@ -141,17 +141,18 @@ module evolution
       do j = 1, jgrids
         do i = 1, igrids
           do q = 1, nvars
-            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) + dt*du(q,i,j,k))
+            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) &
+                              + dt*du(q,i,j,k))
           end do
         end do
       end do
     end do
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
 #endif /* RK2 */
 
-!======================================================================
+!===============================================================================
 !
 end module
