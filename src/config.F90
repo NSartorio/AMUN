@@ -57,7 +57,11 @@ module config
 
 ! data file type
 !
-  character      , save :: ftype
+  character      , save :: ftype = 'r'
+
+! data storing time increment
+!
+  real           , save :: dtout = 0.0
 
 ! equation of state parameters (gamma, sound speed)
 !
@@ -160,6 +164,8 @@ module config
       read(value,        *) gamma
     case("csnd")
       read(value,        *) csnd
+    case("dtout")
+      read(value,        *) dtout
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
