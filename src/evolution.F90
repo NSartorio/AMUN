@@ -123,8 +123,8 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks, only : block, nvars
-    use config, only : igrids, jgrids, kgrids
+    use blocks, only : block, nv => nvars
+    use config, only : im, jm, km
     use mesh  , only : adxi, adyi, adzi
     use scheme, only : update
 
@@ -141,7 +141,7 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nvars,igrids,jgrids,kgrids) :: du
+    real, dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -157,10 +157,10 @@ module evolution
 
 ! update solution
 !
-    do k = 1, kgrids
-      do j = 1, jgrids
-        do i = 1, igrids
-          do q = 1, nvars
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          do q = 1, nv
             pblock%u(q,i,j,k) = pblock%u(q,i,j,k) + dt*du(q,i,j,k)
           end do
         end do

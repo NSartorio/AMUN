@@ -39,16 +39,16 @@ module scheme
 !
   subroutine update(u, du, dxi, dyi, dzi)
 
-    use blocks, only : nvars, idn, imx, imy, imz, ien
-    use config, only : igrids, jgrids, kgrids, ngrids
+    use blocks, only : nv => nvars, idn, imx, imy, imz, ien
+    use config, only : im, jm, km, ngrids
 
     implicit none
 
 ! input arguments
 !
-    real, dimension(nvars,igrids,jgrids,kgrids), intent(in)  :: u
-    real, dimension(nvars,igrids,jgrids,kgrids), intent(out) :: du
-    real                                       , intent(in)  :: dxi, dyi, dzi
+    real, dimension(nv,im,jm,km), intent(in)  :: u
+    real, dimension(nv,im,jm,km), intent(out) :: du
+    real                        , intent(in)  :: dxi, dyi, dzi
 
 ! local variables
 !
@@ -56,7 +56,7 @@ module scheme
 
 ! local arrays
 !
-    real, dimension(nvars,ngrids) :: ul, fl
+    real, dimension(nv,ngrids) :: ul, fl
 !
 !-------------------------------------------------------------------------------
 !
@@ -64,12 +64,12 @@ module scheme
 
 !  update along X-direction
 !
-    do k = 1, kgrids
-      do j = 1, jgrids
+    do k = 1, km
+      do j = 1, jm
 
 ! copy directional vectors of variables for the one dimensional solver
 !
-        do i = 1, igrids
+        do i = 1, im
           ul(1,i) = u(idn,i,j,k)
           ul(2,i) = u(imx,i,j,k)
           ul(3,i) = u(imy,i,j,k)
@@ -82,12 +82,12 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nvars, igrids, ul, fl)
+        call hll(nv, im, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
 !
-        do i = 1, igrids
+        do i = 1, im
           du(idn,i,j,k) = du(idn,i,j,k) + dxi * fl(1,i)
           du(imx,i,j,k) = du(imx,i,j,k) + dxi * fl(2,i)
           du(imy,i,j,k) = du(imy,i,j,k) + dxi * fl(3,i)
@@ -101,14 +101,14 @@ module scheme
 
 !  update along Y-direction
 !
-    do k = 1, kgrids
-      do i = 1, igrids
+    do k = 1, km
+      do i = 1, im
 
 ! copy directional vectors of variables for the one dimensional solver
 !
-        do j = 1, jgrids
+        do j = 1, jm
           ul(1,j) = u(idn,i,j,k)
-          ul(2,i) = u(imy,i,j,k)
+          ul(2,j) = u(imy,i,j,k)
           ul(3,j) = u(imz,i,j,k)
           ul(4,j) = u(imx,i,j,k)
 #ifdef ADI
@@ -119,12 +119,12 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nvars, jgrids, ul, fl)
+        call hll(nv, jm, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
 !
-        do j = 1, jgrids
+        do j = 1, jm
           du(idn,i,j,k) = du(idn,i,j,k) + dyi * fl(1,j)
           du(imx,i,j,k) = du(imx,i,j,k) + dyi * fl(4,j)
           du(imy,i,j,k) = du(imy,i,j,k) + dyi * fl(2,j)
@@ -139,12 +139,12 @@ module scheme
 #if NDIMS == 3
 !  update along Z-direction
 !
-    do j = 1, jgrids
-      do i = 1, igrids
+    do j = 1, jm
+      do i = 1, im
 
 ! copy directional vectors of variables for the one dimensional solver
 !
-        do k = 1, kgrids
+        do k = 1, km
           ul(1,k) = u(idn,i,j,k)
           ul(2,k) = u(imz,i,j,k)
           ul(3,k) = u(imx,i,j,k)
@@ -157,12 +157,12 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nvars, kgrids, ul, fl)
+        call hll(nv, km, ul, fl)
 #endif /* HLL */
 
 ! update the arrays of increments
 !
-        do k = 1, kgrids
+        do k = 1, km
           du(idn,i,j,k) = du(idn,i,j,k) + dzi * fl(1,k)
           du(imx,i,j,k) = du(imx,i,j,k) + dzi * fl(3,k)
           du(imy,i,j,k) = du(imy,i,j,k) + dzi * fl(4,k)
