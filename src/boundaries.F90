@@ -138,17 +138,19 @@ module boundaries
 !
   subroutine bnd_copy(u, b, id, is, ip)
 
-    use blocks, only : nvars
-    use config, only : igrids, jgrids, kgrids, nghost, ncells
+    use blocks, only : nv => nvars
+    use config, only : ng, im, ib, ibl, ibu, ie, iel, ieu                 &
+                         , jm, jb, jbl, jbu, je, jel, jeu                 &
+                         , km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
 
     implicit none
 
 ! arguments
 !
-    real, dimension(nvars,igrids,jgrids,kgrids), intent(inout) :: u
-    real, dimension(nvars,igrids,jgrids,kgrids), intent(in)    :: b
-    integer                                    , intent(in)    :: id, is, ip
+    real, dimension(nv,im,jm,km), intent(inout) :: u
+    real, dimension(nv,im,jm,km), intent(in)    :: b
+    integer                     , intent(in)    :: id, is, ip
 
 ! local variables
 !
@@ -164,17 +166,17 @@ module boundaries
 !
     select case(ii)
     case(110)
-      u(:,1:nghost,:,:) = b(:,ncells:ncells+nghost,:,:)
+      u(:,  1:ibl,:,:) = b(:,iel:ie ,:,:)
     case(120)
-      u(:,igrids-nghost:igrids,:,:) = b(:,nghost+1:2*nghost,:,:)
+      u(:,ieu:im ,:,:) = b(:, ib:ibu,:,:)
     case(210)
-      u(:,:,1:nghost,:) = b(:,:,ncells:ncells+nghost,:)
+      u(:,:,  1:jbl,:) = b(:,:,jel:je ,:)
     case(220)
-      u(:,:,jgrids-nghost:jgrids,:) = b(:,:,nghost+1:2*nghost,:)
+      u(:,:,jeu:jm ,:) = b(:,:, jb:jbu,:)
     case(310)
-      u(:,:,:,1:nghost) = b(:,:,:,ncells:ncells+nghost)
+      u(:,:,:,  1:kbl) = b(:,:,:,kel:ke )
     case(320)
-      u(:,:,:,kgrids-nghost:kgrids) = b(:,:,:,nghost+1:2*nghost)
+      u(:,:,:,keu:km ) = b(:,:,:, kb:kbu)
     case default
       call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
     end select

@@ -37,6 +37,12 @@ module config
   integer(kind=4), save :: ncells =  8, nghost =  2, ngrids = 10    &
                          , igrids = 10, jgrids = 10, kgrids = 10
 
+! derived dimensional variables
+!
+  integer(kind=4), save :: in, im, ib, ie, ibl, ibu, iel, ieu, ng   &
+                         , jn, jm, jb, je, jbl, jbu, jel, jeu       &
+                         , kn, km, kb, ke, kbl, kbu, kel, keu
+
 ! mesh refinement control
 !
   integer(kind=4), save :: maxlev = 2
@@ -204,6 +210,47 @@ module config
 #if NDIMS == 3
     kgrids = ngrids
 #endif /* */
+
+    ng  = nghost
+
+    in  = ncells
+    im  = in + 2 * ng
+    ib  = ng + 1
+    ie  = ng + in
+    ibl = ib - 1
+    ibu = ib + ng - 1
+    iel = ie - ng + 1
+    ieu = ie - 1
+
+    jn  = ncells
+    jm  = jn + 2 * ng
+    jb  = ng + 1
+    je  = ng + jn
+    jbl = jb - 1
+    jbu = jb + ng - 1
+    jel = je - ng + 1
+    jeu = je - 1
+
+#if NDIMS == 2
+    kn  = 1
+    km  = 1
+    kb  = 1
+    ke  = 1
+    kbl = 1
+    kbu = 1
+    kel = 1
+    keu = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    kn  = ncells
+    km  = kn + 2 * ng
+    kb  = ng + 1
+    ke  = ng + kn
+    kbl = kb - 1
+    kbu = kb + ng - 1
+    kel = ke - ng + 1
+    keu = ke - 1
+#endif /* NDIMS == 3 */
 
     gammam1  = gamma - 1.0
     gammam1i = 1.0 / gammam1
