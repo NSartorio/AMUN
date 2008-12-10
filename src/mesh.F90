@@ -232,7 +232,7 @@ module mesh
     write(bstr,"(i)") last_id
     write(tstr,"(i)") (2**maxlev)**ndims
     write(*,*)
-    write(*,"(4x,a,1x,a6,' / ',a,' = ',f7.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
+    write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
 
 ! allocating space for coordinate variables
 !

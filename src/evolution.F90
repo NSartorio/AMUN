@@ -42,9 +42,10 @@ module evolution
 !
   subroutine evolve
 
-    use blocks, only : block, plist
-    use mesh  , only : dx_min
-    use scheme, only : maxspeed
+    use blocks    , only : block, plist
+    use boundaries, only : boundary
+    use mesh      , only : dx_min
+    use scheme    , only : maxspeed
 
     implicit none
 
@@ -73,8 +74,9 @@ module evolution
 
     end do
 
-! TODO: boundary conditions
+! update boundaries
 !
+    call boundary
 
 ! reset maximum speed
 !
