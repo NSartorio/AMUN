@@ -34,8 +34,8 @@ module config
 
 ! block dimensions, number of ghost zones
 !
-  integer(kind=4), save :: ncells =  8, nghost =  2, ngrids = 10    &
-                         , igrids = 10, jgrids = 10, kgrids = 10
+  integer(kind=4), save :: ncells =  8, nghost =  4, ngrids = 16    &
+                         , igrids = 16, jgrids = 16, kgrids = 16
 
 ! derived dimensional variables
 !
@@ -220,7 +220,7 @@ module config
     ibl = ib - 1
     ibu = ib + ng - 1
     iel = ie - ng + 1
-    ieu = ie - 1
+    ieu = ie + 1
 
     jn  = ncells
     jm  = jn + 2 * ng
@@ -229,7 +229,7 @@ module config
     jbl = jb - 1
     jbu = jb + ng - 1
     jel = je - ng + 1
-    jeu = je - 1
+    jeu = je + 1
 
 #if NDIMS == 2
     kn  = 1
@@ -249,7 +249,7 @@ module config
     kbl = kb - 1
     kbu = kb + ng - 1
     kel = ke - ng + 1
-    keu = ke - 1
+    keu = ke + 1
 #endif /* NDIMS == 3 */
 
     gammam1  = gamma - 1.0

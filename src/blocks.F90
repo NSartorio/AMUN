@@ -341,25 +341,42 @@ module blocks
 
 ! set neighbor pointers
 !
+    pbl%pneigh(1,1,1)%p => pbr  ! BL left  -> BR
+    pbl%pneigh(1,1,2)%p => pbr
     pbl%pneigh(1,2,1)%p => pbr  ! BL right  -> BR
     pbl%pneigh(1,2,2)%p => pbr
+    pbl%pneigh(2,1,1)%p => ptl  ! BL bottom -> TL
+    pbl%pneigh(2,1,2)%p => ptl
     pbl%pneigh(2,2,1)%p => ptl  ! BL top    -> TL
     pbl%pneigh(2,2,2)%p => ptl
 
+
     pbr%pneigh(1,1,1)%p => pbl  ! BR left   -> BL
     pbr%pneigh(1,1,2)%p => pbl
+    pbr%pneigh(1,2,1)%p => pbl  ! BR right  -> BL
+    pbr%pneigh(1,2,2)%p => pbl
+    pbr%pneigh(2,1,1)%p => ptr  ! BR bottom -> TR
+    pbr%pneigh(2,1,2)%p => ptr
     pbr%pneigh(2,2,1)%p => ptr  ! BR top    -> TR
     pbr%pneigh(2,2,2)%p => ptr
 
+    ptl%pneigh(1,1,1)%p => ptr  ! TL left   -> TR
+    ptl%pneigh(1,1,2)%p => ptr
     ptl%pneigh(1,2,1)%p => ptr  ! TL right  -> TR
     ptl%pneigh(1,2,2)%p => ptr
     ptl%pneigh(2,1,1)%p => pbl  ! TL bottom -> BL
     ptl%pneigh(2,1,2)%p => pbl
+    ptl%pneigh(2,2,1)%p => pbl  ! TL top    -> BL
+    ptl%pneigh(2,2,2)%p => pbl
 
     ptr%pneigh(1,1,1)%p => ptl  ! TR left   -> TL
     ptr%pneigh(1,1,2)%p => ptl
+    ptr%pneigh(1,2,1)%p => ptl  ! TR right  -> TL
+    ptr%pneigh(1,2,2)%p => ptl
     ptr%pneigh(2,1,1)%p => pbr  ! TR bottom -> BR
     ptr%pneigh(2,1,2)%p => pbr
+    ptr%pneigh(2,2,1)%p => pbr  ! TR top    -> BR
+    ptr%pneigh(2,2,2)%p => pbr
 
 ! set block bounds
 !

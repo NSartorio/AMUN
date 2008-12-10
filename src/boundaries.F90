@@ -91,11 +91,10 @@ module boundaries
 !
                   select case(dl)
                   case(-1)  ! restriction
-
                   case(0)   ! the same level, copying
-                    call bnd_copy(pblock%u, pneigh%u, i, j, k)
+                    if (k .eq. 1) &
+                      call bnd_copy(pblock, pneigh, i, j, k)
                   case(1)   ! prolongation
-
                   case default
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
@@ -136,9 +135,9 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_copy(u, b, id, is, ip)
+  subroutine bnd_copy(pb, pn, id, is, ip)
 
-    use blocks, only : nv => nvars
+    use blocks, only : block, nv => nvars
     use config, only : ng, im, ib, ibl, ibu, ie, iel, ieu                 &
                          , jm, jb, jbl, jbu, je, jel, jeu                 &
                          , km, kb, kbl, kbu, ke, kel, keu
@@ -148,13 +147,12 @@ module boundaries
 
 ! arguments
 !
-    real, dimension(nv,im,jm,km), intent(inout) :: u
-    real, dimension(nv,im,jm,km), intent(in)    :: b
+    type(block), pointer, intent(inout) :: pb, pn
     integer                     , intent(in)    :: id, is, ip
 
 ! local variables
 !
-    integer :: ii
+    integer :: ii, i, j, k
 !
 !-------------------------------------------------------------------------------
 !
@@ -166,17 +164,33 @@ module boundaries
 !
     select case(ii)
     case(110)
-      u(:,  1:ibl,:,:) = b(:,iel:ie ,:,:)
+      do k = 1, km
+        do j = 1, jm
+          pb%u(1:nv,1:ibl,j,k) = pn%u(1:nv,iel:ie,j,k)
+        end do
+      end do
     case(120)
-      u(:,ieu:im ,:,:) = b(:, ib:ibu,:,:)
+      do k = 1, km
+        do j = 1, jm
+          pb%u(1:nv,ieu:im,j,k) = pn%u(1:nv,ib:ibu,j,k)
+        end do
+      end do
     case(210)
-      u(:,:,  1:jbl,:) = b(:,:,jel:je ,:)
+      do k = 1, km
+        do i = 1, im
+          pb%u(1:nv,i,1:jbl,k) = pn%u(1:nv,i,jel:je ,k)
+        end do
+      end do
     case(220)
-      u(:,:,jeu:jm ,:) = b(:,:, jb:jbu,:)
+      do k = 1, km
+        do i = 1, im
+          pb%u(1:nv,i,jeu:jm ,k) = pn%u(1:nv,i, jb:jbu,k)
+        end do
+      end do
     case(310)
-      u(:,:,:,  1:kbl) = b(:,:,:,kel:ke )
+!       u(1:nv,:,:,  1:kbl) = b(1:nv,:,:,kel:ke )
     case(320)
-      u(:,:,:,keu:km ) = b(:,:,:, kb:kbu)
+!       u(1:nv,:,:,keu:km ) = b(1:nv,:,:, kb:kbu)
     case default
       call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
     end select
