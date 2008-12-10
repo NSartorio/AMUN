@@ -63,6 +63,10 @@ module evolution
 
 ! check if this block is a leaf
 !
+#ifdef EULER
+      if (pblock%leaf .eq. 'T') &
+        call evolve_euler(pblock)
+#endif /* EULER */
 #ifdef RK2
       if (pblock%leaf .eq. 'T') &
         call evolve_rk2(pblock)
@@ -109,6 +113,64 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve
+#ifdef EULER
+!
+!===============================================================================
+!
+! evolve_euler: subroutine evolves the current block using Euler integration
+!
+!===============================================================================
+!
+  subroutine evolve_euler(pblock)
+
+    use blocks, only : block, nvars
+    use config, only : igrids, jgrids, kgrids
+    use mesh  , only : adxi, adyi, adzi
+    use scheme, only : update
+
+    implicit none
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer :: q, i, j, k
+    real    :: dxi, dyi, dzi
+
+! local arrays
+!
+    real, dimension(nvars,igrids,jgrids,kgrids) :: du
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%level)
+    dyi = adyi(pblock%level)
+    dzi = adzi(pblock%level)
+
+! 1st step of integration
+!
+    call update(pblock%u, du, dxi, dyi, dzi)
+
+! update solution
+!
+    do k = 1, kgrids
+      do j = 1, jgrids
+        do i = 1, igrids
+          do q = 1, nvars
+            pblock%u(q,i,j,k) = pblock%u(q,i,j,k) + dt*du(q,i,j,k)
+          end do
+        end do
+      end do
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_euler
+#endif /* EULER */
 #ifdef RK2
 !
 !===============================================================================
