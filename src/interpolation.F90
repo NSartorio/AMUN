@@ -87,6 +87,170 @@ module interpolation
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
+!
+!===============================================================================
+!
+! expand: Expands multi-dimentional array similar to EXPAND for 2D images
+!         but using second-order TVD interpolation. EXPAND_TVD expands
+!         array only in one selected direction at time.
+!
+!===============================================================================
+!
+  subroutine expand(dm, fm, ng, u, v, xflag, yflag, zflag)
+
+    implicit none
+
+! input parameters
+!
+    integer, dimension(3)         , intent(in)  :: dm, fm
+    integer                       , intent(in)  :: ng
+    real        , dimension(:,:,:), intent(in)  :: u
+    real        , dimension(:,:,:), intent(out) :: v
+    character                     , intent(in)  :: xflag, yflag, zflag
+
+! local variables
+!
+    integer :: i, j, k
+
+! allocatable variables
+!
+    real(kind=8), dimension(:)    , allocatable :: x, y
+    real(kind=8), dimension(:,:,:), allocatable :: w, z
+!
+!-------------------------------------------------------------------------------
+!
+    v(:,:,:) = 0.0
+
+    allocate(x(maxval(dm)))
+    allocate(y(maxval(fm)))
+    allocate(w(fm(1),dm(2),dm(3)))
+    allocate(z(fm(1),fm(2),dm(3)))
+
+! expand in X direction
+!
+    do k = 1, dm(3)
+      do j = 1, dm(2)
+        x(1:dm(1)) = u(1:dm(1),j,k)
+
+        call interpolate(dm(1),fm(1),ng,x(1:dm(1)),y(1:fm(1)),xflag)
+
+        w(1:fm(1),j,k) = y(1:fm(1))
+      end do
+    end do
+
+! expand in Y-direction
+!
+    do k = 1, dm(3)
+      do i = 1, fm(1)
+        x(1:dm(2)) = w(i,1:dm(2),k)
+
+        call interpolate(dm(2),fm(2),ng,x(1:dm(2)),y(1:fm(2)),yflag)
+
+        z(i,1:fm(2),k) = y(1:fm(2))
+      end do
+    end do
+
+! expand in Z-direction
+!
+    if (dm(3) .gt. 1) then
+      do j = 1, fm(2)
+        do i = 1, fm(1)
+          x(1:dm(3)) = z(i,j,1:dm(3))
+
+          call interpolate(dm(3),fm(3),ng,x(1:dm(3)),y(1:fm(3)),zflag)
+
+          v(i,j,1:fm(3)) = y(1:fm(3))
+        end do
+      end do
+    else
+      v(:,:,:) = z(:,:,:)
+    endif
+
+    deallocate(w)
+    deallocate(z)
+    deallocate(x)
+    deallocate(y)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine expand
+!
+!===============================================================================
+!
+! interpolate: One dimensional second-order TVD interpolation.
+!
+!===============================================================================
+!
+  subroutine interpolate(n, m, ng, u, v, flag)
+
+    implicit none
+
+! input parameters
+!
+    integer                   , intent(in)  :: n, m, ng
+    real        , dimension(n), intent(in)  :: u
+    real        , dimension(m), intent(out) :: v
+    character                 , intent(in)  :: flag
+
+! local variables
+!
+    integer      :: i, ib, ie, j0, j1
+    real(kind=8) :: du, ddu, dum, dup, du0, ds
+!
+!-------------------------------------------------------------------------------
+!
+    v(:) = 0.0
+
+    ib = ng / 2 + 1
+    ie = n - ng / 2
+
+    select case(flag)
+    case('l')
+      do i = ib, ie
+        du = 0.5 * (u(i+1) - u(i-1))
+
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        v(j0) = u(i) - 0.25 * du
+        v(j1) = u(i) + 0.25 * du
+      end do
+    case('c')
+      do i = ib, ie
+        du  = u(i) - u(i-1)
+        ddu = - 0.25 * (u(i+1) - u(i-1) - u(i) + u(i-2))
+
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        v(j0) = u(i) - 0.5 * du + 0.25 * ddu
+        v(j1) = u(i)
+      end do
+    case default
+      do i = ib, ie
+        dup = u(i+1) - u(i)
+        dum = u(i) - u(i-1)
+        du0 = dup + dum
+        ds  = dup * dum
+
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        if (ds .gt. 0.0) then
+          du = ds / du0
+
+          v(j0) = u(i) - 0.25 * du
+          v(j1) = u(i) + 0.25 * du
+        else
+          v(j0) = u(i)
+          v(j1) = u(i)
+        endif
+      end do
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine interpolate
 
 !===============================================================================
 !

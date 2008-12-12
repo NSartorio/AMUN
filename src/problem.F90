@@ -117,6 +117,12 @@ module problem
             pblock%u(ien,i,j,k) = enamb
           endif
 
+!           if (y(j) .le. 0.0) then
+!             pblock%u(ien,i,j,k) = en
+!           else
+!             pblock%u(ien,i,j,k) = enamb
+!           endif
+
         end do
       end do
     end do

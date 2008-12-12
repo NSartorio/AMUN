@@ -91,10 +91,12 @@ module boundaries
 !
                   select case(dl)
                   case(-1)  ! restriction
+                    call bnd_rest(pblock, pneigh, i, j, k)
                   case(0)   ! the same level, copying
                     if (k .eq. 1) &
                       call bnd_copy(pblock, pneigh, i, j, k)
                   case(1)   ! prolongation
+!                     call bnd_prolong(pblock, pneigh, i, j, k)
                   case default
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
@@ -148,7 +150,7 @@ module boundaries
 ! arguments
 !
     type(block), pointer, intent(inout) :: pb, pn
-    integer                     , intent(in)    :: id, is, ip
+    integer             , intent(in)    :: id, is, ip
 
 ! local variables
 !
@@ -178,19 +180,27 @@ module boundaries
     case(210)
       do k = 1, km
         do i = 1, im
-          pb%u(1:nv,i,1:jbl,k) = pn%u(1:nv,i,jel:je ,k)
+          pb%u(1:nv,i,1:jbl,k) = pn%u(1:nv,i,jel:je,k)
         end do
       end do
     case(220)
       do k = 1, km
         do i = 1, im
-          pb%u(1:nv,i,jeu:jm ,k) = pn%u(1:nv,i, jb:jbu,k)
+          pb%u(1:nv,i,jeu:jm,k) = pn%u(1:nv,i,jb:jbu,k)
         end do
       end do
     case(310)
-!       u(1:nv,:,:,  1:kbl) = b(1:nv,:,:,kel:ke )
+      do j = 1, jm
+        do i = 1, im
+          pb%u(1:nv,i,j,1:kbl) = pn%u(1:nv,i,j,kel:ke)
+        end do
+      end do
     case(320)
-!       u(1:nv,:,:,keu:km ) = b(1:nv,:,:, kb:kbu)
+      do j = 1, jm
+        do i = 1, im
+          pb%u(1:nv,i,j,keu:km) = pn%u(1:nv,i,j,kb:kbu)
+        end do
+      end do
     case default
       call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
     end select
@@ -198,6 +208,485 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine bnd_copy
+!
+!===============================================================================
+!
+! bnd_rest: subroutine copies the interior of neighbor to update the boundaries
+!           of current block
+!
+!===============================================================================
+!
+  subroutine bnd_rest(pb, pn, id, is, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
+                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
+                         , kn, km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_warning
+    use interpolation, only : expand
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer, intent(inout) :: pb, pn
+    integer             , intent(in)    :: id, is, ip
+
+! local variables
+!
+    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
+    real    :: dup, dum, du0, ds, du
+
+! local arrays
+!
+    real, dimension(2*im,2*jm,km) :: ux
+
+! local pointers
+!
+    type(block), pointer :: pn1, pn2
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * is + ip
+
+! perform update according to the flag
+!
+    select case(ii)
+    case(111)
+
+! neighbor to current
+!
+      jl = ng / 2 + 1
+      ju = jm / 2 + ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * (j - jl + 1)
+          j1 = j2 - 1
+          do i = 1, ng
+            i1 = ie + 2 * (i - ng)
+            i2 = i1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + ng - 1
+      j0 = ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(112)
+
+! neighbor to current
+!
+      jl = jm / 2 + 1 - ng / 2
+      ju = jm - ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * (j - jl + 1)
+          j1 = j2 - 1
+          do i = 1, ng
+            i1 = ie + 2 * (i - ng)
+            i2 = i1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + ng - 1
+      j0 = jm / 2 - ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(121)
+
+! neighbor to current
+!
+      jl = ng / 2 + 1
+      ju = jm / 2 + ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * (j - jl + 1)
+          j1 = j2 - 1
+          do i = ieu, im
+            i1 = ng + 2*(i - ie)
+            i2 = i1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i1 = ie + 1
+      i0 = i1 - dm(1) + 1
+!       i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + ng - 1
+      j0 = ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(122)
+
+! neighbor to current
+!
+      jl = jm / 2 + 1 - ng / 2
+      ju = jm - ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * (j - jl + 1)
+          j1 = j2 - 1
+          do i = ieu, im
+            i1 = ng + 2*(i - ie)
+            i2 = i1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i1 = ie + 1
+      i0 = i1 - dm(1) + 1
+      il = 3
+      iu = il + ng - 1
+      j0 = jm / 2 - ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(211)
+
+! neighbor to current
+!
+      il = ng / 2 + 1
+      iu = im / 2 + ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * (i - il + 1)
+          i1 = i2 - 1
+          do j = 1, ng
+            j1 = je + 2 * (j - ng)
+            j2 = j1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j0 = ng
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(212)
+
+! neighbor to current
+!
+      il = im / 2 + 1 - ng / 2
+      iu = im - ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * (i - il + 1)
+          i1 = i2 - 1
+          do j = 1, ng
+            j1 = je + 2 * (j - ng)
+            j2 = j1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = im / 2 - ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j0 = ng
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(221)
+
+! neighbor to current
+!
+      il = ng / 2 + 1
+      iu = im / 2 + ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * (i - il + 1)
+          i1 = i2 - 1
+          do j = jeu, jm
+            j1 = ng + 2*(j - je)
+            j2 = j1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j1 = je + 1
+      j0 = j1 - dm(2) + 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(222)
+
+! neighbor to current
+!
+      il = im / 2 + 1 - ng / 2
+      iu = im - ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * (i - il + 1)
+          i1 = i2 - 1
+          do j = jeu, jm
+            j1 = ng + 2*(j - je)
+            j2 = j1 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
+                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+! current to neighbor
+!
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = im / 2 - ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+
+      j1 = je + 1
+      j0 = j1 - dm(2) + 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pn%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+    case default
+      call print_warning("boundaries::bnd_rest", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_rest
+!
+!===============================================================================
+!
+! bnd_prolong: subroutine prolongs the data from a lower level neighbor in order
+!              to update the boundary of the current block
+!
+!===============================================================================
+!
+  subroutine bnd_prolong(pb, pn, id, is, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : ng, im, ib, ibl, ibu, ie, iel, ieu                 &
+                         , jm, jb, jbl, jbu, je, jel, jeu                 &
+                         , km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_warning
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer, intent(inout) :: pb, pn
+    integer             , intent(in)    :: id, is, ip
+
+! local variables
+!
+    integer :: ii, i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * is + ip
+
+! perform update according to the flag
+!
+    select case(ii)
+
+! prepare an input array using of
+!
+! call prolong(inp())
+
+    case default
+      call print_warning("boundaries::bnd_prolong", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_prolong
 
 !===============================================================================
 !

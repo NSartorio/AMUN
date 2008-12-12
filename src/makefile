@@ -101,7 +101,7 @@ clean-all:
 #-------------------------------------------------------------------------------
 
 blocks.o        : blocks.F90 config.o
-boundaries.o    : boundaries.F90 blocks.o config.o error.o
+boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o
 config.o        : config.F90 error.o
 driver.o        : driver.F90 config.o evolution.o io.o mesh.o timer.o
 error.o         : error.F90
