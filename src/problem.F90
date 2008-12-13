@@ -117,12 +117,6 @@ module problem
             pblock%u(ien,i,j,k) = enamb
           endif
 
-!           if (y(j) .le. 0.0) then
-!             pblock%u(ien,i,j,k) = en
-!           else
-!             pblock%u(ien,i,j,k) = enamb
-!           endif
-
         end do
       end do
     end do
@@ -148,8 +142,8 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block, ien
-    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost
+    use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
+    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i
 
 ! input arguments
 !
@@ -163,27 +157,38 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: dpmax, dpdx, dpdy, dpdz
+    real                          :: dpmax, dpdx, dpdy, dpdz, dn, vx, vy, vz, en, ek, ei
+    real, dimension(im,jm,km)     :: pr
 !
 !----------------------------------------------------------------------
 !
-! get dimensions
-!
-    dm(1) = igrids
-    dm(2) = jgrids
-    dm(3) = kgrids
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          dn = pblock%u(idn,i,j,k)
+          vx = pblock%u(imx,i,j,k) / dn
+          vy = pblock%u(imy,i,j,k) / dn
+          vz = pblock%u(imz,i,j,k) / dn
+          en = pblock%u(ien,i,j,k)
+
+          ek = 0.5 * dn * (vx*vx + vy*vy + vz*vz)
+          ei = en - ek
+          pr(i,j,k) = gammam1i * ei
+        end do
+      end do
+    end do
 
 ! check gradient of pressure
 !
     dpmax = 0.0d0
 
-    do k = 1, dm(3)
-      do j = 2, dm(2)-1
-        do i = 2, dm(1)-1
-          dpdx = abs(pblock%u(ien,i+1,j,k) - 2 * pblock%u(ien,i,j,k) + pblock%u(ien,i-1,j,k)) / &
-                 max(1.0e-8, (abs(pblock%u(ien,i+1,j,k) - pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j,k) - pblock%u(ien,i-1,j,k)) + 1.0e-2 * (abs(pblock%u(ien,i+1,j,k)) - 2 * abs(pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i-1,j,k)))))
-          dpdy = abs(pblock%u(ien,i,j+1,k) - 2 * pblock%u(ien,i,j,k) + pblock%u(ien,i,j-1,k)) / &
-                 max(1.e-8, (abs(pblock%u(ien,i,j+1,k) - pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j,k) - pblock%u(ien,i,j-1,k)) + 1.0e-2 * (abs(pblock%u(ien,i,j+1,k)) - 2 * abs(pblock%u(ien,i,j,k)) + abs(pblock%u(ien,i,j-1,k)))))
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+          dpdx = abs(pr(i+1,j,k) - 2 * pr(i,j,k) + pr(i-1,j,k)) / &
+                 max(1.0e-8, (abs(pr(i+1,j,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i-1,j,k)) + 1.0e-2 * (abs(pr(i+1,j,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i-1,j,k)))))
+          dpdy = abs(pr(i,j+1,k) - 2 * pr(i,j,k) + pr(i,j-1,k)) / &
+                 max(1.e-8, (abs(pr(i,j+1,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i,j-1,k)) + 1.0e-2 * (abs(pr(i,j+1,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i,j-1,k)))))
 
           dpmax = max(dpmax, dpdx, dpdy)
         end do
@@ -194,10 +199,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .gt. 0.7) then
+    if (dpmax .gt. 0.8) then
       check_ref =  1
     endif
-    if (dpmax .lt. 0.3) then
+    if (dpmax .lt. 0.5) then
       check_ref = -1
     endif
 

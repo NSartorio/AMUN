@@ -196,6 +196,9 @@ module blocks
 !
     deallocate(pblock%u)
 
+    nullify(pblock%next)
+    nullify(pblock%prev)
+
 ! free and nullify the block
 !
     deallocate(pblock)
@@ -933,6 +936,168 @@ module blocks
 !----------------------------------------------------------------------
 !
   end subroutine refine_block
+!
+!======================================================================
+!
+! derefine_block: subroutine derefines selected block
+!
+!======================================================================
+!
+  subroutine derefine_block(pblock)
+
+    implicit none
+
+! input parameters
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer :: p
+
+! pointers
+!
+    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
+!
+!----------------------------------------------------------------------
+!
+! prepare pointers to children
+!
+    pbl => pblock%child(1)%p
+    pbr => pblock%child(2)%p
+    ptl => pblock%child(3)%p
+    ptr => pblock%child(4)%p
+
+    do p = 1, nchild
+      nullify(pblock%child(p)%p)
+    end do
+
+! prepare neighbors
+!
+    pblock%pneigh(1,1,1)%p => pbl%pneigh(1,1,1)%p
+    pblock%pneigh(1,1,2)%p => ptl%pneigh(1,1,2)%p
+    pblock%pneigh(1,2,1)%p => pbr%pneigh(1,2,1)%p
+    pblock%pneigh(1,2,2)%p => ptr%pneigh(1,2,2)%p
+    pblock%pneigh(2,1,1)%p => pbl%pneigh(2,1,1)%p
+    pblock%pneigh(2,1,2)%p => pbr%pneigh(2,1,2)%p
+    pblock%pneigh(2,2,1)%p => ptl%pneigh(2,2,1)%p
+    pblock%pneigh(2,2,2)%p => ptr%pneigh(2,2,2)%p
+
+    pneigh => pblock%pneigh(1,1,1)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(1,2,1)%p => pblock
+      pneigh%pneigh(1,2,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(1,1,2)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(1,2,1)%p => pblock
+      pneigh%pneigh(1,2,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(1,2,1)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(1,1,1)%p => pblock
+      pneigh%pneigh(1,1,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(1,2,2)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(1,1,1)%p => pblock
+      pneigh%pneigh(1,1,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(2,1,1)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(2,2,1)%p => pblock
+      pneigh%pneigh(2,2,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(2,1,2)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(2,2,1)%p => pblock
+      pneigh%pneigh(2,2,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(2,2,1)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(2,1,1)%p => pblock
+      pneigh%pneigh(2,1,2)%p => pblock
+    endif
+
+    pneigh => pblock%pneigh(2,2,2)%p
+    if (associated(pneigh)) then
+      pneigh%pneigh(2,1,1)%p => pblock
+      pneigh%pneigh(2,1,2)%p => pblock
+    endif
+
+! set the leaf flag for children
+!
+    pblock%leaf = 'T'
+    pbl%leaf = 'F'
+    pbr%leaf = 'F'
+    ptl%leaf = 'F'
+    ptr%leaf = 'F'
+
+! prepare next and prev pointers
+!
+    select case(pblock%config)
+      case('z', 'Z')
+        pb => ptr%next
+        if (associated(pb)) then
+          pb%prev => pblock
+          pblock%next => pb
+        else
+          nullify(pblock%next)
+        endif
+      case('n', 'N')
+        pb => pbr%next
+        if (associated(pb)) then
+          pb%prev => pblock
+          pblock%next => pb
+        else
+          nullify(pblock%next)
+        endif
+      case('d', 'D')
+        pb => ptl%next
+        if (associated(pb)) then
+          pb%prev => pblock
+          pblock%next => pb
+        else
+          nullify(pblock%next)
+        endif
+      case('c', 'C')
+        pb => pbr%next
+        if (associated(pb)) then
+          pb%prev => pblock
+          pblock%next => pb
+        else
+          nullify(pblock%next)
+        endif
+      case('u', 'U')
+        pb => ptl%next
+        if (associated(pb)) then
+          pb%prev => pblock
+          pblock%next => pb
+        else
+          nullify(pblock%next)
+        endif
+    end select
+
+    pblock%refine = 0
+    pbl%refine = 0
+    pbr%refine = 0
+    ptl%refine = 0
+    ptr%refine = 0
+
+    call deallocate_block(pbl)
+    call deallocate_block(pbr)
+    call deallocate_block(ptl)
+    call deallocate_block(ptr)
+
+!----------------------------------------------------------------------
+!
+  end subroutine derefine_block
 
 !======================================================================
 !

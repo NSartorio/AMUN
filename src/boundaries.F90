@@ -90,7 +90,7 @@ module boundaries
 ! depending on the level difference
 !
                   select case(dl)
-                  case(-1)  ! restriction
+                  case(-1)  ! restriction and prolongation
                     call bnd_rest(pblock, pneigh, i, j, k)
                   case(0)   ! the same level, copying
                     if (k .eq. 1) &
@@ -98,6 +98,7 @@ module boundaries
                   case(1)   ! prolongation
 !                     call bnd_prolong(pblock, pneigh, i, j, k)
                   case default
+                    print *, dl
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
 
@@ -259,14 +260,14 @@ module boundaries
 ! neighbor to current
 !
       jl = ng / 2 + 1
-      ju = jm / 2 + ng / 2
+      ju = jm / 2
       do k = 1, km
         do j = jl, ju
-          j2 = 2 * (j - jl + 1)
+          j2 = 2 * j - ng
           j1 = j2 - 1
           do i = 1, ng
-            i1 = ie + 2 * (i - ng)
-            i2 = i1 - 1
+            i2 = ie + 2 * (i - ng)
+            i1 = i2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -305,15 +306,15 @@ module boundaries
 
 ! neighbor to current
 !
-      jl = jm / 2 + 1 - ng / 2
+      jl = jm / 2 + 1
       ju = jm - ng / 2
       do k = 1, km
         do j = jl, ju
-          j2 = 2 * (j - jl + 1)
+          j2 = 2 * j - jm + ng
           j1 = j2 - 1
           do i = 1, ng
-            i1 = ie + 2 * (i - ng)
-            i2 = i1 - 1
+            i2 = ie + 2 * (i - ng)
+            i1 = i2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -353,14 +354,14 @@ module boundaries
 ! neighbor to current
 !
       jl = ng / 2 + 1
-      ju = jm / 2 + ng / 2
+      ju = jm / 2
       do k = 1, km
         do j = jl, ju
-          j2 = 2 * (j - jl + 1)
+          j2 = 2 * j - ng
           j1 = j2 - 1
           do i = ieu, im
-            i1 = ng + 2*(i - ie)
-            i2 = i1 - 1
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -378,7 +379,6 @@ module boundaries
 
       i1 = ie + 1
       i0 = i1 - dm(1) + 1
-!       i1 = i0 + dm(1) - 1
       il = 3
       iu = il + ng - 1
       j0 = ng / 2
@@ -400,15 +400,15 @@ module boundaries
 
 ! neighbor to current
 !
-      jl = jm / 2 + 1 - ng / 2
+      jl = jm / 2 + 1
       ju = jm - ng / 2
       do k = 1, km
         do j = jl, ju
-          j2 = 2 * (j - jl + 1)
+          j2 = 2 * j - jm + ng
           j1 = j2 - 1
           do i = ieu, im
-            i1 = ng + 2*(i - ie)
-            i2 = i1 - 1
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -449,14 +449,14 @@ module boundaries
 ! neighbor to current
 !
       il = ng / 2 + 1
-      iu = im / 2 + ng / 2
+      iu = im / 2
       do k = 1, km
         do i = il, iu
-          i2 = 2 * (i - il + 1)
+          i2 = 2 * i - ng
           i1 = i2 - 1
           do j = 1, ng
-            j1 = je + 2 * (j - ng)
-            j2 = j1 - 1
+            j2 = je + 2 * (j - ng)
+            j1 = j2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -495,15 +495,15 @@ module boundaries
 
 ! neighbor to current
 !
-      il = im / 2 + 1 - ng / 2
+      il = im / 2 + 1
       iu = im - ng / 2
       do k = 1, km
         do i = il, iu
-          i2 = 2 * (i - il + 1)
+          i2 = 2 * i - im + ng
           i1 = i2 - 1
           do j = 1, ng
-            j1 = je + 2 * (j - ng)
-            j2 = j1 - 1
+            j2 = je + 2 * (j - ng)
+            j1 = j2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -543,14 +543,14 @@ module boundaries
 ! neighbor to current
 !
       il = ng / 2 + 1
-      iu = im / 2 + ng / 2
+      iu = im / 2
       do k = 1, km
         do i = il, iu
-          i2 = 2 * (i - il + 1)
+          i2 = 2 * i - ng
           i1 = i2 - 1
           do j = jeu, jm
-            j1 = ng + 2*(j - je)
-            j2 = j1 - 1
+            j2 = ng + 2 * (j - je)
+            j1 = j2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do
@@ -589,15 +589,15 @@ module boundaries
 
 ! neighbor to current
 !
-      il = im / 2 + 1 - ng / 2
+      il = im / 2 + 1
       iu = im - ng / 2
       do k = 1, km
         do i = il, iu
-          i2 = 2 * (i - il + 1)
+          i2 = 2 * i - im + ng
           i1 = i2 - 1
           do j = jeu, jm
-            j1 = ng + 2*(j - je)
-            j2 = j1 - 1
+            j2 = ng + 2 * (j - je)
+            j1 = j2 - 1
             pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
                                      + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
           end do

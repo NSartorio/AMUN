@@ -44,7 +44,7 @@ module evolution
 
     use blocks    , only : block, plist
     use boundaries, only : boundary
-    use mesh      , only : dx_min
+    use mesh      , only : dx_min, update_mesh
     use scheme    , only : maxspeed
 
     implicit none
@@ -109,6 +109,22 @@ module evolution
 ! get maximum time step
 !
     dtn = dx_min / max(cmax, 1.e-8)
+
+! check refinement and refine
+!
+    call update_mesh(0)
+
+! update boundaries
+!
+    call boundary
+
+! check refinement and refine
+!
+!     call update_mesh(1)
+
+! update boundaries
+!
+!     call boundary
 
 !-------------------------------------------------------------------------------
 !

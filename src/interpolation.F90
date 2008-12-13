@@ -163,7 +163,13 @@ module interpolation
         end do
       end do
     else
-      v(:,:,:) = z(:,:,:)
+      do k = 1, fm(3)
+        do j = 1, fm(2)
+          do i = 1, fm(1)
+            v(i,j,k) = z(i,j,k)
+          end do
+        end do
+      end do
     endif
 
     deallocate(w)
