@@ -107,7 +107,7 @@ driver.o        : driver.F90 config.o evolution.o io.o mesh.o timer.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o mesh.o scheme.o
 interpolation.o : interpolation.F90
-io.o            : io.F90 blocks.o error.o
+io.o            : io.F90 blocks.o error.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o problem.o
 problem.o       : problem.F90 blocks.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o
