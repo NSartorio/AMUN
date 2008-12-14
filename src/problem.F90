@@ -40,8 +40,7 @@ module problem
   subroutine init_problem(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien
-    use config, only : ncells, ngrids, igrids, jgrids, kgrids, nghost &
-                     , dens, pres, gammam1i
+    use config, only : in, jn, kn, im, jm, km, ng, dens, pres, gammam1i
 
 ! input arguments
 !
@@ -64,34 +63,28 @@ module problem
     enamb = gammam1i * pres
     en    = 100.0 * enamb
 
-! get dimensions
-!
-    dm(1) = igrids
-    dm(2) = jgrids
-    dm(3) = kgrids
-
 ! allocate coordinates
 !
-    allocate(x(dm(1)))
-    allocate(y(dm(2)))
-    allocate(z(dm(3)))
+    allocate(x(im))
+    allocate(y(jm))
+    allocate(z(km))
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / ncells
-    dy = (pblock%ymax - pblock%ymin) / ncells
+    dx = (pblock%xmax - pblock%xmin) / in
+    dy = (pblock%ymax - pblock%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / ncells
+    dz = (pblock%zmax - pblock%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, dm(1))/) - nghost - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, dm(2))/) - nghost - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, dm(3))/) - nghost - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */
@@ -105,9 +98,9 @@ module problem
 
 ! set initial pressure
 !
-    do k = 1, dm(3)
-      do j = 1, dm(2)
-        do i = 1, dm(1)
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 

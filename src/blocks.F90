@@ -32,13 +32,14 @@ module blocks
 !
   integer(kind=4), parameter :: ndims  = NDIMS
   integer(kind=4), parameter :: nchild = 2**ndims
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4
+  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4 &
+                              , ivx = 2, ivy = 3, ivz = 4
 #ifdef HYDRO
 #ifdef ISO
   integer(kind=4), parameter :: nvars  = 4
 #endif /* ISO */
 #ifdef ADI
-  integer(kind=4), parameter :: ien = 5
+  integer(kind=4), parameter :: ien = 5, ipr = 5
   integer(kind=4), parameter :: nvars  = 5
 #endif /* ADI */
 #endif /* HYDRO */

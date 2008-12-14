@@ -254,12 +254,12 @@ module mesh
 ! generating coordinates for all levels
 !
     do l = 1, maxlev
-      adx (l) = (xmax - xmin) / (ncells*2**(l-1))
+      adx (l) = (xmax - xmin) / (ncells*2**l)
       adxi(l) = 1.0 / adx(l)
-      ady (l) = (ymax - ymin) / (ncells*2**(l-1))
+      ady (l) = (ymax - ymin) / (ncells*2**l)
       adyi(l) = 1.0 / ady(l)
 #if NDIMS == 3
-      adz (l) = (zmax - zmin) / (ncells*2**(l-1))
+      adz (l) = (zmax - zmin) / (ncells*2**l)
 #else
       adz (l) = 1.0
 #endif
@@ -268,7 +268,7 @@ module mesh
 
 ! get the minimum grid step
 !
-    dx_min = min(adx(maxlev), ady(maxlev), adz(maxlev))
+    dx_min = 0.5*min(adx(maxlev), ady(maxlev), adz(maxlev))
 
 !-------------------------------------------------------------------------------
 !

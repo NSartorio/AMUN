@@ -424,14 +424,14 @@ module scheme
 !
   function maxspeed(u)
 
-    use blocks, only : nvars, idn, imx, imy, imz, ien
-    use config, only : igrids, jgrids, kgrids, nghost, gamma
+    use blocks, only : nv => nvars, idn, ivx, ivy, ivz, ipr
+    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
 
     implicit none
 
 ! input arguments
 !
-    real, dimension(nvars,igrids,jgrids,kgrids), intent(in)  :: u
+    real, dimension(nv,im,jm,km), intent(in)  :: u
 
 ! local variables
 !
@@ -441,7 +441,7 @@ module scheme
 
 ! local arrays
 !
-    real, dimension(nvars,igrids) :: q
+    real, dimension(nv,im) :: q
 !
 !----------------------------------------------------------------------
 !
@@ -449,26 +449,22 @@ module scheme
 
 ! iterate over all points and calculate maximum speed
 !
-#if NDIMS == 3
-    do k = nghost, kgrids - nghost
-#else /* NDIMS == 3 */
-    k = 1
-#endif /* NDIMS == 3 */
-      do j = nghost, jgrids - nghost
+    do k = kb, ke
+      do j = jb, je
 
-        call cons2prim(nvars,igrids,u(:,:,j,k),q(:,:))
+        call cons2prim(nv,im,u(:,:,j,k),q(:,:))
 
-        do i = nghost, igrids - nghost
+        do i = ib, ie
 
 ! calculate the velocity
 !
-          vv = sum(q(imx:imz,i)**2)
+          vv = sum(q(ivx:ivz,i)**2)
           v  = sqrt(vv)
 
 ! calculate the maximum characteristic speed
 !
 #ifdef ADI
-          c = sqrt(gamma*q(ien,i)/q(idn,i))
+          c = sqrt(gamma*q(ipr,i)/q(idn,i))
 #endif /* ADI */
 #ifdef ISO
           c = csnd
@@ -479,9 +475,7 @@ module scheme
           maxspeed = max(maxspeed, v + c)
         enddo
       enddo
-#if NDIMS == 3
     enddo
-#endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !

@@ -197,8 +197,8 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks, only : block, nvars
-    use config, only : igrids, jgrids, kgrids
+    use blocks, only : block, nv => nvars
+    use config, only : im, jm, km
     use mesh  , only : adxi, adyi, adzi
     use scheme, only : update
 
@@ -215,7 +215,7 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nvars,igrids,jgrids,kgrids) :: u1, du
+    real, dimension(nv,im,jm,km) :: u1, du
 !
 !-------------------------------------------------------------------------------
 !
@@ -231,12 +231,10 @@ module evolution
 
 ! update solution
 !
-    do k = 1, kgrids
-      do j = 1, jgrids
-        do i = 1, igrids
-          do q = 1, nvars
-            u1(q,i,j,k) = pblock%u(q,i,j,k) + dt*du(q,i,j,k)
-          end do
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          u1(:,i,j,k) = pblock%u(:,i,j,k) + dt*du(:,i,j,k)
         end do
       end do
     end do
@@ -247,13 +245,10 @@ module evolution
 
 ! update solution
 !
-    do k = 1, kgrids
-      do j = 1, jgrids
-        do i = 1, igrids
-          do q = 1, nvars
-            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) &
-                              + dt*du(q,i,j,k))
-          end do
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          pblock%u(:,i,j,k) = 0.5 * (pblock%u(:,i,j,k) + u1(:,i,j,k) + dt*du(:,i,j,k))
         end do
       end do
     end do
