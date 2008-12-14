@@ -151,6 +151,8 @@ program godunov
   write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
   write (*,fmt) "Time for evolution      : ", get_timer(2), 100.0*get_timer(2)/tall
   write (*,fmt) "Time for data output    : ", get_timer(3), 100.0*get_timer(3)/tall
+  write (*,fmt) "Time for boundary update: ", get_timer(4), 100.0*get_timer(4)/tall
+  write (*,fmt) "Time for mesh update    : ", get_timer(5), 100.0*get_timer(5)/tall
   write (*,fmt) "EXECUTION TIME          : ", tall, 100.0
 
 !-------------------------------------------------------------------------------

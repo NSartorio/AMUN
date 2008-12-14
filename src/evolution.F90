@@ -46,6 +46,7 @@ module evolution
     use boundaries, only : boundary
     use mesh      , only : dx_min, update_mesh
     use scheme    , only : maxspeed
+    use timer     , only : start_timer, stop_timer
 
     implicit none
 
@@ -80,7 +81,9 @@ module evolution
 
 ! update boundaries
 !
+    call start_timer(4)
     call boundary
+    call stop_timer(4)
 
 ! reset maximum speed
 !
@@ -112,19 +115,15 @@ module evolution
 
 ! check refinement and refine
 !
+    call start_timer(5)
     call update_mesh(0)
+    call stop_timer(5)
 
 ! update boundaries
 !
-    call boundary
-
-! check refinement and refine
-!
-!     call update_mesh(1)
-
-! update boundaries
-!
+!     call start_timer(4)
 !     call boundary
+!     call stop_timer(4)
 
 !-------------------------------------------------------------------------------
 !

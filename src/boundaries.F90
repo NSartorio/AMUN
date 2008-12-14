@@ -95,10 +95,8 @@ module boundaries
                   case(0)   ! the same level, copying
                     if (k .eq. 1) &
                       call bnd_copy(pblock, pneigh, i, j, k)
-                  case(1)   ! prolongation
-!                     call bnd_prolong(pblock, pneigh, i, j, k)
+                  case(1)   ! prolongation is handled by bnd_rest
                   case default
-                    print *, dl
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
 
@@ -141,9 +139,9 @@ module boundaries
   subroutine bnd_copy(pb, pn, id, is, ip)
 
     use blocks, only : block, nv => nvars
-    use config, only : ng, im, ib, ibl, ibu, ie, iel, ieu                 &
-                         , jm, jb, jbl, jbu, je, jel, jeu                 &
-                         , km, kb, kbl, kbu, ke, kel, keu
+    use config, only : im, ib, ibl, ibu, ie, iel, ieu                 &
+                     , jm, jb, jbl, jbu, je, jel, jeu                 &
+                     , km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
 
     implicit none
@@ -639,54 +637,6 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine bnd_rest
-!
-!===============================================================================
-!
-! bnd_prolong: subroutine prolongs the data from a lower level neighbor in order
-!              to update the boundary of the current block
-!
-!===============================================================================
-!
-  subroutine bnd_prolong(pb, pn, id, is, ip)
-
-    use blocks, only : block, nv => nvars
-    use config, only : ng, im, ib, ibl, ibu, ie, iel, ieu                 &
-                         , jm, jb, jbl, jbu, je, jel, jeu                 &
-                         , km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_warning
-
-    implicit none
-
-! arguments
-!
-    type(block), pointer, intent(inout) :: pb, pn
-    integer             , intent(in)    :: id, is, ip
-
-! local variables
-!
-    integer :: ii, i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-! calcuate the flag determinig the side of boundary to update
-!
-    ii = 100 * id + 10 * is + ip
-
-! perform update according to the flag
-!
-    select case(ii)
-
-! prepare an input array using of
-!
-! call prolong(inp())
-
-    case default
-      call print_warning("boundaries::bnd_prolong", "Boundary flag unsupported!")
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine bnd_prolong
 
 !===============================================================================
 !

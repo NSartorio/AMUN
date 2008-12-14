@@ -366,7 +366,7 @@ module mesh
 
               pparent => pblock
 
-              print *, 'refine block ', pparent%id
+!               print *, 'refine block ', pparent%id
               call refine_block(pblock)
               call prolong_block(pparent)
             endif
@@ -487,7 +487,7 @@ module mesh
             pparent => pblock%parent
 
             if (associated(pparent) .and. pparent%refine .eq. -1) then
-              print *, 'derefine block ', pparent%id
+!               print *, 'derefine block ', pparent%id
               call restrict_block(pparent)
               pblock => pparent
             endif

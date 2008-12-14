@@ -150,21 +150,21 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: dpmax, dpdx, dpdy, dpdz, dn, vx, vy, vz, en, ek, ei
-    real, dimension(im,jm,km)     :: pr
+    real                          :: dpmax, dpdx, dpdy, dpdz, vx, vy, vz, en, ek, ei, dddx, dddy
+    real, dimension(im,jm,km)     :: dn, pr
 !
 !----------------------------------------------------------------------
 !
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          dn = pblock%u(idn,i,j,k)
-          vx = pblock%u(imx,i,j,k) / dn
-          vy = pblock%u(imy,i,j,k) / dn
-          vz = pblock%u(imz,i,j,k) / dn
+          dn(i,j,k) = pblock%u(idn,i,j,k)
+          vx = pblock%u(imx,i,j,k) / dn(i,j,k)
+          vy = pblock%u(imy,i,j,k) / dn(i,j,k)
+          vz = pblock%u(imz,i,j,k) / dn(i,j,k)
           en = pblock%u(ien,i,j,k)
 
-          ek = 0.5 * dn * (vx*vx + vy*vy + vz*vz)
+          ek = 0.5 * dn(i,j,k) * (vx*vx + vy*vy + vz*vz)
           ei = en - ek
           pr(i,j,k) = gammam1i * ei
         end do
@@ -178,12 +178,17 @@ module problem
     do k = kb, ke
       do j = jb, je
         do i = ib, ie
+          dddx = abs(dn(i+1,j,k) - 2 * dn(i,j,k) + dn(i-1,j,k)) / &
+                 max(1.0e-8, (abs(dn(i+1,j,k) - dn(i,j,k)) + abs(dn(i,j,k) - dn(i-1,j,k)) + 1.0e-2 * (abs(dn(i+1,j,k)) - 2 * abs(dn(i,j,k)) + abs(dn(i-1,j,k)))))
+          dddy = abs(dn(i,j+1,k) - 2 * dn(i,j,k) + dn(i,j-1,k)) / &
+                 max(1.e-8, (abs(dn(i,j+1,k) - dn(i,j,k)) + abs(dn(i,j,k) - dn(i,j-1,k)) + 1.0e-2 * (abs(dn(i,j+1,k)) - 2 * abs(dn(i,j,k)) + abs(dn(i,j-1,k)))))
+
           dpdx = abs(pr(i+1,j,k) - 2 * pr(i,j,k) + pr(i-1,j,k)) / &
                  max(1.0e-8, (abs(pr(i+1,j,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i-1,j,k)) + 1.0e-2 * (abs(pr(i+1,j,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i-1,j,k)))))
           dpdy = abs(pr(i,j+1,k) - 2 * pr(i,j,k) + pr(i,j-1,k)) / &
                  max(1.e-8, (abs(pr(i,j+1,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i,j-1,k)) + 1.0e-2 * (abs(pr(i,j+1,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i,j-1,k)))))
 
-          dpmax = max(dpmax, dpdx, dpdy)
+          dpmax = max(dpmax, dddx, dddy, dpdx, dpdy)
         end do
       end do
     end do
@@ -192,10 +197,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .gt. 0.8) then
+    if (dpmax .gt. 0.7) then
       check_ref =  1
     endif
-    if (dpmax .lt. 0.5) then
+    if (dpmax .lt. 0.3) then
       check_ref = -1
     endif
 
