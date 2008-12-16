@@ -73,6 +73,7 @@ module blocks
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
     real, dimension(:,:,:,:), allocatable :: u
+    real, dimension(:,:,:)  , allocatable :: c
   end type block
 
 ! stored pointers
@@ -171,6 +172,7 @@ module blocks
 ! allocate space for variables
 !
     allocate(pblock%u(nvars,igrids,jgrids,kgrids))
+    allocate(pblock%c(igrids,jgrids,kgrids))
 
 !----------------------------------------------------------------------
 !
@@ -196,6 +198,7 @@ module blocks
 ! deallocate variables
 !
     deallocate(pblock%u)
+    deallocate(pblock%c)
 
     nullify(pblock%next)
     nullify(pblock%prev)

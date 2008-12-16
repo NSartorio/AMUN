@@ -49,6 +49,7 @@ module io
                      , hid_t, hsize_t, H5F_ACC_TRUNC_F                      &
                      , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
     use scheme, only : cons2prim
+    use problem, only : check_ref
 
     implicit none
 
@@ -65,7 +66,7 @@ module io
 ! local variables
 !
     character(len=64) :: fl, gnm
-    integer           :: err, i, j, k
+    integer           :: err, i, j, k, r
 
 ! pointers
 !
@@ -73,7 +74,7 @@ module io
 
 ! local arrays
 !
-    real, dimension(im,jm,km)    :: tmp
+    real, dimension(im,jm,km)    :: tmp, c
     real, dimension(nv,im,jm,km) :: u, v
 !
 !----------------------------------------------------------------------
@@ -192,12 +193,15 @@ module io
 
           call h5sclose_f(sid, err)
 
+          r = check_ref(pblock)
+
 ! prepare field variables for writing
 !
           do k = 1, km
             do j = 1, jm
               u(:,:,j,k) = pblock%u(:,:,j,k)
               call cons2prim(nv,im,u(:,:,j,k),v(:,:,j,k))
+              c(:,j,k) = pblock%c(:,j,k)
             end do
           end do
 
@@ -230,6 +234,10 @@ module io
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, u(5,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 #endif /* ADI */
+
+          call h5dcreate_f(gid, 'crit', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, c(:,:,:), dm(1:3), err, sid)
+          call h5dclose_f(did, err)
 
           call h5sclose_f(sid, err)
 

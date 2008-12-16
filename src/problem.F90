@@ -140,7 +140,7 @@ module problem
 
 ! input arguments
 !
-    type(block), pointer, intent(in) :: pblock
+    type(block), pointer, intent(inout) :: pblock
 
 ! return variable
 !
@@ -148,9 +148,9 @@ module problem
 
 ! local variables
 !
-    integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: dpmax, dpdx, dpdy, dpdz, vx, vy, vz, en, ek, ei, dddx, dddy
+    real                          :: dpmax, vx, vy, vz, en, ek, ei
+    real                          :: dnl, dnr, prl, prr, ddndx, ddndy, dprdx, dprdy, ddn, dpr
     real, dimension(im,jm,km)     :: dn, pr
 !
 !----------------------------------------------------------------------
@@ -176,19 +176,30 @@ module problem
     dpmax = 0.0d0
 
     do k = kb, ke
-      do j = jb, je
-        do i = ib, ie
-          dddx = abs(dn(i+1,j,k) - 2 * dn(i,j,k) + dn(i-1,j,k)) / &
-                 max(1.0e-8, (abs(dn(i+1,j,k) - dn(i,j,k)) + abs(dn(i,j,k) - dn(i-1,j,k)) + 1.0e-2 * (abs(dn(i+1,j,k)) - 2 * abs(dn(i,j,k)) + abs(dn(i-1,j,k)))))
-          dddy = abs(dn(i,j+1,k) - 2 * dn(i,j,k) + dn(i,j-1,k)) / &
-                 max(1.e-8, (abs(dn(i,j+1,k) - dn(i,j,k)) + abs(dn(i,j,k) - dn(i,j-1,k)) + 1.0e-2 * (abs(dn(i,j+1,k)) - 2 * abs(dn(i,j,k)) + abs(dn(i,j-1,k)))))
+      do j = jb-1, je+1
+        do i = ib-1, ie+1
+          dnl = dn(i-1,j,k)
+          dnr = dn(i+1,j,k)
+          ddndx = abs(dnr-dnl)/(dnr+dnl)
+          dnl = dn(i,j-1,k)
+          dnr = dn(i,j+1,k)
+          ddndy = abs(dnr-dnl)/(dnr+dnl)
 
-          dpdx = abs(pr(i+1,j,k) - 2 * pr(i,j,k) + pr(i-1,j,k)) / &
-                 max(1.0e-8, (abs(pr(i+1,j,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i-1,j,k)) + 1.0e-2 * (abs(pr(i+1,j,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i-1,j,k)))))
-          dpdy = abs(pr(i,j+1,k) - 2 * pr(i,j,k) + pr(i,j-1,k)) / &
-                 max(1.e-8, (abs(pr(i,j+1,k) - pr(i,j,k)) + abs(pr(i,j,k) - pr(i,j-1,k)) + 1.0e-2 * (abs(pr(i,j+1,k)) - 2 * abs(pr(i,j,k)) + abs(pr(i,j-1,k)))))
+          ddn = sqrt(ddndx**2 + ddndy**2)
 
-          dpmax = max(dpmax, dddx, dddy, dpdx, dpdy)
+          prl = pr(i-1,j,k)
+          prr = pr(i+1,j,k)
+          dprdx = abs(prr-prl)/(prr+prl)
+          prl = pr(i,j-1,k)
+          prr = pr(i,j+1,k)
+          dprdy = abs(prr-prl)/(prr+prl)
+
+          dpr = sqrt(dprdx**2 + dprdy**2)
+
+          pblock%c(i,j,k) = max(ddn,dpr)
+
+          dpmax = max(dpmax, ddn, dpr)
+
         end do
       end do
     end do
@@ -197,10 +208,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .gt. 0.7) then
+    if (dpmax .ge. 0.4) then
       check_ref =  1
     endif
-    if (dpmax .lt. 0.3) then
+    if (dpmax .le. 0.2) then
       check_ref = -1
     endif
 
