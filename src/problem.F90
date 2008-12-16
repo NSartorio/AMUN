@@ -208,10 +208,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .ge. 0.4) then
+    if (dpmax .ge. 0.25) then
       check_ref =  1
     endif
-    if (dpmax .le. 0.2) then
+    if (dpmax .le. 0.12) then
       check_ref = -1
     endif
 

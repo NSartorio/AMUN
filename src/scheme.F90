@@ -84,6 +84,9 @@ module scheme
 #ifdef HLL
         call hll(nv, im, ul, fl)
 #endif /* HLL */
+#ifdef HLLC
+        call hllc(nv, im, ul, fl)
+#endif /* HLLC */
 
 ! update the arrays of increments
 !
@@ -121,6 +124,9 @@ module scheme
 #ifdef HLL
         call hll(nv, jm, ul, fl)
 #endif /* HLL */
+#ifdef HLLC
+        call hllc(nv, jm, ul, fl)
+#endif /* HLLC */
 
 ! update the arrays of increments
 !
@@ -159,6 +165,9 @@ module scheme
 #ifdef HLL
         call hll(nv, km, ul, fl)
 #endif /* HLL */
+#ifdef HLLC
+        call hllc(nv, km, ul, fl)
+#endif /* HLLC */
 
 ! update the arrays of increments
 !
@@ -274,6 +283,216 @@ module scheme
 !
   end subroutine hll
 #endif /* HLL */
+#ifdef HLLC
+!===============================================================================
+!
+! hllc: subroutine to compute flux approximated by HLLC method (HYDRO only)
+!         ([1] Batten et al., 1997, JSC, 18, 6, 1553)
+!         ([2] Miyoshi & Kusano, 2005, JCP, 208, 315)
+!
+!===============================================================================
+!
+  subroutine hllc(m, n, uc, f)
+
+    use interpolation, only : reconstruct
+
+    implicit none
+
+! input/output arguments
+!
+    integer             , intent(in)  :: m, n
+    real, dimension(m,n), intent(in)  :: uc
+    real, dimension(m,n), intent(out) :: f
+
+! local variables
+!
+    integer              :: p, i
+    real, dimension(m,n) :: ql, qr, qc, ul, ur
+    real, dimension(m,n) :: fl, fr, fx
+    real, dimension(n)   :: cl, cr, cm
+    real                 :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm  &
+                          , smvl, smvr, div, pt
+    real, dimension(m)   :: q1l, q1r, u1l, u1r
+!
+!----------------------------------------------------------------------
+!
+    f (:,:) = 0.0
+    fx(:,:) = 0.0
+
+#ifdef CONREC
+! reconstruct left and right states of conserved variables
+!
+    do p = 1, m
+      call reconstruct(n,uc(p,:),ul(p,:),ur(p,:))
+    enddo
+
+! calculate primitive variables
+!
+    call cons2prim(m,n,ul,ql)
+    call cons2prim(m,n,ur,qr)
+#else /* CONREC */
+
+! calculate primitive variables
+!
+    call cons2prim(m,n,uc,qc)
+
+! reconstruct left and right states of primitive variables
+!
+    do p = 1, m
+      call reconstruct(n,qc(p,:),ql(p,:),qr(p,:))
+    enddo
+
+! calculate conservative variables at states
+!
+    call prim2cons(m,n,ql,ul)
+    call prim2cons(m,n,qr,ur)
+#endif /* CONREC */
+
+! calculate fluxes and speeds
+!
+    call fluxspeed(m,n,ql,ul,fl,cl)
+    call fluxspeed(m,n,qr,ur,fr,cr)
+
+! calculate fluxes
+!
+    do i = 1, n
+
+! calculate min and max and intermediate speeds: eq. (67)
+!
+      sl = min(ql(2,i) - cl(i),qr(2,i) - cr(i))
+      sr = max(ql(2,i) + cl(i),qr(2,i) + cr(i))
+
+! all speeds >= 0, left side flux
+!
+      if (sl .ge. 0.0) then
+
+        fx(:,i) = fl(:,i)
+
+! all speeds <= 0, right side flux
+!
+      else if (sr .le. 0.0) then
+
+        fx(:,i) = fr(:,i)
+
+! intermediate states
+!
+      else  ! sl < 0 & sr > 0
+
+! useful differences
+!
+        slmv = sl - ql(2,i)
+        srmv = sr - qr(2,i)
+
+! speed of contact discontinuity (eq. 34 [1], 14 [2])
+!
+        div =  srmv*qr(1,i) - slmv*ql(1,i)
+        sml = (srmv*ur(2,i) - slmv*ul(2,i) - qr(5,i) + ql(5,i))/div
+        div =  slmv*ql(1,i) - srmv*qr(1,i)
+        smr = (slmv*ul(2,i) - srmv*ur(2,i) - ql(5,i) + qr(5,i))/div
+        sm  = 0.5d0 * (sml + smr)
+
+        if (sm .eq. 0.0d0) then
+
+! calculate left intermediate state
+!
+          pt = ql(5,i) - ul(2,i)*slmv
+          u1l(1) = ql(1,i)*slmv/sl
+          u1l(2) = 0.0d0
+          u1l(3) = u1l(1)*ql(3,i)
+          u1l(4) = u1l(1)*ql(4,i)
+          if (sl .eq. 0.0) then
+            u1l(5) = ul(5,i)
+          else
+            u1l(5) = (slmv*ul(5,i) - ql(5,i)*ql(2,i))/sl
+          endif
+
+! calculate right intermediate state
+!
+            pt = qr(5,i) - ur(2,i)*srmv
+            u1r(1) = qr(1,i)*srmv/sr
+            u1r(2) = 0.0d0
+            u1r(3) = u1r(1)*qr(3,i)
+            u1r(4) = u1r(1)*qr(4,i)
+            if (sr .eq. 0.0) then
+              u1r(5) = ur(5,i)
+            else
+              u1r(5) = (srmv*ur(5,i) - qr(5,i)*qr(2,i))/sr
+            endif
+
+! calculate intermediate flux
+!
+            fx(:,i) = 0.5*(fl(:,i) + sl*(u1l(:) - ul(:,i)) &
+                    +      fr(:,i) + sr*(u1r(:) - ur(:,i)))
+
+        else
+
+! useful differences
+!
+          slmm = sl - sm
+          srmm = sr - sm
+          smvl = sm - ql(2,i)
+          smvr = sm - qr(2,i)
+
+! intermediate discontinuities
+!
+          if (sm .gt. 0.0) then
+
+! pressure of intermediate states (eq. 36 [1], 16 [2])
+!
+            pt = ql(5,i) + ql(1,i)*slmv*smvl
+
+! calculate left intermediate state
+!
+            u1l(1) = ql(1,i)*slmv/slmm                               ! eq. (35 [1], 17 [2])
+            u1l(2) = u1l(1)*sm                                       ! eq. (37 [1])
+            u1l(3) = u1l(1)*ql(3,i)                                  ! eq. (38 [1], 18 [2])
+            u1l(4) = u1l(1)*ql(4,i)                                  ! eq. (39 [1], 19 [2])
+            if (slmm .eq. 0.0) then
+              u1l(5) = ul(5,i)
+            else
+              u1l(5) = (slmv*ul(5,i) - ql(5,i)*ql(2,i) + pt*sm)/slmm ! eq. (40 [1], 20 [2])
+            endif
+
+! calculate left intermediate flux
+!
+            fx(:,i) = fl(:,i) + sl*(u1l(:) - ul(:,i))    ! eq. (29 [1], 15 [2])
+
+          else if (sm .lt. 0.0) then
+
+! pressure of intermediate states (eq. 36 [1], 16 [2])
+!
+            pt = qr(5,i) + qr(1,i)*srmv*smvr
+
+! calculate right intermediate state
+!
+            u1r(1) = qr(1,i)*srmv/srmm                               ! eq. (35 [1], 17 [2])
+            u1r(2) = u1r(1)*sm                                       ! eq. (37 [1])
+            u1r(3) = u1r(1)*qr(3,i)                                  ! eq. (38 [1], 18 [2])
+            u1r(4) = u1r(1)*qr(4,i)                                  ! eq. (39 [1], 19 [2])
+            if (srmm .eq. 0.0) then
+              u1r(5) = ur(5,i)
+            else
+              u1r(5) = (srmv*ur(5,i) - qr(5,i)*qr(2,i) + pt*sm)/srmm ! eq. (40 [1], 20 [2])
+            endif
+
+! calculate right intermediate flux
+!
+            fx(:,i) = fr(:,i) + sr*(u1r(:) - ur(:,i))    ! eq. (30 [1], 15 [2])
+
+          endif
+        endif
+      endif
+
+    enddo
+
+! calculate numerical flux
+!
+    f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine hllc
+#endif /* HLLC */
 !
 !===============================================================================
 !
