@@ -40,7 +40,8 @@ module io
   subroutine write_data(ftype, nfile, nproc)
 
     use blocks, only : block, plist, nv => nvars
-    use config, only : im, jm, km
+    use config, only : ncells, nghost, ngrids, igrids, jgrids, kgrids       &
+                     , im, jm, km, maxlev
     use error , only : print_error
     use hdf5  , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f         &
                      , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
@@ -48,6 +49,7 @@ module io
                      , h5dcreate_f, h5dwrite_f, h5dclose_f                  &
                      , hid_t, hsize_t, H5F_ACC_TRUNC_F                      &
                      , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
+    use mesh  , only : ax, ay, az, adx, ady, adz
     use scheme, only : cons2prim
     use problem, only : check_ref
 
@@ -60,8 +62,8 @@ module io
 
 ! HDF5 variables
 !
-    integer(hid_t)    :: fid, gid, sid, aid, did
-    integer(hsize_t)  :: am(1), dm(3)
+    integer(hid_t)    :: fid, gid, sid, aid, did, bid
+    integer(hsize_t)  :: am(1), cm(2), dm(3)
 
 ! local variables
 !
@@ -101,8 +103,87 @@ module io
 
       if (err .ge. 0) then
 
-! TODO: write all attributes
-! TODO: write coordinates for all refinement levels
+! create a group for the global attributes
+!
+        call h5gcreate_f(fid, 'attributes', gid, err)
+        am(1) = 1
+        call h5screate_simple_f(1, am, sid, err)
+
+        call h5acreate_f(gid, 'ncells', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, ncells, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'ngrids', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, ngrids, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'igrids', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, igrids, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'jgrids', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, jgrids, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'kgrids', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, kgrids, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'nghost', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, nghost, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'maxlev', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, maxlev, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5sclose_f(sid, err)
+        call h5gclose_f(gid, err)
+
+! create a group for the coordinates
+!
+        call h5gcreate_f(fid, 'coordinates', gid, err)
+        cm(1) = maxlev
+        cm(2) = ngrids
+        call h5screate_simple_f(1, cm, sid, err)
+
+        call h5acreate_f(gid, 'x', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(ax(:,:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'y', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(ay(:,:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'z', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(az(:,:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5sclose_f(sid, err)
+
+        am(1) = maxlev
+        call h5screate_simple_f(1, am, sid, err)
+
+        call h5acreate_f(gid, 'dx', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(adx(:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'dy', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(ady(:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'dz', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(adz(:),8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5sclose_f(sid, err)
+
+        call h5gclose_f(gid, err)
+
+! create a group for the block storage
+!
+        call h5gcreate_f(fid, 'blocks', gid, err)
+
 ! TODO: iterate over all blocks and write complete structure of each of them
 !
         pblock => plist
@@ -113,23 +194,23 @@ module io
 
           write(gnm,"('blk',i8.8)") pblock%id
 
-          call h5gcreate_f(fid, gnm, gid, err)
+          call h5gcreate_f(gid, gnm, bid, err)
 
 ! TODO: create block attributes (xmin, xmax, ..., level, parent, all entries of structure)
 !
           am(1) = 1
           call h5screate_simple_f(1, am, sid, err)
 
-          call h5acreate_f(gid, 'id', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'id', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%id, am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'refine', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'refine', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%refine, am, err)
           call h5aclose_f(aid, err)
 
           ptemp => pblock%prev
-          call h5acreate_f(gid, 'prev', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'prev', H5T_NATIVE_INTEGER, sid, aid, err)
           if (associated(ptemp)) then
             call h5awrite_f(aid, H5T_NATIVE_INTEGER, ptemp%id, am, err)
           else
@@ -138,7 +219,7 @@ module io
           call h5aclose_f(aid, err)
 
           ptemp => pblock%next
-          call h5acreate_f(gid, 'next', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'next', H5T_NATIVE_INTEGER, sid, aid, err)
           if (associated(ptemp)) then
             call h5awrite_f(aid, H5T_NATIVE_INTEGER, ptemp%id, am, err)
           else
@@ -146,16 +227,16 @@ module io
           endif
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'config', H5T_NATIVE_CHARACTER, sid, aid, err)
+          call h5acreate_f(bid, 'config', H5T_NATIVE_CHARACTER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pblock%config, am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'leaf', H5T_NATIVE_CHARACTER, sid, aid, err)
+          call h5acreate_f(bid, 'leaf', H5T_NATIVE_CHARACTER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pblock%leaf, am, err)
           call h5aclose_f(aid, err)
 
           ptemp => pblock%parent
-          call h5acreate_f(gid, 'parent', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'parent', H5T_NATIVE_INTEGER, sid, aid, err)
           if (associated(ptemp)) then
             call h5awrite_f(aid, H5T_NATIVE_INTEGER, ptemp%id, am, err)
           else
@@ -163,31 +244,31 @@ module io
           endif
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'level', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5acreate_f(bid, 'level', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%level, am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'xmin', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'xmin', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%xmin,8), am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'xmax', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'xmax', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%xmax,8), am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'ymin', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'ymin', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%ymin,8), am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'ymax', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'ymax', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%ymax,8), am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'zmin', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'zmin', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%zmin,8), am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(gid, 'zmax', H5T_NATIVE_DOUBLE, sid, aid, err)
+          call h5acreate_f(bid, 'zmax', H5T_NATIVE_DOUBLE, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%zmax,8), am, err)
           call h5aclose_f(aid, err)
 
@@ -209,42 +290,46 @@ module io
 !
           call h5screate_simple_f(3, dm(1:3), sid, err)
 
-          call h5dcreate_f(gid, 'dens', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'dens', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, v(1,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
-          call h5dcreate_f(gid, 'velx', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'velx', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, v(2,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
-          call h5dcreate_f(gid, 'vely', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'vely', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, v(3,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
-          call h5dcreate_f(gid, 'velz', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'velz', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, v(4,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
 #ifdef ADI
-          call h5dcreate_f(gid, 'pres', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'pres', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, v(5,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
-          call h5dcreate_f(gid, 'ener', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'ener', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, u(5,:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 #endif /* ADI */
 
-          call h5dcreate_f(gid, 'crit', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dcreate_f(bid, 'crit', H5T_NATIVE_DOUBLE, sid, did, err)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, c(:,:,:), dm(1:3), err, sid)
           call h5dclose_f(did, err)
 
           call h5sclose_f(sid, err)
 
-          call h5gclose_f(gid, err)
+          call h5gclose_f(bid, err)
           endif
           pblock => pblock.next
         end do
+
+! close group 'blocks'
+!
+        call h5gclose_f(gid, err)
 
 ! terminate access to the file
 !
