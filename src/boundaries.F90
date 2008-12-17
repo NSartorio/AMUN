@@ -110,6 +110,8 @@ module boundaries
 
 ! neighbor is not associated, it means that we have non periodic boundary here
 !
+                if (k .eq. 1) &
+                  call bnd_spec(pblock, i, j, k)
 
               endif
 
@@ -637,6 +639,199 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine bnd_rest
+!
+!===============================================================================
+!
+! bnd_spec: subroutine to apply specific boundary conditions
+!
+!===============================================================================
+!
+  subroutine bnd_spec(pb, id, il, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
+                     , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu      &
+                     , kb, kbl, ke, keu
+    use error , only : print_warning
+    use interpolation, only : expand
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer, intent(inout) :: pb
+    integer             , intent(in)    :: id, il, ip
+
+! local variables
+!
+    integer :: ii, i, j, k, it, jt, kt, is, js, ks, itm1, itp1, jtm1, jtp1, ktm1, ktp1
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * il
+
+! perform update according to the flag
+!
+    select case(ii)
+    case(110)
+      select case(xlbndry)
+      case("reflecting")
+        do i = 1, ng
+          it = ib  - i
+          is = ibl + i
+          do k = 1, km
+            do j = 1, jm
+              pb%u(:,it,j,k) =  pb%u(:,is,j,k)
+              pb%u(2,it,j,k) = -pb%u(2,is,j,k)
+          end do
+          end do
+        end do
+      case default ! set "open" for default
+        do i = 1, ng
+          it   = ib - i
+          itp1 = it + 1
+
+          do k = 1, km
+            do j = 1, jm
+              pb%u(:,it,j,k) = pb%u(:,itp1,j,k)
+            end do
+          end do
+        end do
+      end select
+    case(120)
+      select case(xubndry)
+      case("reflecting")
+        do i = 1, ng
+          it = ie  + i
+          is = ieu - i
+          do k = 1, km
+            do j = 1, jm
+              pb%u(:,it,j,k) =  pb%u(:,is,j,k)
+              pb%u(2,it,j,k) = -pb%u(2,is,j,k)
+            end do
+          end do
+        end do
+      case default ! set "open" for default
+        do i = 1, ng
+          it   = ie + i
+          itm1 = it - 1
+
+          do k = 1, km
+            do j = 1, jm
+              pb%u(:,it,j,k) = pb%u(:,itm1,j,k)
+            end do
+          end do
+        end do
+      end select
+    case(210)
+      select case(ylbndry)
+      case("reflecting")
+        do j = 1, ng
+          jt = jb  - j
+          js = jbl + j
+          do k = 1, km
+            do i = 1, im
+              pb%u(:,i,jt,k) =  pb%u(:,i,js,k)
+              pb%u(3,i,jt,k) = -pb%u(3,i,js,k)
+            end do
+          end do
+        end do
+      case default ! set "open" for default
+        do j = 1, ng
+          jt   = jb - j
+          jtp1 = jt + 1
+
+          do k = 1, km
+            do i = 1, im
+              pb%u(:,i,jt,k) = pb%u(:,i,jtp1,k)
+            end do
+          end do
+        end do
+      end select
+    case(220)
+      select case(yubndry)
+      case("reflecting")
+        do j = 1, ng
+          jt = je  + j
+          js = jeu - j
+          do k = 1, km
+            do i = 1, im
+              pb%u(:,i,jt,k) =  pb%u(:,i,js,k)
+              pb%u(3,i,jt,k) = -pb%u(3,i,js,k)
+            end do
+          end do
+        end do
+      case default ! set "open" for default
+        do j = 1, ng
+          jt   = je + j
+          jtm1 = jt - 1
+
+          do k = 1, km
+            do i = 1, im
+              pb%u(:,i,jt,k) = pb%u(:,i,jtm1,k)
+            end do
+          end do
+        end do
+      end select
+    case(310)
+      select case(zlbndry)
+      case("reflecting")
+        do k = 1, ng
+          kt = kb  - k
+          ks = kbl + k
+          do j = 1, jm
+            do i = 1, im
+              pb%u(:,i,j,kt) =  pb%u(:,i,j,ks)
+              pb%u(4,i,j,kt) = -pb%u(4,i,j,ks)
+            end do
+          end do
+        end do
+      case default ! set "open" for default
+        do k = 1, ng
+          kt   = kb - k
+          ktp1 = kt + 1
+
+          do j = 1, jm
+            do i = 1, im
+              pb%u(:,i,j,kt) = pb%u(:,i,j,ktp1)
+            end do
+          end do
+        end do
+      end select
+    case(320)
+      select case(zubndry)
+      case("reflecting")
+        do k = 1, ng
+          kt = ke  + k
+          ks = keu - k
+          do j = 1, jm
+            do i = 1, im
+              pb%u(:,i,j,kt) =  pb%u(:,i,j,ks)
+              pb%u(4,i,j,kt) = -pb%u(4,i,j,ks)
+            end do
+          end do
+        end do
+      case default ! set "open" for default
+        do k = 1, ng
+          kt   = ke + k
+          ktm1 = kt - 1
+
+          do j = 1, jm
+            do i = 1, im
+              pb%u(:,i,j,kt) = pb%u(:,i,j,ktm1)
+            end do
+          end do
+        end do
+      end select
+    case default
+      call print_warning("boundaries::bnd_spec", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_spec
 
 !===============================================================================
 !

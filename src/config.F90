@@ -82,6 +82,15 @@ module config
 !
   real           , save :: dens = 1.0, pres = 1.0
 
+! boundary conditions
+!
+  character(len = 32), save :: xlbndry = "periodic"
+  character(len = 32), save :: xubndry = "periodic"
+  character(len = 32), save :: ylbndry = "periodic"
+  character(len = 32), save :: yubndry = "periodic"
+  character(len = 32), save :: zlbndry = "periodic"
+  character(len = 32), save :: zubndry = "periodic"
+
   contains
 !
 !======================================================================
@@ -186,6 +195,24 @@ module config
       read(value,        *) dens
     case("pres")
       read(value,        *) pres
+    case ('xlbndry')
+      l = len_trim(value)
+      write(xlbndry  , "(a)") value(2:l-1)
+    case ('xubndry')
+      l = len_trim(value)
+      write(xubndry  , "(a)") value(2:l-1)
+    case ('ylbndry')
+      l = len_trim(value)
+      write(ylbndry  , "(a)") value(2:l-1)
+    case ('yubndry')
+      l = len_trim(value)
+      write(yubndry  , "(a)") value(2:l-1)
+    case ('zlbndry')
+      l = len_trim(value)
+      write(zlbndry  , "(a)") value(2:l-1)
+    case ('zubndry')
+      l = len_trim(value)
+      write(zubndry  , "(a)") value(2:l-1)
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
