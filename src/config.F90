@@ -45,7 +45,9 @@ module config
 
 ! mesh refinement control
 !
-  integer(kind=4), save :: maxlev = 2
+  integer(kind=4), save :: maxlev  = 2
+  real           , save :: crefmin = 0.1
+  real           , save :: crefmax = 0.2
 
 ! the maximum number of iterations
 !
@@ -195,6 +197,10 @@ module config
       read(value,        *) dens
     case("pres")
       read(value,        *) pres
+    case("crefmin")
+      read(value,        *) crefmin
+    case("crefmax")
+      read(value,        *) crefmax
     case ('xlbndry')
       l = len_trim(value)
       write(xlbndry  , "(a)") value(2:l-1)

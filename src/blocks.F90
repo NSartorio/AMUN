@@ -405,10 +405,10 @@ module blocks
 ! set block bounds
 !
     xl = xmn
-    xc = xmn + (xmx - xmn) / 2
+    xc = 0.5 * (xmx + xmn)
     xr = xmx
     yl = ymn
-    yc = ymn + (ymx - ymn) / 2
+    yc = 0.5 * (ymx + ymn)
     yr = ymx
 
     pbl%xmin = xl
@@ -614,9 +614,9 @@ module blocks
 ! set bounds
 !
       pbl%xmin = pblock%xmin
-      pbl%xmax = 0.5 * (pblock%xmin + pblock%xmax)
+      pbl%xmax = 0.5 * (pblock%xmax + pblock%xmin)
       pbl%ymin = pblock%ymin
-      pbl%ymax = 0.5 * (pblock%ymin + pblock%ymax)
+      pbl%ymax = 0.5 * (pblock%ymax + pblock%ymin)
 
       pbr%xmin = pbl%xmax
       pbr%xmax = pblock%xmax

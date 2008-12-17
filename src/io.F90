@@ -41,7 +41,7 @@ module io
 
     use blocks, only : block, plist, nv => nvars
     use config, only : ncells, nghost, ngrids, igrids, jgrids, kgrids       &
-                     , im, jm, km, maxlev
+                     , im, jm, km, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use error , only : print_error
     use hdf5  , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f         &
                      , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
@@ -135,6 +135,30 @@ module io
 
         call h5acreate_f(gid, 'maxlev', H5T_NATIVE_INTEGER, sid, aid, err)
         call h5awrite_f(aid, H5T_NATIVE_INTEGER, maxlev, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'xmin', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(xmin,8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'xmax', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(xmax,8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'ymin', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(ymin,8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'ymax', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(ymax,8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'zmin', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(zmin,8), am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'zmax', H5T_NATIVE_DOUBLE, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(zmax,8), am, err)
         call h5aclose_f(aid, err)
 
         call h5sclose_f(sid, err)

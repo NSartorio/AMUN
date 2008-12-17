@@ -102,12 +102,25 @@ module problem
       do j = 1, jm
         do i = 1, im
 
-          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+! blast
+!
+!           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+!           if (r .le. 0.1) then
+!             pblock%u(ien,i,j,k) = en
+!           else
+!             pblock%u(ien,i,j,k) = enamb
+!           endif
 
-          if (r .le. 0.1) then
-            pblock%u(ien,i,j,k) = en
+! implosion
+!
+          r = x(i) + y(j)
+
+          if (r .le. 0.15) then
+            pblock%u(idn,i,j,k) = 0.125
+            pblock%u(ien,i,j,k) = gammam1i * 0.14
           else
-            pblock%u(ien,i,j,k) = enamb
+            pblock%u(idn,i,j,k) = 1.0
+            pblock%u(ien,i,j,k) = gammam1i
           endif
 
         end do
@@ -136,7 +149,7 @@ module problem
   function check_ref(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
-    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i
+    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i, crefmin, crefmax
 
 ! input arguments
 !
@@ -208,10 +221,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .ge. 0.25) then
+    if (dpmax .ge. crefmax) then
       check_ref =  1
     endif
-    if (dpmax .le. 0.12) then
+    if (dpmax .le. crefmin) then
       check_ref = -1
     endif
 

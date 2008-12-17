@@ -40,8 +40,8 @@ program godunov
 ! local variables
 !
   character(len=60) :: fmt
-  integer           :: no
-  real              :: tall
+  integer           :: no, ed, eh, em, es, ec
+  real              :: tall, tbeg, tcur
 !
 !-------------------------------------------------------------------------------
 !
@@ -68,6 +68,7 @@ program godunov
   dt  = cfl*dtini
   dtn = dtini
   no  = 0
+  tbeg = 0.0
 
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
@@ -118,11 +119,22 @@ program godunov
     endif
     call stop_timer(3)
 
+! get current time in seconds
+!
+    tcur = get_timer_total()
+    ec   = int((tmax - t)/(t - tbeg)*tcur, kind=4)
+    es   = max(0, int(mod(ec,60)))
+    em   = int(mod(ec/60,60))
+    eh   = int(ec/3600)
+    ed   = int(eh/24)
+    eh   = int(mod(eh, 24))
+    ed   = min(9999,ed)
+
 ! print progress information
 !
     if (mod(n, 50) .eq. 1) &
       write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
-    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, 0, 0, 0, 0!, ed, eh, em, es
+    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, ed, eh, em, es
 
   end do
 
