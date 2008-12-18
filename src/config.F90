@@ -80,9 +80,13 @@ module config
 !
   real           , save :: cfl = 0.6
 
+! problem selection
+!
+  character(len = 64), save :: problem = "blast"
+
 ! initial values
 !
-  real           , save :: dens = 1.0, pres = 1.0
+  real               , save :: dens = 1.0, pres = 1.0, rmid = 0.5
 
 ! boundary conditions
 !
@@ -197,10 +201,15 @@ module config
       read(value,        *) dens
     case("pres")
       read(value,        *) pres
+    case("rmid")
+      read(value,        *) rmid
     case("crefmin")
       read(value,        *) crefmin
     case("crefmax")
       read(value,        *) crefmax
+    case ('problem')
+      l = len_trim(value)
+      write(problem  , "(a)") value(2:l-1)
     case ('xlbndry')
       l = len_trim(value)
       write(xlbndry  , "(a)") value(2:l-1)

@@ -30,14 +30,50 @@ module problem
 
   contains
 !
-!======================================================================
+!===============================================================================
 !
 ! init_problem: subroutine initializes the variables according to
 !               the studied problem
 !
-!======================================================================
+!===============================================================================
 !
   subroutine init_problem(pblock)
+
+    use blocks, only : block
+    use config, only : problem
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! local arguments
+!
+    type(block), pointer :: pb
+!
+!-------------------------------------------------------------------------------
+!
+    pb => pblock
+
+    select case(trim(problem))
+    case("blast")
+      call init_blast(pb)
+    case("implosion")
+      call init_implosion(pb)
+    end select
+
+    nullify(pb)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_problem
+!
+!===============================================================================
+!
+! init_blast: subroutine initializes the variables for the blast problem
+!
+!===============================================================================
+!
+  subroutine init_blast(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien
     use config, only : in, jn, kn, im, jm, km, ng, dens, pres, gammam1i
@@ -56,7 +92,7 @@ module problem
 !
     real, dimension(:), allocatable :: x, y, z
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! calculate parameters
 !
@@ -102,25 +138,11 @@ module problem
       do j = 1, jm
         do i = 1, im
 
-! blast
-!
-!           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-!           if (r .le. 0.1) then
-!             pblock%u(ien,i,j,k) = en
-!           else
-!             pblock%u(ien,i,j,k) = enamb
-!           endif
-
-! implosion
-!
-          r = x(i) + y(j)
-
-          if (r .le. 0.15) then
-            pblock%u(idn,i,j,k) = 0.125
-            pblock%u(ien,i,j,k) = gammam1i * 0.14
+          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+          if (r .le. 0.1) then
+            pblock%u(ien,i,j,k) = en
           else
-            pblock%u(idn,i,j,k) = 1.0
-            pblock%u(ien,i,j,k) = gammam1i
+            pblock%u(ien,i,j,k) = enamb
           endif
 
         end do
@@ -133,23 +155,119 @@ module problem
     deallocate(y)
     deallocate(z)
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
-  end subroutine init_problem
+  end subroutine init_blast
 !
-!======================================================================
+!===============================================================================
+!
+! init_implosion: subroutine initializes variables for the implosion problem
+!
+!===============================================================================
+!
+  subroutine init_implosion(pblock)
+
+    use blocks, only : block, idn, imx, imy, imz, ien
+    use config, only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: dx, dy, dxh, dyh, rc, rl, ru, ds, dl, dr
+
+! local arrays
+!
+    real, dimension(:), allocatable :: x, y
+!
+!-------------------------------------------------------------------------------
+!
+! allocate coordinates
+!
+    allocate(x(im))
+    allocate(y(jm))
+
+! calculate cell sizes
+!
+    dx  = (pblock%xmax - pblock%xmin) / in
+    dy  = (pblock%ymax - pblock%ymin) / jn
+    dxh = 0.5d0 * dx
+    dyh = 0.5d0 * dy
+    ds  = dx * dy
+
+! generate coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%ymin
+
+! set variables
+!
+    pblock%u(idn,:,:,:) = dens
+    pblock%u(imx,:,:,:) = 0.0d0
+    pblock%u(imy,:,:,:) = 0.0d0
+    pblock%u(imz,:,:,:) = 0.0d0
+
+! set initial pressure
+!
+    do j = 1, jm
+      do i = 1, im
+        rc = x(i) + y(j)
+        rl = rc - dxh - dyh
+        ru = rc + dxh + dyh
+
+        if (ru .le. rmid) then
+          pblock%u(idn,i,j,:) = 0.125d0
+#ifdef ADI
+          pblock%u(ien,i,j,:) = gammam1i * 0.140d0
+#endif /* ADI */
+        else if (rl .ge. rmid) then
+          pblock%u(idn,i,j,:) = 1.0d0
+#ifdef ADI
+          pblock%u(ien,i,j,:) = gammam1i
+#endif /* ADI */
+        else
+          if (rc .ge. rmid) then
+            dl = 0.125d0 * (rmid - rl)**2 / ds
+            dr = 1.0d0 - dl
+          else
+            dr = 0.125d0 * (ru - rmid)**2 / ds
+            dl = 1.0d0 - dr
+          endif
+          pblock%u(idn,i,j,:) = 0.125d0 * dl + dr
+#ifdef ADI
+          pblock%u(ien,i,j,:) = gammam1i * (0.140d0 * dl + dr)
+#endif /* ADI */
+        endif
+      end do
+    end do
+
+! deallocate coordinates
+!
+    deallocate(x)
+    deallocate(y)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_implosion
+!
+!===============================================================================
 !
 ! check_ref: function checks refinement criterium and returns +1 if
 !            the criterium fullfiled and block is selected for
 !            refinement, 0 there is no need for refinement, and -1 if
 !            block is selected for refinement
 !
-!======================================================================
+!===============================================================================
 !
   function check_ref(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
-    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i, crefmin, crefmax
+    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i            &
+                     , crefmin, crefmax
 
 ! input arguments
 !
@@ -163,10 +281,11 @@ module problem
 !
     integer                       :: i, j, k
     real                          :: dpmax, vx, vy, vz, en, ek, ei
-    real                          :: dnl, dnr, prl, prr, ddndx, ddndy, dprdx, dprdy, ddn, dpr
+    real                          :: dnl, dnr, prl, prr, ddndx, ddndy, ddn     &
+                                   , dprdx, dprdy, dpr
     real, dimension(im,jm,km)     :: dn, pr
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
     do k = 1, km
       do j = 1, jm
@@ -230,10 +349,10 @@ module problem
 
     return
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end function check_ref
 
-!======================================================================
+!===============================================================================
 !
 end module
