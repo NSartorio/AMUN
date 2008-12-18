@@ -59,6 +59,8 @@ module problem
       call init_blast(pb)
     case("implosion")
       call init_implosion(pb)
+    case("binaries")
+      call init_binaries(pb)
     end select
 
     nullify(pb)
@@ -253,6 +255,135 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_implosion
+!
+!===============================================================================
+!
+! init_binaries: subroutine initializes the variables for the binary star
+!                problem
+!
+!===============================================================================
+!
+  subroutine init_binaries(pblock)
+
+    use blocks, only : block, idn, imx, imy, imz, ien
+    use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
+                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
+                     , csnd2, gamma, gammam1i
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
+    real    :: dx, dy, dz, dnamb, enamb
+    real    :: dnstar1, enstar1, x1l, y1l, z1l, r1
+    real    :: dnstar2, enstar2, x2l, y2l, z2l, r2
+
+! local arrays
+!
+    real, dimension(:), allocatable :: x, y, z
+!
+!-------------------------------------------------------------------------------
+!
+! calculate pressure from sound speed
+!
+#ifdef ISO
+    pres = csnd2 * dens
+#endif /* ISO */
+#ifdef ADI
+    pres = csnd2 * dens / gamma
+#endif /* ADI */
+
+! calculate parameters
+!
+    dnamb   = dens
+    dnstar2 = dnamb*dnfac
+    dnstar1 = dnstar2*dnrat
+    enamb   = gammam1i*pres
+    enstar1 = enamb*dnfac
+    enstar2 = enstar1/dnrat
+
+! allocate coordinates
+!
+    allocate(x(im))
+    allocate(y(jm))
+    allocate(z(km))
+
+! calculate cell sizes
+!
+    dx = (pblock%xmax - pblock%xmin) / in
+    dy = (pblock%ymax - pblock%ymin) / jn
+#if NDIMS == 3
+    dz = (pblock%zmax - pblock%zmin) / kn
+#else /* NDIMS == 3 */
+    dz = 1.0
+#endif /* NDIMS == 3 */
+
+! generate coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+#if NDIMS == 3
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+#else /* NDIMS == 3 */
+    z(1) = 0.0
+#endif /* NDIMS == 3 */
+
+! set variables
+!
+    pblock%u(idn,:,:,:) = dnamb
+    pblock%u(imx,:,:,:) = 0.0d0
+    pblock%u(imy,:,:,:) = 0.0d0
+    pblock%u(imz,:,:,:) = 0.0d0
+#ifdef ADI
+    pblock%u(ien,:,:,:) = enamb
+#endif /* ADI */
+
+! set initial pressure
+!
+    do k = 1, km
+      z1l = z(k) - z1c
+      z2l = z(k) - z2c
+
+      do j = 1, jm
+        y1l = y(j) - y1c
+        y2l = y(j) - y2c
+
+        do i = 1, im
+          x1l = x(i) - x1c
+          x2l = x(i) - x2c
+
+          r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
+          r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
+
+          if (r1 .le. r1c) then
+            pblock%u(idn,i,j,k) = dnstar1
+#ifdef ADI
+            pblock%u(ien,i,j,k) = enstar1
+#endif /* ADI */
+          endif
+
+          if (r2 .le. r2c) then
+            pblock%u(idn,i,j,k) = dnstar2
+#ifdef ADI
+            pblock%u(ien,i,j,k) = enstar2
+#endif /* ADI */
+          endif
+        end do
+      end do
+    end do
+
+! deallocate coordinates
+!
+    deallocate(x)
+    deallocate(y)
+    deallocate(z)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_binaries
 !
 !===============================================================================
 !

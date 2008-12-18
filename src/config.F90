@@ -87,6 +87,9 @@ module config
 ! initial values
 !
   real               , save :: dens = 1.0, pres = 1.0, rmid = 0.5
+  real               , save :: x1c = 0.0, y1c = 0.0, z1c = 0.0, r1c = 0.1
+  real               , save :: x2c = 0.0, y2c = 0.0, z2c = 0.0, r2c = 0.1
+  real               , save :: dnfac = 1.0, dnrat = 1.0
 
 ! boundary conditions
 !
@@ -203,6 +206,26 @@ module config
       read(value,        *) pres
     case("rmid")
       read(value,        *) rmid
+    case("x1c")
+      read(value,        *) x1c
+    case("y1c")
+      read(value,        *) y1c
+    case("z1c")
+      read(value,        *) z1c
+    case("r1c")
+      read(value,        *) r1c
+    case("x2c")
+      read(value,        *) x2c
+    case("y2c")
+      read(value,        *) y2c
+    case("z2c")
+      read(value,        *) z2c
+    case("r2c")
+      read(value,        *) r2c
+    case("dnfac")
+      read(value,        *) dnfac
+    case("dnrat")
+      read(value,        *) dnrat
     case("crefmin")
       read(value,        *) crefmin
     case("crefmax")
