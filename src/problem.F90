@@ -68,6 +68,44 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_problem
+#ifdef SHAPE
+!
+!===============================================================================
+!
+! shapes: subroutine resets the update for a give shape
+!
+!===============================================================================
+!
+  subroutine update_shapes(pblock, du)
+
+    use blocks, only : block
+    use config, only : problem
+
+! input arguments
+!
+    type(block), pointer    , intent(inout) :: pblock
+    real, dimension(:,:,:,:), intent(inout) :: du
+
+! local arguments
+!
+    type(block), pointer :: pb
+!
+!-------------------------------------------------------------------------------
+!
+    pb => pblock
+
+    select case(trim(problem))
+    case("binaries")
+      call shape_binaries(pb, du)
+    case default
+    end select
+
+    nullify(pb)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_shapes
+#endif /* SHAPE */
 !
 !===============================================================================
 !
@@ -384,6 +422,104 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_binaries
+#ifdef SHAPE
+!
+!===============================================================================
+!
+! shape_binaries: subroutine initializes the variables for the binary star
+!                problem
+!
+!===============================================================================
+!
+  subroutine shape_binaries(pblock, du)
+
+    use blocks, only : block, idn, imx, imy, imz, ien
+    use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
+                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
+                     , csnd2, gamma, gammam1i
+
+! input arguments
+!
+    type(block), pointer, intent(inout) :: pblock
+    real, dimension(:,:,:,:), intent(inout) :: du
+
+! local variables
+!
+    integer :: i, j, k
+    real    :: dx, dy, dz
+    real    :: x1l, y1l, z1l, r1
+    real    :: x2l, y2l, z2l, r2
+
+! local arrays
+!
+    real, dimension(:), allocatable :: x, y, z
+!
+!-------------------------------------------------------------------------------
+!
+! allocate coordinates
+!
+    allocate(x(im))
+    allocate(y(jm))
+    allocate(z(km))
+
+! calculate cell sizes
+!
+    dx = (pblock%xmax - pblock%xmin) / in
+    dy = (pblock%ymax - pblock%ymin) / jn
+#if NDIMS == 3
+    dz = (pblock%zmax - pblock%zmin) / kn
+#else /* NDIMS == 3 */
+    dz = 1.0
+#endif /* NDIMS == 3 */
+
+! generate coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+#if NDIMS == 3
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+#else /* NDIMS == 3 */
+    z(1) = 0.0
+#endif /* NDIMS == 3 */
+
+! reset update
+!
+    do k = 1, km
+      z1l = z(k) - z1c
+      z2l = z(k) - z2c
+
+      do j = 1, jm
+        y1l = y(j) - y1c
+        y2l = y(j) - y2c
+
+        do i = 1, im
+          x1l = x(i) - x1c
+          x2l = x(i) - x2c
+
+          r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
+          r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
+
+          if (r1 .le. r1c) then
+            du(:,i,j,k) = 0.0
+          endif
+
+          if (r2 .le. r2c) then
+            du(:,i,j,k) = 0.0
+          endif
+        end do
+      end do
+    end do
+
+! deallocate coordinates
+!
+    deallocate(x)
+    deallocate(y)
+    deallocate(z)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine shape_binaries
+#endif /* SHAPE */
 !
 !===============================================================================
 !

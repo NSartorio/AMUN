@@ -138,10 +138,13 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks, only : block, nv => nvars
-    use config, only : im, jm, km
-    use mesh  , only : adxi, adyi, adzi
-    use scheme, only : update
+    use blocks , only : block, nv => nvars
+    use config , only : im, jm, km
+    use mesh   , only : adxi, adyi, adzi
+#ifdef SHAPE
+    use problem, only : update_shapes
+#endif /* SHAPE */
+    use scheme , only : update
 
     implicit none
 
@@ -157,18 +160,30 @@ module evolution
 ! local arrays
 !
     real, dimension(nv,im,jm,km) :: du
+
+! local pointers
+!
+    type(block), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
+    pb => pblock
+
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pblock%level)
-    dyi = adyi(pblock%level)
-    dzi = adzi(pblock%level)
+    dxi = adxi(pb%level)
+    dyi = adyi(pb%level)
+    dzi = adzi(pb%level)
 
 ! 1st step of integration
 !
-    call update(pblock%u, du, dxi, dyi, dzi)
+    call update(pb%u, du, dxi, dyi, dzi)
+
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pb, du)
+#endif /* SHAPE */
 
 ! update solution
 !
@@ -176,11 +191,13 @@ module evolution
       do j = 1, jm
         do i = 1, im
           do q = 1, nv
-            pblock%u(q,i,j,k) = pblock%u(q,i,j,k) + dt*du(q,i,j,k)
+            pb%u(q,i,j,k) = pb%u(q,i,j,k) + dt*du(q,i,j,k)
           end do
         end do
       end do
     end do
+
+    nullify(pb)
 
 !-------------------------------------------------------------------------------
 !
@@ -196,10 +213,13 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks, only : block, nv => nvars
-    use config, only : im, jm, km
-    use mesh  , only : adxi, adyi, adzi
-    use scheme, only : update
+    use blocks , only : block, nv => nvars
+    use config , only : im, jm, km
+    use mesh   , only : adxi, adyi, adzi
+#ifdef SHAPE
+    use problem, only : update_shapes
+#endif /* SHAPE */
+    use scheme , only : update
 
     implicit none
 
@@ -215,25 +235,37 @@ module evolution
 ! local arrays
 !
     real, dimension(nv,im,jm,km) :: u1, du
+
+! local pointers
+!
+    type(block), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
+    pb => pblock
+
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pblock%level)
-    dyi = adyi(pblock%level)
-    dzi = adzi(pblock%level)
+    dxi = adxi(pb%level)
+    dyi = adyi(pb%level)
+    dzi = adzi(pb%level)
 
 ! 1st step of integration
 !
-    call update(pblock%u, du, dxi, dyi, dzi)
+    call update(pb%u, du, dxi, dyi, dzi)
+
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pb, du)
+#endif /* SHAPE */
 
 ! update solution
 !
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          u1(:,i,j,k) = pblock%u(:,i,j,k) + dt*du(:,i,j,k)
+          u1(:,i,j,k) = pb%u(:,i,j,k) + dt*du(:,i,j,k)
         end do
       end do
     end do
@@ -242,15 +274,23 @@ module evolution
 !
     call update(u1, du, dxi, dyi, dzi)
 
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pb, du)
+#endif /* SHAPE */
+
 ! update solution
 !
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          pblock%u(:,i,j,k) = 0.5 * (pblock%u(:,i,j,k) + u1(:,i,j,k) + dt*du(:,i,j,k))
+          pb%u(:,i,j,k) = 0.5 * (pb%u(:,i,j,k) + u1(:,i,j,k) + dt*du(:,i,j,k))
         end do
       end do
     end do
+
+    nullify(pb)
 
 !-------------------------------------------------------------------------------
 !

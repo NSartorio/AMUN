@@ -39,6 +39,9 @@ endif
 # number of dimensions
 #
 FFLAGS  += -DNDIMS=${NDIMS}
+ifeq ($(SHAPE),Y)
+FFLAGS  += -DSHAPE
+endif
 
 # output data format
 #
@@ -105,8 +108,8 @@ boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o
 config.o        : config.F90 error.o
 driver.o        : driver.F90 config.o evolution.o io.o mesh.o timer.o
 error.o         : error.F90
-evolution.o     : evolution.F90 blocks.o boundaries.o config.o mesh.o scheme.o \
-                  timer.o
+evolution.o     : evolution.F90 blocks.o boundaries.o config.o mesh.o          \
+                  problem.o scheme.o timer.o
 interpolation.o : interpolation.F90
 io.o            : io.F90 blocks.o error.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o problem.o
