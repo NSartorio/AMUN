@@ -52,7 +52,7 @@ module mesh
     use config , only : iblocks, jblocks, kblocks, ncells             &
                       , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
     use blocks , only : list_allocated, init_blocks, clear_blocks     &
-                      , allocate_blocks, refine_block, block, nchild, ndims, plist, last_id
+                      , allocate_blocks, refine_block, block, nchild, ndims, plist, last_id, idtoptr
     use error  , only : print_info
     use problem, only : init_problem, check_ref
 
@@ -209,7 +209,7 @@ module mesh
 
 ! iterate over all children
 !
-            pparent => pblock%parent
+            pparent => idtoptr(pblock%parent%id)%ptr
             do p = 1, nchild
 
               pchild => pparent%child(p)%ptr
@@ -285,7 +285,7 @@ module mesh
   subroutine update_mesh(ref)
 
     use config , only : maxlev
-    use blocks , only : block, plist, ndims, nchild, refine_block
+    use blocks , only : block, plist, ndims, nchild, refine_block, idtoptr
     use error  , only : print_info
     use problem, only : check_ref
 
@@ -410,7 +410,7 @@ module mesh
               end do
             end do
 
-            pparent => pblock%parent
+            pparent => idtoptr(pblock%parent%id)%ptr
             if (associated(pparent)) then
               do p = 1, nchild
                 pchild => pparent%child(p)%ptr
@@ -436,7 +436,7 @@ module mesh
           endif
         endif
 
-        pparent => pblock%parent
+        pparent => idtoptr(pblock%parent%id)%ptr
         if (associated(pparent) .and. pblock%refine .eq. -1) &
           pparent%refine = -1
 
@@ -455,7 +455,7 @@ module mesh
         if (pblock%level .eq. n) then
           if (pblock%leaf .and. pblock%refine .eq. -1) then
 
-            pparent => pblock%parent
+            pparent => idtoptr(pblock%parent%id)%ptr
 
             if (associated(pparent) .and. pparent%refine .eq. -1) then
 !               print *, 'derefine block ', pparent%id

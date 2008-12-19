@@ -263,13 +263,8 @@ module io
           endif
           call h5aclose_f(aid, err)
 
-          ptemp => pblock%parent
           call h5acreate_f(bid, 'parent', H5T_NATIVE_INTEGER, sid, aid, err)
-          if (associated(ptemp)) then
-            call h5awrite_f(aid, H5T_NATIVE_INTEGER, ptemp%id, am, err)
-          else
-            call h5awrite_f(aid, H5T_NATIVE_INTEGER, -1, am, err)
-          endif
+          call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%parent%id, am, err)
           call h5aclose_f(aid, err)
 
           call h5acreate_f(bid, 'level', H5T_NATIVE_INTEGER, sid, aid, err)

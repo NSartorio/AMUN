@@ -61,11 +61,17 @@ module blocks
     type(block), pointer :: ptr
   end type blockptr
 
+  type blockref
+    integer(kind=4) :: cpu, id
+  end type blockref
+
   type block
-    type(block), pointer :: next, prev, parent
+    type(block), pointer :: next, prev
     type(blockptr)       :: child(nchild), pneigh(ndims,2,2)
+    type(blockref)       :: parent
 
     logical              :: leaf
+
     character            :: config
     integer(kind=4)      :: refine
 
@@ -283,7 +289,11 @@ module blocks
 !
     nullify(pblock%next)
     nullify(pblock%prev)
-    nullify(pblock%parent)
+
+! reset parent block
+!
+    pblock%parent%cpu = -1
+    pblock%parent%id  = -1
 
 ! reset neighbors
 !
@@ -428,10 +438,10 @@ module blocks
 
 ! set parent
 !
-      pbl%parent => pblock
-      pbr%parent => pblock
-      ptl%parent => pblock
-      ptr%parent => pblock
+      pbl%parent%id = pblock%id
+      pbr%parent%id = pblock%id
+      ptl%parent%id = pblock%id
+      ptr%parent%id = pblock%id
 
 ! set level
 !
