@@ -53,6 +53,7 @@ module blocks
   integer(kind=4), parameter :: nvars  = 8
 #endif /* ADI */
 #endif /* MHD */
+  integer(kind=4), parameter :: maxid = 1000000
 
 ! define block type
 !
@@ -76,6 +77,10 @@ module blocks
     real, dimension(:,:,:)  , allocatable :: c
   end type block
 
+! array of ID to pointer conversion
+!
+  type(blockptr), dimension(:), allocatable, save :: idtoptr
+
 ! stored pointers
 !
   type(block), pointer, save :: plist, plast
@@ -87,12 +92,103 @@ module blocks
 
   contains
 !
-!======================================================================
+!===============================================================================
 !
-! list_allocated: function checks if the block list is empty and
-!                 returns true or false
+! init_blocks: subroutine initializes the block variables
 !
-!======================================================================
+!===============================================================================
+!
+  subroutine init_blocks()
+
+    use error, only : print_warning
+
+    implicit none
+
+! local variables
+!
+    integer(kind=4) :: p
+!
+!-------------------------------------------------------------------------------
+!
+! first check if block list is empty
+!
+    if (associated(plist)) &
+      call print_warning("blocks::init_blocks", "Block list already associated!")
+
+! nullify all pointers
+!
+    nullify(plist)
+
+! reset number of blocks
+!
+    nblocks = 0
+
+! reset ID
+!
+    last_id = 0
+
+! allocate space for ID to pointer array
+!
+    allocate(idtoptr(maxid))
+
+! nullify all pointers in ID to pointer array
+!
+    do p = 1, maxid
+      nullify(idtoptr(p)%ptr)
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_blocks
+!
+!===============================================================================
+!
+! clear_blocks: subroutine clears the block variables
+!
+!===============================================================================
+!
+  subroutine clear_blocks
+
+    implicit none
+
+! pointers
+!
+    type(block), pointer :: pnext
+!
+!-------------------------------------------------------------------------------
+!
+! untill the list is free, iterate over all chunks and deallocate blocks
+!
+    do while(associated(plist))
+
+! assign temporary pointer to the next chunk
+!
+      pnext => plist%next
+
+! deallocate and nullify the current block
+!
+      call deallocate_block(plist)
+
+! assign pointer to the current chunk
+!
+      plist => pnext
+
+    end do
+
+! deallocate ID to pointer conversion array
+!
+    deallocate(idtoptr)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine clear_blocks
+!
+!===============================================================================
+!
+! list_allocated: function returns true if the block list is allocated,
+!                 otherwise it returns false
+!
+!===============================================================================
 !
   function list_allocated
 
@@ -102,26 +198,56 @@ module blocks
 !
     logical :: list_allocated
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
     list_allocated = associated(plist)
 
     return
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end function list_allocated
 !
-!======================================================================
+!===============================================================================
 !
-! allocate_block: subroutine allocates space for one block and returns
+! increase_id: function increases the last ID by 1 and returns it
+!
+!===============================================================================
+!
+  function increase_id
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: increase_id
+!
+!-------------------------------------------------------------------------------
+!
+! increase ID by 1
+!
+    last_id = last_id + 1
+
+! return ID
+!
+    increase_id = last_id
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function increase_id
+!
+!===============================================================================
+!
+! allocate_block: subroutine allocates space for one block and returns the
 !                 pointer to this block
 !
-!======================================================================
+!===============================================================================
 !
   subroutine allocate_block(pblock)
 
-    use config, only : igrids, jgrids, kgrids
+    use config, only : im, jm, km
 
     implicit none
 
@@ -133,7 +259,7 @@ module blocks
 !
     integer :: i, j, k
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! allocate block structure
 !
@@ -141,14 +267,14 @@ module blocks
 
 ! set unique ID
 !
-    pblock%id = increase_id()
+    pblock%id = increase_id()   ! TODO: replace with get_free_id() which return the first free id
 
 ! set configuration and leaf flags
 !
-    pblock%config = 'N'
-    pblock%leaf   = 'F'
+    pblock%config = 'N'         ! TODO: replace with an integer number
+    pblock%leaf   = 'F'         ! TODO: replace with a logical variable
 
-! initialize refinement flag
+! initialize the refinement flag
 !
     pblock%refine = 0
 
@@ -171,19 +297,22 @@ module blocks
 
 ! allocate space for variables
 !
-    allocate(pblock%u(nvars,igrids,jgrids,kgrids))
-    allocate(pblock%c(igrids,jgrids,kgrids))
+    allocate(pblock%u(nvars,im,jm,km))
+    allocate(pblock%c(im,jm,km))
 
-!----------------------------------------------------------------------
+! set the correspponding pointer in the ID to pointer array to the current block
+!
+    idtoptr(pblock%id)%ptr => pblock
+
+!-------------------------------------------------------------------------------
 !
   end subroutine allocate_block
 !
-!======================================================================
+!===============================================================================
 !
-! deallocate_block: subroutine deallocates space ocuppied by a given
-!                   block
+! deallocate_block: subroutine deallocates space ocuppied by a given block
 !
-!======================================================================
+!===============================================================================
 !
   subroutine deallocate_block(pblock)
 
@@ -193,31 +322,37 @@ module blocks
 !
     type(block), pointer, intent(inout) :: pblock
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! deallocate variables
 !
     deallocate(pblock%u)
     deallocate(pblock%c)
 
+! nullify pointers
+!
     nullify(pblock%next)
     nullify(pblock%prev)
+
+! nullify the corresponding pointer in the ID to pointer array
+!
+    nullify(idtoptr(pblock%id)%ptr)
 
 ! free and nullify the block
 !
     deallocate(pblock)
     nullify(pblock)
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine deallocate_block
 !
-!======================================================================
+!===============================================================================
 !
-! append_block: subroutine allocates space for one block and appends
-!               it to the list
+! append_block: subroutine allocates space for one block and appends it to
+!               the list
 !
-!======================================================================
+!===============================================================================
 !
   subroutine append_block(pblock)
 
@@ -227,7 +362,7 @@ module blocks
 !
     type(block), pointer, intent(out) :: pblock
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! allocate block
 !
@@ -248,315 +383,15 @@ module blocks
       nullify(pblock%next)
     endif
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine append_block
 !
-!======================================================================
-!
-! allocate_blocks: subroutine allocates a configuration of blocks
-!
-!======================================================================
-!
-  subroutine allocate_blocks(block_config, xmn, xmx, ymn, ymx &
-                           , zmn, zmx)
-
-    use config, only : xlbndry, xubndry, ylbndry, yubndry
-    use error , only : print_error
-
-    implicit none
-
-! input parameters
-!
-    character(len=1), intent(in) :: block_config
-    real            , intent(in) :: xmn, xmx, ymn, ymx, zmn, zmx
-
-! local pointers
-!
-    type(block), pointer :: pbl, pbr, ptl, ptr
-
-! local variables
-!
-    real :: xl, xc, xr, yl, yc, yr, zl, zc, zr
-!
-!----------------------------------------------------------------------
-!
-    select case(block_config)
-    case('z', 'Z')
-
-! create root blocks
-!
-      call append_block(pbl)
-      call append_block(pbr)
-      call append_block(ptl)
-      call append_block(ptr)
-
-! set configurations
-!
-      pbl%config = 'Z'
-      pbr%config = 'Z'
-      ptl%config = 'Z'
-      ptr%config = 'Z'
-
-! copy pointer of the first block in chain
-!
-      plist => pbl
-
-    case('n', 'N')
-
-! create root blocks
-!
-      call append_block(pbl)
-      call append_block(ptl)
-      call append_block(ptr)
-      call append_block(pbr)
-
-! set configurations
-!
-      pbl%config = 'D'
-      ptl%config = 'N'
-      ptr%config = 'N'
-      pbr%config = 'C'
-
-! copy pointer of the first block in chain
-!
-      plist => pbl
-
-    case default
-      call print_error("blocks::allocate_blocks","Configuration '" // block_config // "' not supported! Terminating!")
-    end select
-
-! set leaf flags
-!
-    pbl%leaf   = 'T'
-    pbr%leaf   = 'T'
-    ptl%leaf   = 'T'
-    ptr%leaf   = 'T'
-
-! set neighbors
-!
-    pbl%neigh(1,2,:) = pbr%id
-    pbl%neigh(2,2,:) = ptl%id
-
-    pbr%neigh(1,1,:) = pbl%id
-    pbr%neigh(2,2,:) = ptr%id
-
-    ptl%neigh(1,2,:) = ptr%id
-    ptl%neigh(2,1,:) = pbl%id
-
-    ptr%neigh(1,1,:) = ptl%id
-    ptr%neigh(2,1,:) = pbr%id
-
-! set neighbor pointers
-!
-    if (xlbndry .eq. 'periodic') then
-      pbl%pneigh(1,1,1)%ptr => pbr  ! BL left  -> BR
-      pbl%pneigh(1,1,2)%ptr => pbr
-    endif
-    pbl%pneigh(1,2,1)%ptr => pbr  ! BL right  -> BR
-    pbl%pneigh(1,2,2)%ptr => pbr
-    if (ylbndry .eq. 'periodic') then
-      pbl%pneigh(2,1,1)%ptr => ptl  ! BL bottom -> TL
-      pbl%pneigh(2,1,2)%ptr => ptl
-    endif
-    pbl%pneigh(2,2,1)%ptr => ptl  ! BL top    -> TL
-    pbl%pneigh(2,2,2)%ptr => ptl
-
-
-    pbr%pneigh(1,1,1)%ptr => pbl  ! BR left   -> BL
-    pbr%pneigh(1,1,2)%ptr => pbl
-    if (xubndry .eq. 'periodic') then
-      pbr%pneigh(1,2,1)%ptr => pbl  ! BR right  -> BL
-      pbr%pneigh(1,2,2)%ptr => pbl
-    endif
-    if (ylbndry .eq. 'periodic') then
-      pbr%pneigh(2,1,1)%ptr => ptr  ! BR bottom -> TR
-      pbr%pneigh(2,1,2)%ptr => ptr
-    endif
-    pbr%pneigh(2,2,1)%ptr => ptr  ! BR top    -> TR
-    pbr%pneigh(2,2,2)%ptr => ptr
-
-    if (xlbndry .eq. 'periodic') then
-      ptl%pneigh(1,1,1)%ptr => ptr  ! TL left   -> TR
-      ptl%pneigh(1,1,2)%ptr => ptr
-    endif
-    ptl%pneigh(1,2,1)%ptr => ptr  ! TL right  -> TR
-    ptl%pneigh(1,2,2)%ptr => ptr
-    ptl%pneigh(2,1,1)%ptr => pbl  ! TL bottom -> BL
-    ptl%pneigh(2,1,2)%ptr => pbl
-    if (yubndry .eq. 'periodic') then
-      ptl%pneigh(2,2,1)%ptr => pbl  ! TL top    -> BL
-      ptl%pneigh(2,2,2)%ptr => pbl
-    endif
-
-    ptr%pneigh(1,1,1)%ptr => ptl  ! TR left   -> TL
-    ptr%pneigh(1,1,2)%ptr => ptl
-    if (xubndry .eq. 'periodic') then
-      ptr%pneigh(1,2,1)%ptr => ptl  ! TR right  -> TL
-      ptr%pneigh(1,2,2)%ptr => ptl
-    endif
-    ptr%pneigh(2,1,1)%ptr => pbr  ! TR bottom -> BR
-    ptr%pneigh(2,1,2)%ptr => pbr
-    if (yubndry .eq. 'periodic') then
-      ptr%pneigh(2,2,1)%ptr => pbr  ! TR top    -> BR
-      ptr%pneigh(2,2,2)%ptr => pbr
-    endif
-
-! set block bounds
-!
-    xl = xmn
-    xc = 0.5 * (xmx + xmn)
-    xr = xmx
-    yl = ymn
-    yc = 0.5 * (ymx + ymn)
-    yr = ymx
-
-    pbl%xmin = xl
-    pbl%xmax = xc
-    pbl%ymin = yl
-    pbl%ymax = yc
-
-    ptl%xmin = xl
-    ptl%xmax = xc
-    ptl%ymin = yc
-    ptl%ymax = yr
-
-    ptr%xmin = xc
-    ptr%xmax = xr
-    ptr%ymin = yc
-    ptr%ymax = yr
-
-    pbr%xmin = xc
-    pbr%xmax = xr
-    pbr%ymin = yl
-    pbr%ymax = yc
-
-!----------------------------------------------------------------------
-!
-  end subroutine allocate_blocks
-!
-!======================================================================
-!
-! init_blocks: subroutine initializes the structure of blocks
-!
-!======================================================================
-!
-  subroutine init_blocks()
-
-    use config, only : ngrids, iblocks, jblocks, kblocks, nghost, ncells
-!     use problem, only : init_problem
-
-    implicit none
-
-! local variables
-!
-    integer(kind=4) :: i, j, k
-
-! pointers
-!
-    type(block), pointer :: pcurr
-!
-!----------------------------------------------------------------------
-!
-! first check if block list is empty
-!
-    if (associated(plist)) then
-      write(*,*) 'ERROR: Block list already associated!'
-    endif
-
-! nullify all pointers
-!
-    nullify(plist)
-
-! reset number of blocks
-!
-    nblocks = 0
-
-! reset ID
-!
-    last_id = 0
-
-!----------------------------------------------------------------------
-!
-  end subroutine init_blocks
-!
-!======================================================================
-!
-! clear_blocks: subroutine clears the structure of blocks
-!
-!======================================================================
-!
-  subroutine clear_blocks
-
-    implicit none
-
-! pointers
-!
-    type(block), pointer :: pcurr
-!
-!----------------------------------------------------------------------
-!
-! until list is free, reiterate over all chunks
-!
-    do while(associated(plist))
-
-! assign temporary pointer to the next chunk
-!
-      pcurr => plist%next
-
-! deallocate the content of current block
-!
-!       write (*,"(i9.9,2x,i2,1x,4(1x,f6.3))") plist%id, plist%level, plist%xmin, plist%xmax, plist%ymin, plist%ymax
-
-! deallocate and nullify the current block
-!
-      call deallocate_block(plist)
-
-! assign pointer to the current chunk
-!
-      plist => pcurr
-
-    end do
-
-!----------------------------------------------------------------------
-!
-  end subroutine clear_blocks
-!
-!======================================================================
-!
-! increase_id: function increases last ID by 1 and returns it
-!
-!======================================================================
-!
-  function increase_id
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: increase_id
-!
-!----------------------------------------------------------------------
-!
-! increase ID by 1
-!
-    last_id = last_id + 1
-
-! return ID
-!
-    increase_id = last_id
-
-    return
-
-!----------------------------------------------------------------------
-!
-  end function increase_id
-!
-!======================================================================
+!===============================================================================
 !
 ! refine_block: subroutine refines selected block
 !
-!======================================================================
+!===============================================================================
 !
   subroutine refine_block(pblock)
 
@@ -572,7 +407,7 @@ module blocks
 !
     type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! check if pointer is associated
 !
@@ -954,15 +789,15 @@ module blocks
       call print_error("blocks::refine_blocks","Input pointer is not associated! Terminating!")
     endif
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine refine_block
 !
-!======================================================================
+!===============================================================================
 !
 ! derefine_block: subroutine derefines selected block
 !
-!======================================================================
+!===============================================================================
 !
   subroutine derefine_block(pblock)
 
@@ -980,7 +815,7 @@ module blocks
 !
     type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 ! prepare pointers to children
 !
@@ -1116,10 +951,196 @@ module blocks
     call deallocate_block(ptl)
     call deallocate_block(ptr)
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
   end subroutine derefine_block
+!
+!===============================================================================
+!
+! allocate_blocks: subroutine allocates a configuration of blocks
+!
+! TODO: move to/replace with a subroutine in problem module; this will allow
+!       a user to define his/her own initial mesh
+!
+!===============================================================================
+!
+  subroutine allocate_blocks(block_config, xmn, xmx, ymn, ymx &
+                           , zmn, zmx)
 
-!======================================================================
+    use config, only : xlbndry, xubndry, ylbndry, yubndry
+    use error , only : print_error
+
+    implicit none
+
+! input parameters
+!
+    character(len=1), intent(in) :: block_config
+    real            , intent(in) :: xmn, xmx, ymn, ymx, zmn, zmx
+
+! local pointers
+!
+    type(block), pointer :: pbl, pbr, ptl, ptr
+
+! local variables
+!
+    real :: xl, xc, xr, yl, yc, yr, zl, zc, zr
+!
+!-------------------------------------------------------------------------------
+!
+    select case(block_config)
+    case('z', 'Z')
+
+! create root blocks
+!
+      call append_block(pbl)
+      call append_block(pbr)
+      call append_block(ptl)
+      call append_block(ptr)
+
+! set configurations
+!
+      pbl%config = 'Z'
+      pbr%config = 'Z'
+      ptl%config = 'Z'
+      ptr%config = 'Z'
+
+! copy pointer of the first block in chain
+!
+      plist => pbl
+
+    case('n', 'N')
+
+! create root blocks
+!
+      call append_block(pbl)
+      call append_block(ptl)
+      call append_block(ptr)
+      call append_block(pbr)
+
+! set configurations
+!
+      pbl%config = 'D'
+      ptl%config = 'N'
+      ptr%config = 'N'
+      pbr%config = 'C'
+
+! copy pointer of the first block in chain
+!
+      plist => pbl
+
+    case default
+      call print_error("blocks::allocate_blocks","Configuration '" // block_config // "' not supported! Terminating!")
+    end select
+
+! set leaf flags
+!
+    pbl%leaf   = 'T'
+    pbr%leaf   = 'T'
+    ptl%leaf   = 'T'
+    ptr%leaf   = 'T'
+
+! set neighbors
+!
+    pbl%neigh(1,2,:) = pbr%id
+    pbl%neigh(2,2,:) = ptl%id
+
+    pbr%neigh(1,1,:) = pbl%id
+    pbr%neigh(2,2,:) = ptr%id
+
+    ptl%neigh(1,2,:) = ptr%id
+    ptl%neigh(2,1,:) = pbl%id
+
+    ptr%neigh(1,1,:) = ptl%id
+    ptr%neigh(2,1,:) = pbr%id
+
+! set neighbor pointers
+!
+    if (xlbndry .eq. 'periodic') then
+      pbl%pneigh(1,1,1)%ptr => pbr  ! BL left  -> BR
+      pbl%pneigh(1,1,2)%ptr => pbr
+    endif
+    pbl%pneigh(1,2,1)%ptr => pbr  ! BL right  -> BR
+    pbl%pneigh(1,2,2)%ptr => pbr
+    if (ylbndry .eq. 'periodic') then
+      pbl%pneigh(2,1,1)%ptr => ptl  ! BL bottom -> TL
+      pbl%pneigh(2,1,2)%ptr => ptl
+    endif
+    pbl%pneigh(2,2,1)%ptr => ptl  ! BL top    -> TL
+    pbl%pneigh(2,2,2)%ptr => ptl
+
+
+    pbr%pneigh(1,1,1)%ptr => pbl  ! BR left   -> BL
+    pbr%pneigh(1,1,2)%ptr => pbl
+    if (xubndry .eq. 'periodic') then
+      pbr%pneigh(1,2,1)%ptr => pbl  ! BR right  -> BL
+      pbr%pneigh(1,2,2)%ptr => pbl
+    endif
+    if (ylbndry .eq. 'periodic') then
+      pbr%pneigh(2,1,1)%ptr => ptr  ! BR bottom -> TR
+      pbr%pneigh(2,1,2)%ptr => ptr
+    endif
+    pbr%pneigh(2,2,1)%ptr => ptr  ! BR top    -> TR
+    pbr%pneigh(2,2,2)%ptr => ptr
+
+    if (xlbndry .eq. 'periodic') then
+      ptl%pneigh(1,1,1)%ptr => ptr  ! TL left   -> TR
+      ptl%pneigh(1,1,2)%ptr => ptr
+    endif
+    ptl%pneigh(1,2,1)%ptr => ptr  ! TL right  -> TR
+    ptl%pneigh(1,2,2)%ptr => ptr
+    ptl%pneigh(2,1,1)%ptr => pbl  ! TL bottom -> BL
+    ptl%pneigh(2,1,2)%ptr => pbl
+    if (yubndry .eq. 'periodic') then
+      ptl%pneigh(2,2,1)%ptr => pbl  ! TL top    -> BL
+      ptl%pneigh(2,2,2)%ptr => pbl
+    endif
+
+    ptr%pneigh(1,1,1)%ptr => ptl  ! TR left   -> TL
+    ptr%pneigh(1,1,2)%ptr => ptl
+    if (xubndry .eq. 'periodic') then
+      ptr%pneigh(1,2,1)%ptr => ptl  ! TR right  -> TL
+      ptr%pneigh(1,2,2)%ptr => ptl
+    endif
+    ptr%pneigh(2,1,1)%ptr => pbr  ! TR bottom -> BR
+    ptr%pneigh(2,1,2)%ptr => pbr
+    if (yubndry .eq. 'periodic') then
+      ptr%pneigh(2,2,1)%ptr => pbr  ! TR top    -> BR
+      ptr%pneigh(2,2,2)%ptr => pbr
+    endif
+
+! set block bounds
+!
+    xl = xmn
+    xc = 0.5 * (xmx + xmn)
+    xr = xmx
+    yl = ymn
+    yc = 0.5 * (ymx + ymn)
+    yr = ymx
+
+    pbl%xmin = xl
+    pbl%xmax = xc
+    pbl%ymin = yl
+    pbl%ymax = yc
+
+    ptl%xmin = xl
+    ptl%xmax = xc
+    ptl%ymin = yc
+    ptl%ymax = yr
+
+    ptr%xmin = xc
+    ptr%xmax = xr
+    ptr%ymin = yc
+    ptr%ymax = yr
+
+    pbr%xmin = xc
+    pbr%xmax = xr
+    pbr%ymin = yl
+    pbr%ymax = yc
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_blocks
+
+!===============================================================================
 !
 end module
