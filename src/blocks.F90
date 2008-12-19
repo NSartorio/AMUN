@@ -67,7 +67,7 @@ module blocks
 
   type block
     type(block), pointer :: next, prev
-    type(blockptr)       :: child(nchild), pneigh(ndims,2,2)
+    type(blockptr)       :: child(nchild)
     type(blockref)       :: parent, neigh(ndims,2,2)
 
     logical              :: leaf
@@ -333,14 +333,6 @@ module blocks
     pblock%neigh(:,:,:)%cpu = -1
     pblock%neigh(:,:,:)%id  = -1
 
-    do i = 1, ndims
-      do j = 1, 2
-        do k = 1, 2
-          nullify(pblock%pneigh(i,j,k)%ptr)
-        end do
-      end do
-    end do
-
 ! allocate space for variables
 !
     allocate(pblock%u(nvars,im,jm,km))
@@ -544,26 +536,6 @@ module blocks
       ptr%neigh(2,1,1)%id = pbr%id  ! TR bottom -> BR
       ptr%neigh(2,1,2)%id = pbr%id
 
-      pbl%pneigh(1,2,1)%ptr => pbr  ! BL right  -> BR
-      pbl%pneigh(1,2,2)%ptr => pbr
-      pbl%pneigh(2,2,1)%ptr => ptl  ! BL top    -> TL
-      pbl%pneigh(2,2,2)%ptr => ptl
-
-      pbr%pneigh(1,1,1)%ptr => pbl  ! BR left   -> BL
-      pbr%pneigh(1,1,2)%ptr => pbl
-      pbr%pneigh(2,2,1)%ptr => ptr  ! BR top    -> TR
-      pbr%pneigh(2,2,2)%ptr => ptr
-
-      ptl%pneigh(1,2,1)%ptr => ptr  ! TL right  -> TR
-      ptl%pneigh(1,2,2)%ptr => ptr
-      ptl%pneigh(2,1,1)%ptr => pbl  ! TL bottom -> BL
-      ptl%pneigh(2,1,2)%ptr => pbl
-
-      ptr%pneigh(1,1,1)%ptr => ptl  ! TR left   -> TL
-      ptr%pneigh(1,1,2)%ptr => ptl
-      ptr%pneigh(2,1,1)%ptr => pbr  ! TR bottom -> BR
-      ptr%pneigh(2,1,2)%ptr => pbr
-
 ! set pointer to the neighbors of the parent block
 !
       pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
@@ -683,130 +655,6 @@ module blocks
         if (pneigh%level .eq. ptr%level) then
           pneigh%neigh(2,1,1)%id = ptr%id
           pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-      endif
-
-
-
-
-
-      pneigh => pblock%pneigh(1,1,1)%ptr ! left lower neighbor
-      if (associated(pneigh)) then
-        pbl%pneigh(1,1,1)%ptr => pneigh
-        pbl%pneigh(1,1,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(1,2,1)%ptr => pbl
-          pneigh%pneigh(1,2,2)%ptr => ptl
-        endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%pneigh(1,2,1)%ptr => pbl
-          pneigh%pneigh(1,2,2)%ptr => pbl
-        endif
-      endif
-
-      pneigh => pblock%pneigh(1,1,2)%ptr ! left upper neighbor
-      if (associated(pneigh)) then
-        ptl%pneigh(1,1,1)%ptr => pneigh
-        ptl%pneigh(1,1,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(1,2,1)%ptr => pbl
-          pneigh%pneigh(1,2,2)%ptr => ptl
-        endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%pneigh(1,2,1)%ptr => ptl
-          pneigh%pneigh(1,2,2)%ptr => ptl
-        endif
-      endif
-
-      pneigh => pblock%pneigh(1,2,1)%ptr ! right lower neighbor
-      if (associated(pneigh)) then
-        pbr%pneigh(1,2,1)%ptr => pneigh
-        pbr%pneigh(1,2,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(1,1,1)%ptr => pbr
-          pneigh%pneigh(1,1,2)%ptr => ptr
-        endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%pneigh(1,1,1)%ptr => pbr
-          pneigh%pneigh(1,1,2)%ptr => pbr
-        endif
-      endif
-
-      pneigh => pblock%pneigh(1,2,2)%ptr ! right upper neighbor
-      if (associated(pneigh)) then
-        ptr%pneigh(1,2,1)%ptr => pneigh
-        ptr%pneigh(1,2,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(1,1,1)%ptr => pbr
-          pneigh%pneigh(1,1,2)%ptr => ptr
-        endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%pneigh(1,1,1)%ptr => ptr
-          pneigh%pneigh(1,1,2)%ptr => ptr
-        endif
-      endif
-
-      pneigh => pblock%pneigh(2,1,1)%ptr  ! bottom left neighbor
-      if (associated(pneigh)) then
-        pbl%pneigh(2,1,1)%ptr => pneigh
-        pbl%pneigh(2,1,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(2,2,1)%ptr => pbl
-          pneigh%pneigh(2,2,2)%ptr => pbr
-        endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%pneigh(2,2,1)%ptr => pbl
-          pneigh%pneigh(2,2,2)%ptr => pbl
-        endif
-      endif
-
-      pneigh => pblock%pneigh(2,1,2)%ptr  ! bottom right neighbor
-      if (associated(pneigh)) then
-        pbr%pneigh(2,1,1)%ptr => pneigh
-        pbr%pneigh(2,1,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(2,2,1)%ptr => pbl
-          pneigh%pneigh(2,2,2)%ptr => pbr
-        endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%pneigh(2,2,1)%ptr => pbr
-          pneigh%pneigh(2,2,2)%ptr => pbr
-        endif
-      endif
-
-      pneigh => pblock%pneigh(2,2,1)%ptr  ! top left neighbor
-      if (associated(pneigh)) then
-        ptl%pneigh(2,2,1)%ptr => pneigh
-        ptl%pneigh(2,2,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(2,1,1)%ptr => ptl
-          pneigh%pneigh(2,1,2)%ptr => ptr
-        endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%pneigh(2,1,1)%ptr => ptl
-          pneigh%pneigh(2,1,2)%ptr => ptl
-        endif
-      endif
-
-      pneigh => pblock%pneigh(2,2,2)%ptr  ! top right neighbor
-      if (associated(pneigh)) then
-        ptr%pneigh(2,2,1)%ptr => pneigh
-        ptr%pneigh(2,2,2)%ptr => pneigh
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%pneigh(2,1,1)%ptr => ptl
-          pneigh%pneigh(2,1,2)%ptr => ptr
-        endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%pneigh(2,1,1)%ptr => ptr
-          pneigh%pneigh(2,1,2)%ptr => ptr
         endif
       endif
 
@@ -1085,64 +933,6 @@ module blocks
       pneigh%neigh(2,1,2)%id = pblock%id
     endif
 
-
-    pblock%pneigh(1,1,1)%ptr => pbl%pneigh(1,1,1)%ptr
-    pblock%pneigh(1,1,2)%ptr => ptl%pneigh(1,1,2)%ptr
-    pblock%pneigh(1,2,1)%ptr => pbr%pneigh(1,2,1)%ptr
-    pblock%pneigh(1,2,2)%ptr => ptr%pneigh(1,2,2)%ptr
-    pblock%pneigh(2,1,1)%ptr => pbl%pneigh(2,1,1)%ptr
-    pblock%pneigh(2,1,2)%ptr => pbr%pneigh(2,1,2)%ptr
-    pblock%pneigh(2,2,1)%ptr => ptl%pneigh(2,2,1)%ptr
-    pblock%pneigh(2,2,2)%ptr => ptr%pneigh(2,2,2)%ptr
-
-    pneigh => pblock%pneigh(1,1,1)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(1,2,1)%ptr => pblock
-      pneigh%pneigh(1,2,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(1,1,2)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(1,2,1)%ptr => pblock
-      pneigh%pneigh(1,2,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(1,2,1)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(1,1,1)%ptr => pblock
-      pneigh%pneigh(1,1,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(1,2,2)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(1,1,1)%ptr => pblock
-      pneigh%pneigh(1,1,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(2,1,1)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(2,2,1)%ptr => pblock
-      pneigh%pneigh(2,2,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(2,1,2)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(2,2,1)%ptr => pblock
-      pneigh%pneigh(2,2,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(2,2,1)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(2,1,1)%ptr => pblock
-      pneigh%pneigh(2,1,2)%ptr => pblock
-    endif
-
-    pneigh => pblock%pneigh(2,2,2)%ptr
-    if (associated(pneigh)) then
-      pneigh%pneigh(2,1,1)%ptr => pblock
-      pneigh%pneigh(2,1,2)%ptr => pblock
-    endif
-
 ! set the leaf flag for children
 !
     pblock%leaf = .true.
@@ -1324,61 +1114,6 @@ module blocks
     ptr%neigh(2,1,:)%id = pbr%id
     if (yubndry .eq. 'periodic') &
       ptr%neigh(2,2,:)%id = pbr%id
-
-! set neighbor pointers
-!
-    if (xlbndry .eq. 'periodic') then
-      pbl%pneigh(1,1,1)%ptr => pbr  ! BL left  -> BR
-      pbl%pneigh(1,1,2)%ptr => pbr
-    endif
-    pbl%pneigh(1,2,1)%ptr => pbr  ! BL right  -> BR
-    pbl%pneigh(1,2,2)%ptr => pbr
-    if (ylbndry .eq. 'periodic') then
-      pbl%pneigh(2,1,1)%ptr => ptl  ! BL bottom -> TL
-      pbl%pneigh(2,1,2)%ptr => ptl
-    endif
-    pbl%pneigh(2,2,1)%ptr => ptl  ! BL top    -> TL
-    pbl%pneigh(2,2,2)%ptr => ptl
-
-
-    pbr%pneigh(1,1,1)%ptr => pbl  ! BR left   -> BL
-    pbr%pneigh(1,1,2)%ptr => pbl
-    if (xubndry .eq. 'periodic') then
-      pbr%pneigh(1,2,1)%ptr => pbl  ! BR right  -> BL
-      pbr%pneigh(1,2,2)%ptr => pbl
-    endif
-    if (ylbndry .eq. 'periodic') then
-      pbr%pneigh(2,1,1)%ptr => ptr  ! BR bottom -> TR
-      pbr%pneigh(2,1,2)%ptr => ptr
-    endif
-    pbr%pneigh(2,2,1)%ptr => ptr  ! BR top    -> TR
-    pbr%pneigh(2,2,2)%ptr => ptr
-
-    if (xlbndry .eq. 'periodic') then
-      ptl%pneigh(1,1,1)%ptr => ptr  ! TL left   -> TR
-      ptl%pneigh(1,1,2)%ptr => ptr
-    endif
-    ptl%pneigh(1,2,1)%ptr => ptr  ! TL right  -> TR
-    ptl%pneigh(1,2,2)%ptr => ptr
-    ptl%pneigh(2,1,1)%ptr => pbl  ! TL bottom -> BL
-    ptl%pneigh(2,1,2)%ptr => pbl
-    if (yubndry .eq. 'periodic') then
-      ptl%pneigh(2,2,1)%ptr => pbl  ! TL top    -> BL
-      ptl%pneigh(2,2,2)%ptr => pbl
-    endif
-
-    ptr%pneigh(1,1,1)%ptr => ptl  ! TR left   -> TL
-    ptr%pneigh(1,1,2)%ptr => ptl
-    if (xubndry .eq. 'periodic') then
-      ptr%pneigh(1,2,1)%ptr => ptl  ! TR right  -> TL
-      ptr%pneigh(1,2,2)%ptr => ptl
-    endif
-    ptr%pneigh(2,1,1)%ptr => pbr  ! TR bottom -> BR
-    ptr%pneigh(2,1,2)%ptr => pbr
-    if (yubndry .eq. 'periodic') then
-      ptr%pneigh(2,2,1)%ptr => pbr  ! TR top    -> BR
-      ptr%pneigh(2,2,2)%ptr => pbr
-    endif
 
 ! set block bounds
 !
