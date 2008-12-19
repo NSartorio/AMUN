@@ -213,7 +213,7 @@ module mesh
             pparent => get_pointer(pblock%parent%id)
             do p = 1, nchild
 
-              pchild => pparent%child(p)%ptr
+              pchild => get_pointer(pparent%child(p)%id)
 
 ! initialize problem for that children and check the refinement criterion
 !
@@ -414,7 +414,7 @@ module mesh
             pparent => get_pointer(pblock%parent%id)
             if (associated(pparent)) then
               do p = 1, nchild
-                pchild => pparent%child(p)%ptr
+                pchild => get_pointer(pparent%child(p)%id)
 
                 if (associated(pchild)) then
                   if (pchild%refine .ne. -1 .or. pchild%level .ne. pblock%level) &
@@ -424,7 +424,7 @@ module mesh
 
               if (pblock%refine .ne. -1) then
                 do p = 1, nchild
-                  pchild => pparent%child(p)%ptr
+                  pchild => get_pointer(pparent%child(p)%id)
 
                   if (associated(pchild)) then
                     if (pchild%refine .eq. -1 .and. pchild%level .eq. pblock%level) &
@@ -486,7 +486,7 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block, nv => nvars
+    use blocks       , only : block, nv => nvars, get_pointer
     use config       , only : in, jn, kn, im, jm, km, ng
     use interpolation, only : expand
 
@@ -525,32 +525,36 @@ module mesh
     iu = il + im - 1
     jl = 1
     ju = jl + jm - 1
+    pchild => get_pointer(pblock%child(1)%id)
     do k = 1, km
-      pblock%child(1)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
     iu = il + im - 1
     jl = 1
     ju = jl + jm - 1
+    pchild => get_pointer(pblock%child(2)%id)
     do k = 1, km
-      pblock%child(2)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = 1
     iu = il + im - 1
     jl = in + 1
     ju = jl + jm - 1
+    pchild => get_pointer(pblock%child(3)%id)
     do k = 1, km
-      pblock%child(3)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
     iu = il + im - 1
     jl = in + 1
     ju = jl + jm - 1
+    pchild => get_pointer(pblock%child(4)%id)
     do k = 1, km
-      pblock%child(4)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
 !-------------------------------------------------------------------------------
@@ -565,7 +569,7 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block, nv => nvars, derefine_block
+    use blocks       , only : block, nv => nvars, derefine_block, get_pointer
     use config       , only : in, jn, kn, im, jm, km, ng
 
     implicit none
@@ -584,10 +588,10 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-    pbl => pblock%child(1)%ptr
-    pbr => pblock%child(2)%ptr
-    ptl => pblock%child(3)%ptr
-    ptr => pblock%child(4)%ptr
+    pbl => get_pointer(pblock%child(1)%id)
+    pbr => get_pointer(pblock%child(2)%id)
+    ptl => get_pointer(pblock%child(3)%id)
+    ptr => get_pointer(pblock%child(4)%id)
 
 ! BL
 !

@@ -62,13 +62,12 @@ module blocks
   end type blockptr
 
   type blockref
-    integer(kind=4) :: cpu, id
+    integer(kind=4)      :: cpu, id
   end type blockref
 
   type block
     type(block), pointer :: next, prev
-    type(blockptr)       :: child(nchild)
-    type(blockref)       :: parent, neigh(ndims,2,2)
+    type(blockref)       :: parent, child(nchild), neigh(ndims,2,2)
 
     logical              :: leaf
     integer(kind=4)      :: cpu, id, level
@@ -660,10 +659,10 @@ module blocks
 
 ! set children
 !
-      pblock%child(1)%ptr => pbl
-      pblock%child(2)%ptr => pbr
-      pblock%child(3)%ptr => ptl
-      pblock%child(4)%ptr => ptr
+      pblock%child(1)%id = pbl%id
+      pblock%child(2)%id = pbr%id
+      pblock%child(3)%id = ptl%id
+      pblock%child(4)%id = ptr%id
 
 ! depending on the configuration of the parent block
 !
@@ -865,14 +864,10 @@ module blocks
 !
 ! prepare pointers to children
 !
-    pbl => pblock%child(1)%ptr
-    pbr => pblock%child(2)%ptr
-    ptl => pblock%child(3)%ptr
-    ptr => pblock%child(4)%ptr
-
-    do p = 1, nchild
-      nullify(pblock%child(p)%ptr)
-    end do
+    pbl => get_pointer(pblock%child(1)%id)
+    pbr => get_pointer(pblock%child(2)%id)
+    ptl => get_pointer(pblock%child(3)%id)
+    ptr => get_pointer(pblock%child(4)%id)
 
 ! prepare neighbors
 !
