@@ -42,7 +42,7 @@ module boundaries
 !
   subroutine boundary
 
-    use blocks, only : block, plist, ndims
+    use blocks, only : block, plist, ndims, get_pointer
     use error , only : print_error
 
     implicit none
@@ -72,7 +72,7 @@ module boundaries
           do j = 1, 2
             do k = 1, 2
 
-              pneigh => pblock%pneigh(i,j,k)%ptr
+              pneigh => get_pointer(pblock%neigh(i,j,k)%id)
 
 ! check if neighbor is associated
 !

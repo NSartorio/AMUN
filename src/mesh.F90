@@ -51,8 +51,9 @@ module mesh
 
     use config , only : iblocks, jblocks, kblocks, ncells             &
                       , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
-    use blocks , only : list_allocated, init_blocks, clear_blocks     &
-                      , allocate_blocks, refine_block, block, nchild, ndims, plist, last_id, idtoptr
+    use blocks , only : list_allocated, init_blocks, clear_blocks              &
+                      , allocate_blocks, refine_block, get_pointer             &
+                      , block, nchild, ndims, plist, last_id
     use error  , only : print_info
     use problem, only : init_problem, check_ref
 
@@ -167,7 +168,7 @@ module mesh
               do j = 1, 2
                 do k = 1, 2
 
-                  pneigh => pblock%pneigh(i,j,k)%ptr
+                  pneigh => get_pointer(pblock%neigh(i,j,k)%id)
 
 ! check if neighbor is associated
 !
@@ -209,7 +210,7 @@ module mesh
 
 ! iterate over all children
 !
-            pparent => idtoptr(pblock%parent%id)%ptr
+            pparent => get_pointer(pblock%parent%id)
             do p = 1, nchild
 
               pchild => pparent%child(p)%ptr
@@ -285,7 +286,7 @@ module mesh
   subroutine update_mesh(ref)
 
     use config , only : maxlev
-    use blocks , only : block, plist, ndims, nchild, refine_block, idtoptr
+    use blocks , only : block, plist, ndims, nchild, refine_block, get_pointer
     use error  , only : print_info
     use problem, only : check_ref
 
@@ -337,7 +338,7 @@ module mesh
               do i = 1, ndims
                 do j = 1, 2
                   do k = 1, 2
-                    pneigh => pblock%pneigh(i,j,k)%ptr
+                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
                     if (associated(pneigh)) then
                       if (pneigh%level .lt. pblock%level) &
                         pneigh%refine = 1
@@ -398,7 +399,7 @@ module mesh
             do i = 1, ndims
               do j = 1, 2
                 do k = 1, 2
-                  pneigh => pblock%pneigh(i,j,k)%ptr
+                  pneigh => get_pointer(pblock%neigh(i,j,k)%id)
                   if (associated(pneigh)) then
                     if (pneigh%level .gt. pblock%level) &
                       pblock%refine = 0
@@ -410,7 +411,7 @@ module mesh
               end do
             end do
 
-            pparent => idtoptr(pblock%parent%id)%ptr
+            pparent => get_pointer(pblock%parent%id)
             if (associated(pparent)) then
               do p = 1, nchild
                 pchild => pparent%child(p)%ptr
@@ -436,7 +437,7 @@ module mesh
           endif
         endif
 
-        pparent => idtoptr(pblock%parent%id)%ptr
+        pparent => get_pointer(pblock%parent%id)
         if (associated(pparent) .and. pblock%refine .eq. -1) &
           pparent%refine = -1
 
@@ -455,7 +456,7 @@ module mesh
         if (pblock%level .eq. n) then
           if (pblock%leaf .and. pblock%refine .eq. -1) then
 
-            pparent => idtoptr(pblock%parent%id)%ptr
+            pparent => get_pointer(pblock%parent%id)
 
             if (associated(pparent) .and. pparent%refine .eq. -1) then
 !               print *, 'derefine block ', pparent%id

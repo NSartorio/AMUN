@@ -68,15 +68,14 @@ module blocks
   type block
     type(block), pointer :: next, prev
     type(blockptr)       :: child(nchild), pneigh(ndims,2,2)
-    type(blockref)       :: parent
+    type(blockref)       :: parent, neigh(ndims,2,2)
 
     logical              :: leaf
+    integer(kind=4)      :: cpu, id, level
 
     character            :: config
     integer(kind=4)      :: refine
 
-    integer(kind=4)      :: id, level
-    integer(kind=4)      :: neigh(ndims,2,2)
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -91,11 +90,14 @@ module blocks
 ! stored pointers
 !
   type(block), pointer, save :: plist, plast
-  integer(kind=4)     , save :: nblocks
 
 ! stored last id (should always increase)
 !
   integer(kind=4)     , save :: last_id
+
+! store number of allocated blocks
+!
+  integer(kind=4)     , save :: nblocks
 
   contains
 !
@@ -247,6 +249,37 @@ module blocks
 !
 !===============================================================================
 !
+! get_pointer: function returns a pointer to the block with requested ID
+!
+!===============================================================================
+!
+  function get_pointer(id)
+
+    implicit none
+
+! input argument
+!
+    integer(kind=4) :: id
+
+! return variable
+!
+    type(block), pointer :: get_pointer
+!
+!-------------------------------------------------------------------------------
+!
+    nullify(get_pointer)
+
+    if (id .ge. 1 .and. id .le. maxid) &
+      get_pointer => idtoptr(id)%ptr
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_pointer
+!
+!===============================================================================
+!
 ! allocate_block: subroutine allocates space for one block and returns the
 !                 pointer to this block
 !
@@ -297,7 +330,9 @@ module blocks
 
 ! reset neighbors
 !
-    pblock%neigh(:,:,:) = -1
+    pblock%neigh(:,:,:)%cpu = -1
+    pblock%neigh(:,:,:)%id  = -1
+
     do i = 1, ndims
       do j = 1, 2
         do k = 1, 2
@@ -314,6 +349,10 @@ module blocks
 ! set the correspponding pointer in the ID to pointer array to the current block
 !
     idtoptr(pblock%id)%ptr => pblock
+
+! increase the number of allocated blocks
+!
+    nblocks = nblocks + 1
 
 !-------------------------------------------------------------------------------
 !
@@ -353,6 +392,10 @@ module blocks
 !
     deallocate(pblock)
     nullify(pblock)
+
+! decrease the number of allocated blocks
+!
+    nblocks = nblocks - 1
 
 !-------------------------------------------------------------------------------
 !
@@ -479,8 +522,28 @@ module blocks
       ptr%ymin = ptl%ymin
       ptr%ymax = pblock%ymax
 
-! set neighbor pointers to the refined blocks
+! set neighbors to the refined blocks
 !
+      pbl%neigh(1,2,1)%id = pbr%id  ! BL right  -> BR
+      pbl%neigh(1,2,2)%id = pbr%id
+      pbl%neigh(2,2,1)%id = ptl%id  ! BL top    -> TL
+      pbl%neigh(2,2,2)%id = ptl%id
+
+      pbr%neigh(1,1,1)%id = pbl%id  ! BR left   -> BL
+      pbr%neigh(1,1,2)%id = pbl%id
+      pbr%neigh(2,2,1)%id = ptr%id  ! BR top    -> TR
+      pbr%neigh(2,2,2)%id = ptr%id
+
+      ptl%neigh(1,2,1)%id = ptr%id  ! TL right  -> TR
+      ptl%neigh(1,2,2)%id = ptr%id
+      ptl%neigh(2,1,1)%id = pbl%id  ! TL bottom -> BL
+      ptl%neigh(2,1,2)%id = pbl%id
+
+      ptr%neigh(1,1,1)%id = ptl%id  ! TR left   -> TL
+      ptr%neigh(1,1,2)%id = ptl%id
+      ptr%neigh(2,1,1)%id = pbr%id  ! TR bottom -> BR
+      ptr%neigh(2,1,2)%id = pbr%id
+
       pbl%pneigh(1,2,1)%ptr => pbr  ! BL right  -> BR
       pbl%pneigh(1,2,2)%ptr => pbr
       pbl%pneigh(2,2,1)%ptr => ptl  ! BL top    -> TL
@@ -503,6 +566,130 @@ module blocks
 
 ! set pointer to the neighbors of the parent block
 !
+      pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
+      if (associated(pneigh)) then
+        pbl%neigh(1,1,1)%id = pneigh%id
+        pbl%neigh(1,1,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,2,1)%id = pbl%id
+          pneigh%neigh(1,2,2)%id = ptl%id
+        endif
+        if (pneigh%level .eq. pbl%level) then
+          pneigh%neigh(1,2,1)%id = pbl%id
+          pneigh%neigh(1,2,2)%id = pbl%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(1,1,2)%id) ! left upper neighbor
+      if (associated(pneigh)) then
+        ptl%neigh(1,1,1)%id = pneigh%id
+        ptl%neigh(1,1,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,2,1)%id = pbl%id
+          pneigh%neigh(1,2,2)%id = ptl%id
+        endif
+        if (pneigh%level .eq. ptl%level) then
+          pneigh%neigh(1,2,1)%id = ptl%id
+          pneigh%neigh(1,2,2)%id = ptl%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(1,2,1)%id) ! right lower neighbor
+      if (associated(pneigh)) then
+        pbr%neigh(1,2,1)%id = pneigh%id
+        pbr%neigh(1,2,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,1)%id = pbr%id
+          pneigh%neigh(1,1,2)%id = ptr%id
+        endif
+        if (pneigh%level .eq. pbr%level) then
+          pneigh%neigh(1,1,1)%id = pbr%id
+          pneigh%neigh(1,1,2)%id = pbr%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(1,2,2)%id) ! right upper neighbor
+      if (associated(pneigh)) then
+        ptr%neigh(1,2,1)%id = pneigh%id
+        ptr%neigh(1,2,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,1)%id = pbr%id
+          pneigh%neigh(1,1,2)%id = ptr%id
+        endif
+        if (pneigh%level .eq. ptr%level) then
+          pneigh%neigh(1,1,1)%id = ptr%id
+          pneigh%neigh(1,1,2)%id = ptr%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(2,1,1)%id)  ! bottom left neighbor
+      if (associated(pneigh)) then
+        pbl%neigh(2,1,1)%id = pneigh%id
+        pbl%neigh(2,1,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,1)%id = pbl%id
+          pneigh%neigh(2,2,2)%id = pbr%id
+        endif
+        if (pneigh%level .eq. pbl%level) then
+          pneigh%neigh(2,2,1)%id = pbl%id
+          pneigh%neigh(2,2,2)%id = pbl%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(2,1,2)%id)  ! bottom right neighbor
+      if (associated(pneigh)) then
+        pbr%neigh(2,1,1)%id = pneigh%id
+        pbr%neigh(2,1,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,1)%id = pbl%id
+          pneigh%neigh(2,2,2)%id = pbr%id
+        endif
+        if (pneigh%level .eq. pbr%level) then
+          pneigh%neigh(2,2,1)%id = pbr%id
+          pneigh%neigh(2,2,2)%id = pbr%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(2,2,1)%id)  ! top left neighbor
+      if (associated(pneigh)) then
+        ptl%neigh(2,2,1)%id = pneigh%id
+        ptl%neigh(2,2,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,1)%id = ptl%id
+          pneigh%neigh(2,1,2)%id = ptr%id
+        endif
+        if (pneigh%level .eq. ptl%level) then
+          pneigh%neigh(2,1,1)%id = ptl%id
+          pneigh%neigh(2,1,2)%id = ptl%id
+        endif
+      endif
+
+      pneigh => get_pointer(pblock%neigh(2,2,2)%id)  ! top right neighbor
+      if (associated(pneigh)) then
+        ptr%neigh(2,2,1)%id = pneigh%id
+        ptr%neigh(2,2,2)%id = pneigh%id
+
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,1)%id = ptl%id
+          pneigh%neigh(2,1,2)%id = ptr%id
+        endif
+        if (pneigh%level .eq. ptr%level) then
+          pneigh%neigh(2,1,1)%id = ptr%id
+          pneigh%neigh(2,1,2)%id = ptr%id
+        endif
+      endif
+
+
+
+
+
       pneigh => pblock%pneigh(1,1,1)%ptr ! left lower neighbor
       if (associated(pneigh)) then
         pbl%pneigh(1,1,1)%ptr => pneigh
@@ -841,6 +1028,64 @@ module blocks
 
 ! prepare neighbors
 !
+    pblock%neigh(1,1,1)%id = pbl%neigh(1,1,1)%id
+    pblock%neigh(1,1,2)%id = ptl%neigh(1,1,2)%id
+    pblock%neigh(1,2,1)%id = pbr%neigh(1,2,1)%id
+    pblock%neigh(1,2,2)%id = ptr%neigh(1,2,2)%id
+    pblock%neigh(2,1,1)%id = pbl%neigh(2,1,1)%id
+    pblock%neigh(2,1,2)%id = pbr%neigh(2,1,2)%id
+    pblock%neigh(2,2,1)%id = ptl%neigh(2,2,1)%id
+    pblock%neigh(2,2,2)%id = ptr%neigh(2,2,2)%id
+
+    pneigh => get_pointer(pblock%neigh(1,1,1)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(1,2,1)%id = pblock%id
+      pneigh%neigh(1,2,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(1,1,2)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(1,2,1)%id = pblock%id
+      pneigh%neigh(1,2,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(1,2,1)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(1,1,1)%id = pblock%id
+      pneigh%neigh(1,1,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(1,2,2)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(1,1,1)%id = pblock%id
+      pneigh%neigh(1,1,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(2,1,1)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(2,2,1)%id = pblock%id
+      pneigh%neigh(2,2,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(2,1,2)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(2,2,1)%id = pblock%id
+      pneigh%neigh(2,2,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(2,2,1)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(2,1,1)%id = pblock%id
+      pneigh%neigh(2,1,2)%id = pblock%id
+    endif
+
+    pneigh => get_pointer(pblock%neigh(2,2,2)%id)
+    if (associated(pneigh)) then
+      pneigh%neigh(2,1,1)%id = pblock%id
+      pneigh%neigh(2,1,2)%id = pblock%id
+    endif
+
+
     pblock%pneigh(1,1,1)%ptr => pbl%pneigh(1,1,1)%ptr
     pblock%pneigh(1,1,2)%ptr => ptl%pneigh(1,1,2)%ptr
     pblock%pneigh(1,2,1)%ptr => pbr%pneigh(1,2,1)%ptr
@@ -1052,17 +1297,33 @@ module blocks
 
 ! set neighbors
 !
-    pbl%neigh(1,2,:) = pbr%id
-    pbl%neigh(2,2,:) = ptl%id
+    if (xlbndry .eq. 'periodic') &
+      pbl%neigh(1,1,:)%id = pbr%id
+    pbl%neigh(1,2,:)%id = pbr%id
+    if (ylbndry .eq. 'periodic') &
+      pbl%neigh(2,1,:)%id = ptl%id
+    pbl%neigh(2,2,:)%id = ptl%id
 
-    pbr%neigh(1,1,:) = pbl%id
-    pbr%neigh(2,2,:) = ptr%id
+    pbr%neigh(1,1,:)%id = pbl%id
+    if (xubndry .eq. 'periodic') &
+      pbr%neigh(1,2,:)%id = pbl%id
+    if (ylbndry .eq. 'periodic') &
+      pbr%neigh(2,1,:)%id = ptr%id
+    pbr%neigh(2,2,:)%id = ptr%id
 
-    ptl%neigh(1,2,:) = ptr%id
-    ptl%neigh(2,1,:) = pbl%id
+    if (xlbndry .eq. 'periodic') &
+      ptl%neigh(1,1,:)%id = ptr%id
+    ptl%neigh(1,2,:)%id = ptr%id
+    ptl%neigh(2,1,:)%id = pbl%id
+    if (yubndry .eq. 'periodic') &
+      ptl%neigh(2,2,:)%id = pbl%id
 
-    ptr%neigh(1,1,:) = ptl%id
-    ptr%neigh(2,1,:) = pbr%id
+    ptr%neigh(1,1,:)%id = ptl%id
+    if (xubndry .eq. 'periodic') &
+      ptr%neigh(1,2,:)%id = ptl%id
+    ptr%neigh(2,1,:)%id = pbr%id
+    if (yubndry .eq. 'periodic') &
+      ptr%neigh(2,2,:)%id = pbr%id
 
 ! set neighbor pointers
 !
