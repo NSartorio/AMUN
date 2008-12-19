@@ -214,7 +214,7 @@ module io
 
         do while(associated(pblock))
 
-          if (pblock%leaf .eq. 'T') then
+          if (pblock%leaf) then
 
           write(gnm,"('blk',i8.8)") pblock%id
 
@@ -255,8 +255,12 @@ module io
           call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pblock%config, am, err)
           call h5aclose_f(aid, err)
 
-          call h5acreate_f(bid, 'leaf', H5T_NATIVE_CHARACTER, sid, aid, err)
-          call h5awrite_f(aid, H5T_NATIVE_CHARACTER, pblock%leaf, am, err)
+          call h5acreate_f(bid, 'leaf', H5T_NATIVE_INTEGER, sid, aid, err)
+          if (pblock%leaf) then
+            call h5awrite_f(aid, H5T_NATIVE_INTEGER, 1, am, err)
+          else
+            call h5awrite_f(aid, H5T_NATIVE_INTEGER, 0, am, err)
+          endif
           call h5aclose_f(aid, err)
 
           ptemp => pblock%parent

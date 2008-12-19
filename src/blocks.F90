@@ -65,7 +65,8 @@ module blocks
     type(block), pointer :: next, prev, parent
     type(blockptr)       :: child(nchild), pneigh(ndims,2,2)
 
-    character            :: config, leaf
+    logical              :: leaf
+    character            :: config
     integer(kind=4)      :: refine
 
     integer(kind=4)      :: id, level
@@ -272,7 +273,7 @@ module blocks
 ! set configuration and leaf flags
 !
     pblock%config = 'N'         ! TODO: replace with an integer number
-    pblock%leaf   = 'F'         ! TODO: replace with a logical variable
+    pblock%leaf   = .false.
 
 ! initialize the refinement flag
 !
@@ -416,7 +417,7 @@ module blocks
 ! unset the refinement and leaf flags for the parent block
 !
       pblock%refine = 0
-      pblock%leaf   = 'F'
+      pblock%leaf   = .false.
 
 ! create 4 blocks
 !
@@ -441,10 +442,10 @@ module blocks
 
 ! set leaf flags
 !
-      pbl%leaf   = 'T'
-      pbr%leaf   = 'T'
-      ptl%leaf   = 'T'
-      ptr%leaf   = 'T'
+      pbl%leaf   = .true.
+      pbr%leaf   = .true.
+      ptl%leaf   = .true.
+      ptr%leaf   = .true.
 
 ! set bounds
 !
@@ -889,11 +890,11 @@ module blocks
 
 ! set the leaf flag for children
 !
-    pblock%leaf = 'T'
-    pbl%leaf = 'F'
-    pbr%leaf = 'F'
-    ptl%leaf = 'F'
-    ptr%leaf = 'F'
+    pblock%leaf = .true.
+    pbl%leaf    = .false.
+    pbr%leaf    = .false.
+    ptl%leaf    = .false.
+    ptr%leaf    = .false.
 
 ! prepare next and prev pointers
 !
@@ -1034,10 +1035,10 @@ module blocks
 
 ! set leaf flags
 !
-    pbl%leaf   = 'T'
-    pbr%leaf   = 'T'
-    ptl%leaf   = 'T'
-    ptr%leaf   = 'T'
+    pbl%leaf   = .true.
+    pbr%leaf   = .true.
+    ptl%leaf   = .true.
+    ptr%leaf   = .true.
 
 ! set neighbors
 !

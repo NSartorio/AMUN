@@ -64,7 +64,7 @@ module boundaries
 
 ! if the current block is a leaf...
 !
-      if (pblock%leaf .eq. 'T') then
+      if (pblock%leaf) then
 
 ! iterate over all neighbor blocks
 !
@@ -81,7 +81,7 @@ module boundaries
 ! neighbor is associated, which means the periodic boundary conditions
 ! or interior of the domain
 !
-                if (pneigh%leaf .eq. 'T') then
+                if (pneigh%leaf) then
 
 ! calculate the difference of current and neighbor levels
 !

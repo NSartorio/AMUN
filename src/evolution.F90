@@ -65,11 +65,11 @@ module evolution
 ! check if this block is a leaf
 !
 #ifdef EULER
-      if (pblock%leaf .eq. 'T') &
+      if (pblock%leaf) &
         call evolve_euler(pblock)
 #endif /* EULER */
 #ifdef RK2
-      if (pblock%leaf .eq. 'T') &
+      if (pblock%leaf) &
         call evolve_rk2(pblock)
 #endif /* RK2 */
 
@@ -96,7 +96,7 @@ module evolution
 
 ! check if this block is a leaf
 !
-      if (pblock%leaf .eq. 'T') &
+      if (pblock%leaf) &
         cm = maxspeed(pblock%u)
 
 ! compare global and local maximum speeds

@@ -134,7 +134,7 @@ module mesh
 
 ! check refinements criterion for the current block
 !
-        if (pblock%leaf .eq. 'T' .and. pblock%level .lt. maxlev) then
+        if (pblock%leaf .and. pblock%level .lt. maxlev) then
           pblock%refine = check_ref(pblock)
 
 ! do not allow for derefinement initially
@@ -172,7 +172,7 @@ module mesh
 ! check if neighbor is associated
 !
                   if (associated(pneigh)) then
-                    if (pneigh%leaf .eq. 'T') then
+                    if (pneigh%leaf) then
                       if (pneigh%level .lt. pblock%level) &
                         pneigh%refine = 1
                     else
@@ -300,8 +300,6 @@ module mesh
 
 !----------------------------------------------------------------------
 !
-!     if (ref .eq. 1) then
-
     do l = 1, maxlev
 
 ! check refinement criterion
@@ -312,11 +310,9 @@ module mesh
         if (pblock%level .eq. l) then
           pblock%refine = 0
 
-          if (pblock%leaf .eq. 'T') then
+          if (pblock%leaf) then
             pblock%refine = check_ref(pblock)
 
-!             if (pblock%refine .eq. -1) &
-!               pblock%refine = 0
             if (pblock%refine .eq. -1 .and. pblock%level .eq. 1) &
               pblock%refine = 0
 
@@ -337,7 +333,7 @@ module mesh
         do while (associated(pblock))
 
           if (pblock%level .eq. n) then
-            if (pblock%refine .eq. 1 .and. pblock%leaf .eq. 'T') then
+            if (pblock%leaf .and. pblock%refine .eq. 1) then
               do i = 1, ndims
                 do j = 1, 2
                   do k = 1, 2
@@ -362,11 +358,10 @@ module mesh
         do while (associated(pblock))
 
           if (pblock%level .eq. n) then
-            if (pblock%refine .eq. 1 .and. pblock%leaf .eq. 'T') then
+            if (pblock%leaf .and. pblock%refine .eq. 1) then
 
               pparent => pblock
 
-!               print *, 'refine block ', pparent%id
               call refine_block(pblock)
               call prolong_block(pparent)
             endif
@@ -382,30 +377,6 @@ module mesh
 ! else
 
     do l = maxlev, 1, -1
-
-! check refinement criterion
-!
-!       pblock => plist
-!       do while (associated(pblock))
-!
-!         if (pblock%level .eq. l) then
-!           pblock%refine = 0
-!
-!           if (pblock%leaf .eq. 'T') then
-!             pblock%refine = check_ref(pblock)
-!
-!             if (pblock%refine .eq. -1 .and. pblock%level .eq. 1) &
-!               pblock%refine = 0
-!
-!             if (pblock%refine .eq. 1) &
-!               pblock%refine = 0
-! !             if (pblock%refine .eq. 1 .and. pblock%level .eq. maxlev) &
-! !               pblock%refine = 0
-!           endif
-!         endif
-!
-!         pblock => pblock%next
-!       end do
 
 ! derefinement conditions for blocks:
 !
@@ -423,7 +394,7 @@ module mesh
       do while (associated(pblock))
 
         if (pblock%level .eq. n) then
-          if (pblock%refine .eq. -1 .and. pblock%leaf .eq. 'T') then
+          if (pblock%leaf .and. pblock%refine .eq. -1) then
             do i = 1, ndims
               do j = 1, 2
                 do k = 1, 2
@@ -482,7 +453,7 @@ module mesh
       do while (associated(pblock))
 
         if (pblock%level .eq. n) then
-          if (pblock%refine .eq. -1 .and. pblock%leaf .eq. 'T') then
+          if (pblock%leaf .and. pblock%refine .eq. -1) then
 
             pparent => pblock%parent
 
