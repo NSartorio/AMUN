@@ -72,7 +72,7 @@ module boundaries
           do j = 1, 2
             do k = 1, 2
 
-              pneigh => pblock%pneigh(i,j,k)%p
+              pneigh => pblock%pneigh(i,j,k)%ptr
 
 ! check if neighbor is associated
 !

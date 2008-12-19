@@ -167,7 +167,7 @@ module mesh
               do j = 1, 2
                 do k = 1, 2
 
-                  pneigh => pblock%pneigh(i,j,k)%p
+                  pneigh => pblock%pneigh(i,j,k)%ptr
 
 ! check if neighbor is associated
 !
@@ -212,7 +212,7 @@ module mesh
             pparent => pblock%parent
             do p = 1, nchild
 
-              pchild => pparent%child(p)%p
+              pchild => pparent%child(p)%ptr
 
 ! initialize problem for that children and check the refinement criterion
 !
@@ -341,7 +341,7 @@ module mesh
               do i = 1, ndims
                 do j = 1, 2
                   do k = 1, 2
-                    pneigh => pblock%pneigh(i,j,k)%p
+                    pneigh => pblock%pneigh(i,j,k)%ptr
                     if (associated(pneigh)) then
                       if (pneigh%level .lt. pblock%level) &
                         pneigh%refine = 1
@@ -427,7 +427,7 @@ module mesh
             do i = 1, ndims
               do j = 1, 2
                 do k = 1, 2
-                  pneigh => pblock%pneigh(i,j,k)%p
+                  pneigh => pblock%pneigh(i,j,k)%ptr
                   if (associated(pneigh)) then
                     if (pneigh%level .gt. pblock%level) &
                       pblock%refine = 0
@@ -442,7 +442,7 @@ module mesh
             pparent => pblock%parent
             if (associated(pparent)) then
               do p = 1, nchild
-                pchild => pparent%child(p)%p
+                pchild => pparent%child(p)%ptr
 
                 if (associated(pchild)) then
                   if (pchild%refine .ne. -1 .or. pchild%level .ne. pblock%level) &
@@ -452,7 +452,7 @@ module mesh
 
               if (pblock%refine .ne. -1) then
                 do p = 1, nchild
-                  pchild => pparent%child(p)%p
+                  pchild => pparent%child(p)%ptr
 
                   if (associated(pchild)) then
                     if (pchild%refine .eq. -1 .and. pchild%level .eq. pblock%level) &
@@ -554,7 +554,7 @@ module mesh
     jl = 1
     ju = jl + jm - 1
     do k = 1, km
-      pblock%child(1)%p%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pblock%child(1)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
@@ -562,7 +562,7 @@ module mesh
     jl = 1
     ju = jl + jm - 1
     do k = 1, km
-      pblock%child(2)%p%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pblock%child(2)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = 1
@@ -570,7 +570,7 @@ module mesh
     jl = in + 1
     ju = jl + jm - 1
     do k = 1, km
-      pblock%child(3)%p%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pblock%child(3)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
@@ -578,7 +578,7 @@ module mesh
     jl = in + 1
     ju = jl + jm - 1
     do k = 1, km
-      pblock%child(4)%p%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pblock%child(4)%ptr%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
 !-------------------------------------------------------------------------------
@@ -612,10 +612,10 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-    pbl => pblock%child(1)%p
-    pbr => pblock%child(2)%p
-    ptl => pblock%child(3)%p
-    ptr => pblock%child(4)%p
+    pbl => pblock%child(1)%ptr
+    pbr => pblock%child(2)%ptr
+    ptl => pblock%child(3)%ptr
+    ptr => pblock%child(4)%ptr
 
 ! BL
 !
