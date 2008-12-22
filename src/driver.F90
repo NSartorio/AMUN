@@ -32,6 +32,7 @@ program godunov
   use evolution, only : evolve, n, t, dt, dtn
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
+  use mpitools , only : ncpu, init_mpi, clear_mpi, is_master
   use timer    , only : init_timers, start_timer, stop_timer          &
                       , get_timer, get_timer_total
 !
@@ -45,13 +46,21 @@ program godunov
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef MPI
+! initialize MPI
+!
+  call init_mpi
+#endif /* MPI */
+
 ! print info message
 !
-  write (*,"(1x,78('-'))")
-  write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
-  write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
-  write (*,"(1x,78('-'))")
-  write (*,*)
+  if (is_master()) then
+    write (*,"(1x,78('-'))")
+    write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
+    write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
+    write (*,"(1x,78('-'))")
+    write (*,*)
+  endif
 
 ! read configuration file
 !
@@ -80,7 +89,7 @@ program godunov
 ! write down the initial state
 !
   call start_timer(3)
-  call write_data(ftype, no, 0)
+  call write_data(ftype, no, ncpu)
   call stop_timer(3)
 
 ! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
@@ -88,8 +97,10 @@ program godunov
 
 ! print information
 !
-  write(*,*)
-  write(*,"(1x,a)"   ) "Evolving system:"
+  if (is_master()) then
+    write(*,*)
+    write(*,"(1x,a)"   ) "Evolving system:"
+  endif
 
 ! main loop
 !
@@ -115,7 +126,7 @@ program godunov
     call start_timer(3)
     if (dtout .gt. 0.0 .and. no .lt. (int(t/dtout))) then
       no = no + 1
-      call write_data(ftype, no, 0)
+      call write_data(ftype, no, ncpu)
     endif
     call stop_timer(3)
 
@@ -132,9 +143,11 @@ program godunov
 
 ! print progress information
 !
-    if (mod(n, 50) .eq. 1) &
-      write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
-    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, ed, eh, em, es
+    if (is_master()) then
+      if (mod(n, 50) .eq. 1) &
+        write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
+      write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, ed, eh, em, es
+    endif
 
   end do
 
@@ -142,7 +155,7 @@ program godunov
 !
   call start_timer(3)
   no = no + 1
-  call write_data(ftype, no, 0)
+  call write_data(ftype, no, ncpu)
   call stop_timer(3)
 
 ! deallocate and reset mesh
@@ -157,15 +170,23 @@ program godunov
 
 ! print info about execution times
 !
-  write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6, ".4,' secs = ',f7.3,' %')"
+  if (is_master()) then
+    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6, ".4,' secs = ',f7.3,' %')"
 
-  write (*,*)
-  write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
-  write (*,fmt) "Time for evolution      : ", get_timer(2), 100.0*get_timer(2)/tall
-  write (*,fmt) "Time for data output    : ", get_timer(3), 100.0*get_timer(3)/tall
-  write (*,fmt) "Time for boundary update: ", get_timer(4), 100.0*get_timer(4)/tall
-  write (*,fmt) "Time for mesh update    : ", get_timer(5), 100.0*get_timer(5)/tall
-  write (*,fmt) "EXECUTION TIME          : ", tall, 100.0
+    write (*,*)
+    write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
+    write (*,fmt) "Time for evolution      : ", get_timer(2), 100.0*get_timer(2)/tall
+    write (*,fmt) "Time for data output    : ", get_timer(3), 100.0*get_timer(3)/tall
+    write (*,fmt) "Time for boundary update: ", get_timer(4), 100.0*get_timer(4)/tall
+    write (*,fmt) "Time for mesh update    : ", get_timer(5), 100.0*get_timer(5)/tall
+    write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
+  endif
+
+#ifdef MPI
+! close access to the MPI
+!
+  call clear_mpi
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !

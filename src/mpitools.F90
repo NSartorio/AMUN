@@ -31,6 +31,100 @@ module mpitools
 ! MPI global variables
 !
   integer(kind=4), save                 :: comm3d
-  integer(kind=4), save                 :: nproc, nprocs
+  integer(kind=4), save                 :: ncpu, ncpus
+
+  contains
+!
+!===============================================================================
+!
+! init_mpi: subroutine initializes the MPI variables
+!
+!===============================================================================
+!
+  subroutine init_mpi
+
+#ifdef MPI
+    use mpi, only : mpi_comm_world
+#endif /* MPI */
+
+    implicit none
+#ifdef MPI
+! local variables
+!
+    integer :: err
+#endif /* MPI */
+!
+!-------------------------------------------------------------------------------
+!
+    ncpu  = 0
+    ncpus = 1
+
+#ifdef MPI
+!  initialize the MPI interface
+!
+    call mpi_init(err)
+
+! get the current process id and the total number of processes
+!
+    call mpi_comm_rank(mpi_comm_world, ncpu , err)
+    call mpi_comm_size(mpi_comm_world, ncpus, err)
+
+    comm3d = mpi_comm_world
+
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_mpi
+!
+!===============================================================================
+!
+! clear_mpi: subroutine clears the MPI variables
+!
+!===============================================================================
+!
+  subroutine clear_mpi
+
+    implicit none
+#ifdef MPI
+! local variables
+!
+    integer :: err
+#endif /* MPI */
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef MPI
+!  finalize the MPI interface
+!
+    call mpi_finalize(err)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine clear_mpi
+!
+!===============================================================================
+!
+! is_master: function returns true if it is the master node, otherwise it
+!            returns false
+!
+!===============================================================================
+!
+  function is_master()
+
+    implicit none
+
+! return value
+!
+    logical :: is_master
+!
+!----------------------------------------------------------------------
+!
+    is_master = ncpu .eq. 0
+
+!-------------------------------------------------------------------------------
+!
+  end function is_master
 
 end module

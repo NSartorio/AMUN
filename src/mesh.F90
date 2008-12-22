@@ -49,13 +49,14 @@ module mesh
 !
   subroutine init_mesh
 
-    use config , only : iblocks, jblocks, kblocks, ncells             &
-                      , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
-    use blocks , only : list_allocated, init_blocks, clear_blocks              &
-                      , allocate_blocks, refine_block, get_pointer             &
-                      , block, nchild, ndims, plist, last_id
-    use error  , only : print_info
-    use problem, only : init_problem, check_ref
+    use config  , only : iblocks, jblocks, kblocks, ncells                     &
+                       , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
+    use blocks  , only : list_allocated, init_blocks, clear_blocks             &
+                       , allocate_blocks, refine_block, get_pointer            &
+                       , block, nchild, ndims, plist, last_id
+    use error   , only : print_info
+    use mpitools, only : is_master
+    use problem , only : init_problem, check_ref
 
     implicit none
 
@@ -77,9 +78,11 @@ module mesh
 
 ! print information
 !
-    write(*,"(1x,a)"   ) "Generating initial mesh:"
-    write(*,"(4x,a,1x,i6)") "refining to max. level =", maxlev
-    write(*,"(4x,a,1x,i6)") "effective resolution   =", ncells*2**maxlev
+    if (is_master()) then
+      write(*,"(1x,a)"   ) "Generating initial mesh:"
+      write(*,"(4x,a,1x,i6)") "refining to max. level =", maxlev
+      write(*,"(4x,a,1x,i6)") "effective resolution   =", ncells*2**maxlev
+    endif
 
 ! allocate initial structure of blocks according the the defined geometry
 !
@@ -121,12 +124,14 @@ module mesh
 !       refine blocks, set inital conditions at newly created block,
 !       and finally check the criterium
 !
-    write(*,"(4x,a,$)") "refining level         =    "
+    if (is_master()) &
+      write(*,"(4x,a,$)") "refining level         =    "
     do l = 1, maxlev-1
 
 ! print information
 !
-      write(*,"(1x,i2,$)") l
+      if (is_master()) &
+        write(*,"(1x,i2,$)") l
 
 ! iterate over all blocks and check refinement criterion
 !
@@ -235,10 +240,12 @@ module mesh
 
 ! print information
 !
-    write(bstr,"(i)") last_id
-    write(tstr,"(i)") (2**maxlev)**ndims
-    write(*,*)
-    write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
+    if (is_master()) then
+      write(bstr,"(i)") last_id
+      write(tstr,"(i)") (2**maxlev)**ndims
+      write(*,*)
+      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
+    endif
 
 ! allocating space for coordinate variables
 !
