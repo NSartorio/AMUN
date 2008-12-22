@@ -32,7 +32,7 @@ program godunov
   use evolution, only : evolve, n, t, dt, dtn
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
-  use mpitools , only : ncpu, init_mpi, clear_mpi, is_master
+  use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use timer    , only : init_timers, start_timer, stop_timer          &
                       , get_timer, get_timer_total
 !
@@ -58,6 +58,9 @@ program godunov
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
     write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
+#ifdef MPI
+    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus, ' processors'
+#endif /* MPI */
     write (*,"(1x,78('-'))")
     write (*,*)
   endif
@@ -72,11 +75,11 @@ program godunov
 
 ! reset number of iterations and time, etc.
 !
-  n   = 0
-  t   = 0.0
-  dt  = cfl*dtini
-  dtn = dtini
-  no  = 0
+  n    = 0
+  t    = 0.0
+  dt   = cfl*dtini
+  dtn  = dtini
+  no   = 0
   tbeg = 0.0
 
 ! initialize our adaptive mesh, refine that mesh to the desired level
