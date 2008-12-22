@@ -32,6 +32,27 @@ module problem
 !
 !===============================================================================
 !
+! init_domain: subroutine initializes the domain for a given problem
+!
+!===============================================================================
+!
+  subroutine init_domain
+
+    use config, only : problem
+!
+!-------------------------------------------------------------------------------
+!
+    select case(trim(problem))
+    case default
+      call domain_default()
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_domain
+!
+!===============================================================================
+!
 ! init_problem: subroutine initializes the variables according to
 !               the studied problem
 !
@@ -106,6 +127,115 @@ module problem
 !
   end subroutine update_shapes
 #endif /* SHAPE */
+!
+!===============================================================================
+!
+! domain_default: subroutine initializes the default domain of 2x2 blocks in
+!                'N' configuration
+!
+!===============================================================================
+!
+  subroutine domain_default
+
+    use blocks, only : block, append_block
+    use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
+                     , xmin, xmax, ymin, ymax
+
+    implicit none
+
+! local variables
+!
+    real :: xl, xc, xr, yl, yc, yr
+
+! local pointers
+!
+    type(block), pointer :: pbl, pbr, ptl, ptr
+!
+!-------------------------------------------------------------------------------
+!
+! create root blocks
+!
+    call append_block(pbl)
+    call append_block(ptl)
+    call append_block(ptr)
+    call append_block(pbr)
+
+! set configurations
+!
+    pbl%config = 'D'
+    ptl%config = 'N'
+    ptr%config = 'N'
+    pbr%config = 'C'
+
+! set leaf flags
+!
+    pbl%leaf   = .true.
+    pbr%leaf   = .true.
+    ptl%leaf   = .true.
+    ptr%leaf   = .true.
+
+! set neighbors
+!
+    if (xlbndry .eq. 'periodic') &
+      pbl%neigh(1,1,:)%id = pbr%id
+    pbl%neigh(1,2,:)%id = pbr%id
+    if (ylbndry .eq. 'periodic') &
+      pbl%neigh(2,1,:)%id = ptl%id
+    pbl%neigh(2,2,:)%id = ptl%id
+
+    pbr%neigh(1,1,:)%id = pbl%id
+    if (xubndry .eq. 'periodic') &
+      pbr%neigh(1,2,:)%id = pbl%id
+    if (ylbndry .eq. 'periodic') &
+      pbr%neigh(2,1,:)%id = ptr%id
+    pbr%neigh(2,2,:)%id = ptr%id
+
+    if (xlbndry .eq. 'periodic') &
+      ptl%neigh(1,1,:)%id = ptr%id
+    ptl%neigh(1,2,:)%id = ptr%id
+    ptl%neigh(2,1,:)%id = pbl%id
+    if (yubndry .eq. 'periodic') &
+      ptl%neigh(2,2,:)%id = pbl%id
+
+    ptr%neigh(1,1,:)%id = ptl%id
+    if (xubndry .eq. 'periodic') &
+      ptr%neigh(1,2,:)%id = ptl%id
+    ptr%neigh(2,1,:)%id = pbr%id
+    if (yubndry .eq. 'periodic') &
+      ptr%neigh(2,2,:)%id = pbr%id
+
+! set the bounds of the blocks
+!
+    xl = xmin
+    xc = 0.5 * (xmax + xmin)
+    xr = xmax
+    yl = ymin
+    yc = 0.5 * (ymax + ymin)
+    yr = ymax
+
+    pbl%xmin = xl
+    pbl%xmax = xc
+    pbl%ymin = yl
+    pbl%ymax = yc
+
+    ptl%xmin = xl
+    ptl%xmax = xc
+    ptl%ymin = yc
+    ptl%ymax = yr
+
+    ptr%xmin = xc
+    ptr%xmax = xr
+    ptr%ymin = yc
+    ptr%ymax = yr
+
+    pbr%xmin = xc
+    pbr%xmax = xr
+    pbr%ymin = yl
+    pbr%ymax = yc
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine domain_default
 !
 !===============================================================================
 !

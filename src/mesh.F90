@@ -49,13 +49,13 @@ module mesh
 !
   subroutine init_mesh
 
-    use config , only : iblocks, jblocks, kblocks, ncells             &
-                      , xmin, xmax, ymin, ymax, zmin, zmax, maxlev, ngrids
+    use config , only : im, jm, km, ncells, xmin, xmax, ymin, ymax, zmin, zmax &
+                      , maxlev
     use blocks , only : list_allocated, init_blocks, clear_blocks              &
-                      , allocate_blocks, refine_block, get_pointer             &
+                      , refine_block, get_pointer                              &
                       , block, nchild, ndims, plist, last_id
     use error  , only : print_info
-    use problem, only : init_problem, check_ref
+    use problem, only : init_domain, init_problem, check_ref
 
     implicit none
 
@@ -81,13 +81,13 @@ module mesh
     write(*,"(4x,a,1x,i6)") "refining to max. level =", maxlev
     write(*,"(4x,a,1x,i6)") "effective resolution   =", ncells*2**maxlev
 
-! allocate initial structure of blocks according the the defined geometry
-!
-! TODO: by default we initiate 2x2=4 blocks in N configuration
-! TODO: in the future allow user to define an arbitrary shape
+! initialize blocks
 !
     call init_blocks
-    call allocate_blocks('N', xmin, xmax, ymin, ymax, zmin, zmax)
+
+! allocate the initial structure of blocks according to the problem
+!
+    call init_domain
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
@@ -242,9 +242,9 @@ module mesh
 
 ! allocating space for coordinate variables
 !
-    allocate(ax  (maxlev, ngrids))
-    allocate(ay  (maxlev, ngrids))
-    allocate(az  (maxlev, ngrids))
+    allocate(ax  (maxlev, im))
+    allocate(ay  (maxlev, jm))
+    allocate(az  (maxlev, km))
     allocate(adx (maxlev))
     allocate(ady (maxlev))
     allocate(adz (maxlev))
