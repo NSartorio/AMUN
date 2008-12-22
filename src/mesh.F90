@@ -114,6 +114,12 @@ module mesh
 
     end do
 
+! TODO: refine blocks on master untill the total number of blocks exceeds
+!       the number of MPI processes, then interrupt refining and autobalance
+!       the allocated blocks, after that continue refining on all processes
+!       autobalancing after each level refinement
+!
+
 ! at this point the inital blocks are allocated and set for refinement,
 ! so iterate over all levels from 1 to maxlevel and create sub-blocks,
 ! set the initial conditions for each, check criterium and set for
