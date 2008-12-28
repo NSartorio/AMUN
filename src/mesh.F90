@@ -52,17 +52,17 @@ module mesh
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
                        , ncells, maxlev
     use blocks  , only : list_allocated, init_blocks, clear_blocks             &
-                       , refine_block, get_pointer                             &
-                       , block, nchild, ndims, plist, last_id
-    use error   , only : print_info
-    use mpitools, only : is_master
+                       , deallocate_block, refine_block, get_pointer           &
+                       , block, nchild, ndims, plist, last_id, nblocks
+    use error   , only : print_info, print_error
+    use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
 
     implicit none
 
 ! local variables
 !
-    type(block), pointer :: pblock, pparent, pchild, pneigh
+    type(block), pointer :: pblock, pparent, pchild, pneigh, pnext
     integer(kind=4)      :: l, p, i, j, k, n
     character(len=32)    :: bstr, tstr
 
@@ -114,47 +114,45 @@ module mesh
 
     end do
 
-! TODO: refine blocks on master untill the total number of blocks exceeds
-!       the number of MPI processes, then interrupt refining and autobalance
-!       the allocated blocks, after that continue refining on all processes
-!       autobalancing after each level refinement
-!
-
 ! at this point the inital blocks are allocated and set for refinement,
 ! so iterate over all levels from 1 to maxlevel and create sub-blocks,
 ! set the initial conditions for each, check criterium and set for
 ! refinement according to the criterium fullfilment
 !
-! TODO: iterate over all levels, set neighbors of refined blocks for
-!       refinement too, to keep the level jump not larger then 1,
-!       refine blocks, set inital conditions at newly created block,
-!       and finally check the criterium
+! TODO: refine blocks on master untill the total number of blocks exceeds
+!       the number of MPI processes, then interrupt refining and autobalance
+!       the allocated blocks, after that continue refining on all processes
+!       autobalancing after each level of refinement
+!
+! refine the blocks until the number of blocks is smaller than the number
+! of processes
 !
     if (is_master()) &
       write(*,"(4x,a,$)") "refining level         =    "
-    do l = 1, maxlev-1
 
-! print information
+    l = 1
+    do while (l .lt. maxlev)
+
+! print the level processed
 !
       if (is_master()) &
         write(*,"(1x,i2,$)") l
 
-! iterate over all blocks and check refinement criterion
+! iterate over all blocks at the current level and check the refinement
+! criterion
 !
       pblock => plist
       do while (associated(pblock))
 
-! check refinements criterion for the current block
+! check refinements criterion for the current block;
+! do not allow for derefinement initially;
 !
-        if (pblock%leaf .and. pblock%level .lt. maxlev) then
-          pblock%refine = check_ref(pblock)
-
-! do not allow for derefinement initially
-!
-          if (pblock%refine .eq. -1) &
+        if (pblock%leaf) then
+          if (pblock%level .le. l) then
+            pblock%refine = max(0, check_ref(pblock))
+          else
             pblock%refine = 0
-        else
-          pblock%refine = 0
+          endif
         endif
 
 ! assign pointer to the next block
@@ -163,39 +161,48 @@ module mesh
 
       end do
 
-! iterate over all blocks and select the neighbors of refined blocks for refinement
+! iterate over all blocks of the current level and lower levels and select
+! the neighbors of refined blocks to be refine too
 !
       do n = l, 2, -1
         pblock => plist
         do while (associated(pblock))
 
-! check if block is a leaf and selected for refinement
+! check if the current block is a leaf, at the current level and selected
+! to be refined
 !
-          if (pblock%refine .eq. 1 .and. pblock%level .eq. n) then
+          if (pblock%leaf) then
+            if (pblock%level .eq. n) then
+              if (pblock%refine .eq. 1) then
 
 ! iterate over all neighbors
 !
-            do i = 1, ndims
-              do j = 1, 2
-                do k = 1, 2
+                do i = 1, ndims
+                  do j = 1, 2
+                    do k = 1, 2
 
-                  pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+                      pneigh => get_pointer(pblock%neigh(i,j,k)%id)
 
-! check if neighbor is associated
+! check if the neighbor is associated
 !
-                  if (associated(pneigh)) then
-                    if (pneigh%leaf) then
-                      if (pneigh%level .lt. pblock%level) &
-                        pneigh%refine = 1
-                    else
-                      print *, pneigh%id, 'is not a leaf'
-                    endif
-                  endif
+                      if (associated(pneigh)) then
+                        if (pneigh%leaf) then
 
+! if th eneighbor has lower level, select it to be refined too
+!
+                          if (pneigh%level .lt. pblock%level) &
+                            pneigh%refine = 1
+                        else
+                          call print_error("mesh::init_mesh", "Block is not a leaf!")
+                        endif
+                      endif
+
+                    end do
+                  end do
                 end do
-              end do
-            end do
 
+              endif
+            endif
           endif
 
 ! assign pointer to the next block
@@ -211,28 +218,30 @@ module mesh
         pblock => plist
         do while (associated(pblock))
 
-! check if block needs to be refined and if it is a leaf
+! check if the current block is a leaf, is at the current level and needs
+! to be refined
 !
-          if (pblock%refine .eq. 1 .and. pblock%level .eq. n) then
+          if (pblock%leaf) then
+            if (pblock%level .eq. n) then
+              if (pblock%refine .eq. 1) then
 
 ! refine this block
 !
-            call refine_block(pblock)
+                call refine_block(pblock)
 
 ! iterate over all children
 !
-            pparent => get_pointer(pblock%parent%id)
-            do p = 1, nchild
+                pparent => get_pointer(pblock%parent%id)
+                do p = 1, nchild
+                  pchild => get_pointer(pparent%child(p)%id)
 
-              pchild => get_pointer(pparent%child(p)%id)
-
-! initialize problem for that children and check the refinement criterion
+! initialize problem for that child
 !
-              if (associated(pchild)) &
-                call init_problem(pchild)
-
-            end do
-
+                  if (associated(pchild)) &
+                    call init_problem(pchild)
+                end do
+              endif
+            endif
           endif
 
 ! assign pointer to the next block
@@ -242,7 +251,60 @@ module mesh
         end do
       end do
 
+      l = l + 1
     end do
+
+#ifdef MPI
+! divide all blocks between all processes
+!
+    l = 0
+    pblock => plist
+    do while (associated(pblock))
+
+! assign the cpu to the current block
+!
+      pblock%cpu    = l * ncpus / nblocks
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+      l = l + 1
+    end do
+
+! update the cpu field of the neighbors
+!
+    pblock => plist
+    do while (associated(pblock))
+
+      do i = 1, ndims
+        do j = 1, 2
+          do k = 1, 2
+
+            pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+
+            if (associated(pneigh)) &
+              pblock%neigh(i,j,k)%cpu = pneigh%cpu
+
+          end do
+        end do
+      end do
+
+      pblock => pblock%next
+    end do
+
+! remove all blocks which don't belong to the current process
+!
+    pblock => plist
+    do while (associated(pblock))
+      pnext => pblock%next
+
+      if (pblock%cpu .ne. ncpu) &
+        call deallocate_block(pblock)
+
+      pblock => pnext
+    end do
+#endif /* MPI */
 
 ! print information
 !

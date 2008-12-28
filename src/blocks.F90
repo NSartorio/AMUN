@@ -161,26 +161,20 @@ module blocks
 
 ! pointers
 !
-    type(block), pointer :: pnext
+    type(block), pointer :: pblock
 !
 !-------------------------------------------------------------------------------
 !
 ! untill the list is free, iterate over all chunks and deallocate blocks
 !
-    do while(associated(plist))
-
-! assign temporary pointer to the next chunk
-!
-      pnext => plist%next
+    pblock => plist
+    do while(associated(pblock))
 
 ! deallocate and nullify the current block
 !
-      call deallocate_block(plist)
+      call deallocate_block(pblock)
 
-! assign pointer to the current chunk
-!
-      plist => pnext
-
+      pblock => plist
     end do
 
 ! deallocate ID to pointer conversion array
@@ -286,7 +280,8 @@ module blocks
 !
   subroutine allocate_block(pblock)
 
-    use config, only : im, jm, km
+    use config  , only : im, jm, km
+    use mpitools, only : ncpu
 
     implicit none
 
@@ -312,6 +307,10 @@ module blocks
 !
     pblock%config = 'N'         ! TODO: replace with an integer number
     pblock%leaf   = .false.
+
+! set the cpu of current block
+!
+    pblock%cpu    = ncpu
 
 ! initialize the refinement flag
 !
@@ -365,28 +364,44 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+    if (associated(pblock)) then
+
+! if this is the first block in the list, update the plist pointer
+!
+      if (pblock%id .eq. plist%id) &
+        plist => pblock%next
+
+! update the pointer of previous and next blocks
+!
+      if (associated(pblock%prev)) &
+        pblock%prev%next => pblock%next
+
+      if (associated(pblock%next)) &
+        pblock%next%prev => pblock%prev
+
 ! deallocate variables
 !
-    deallocate(pblock%u)
-    deallocate(pblock%c)
+      deallocate(pblock%u)
+      deallocate(pblock%c)
 
 ! nullify pointers
 !
-    nullify(pblock%next)
-    nullify(pblock%prev)
+      nullify(pblock%next)
+      nullify(pblock%prev)
 
 ! nullify the corresponding pointer in the ID to pointer array
 !
-    nullify(idtoptr(pblock%id)%ptr)
+      nullify(idtoptr(pblock%id)%ptr)
 
 ! free and nullify the block
 !
-    deallocate(pblock)
-    nullify(pblock)
+      deallocate(pblock)
+      nullify(pblock)
 
 ! decrease the number of allocated blocks
 !
-    nblocks = nblocks - 1
+      nblocks = nblocks - 1
+    endif
 
 !-------------------------------------------------------------------------------
 !

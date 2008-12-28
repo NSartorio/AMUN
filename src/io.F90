@@ -229,6 +229,12 @@ module io
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%id, am, err)
           call h5aclose_f(aid, err)
 
+#ifdef MPI
+          call h5acreate_f(bid, 'cpu', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%cpu, am, err)
+          call h5aclose_f(aid, err)
+#endif /* MPI */
+
           call h5acreate_f(bid, 'refine', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%refine, am, err)
           call h5aclose_f(aid, err)

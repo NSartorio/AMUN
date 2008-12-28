@@ -177,6 +177,34 @@ module problem
 ! set neighbors
 !
     if (xlbndry .eq. 'periodic') &
+      pbl%neigh(1,1,:)%cpu = pbr%cpu
+    pbl%neigh(1,2,:)%cpu = pbr%cpu
+    if (ylbndry .eq. 'periodic') &
+      pbl%neigh(2,1,:)%cpu = ptl%cpu
+    pbl%neigh(2,2,:)%cpu = ptl%cpu
+
+    pbr%neigh(1,1,:)%cpu = pbl%cpu
+    if (xubndry .eq. 'periodic') &
+      pbr%neigh(1,2,:)%cpu = pbl%cpu
+    if (ylbndry .eq. 'periodic') &
+      pbr%neigh(2,1,:)%cpu = ptr%cpu
+    pbr%neigh(2,2,:)%cpu = ptr%cpu
+
+    if (xlbndry .eq. 'periodic') &
+      ptl%neigh(1,1,:)%cpu = ptr%cpu
+    ptl%neigh(1,2,:)%cpu = ptr%cpu
+    ptl%neigh(2,1,:)%cpu = pbl%cpu
+    if (yubndry .eq. 'periodic') &
+      ptl%neigh(2,2,:)%cpu = pbl%cpu
+
+    ptr%neigh(1,1,:)%cpu = ptl%cpu
+    if (xubndry .eq. 'periodic') &
+      ptr%neigh(1,2,:)%cpu = ptl%cpu
+    ptr%neigh(2,1,:)%cpu = pbr%cpu
+    if (yubndry .eq. 'periodic') &
+      ptr%neigh(2,2,:)%cpu = pbr%cpu
+
+    if (xlbndry .eq. 'periodic') &
       pbl%neigh(1,1,:)%id = pbr%id
     pbl%neigh(1,2,:)%id = pbr%id
     if (ylbndry .eq. 'periodic') &
