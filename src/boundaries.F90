@@ -42,8 +42,9 @@ module boundaries
 !
   subroutine boundary
 
-    use blocks, only : block, plist, ndims, get_pointer
-    use error , only : print_error
+    use blocks  , only : block, plist, ndims, get_pointer
+    use error   , only : print_error
+    use mpitools, only : ncpu
 
     implicit none
 
@@ -72,16 +73,22 @@ module boundaries
           do j = 1, 2
             do k = 1, 2
 
-              pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+              if (pblock%neigh(i,j,k)%id .eq. -1) then
 
-! check if neighbor is associated
+! neighbor is not associated, it means that we have non periodic boundary here
 !
-              if (associated(pneigh)) then
+                if (k .eq. 1) &
+                  call bnd_spec(pblock, i, j, k)
 
-! neighbor is associated, which means the periodic boundary conditions
-! or interior of the domain
+              else
+
+! neighbor associated; exchange boundaries
 !
-                if (pneigh%leaf) then
+                if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+
+! neighbor is on the same CPU, update
+!
+                  pneigh => get_pointer(pblock%neigh(i,j,k)%id)
 
 ! calculate the difference of current and neighbor levels
 !
@@ -100,20 +107,58 @@ module boundaries
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
 
-! perform copying, prolongation or restriction
-!
-
                 else
-                  print *, pneigh%id, 'is not a leaf'
-                endif
-              else
 
-! neighbor is not associated, it means that we have non periodic boundary here
+! neighbor is on another CPU
 !
-                if (k .eq. 1) &
-                  call bnd_spec(pblock, i, j, k)
+! TODO: use similar trick as in the particle exchange in Godunov, i.e.
+!       1) construct an integer array info(ncpus,ncpus)
+!       2) if the neighbors lay on different processes set info(source cpu, dest cpu) = 1
+!       3) update info globally, so all processes know what to exchange
+!       4) perform actual data exchange between processes
+
+                endif
 
               endif
+
+!               pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+!
+! ! check if neighbor is associated
+! !
+!               if (associated(pneigh)) then
+!
+! ! neighbor is associated, which means the periodic boundary conditions
+! ! or interior of the domain
+! !
+!                 if (pneigh%leaf) then
+!
+! ! calculate the difference of current and neighbor levels
+! !
+!                   dl = pblock%level - pneigh%level
+!
+! ! depending on the level difference
+! !
+!                   select case(dl)
+!                   case(-1)  ! restriction and prolongation
+!                     call bnd_rest(pblock, pneigh, i, j, k)
+!                   case(0)   ! the same level, copying
+!                     if (k .eq. 1) &
+!                       call bnd_copy(pblock, pneigh, i, j, k)
+!                   case(1)   ! prolongation is handled by bnd_rest
+!                   case default
+!                     call print_error("boundaries::boundary", "Level difference unsupported!")
+!                   end select
+!
+! ! perform copying, prolongation or restriction
+! !
+!
+!                 else
+!                   print *, pneigh%id, 'is not a leaf'
+!                 endif
+!               else
+!
+!
+!               endif
 
             end do
           end do

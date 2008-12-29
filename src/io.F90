@@ -31,27 +31,29 @@ module io
   contains
 #ifdef HDF5
 !
-!======================================================================
+!===============================================================================
 !
 ! write_data: subroutine writes all data to file for a given time step
 !
-!======================================================================
+!===============================================================================
 !
   subroutine write_data(ftype, nfile, nproc)
 
-    use blocks, only : block, plist, nv => nvars
-    use config, only : ncells, nghost, ngrids, igrids, jgrids, kgrids       &
-                     , im, jm, km, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
-    use error , only : print_error
-    use hdf5  , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f         &
-                     , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f     &
-                     , h5awrite_f, h5screate_simple_f, h5sclose_f           &
-                     , h5dcreate_f, h5dwrite_f, h5dclose_f                  &
-                     , hid_t, hsize_t, H5F_ACC_TRUNC_F                      &
-                     , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER, H5T_NATIVE_DOUBLE
-    use mesh  , only : ax, ay, az, adx, ady, adz
-    use scheme, only : cons2prim
-    use problem, only : check_ref
+    use blocks  , only : block, plist, nv => nvars
+    use config  , only : ncells, nghost, ngrids, igrids, jgrids, kgrids        &
+                       , im, jm, km, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
+    use error   , only : print_error
+    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f          &
+                       , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f      &
+                       , h5awrite_f, h5screate_simple_f, h5sclose_f            &
+                       , h5dcreate_f, h5dwrite_f, h5dclose_f                   &
+                       , hid_t, hsize_t, H5F_ACC_TRUNC_F                       &
+                       , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER              &
+                       , H5T_NATIVE_DOUBLE
+    use mesh    , only : ax, ay, az, adx, ady, adz
+    use mpitools, only : ncpus, ncpu
+    use scheme  , only : cons2prim
+    use problem , only : check_ref
 
     implicit none
 
@@ -161,6 +163,14 @@ module io
         call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(zmax,8), am, err)
         call h5aclose_f(aid, err)
 
+        call h5acreate_f(gid, 'ncpus', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, ncpus, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'ncpu', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, ncpu, am, err)
+        call h5aclose_f(aid, err)
+
         call h5sclose_f(sid, err)
         call h5gclose_f(gid, err)
 
@@ -228,12 +238,6 @@ module io
           call h5acreate_f(bid, 'id', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%id, am, err)
           call h5aclose_f(aid, err)
-
-#ifdef MPI
-          call h5acreate_f(bid, 'cpu', H5T_NATIVE_INTEGER, sid, aid, err)
-          call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%cpu, am, err)
-          call h5aclose_f(aid, err)
-#endif /* MPI */
 
           call h5acreate_f(bid, 'refine', H5T_NATIVE_INTEGER, sid, aid, err)
           call h5awrite_f(aid, H5T_NATIVE_INTEGER, pblock%refine, am, err)
