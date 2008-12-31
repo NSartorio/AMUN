@@ -42,15 +42,27 @@ module boundaries
 !
   subroutine boundary
 
-    use blocks  , only : block, plist, ndims, get_pointer
+    use config  , only : im, jm, km
+    use blocks  , only : nv => nvars, block, plist, ndims, get_pointer, nblocks
     use error   , only : print_error
-    use mpitools, only : ncpu
+    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl
 
     implicit none
 
 ! local variables
 !
-    integer :: i, j, k, dl
+    integer :: i, j, k, p, l, dl
+
+#ifdef MPI
+
+    integer :: itag, rtag
+
+! local arrays
+!
+    integer(kind=4), dimension(:,:,:), allocatable  :: iblk
+    integer(kind=4), dimension(:,:)  , allocatable  :: ibuf, cn
+    real(kind=8)   , dimension(nv,im,jm,km)         :: rbuf
+#endif /* MPI */
 
 ! local pointers
 !
@@ -58,6 +70,19 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef MPI
+! allocate temporary arrays; since we have two blocks per boundary and 4 sides
+! of each block we need to increase the second dimension
+!
+    allocate(cn  (0:ncpus-1,0:ncpus-1))
+    allocate(iblk(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,6))
+
+! reset the local arrays storing blocks to exchange
+!
+    cn(:,:)     = 0
+    iblk(:,:,:) = 0
+#endif /* MPI */
+
 ! iterate over all blocks and perform boundary update
 !
     pblock => plist
@@ -84,7 +109,7 @@ module boundaries
 
 ! neighbor associated; exchange boundaries
 !
-                if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+                if (pblock%neigh(i,j,k)%cpu .eq. pblock%cpu) then
 
 ! neighbor is on the same CPU, update
 !
@@ -107,59 +132,32 @@ module boundaries
                     call print_error("boundaries::boundary", "Level difference unsupported!")
                   end select
 
+#ifdef MPI
                 else
 
-! neighbor is on another CPU
+! in the array 'info' we store IDs of all blocks which have to be updated from
+! the blocks laying on the other processors
 !
-! TODO: use similar trick as in the particle exchange in Godunov, i.e.
-!       1) construct an integer array info(ncpus,ncpus)
-!       2) if the neighbors lay on different processes set info(source cpu, dest cpu) = 1
-!       3) update info globally, so all processes know what to exchange
-!       4) perform actual data exchange between processes
+! get the processor number of neighbor
+!
+                  p = pblock%neigh(i,j,k)%cpu
 
+! increase the number of blocks to retrieve from that CPU
+!
+                  cn(ncpu,p) = cn(ncpu,p) + 1
+
+! fill out the info array
+!
+                  iblk(p,cn(ncpu,p),1) = pblock%id                ! 1: local block ID
+                  iblk(p,cn(ncpu,p),2) = pblock%level             ! 2: local block level
+                  iblk(p,cn(ncpu,p),3) = pblock%neigh(i,j,k)%id   ! 3: neighbor block ID
+                  iblk(p,cn(ncpu,p),4) = i                        ! 4: directions of boundary
+                  iblk(p,cn(ncpu,p),5) = j                        ! 5: side at the boundary
+                  iblk(p,cn(ncpu,p),6) = k                        ! 6: part of the boundary
+#endif /* MPI */
                 endif
 
               endif
-
-!               pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-!
-! ! check if neighbor is associated
-! !
-!               if (associated(pneigh)) then
-!
-! ! neighbor is associated, which means the periodic boundary conditions
-! ! or interior of the domain
-! !
-!                 if (pneigh%leaf) then
-!
-! ! calculate the difference of current and neighbor levels
-! !
-!                   dl = pblock%level - pneigh%level
-!
-! ! depending on the level difference
-! !
-!                   select case(dl)
-!                   case(-1)  ! restriction and prolongation
-!                     call bnd_rest(pblock, pneigh, i, j, k)
-!                   case(0)   ! the same level, copying
-!                     if (k .eq. 1) &
-!                       call bnd_copy(pblock, pneigh, i, j, k)
-!                   case(1)   ! prolongation is handled by bnd_rest
-!                   case default
-!                     call print_error("boundaries::boundary", "Level difference unsupported!")
-!                   end select
-!
-! ! perform copying, prolongation or restriction
-! !
-!
-!                 else
-!                   print *, pneigh%id, 'is not a leaf'
-!                 endif
-!               else
-!
-!
-!               endif
-
             end do
           end do
         end do
@@ -171,6 +169,78 @@ module boundaries
       pblock => pblock%next
 
     end do
+
+#ifdef MPI
+! TODO: 1) update info globally, write an MPI subroutine to sum the variable
+!          'info' over all processes
+!       2) then iterate over all source and destination processes and send/receive
+!          blocks
+!       3) after receiving the block call bnd_copy, bnd_rest, or bnd_prol to update
+!          the boundary of destination block
+!
+    call mallreducemaxl(size(cn), cn)
+
+    allocate(ibuf(2**(NDIMS-1)*NDIMS*maxval(cn), 6))
+
+    do i = 0, ncpus-1
+      do j = 0, ncpus-1
+        if (i .ne. j) then
+          itag = 100*(i * ncpus + j)
+          rtag = 100*(i * ncpus + j)
+          ibuf(:,:) = 0
+
+! if i == ncpu we are sending the data
+!
+          if (ncpu .eq. i) then
+            ibuf(:,:) = iblk(j,:,:)
+
+            call msendi(size(ibuf), j, itag, ibuf(:,:))
+
+            do p = 1, cn(i,j)
+              pblock => get_pointer(iblk(j,p,1))
+
+              rbuf(:,:,:,:) = pblock%u(:,:,:,:)
+              call msendf(size(rbuf), j, rtag+p, rbuf)
+            end do
+          endif
+
+! if j == ncpu we are receiving the data
+!
+          if (ncpu .eq. j) then
+
+            call mrecvi(size(ibuf), i, itag, ibuf(:,:))
+
+            do p = 1, cn(i,j)
+              call mrecvf(size(rbuf), i, rtag+p, rbuf)
+
+              pblock => get_pointer(ibuf(p,3))
+
+              dl = pblock%level - ibuf(p,2)
+
+              select case(dl)
+              case(-1)  ! restriction
+                call bnd_rest_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+              case(0)   ! the same level, copying
+                if (ibuf(p,6) .eq. 1) &
+                  call bnd_copy_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+              case(1)   ! prolongation
+                call bnd_prol_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+              case default
+                call print_error("boundaries::boundary", "Level difference unsupported!")
+              end select
+            end do
+          endif
+
+        endif
+      end do
+    end do
+
+! deallocate temporary arrays
+!
+    if (allocated(ibuf)) deallocate(ibuf)
+    if (allocated(iblk)) deallocate(iblk)
+    if (allocated(cn)  ) deallocate(cn)
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
@@ -684,6 +754,575 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine bnd_rest
+#ifdef MPI
+!
+!===============================================================================
+!
+! bnd_copy_u: subroutine copies the interior of neighbor to update the
+!             boundaries of current block
+!
+!===============================================================================
+!
+  subroutine bnd_copy_u(pb, un, id, is, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : im, ib, ibl, ibu, ie, iel, ieu                 &
+                     , jm, jb, jbl, jbu, je, jel, jeu                 &
+                     , km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_warning
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer                , intent(inout) :: pb
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
+    integer                             , intent(in)    :: id, is, ip
+
+! local variables
+!
+    integer :: ii, i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * is
+
+! perform update according to the flag
+!
+    select case(ii)
+    case(110)
+      do k = 1, km
+        do j = 1, jm
+          pb%u(1:nv,1:ibl,j,k) = un(1:nv,iel:ie,j,k)
+        end do
+      end do
+    case(120)
+      do k = 1, km
+        do j = 1, jm
+          pb%u(1:nv,ieu:im,j,k) = un(1:nv,ib:ibu,j,k)
+        end do
+      end do
+    case(210)
+      do k = 1, km
+        do i = 1, im
+          pb%u(1:nv,i,1:jbl,k) = un(1:nv,i,jel:je,k)
+        end do
+      end do
+    case(220)
+      do k = 1, km
+        do i = 1, im
+          pb%u(1:nv,i,jeu:jm,k) = un(1:nv,i,jb:jbu,k)
+        end do
+      end do
+    case(310)
+      do j = 1, jm
+        do i = 1, im
+          pb%u(1:nv,i,j,1:kbl) = un(1:nv,i,j,kel:ke)
+        end do
+      end do
+    case(320)
+      do j = 1, jm
+        do i = 1, im
+          pb%u(1:nv,i,j,keu:km) = un(1:nv,i,j,kb:kbu)
+        end do
+      end do
+    case default
+      call print_warning("boundaries::bnd_copy_u", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_copy_u
+!
+!===============================================================================
+!
+! bnd_rest_u: subroutine copies the interior of neighbor to update the
+!             boundaries of current block
+!
+!===============================================================================
+!
+  subroutine bnd_rest_u(pb, un, id, is, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
+                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
+                         , kn, km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_warning
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer                , intent(inout) :: pb
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
+    integer                             , intent(in)    :: id, is, ip
+
+! local variables
+!
+    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
+
+! local arrays
+!
+    real, dimension(2*im,2*jm,km) :: ux
+
+! local pointers
+!
+    type(block), pointer :: pn1, pn2
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * is + ip
+
+! perform update according to the flag
+!
+    select case(ii)
+    case(111)
+
+! neighbor to current
+!
+      jl = ng / 2 + 1
+      ju = jm / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = 1, ng
+            i2 = ie + 2 * (i - ng)
+            i1 = i2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(112)
+
+! neighbor to current
+!
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = 1, ng
+            i2 = ie + 2 * (i - ng)
+            i1 = i2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(121)
+
+! neighbor to current
+!
+      jl = ng / 2 + 1
+      ju = jm / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = ieu, im
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(122)
+
+! neighbor to current
+!
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      do k = 1, km
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = ieu, im
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(211)
+
+! neighbor to current
+!
+      il = ng / 2 + 1
+      iu = im / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * i - ng
+          i1 = i2 - 1
+          do j = 1, ng
+            j2 = je + 2 * (j - ng)
+            j1 = j2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(212)
+
+! neighbor to current
+!
+      il = im / 2 + 1
+      iu = im - ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * i - im + ng
+          i1 = i2 - 1
+          do j = 1, ng
+            j2 = je + 2 * (j - ng)
+            j1 = j2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(221)
+
+! neighbor to current
+!
+      il = ng / 2 + 1
+      iu = im / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * i - ng
+          i1 = i2 - 1
+          do j = jeu, jm
+            j2 = ng + 2 * (j - je)
+            j1 = j2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case(222)
+
+! neighbor to current
+!
+      il = im / 2 + 1
+      iu = im - ng / 2
+      do k = 1, km
+        do i = il, iu
+          i2 = 2 * i - im + ng
+          i1 = i2 - 1
+          do j = jeu, jm
+            j2 = ng + 2 * (j - je)
+            j1 = j2 - 1
+            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
+                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+          end do
+        end do
+      end do
+
+    case default
+      call print_warning("boundaries::bnd_rest_u", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_rest_u
+!
+!===============================================================================
+!
+! bnd_prol_u: subroutine copies the interior of neighbor to update the
+!             boundaries of current block
+!
+!===============================================================================
+!
+  subroutine bnd_prol_u(pb, un, id, is, ip)
+
+    use blocks, only : block, nv => nvars
+    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
+                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
+                         , kn, km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_warning
+    use interpolation, only : expand
+
+    implicit none
+
+! arguments
+!
+    type(block), pointer                , intent(inout) :: pb
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
+    integer                             , intent(in)    :: id, is, ip
+
+! local variables
+!
+    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
+
+! local arrays
+!
+    real, dimension(2*im,2*jm,km) :: ux
+
+! local pointers
+!
+    type(block), pointer :: pn1, pn2
+!
+!-------------------------------------------------------------------------------
+!
+! calcuate the flag determinig the side of boundary to update
+!
+    ii = 100 * id + 10 * is + ip
+
+! perform update according to the flag
+!
+    select case(ii)
+
+    case(111)
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i1 = ie + 1
+      i0 = i1 - dm(1) + 1
+      il = 3
+      iu = il + ng - 1
+      j0 = ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(112)
+
+! current to neighbor
+!
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i1 = ie + 1
+      i0 = i1 - dm(1) + 1
+      il = 3
+      iu = il + ng - 1
+      j0 = jm / 2 - ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(121)
+
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + ng - 1
+      j0 = ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(122)
+
+      dm(1) = ng / 2 + 2
+      dm(2) = jn / 2 + ng + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + ng - 1
+      j0 = jm / 2 - ng / 2
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + jm - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(211)
+
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j1 = je + 1
+      j0 = j1 - dm(2) + 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(212)
+
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = im / 2 - ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+
+      j1 = je + 1
+      j0 = j1 - dm(2) + 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(221)
+
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j0 = ng
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case(222)
+
+      dm(1) = in / 2 + ng + 2
+      dm(2) = ng / 2 + 2
+      dm(3) = km
+      fm(1) = 2 * dm(1)
+      fm(2) = 2 * dm(2)
+      fm(3) = km
+
+      i0 = im / 2 - ng / 2
+      i1 = i0 + dm(1) - 1
+      il = 3
+      iu = il + im - 1
+      j0 = ng
+      j1 = j0 + dm(2) - 1
+      jl = 3
+      ju = jl + ng - 1
+
+! expand cube
+!
+      do q = 1, nv
+
+        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+
+        pb%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
+
+      end do
+
+    case default
+      call print_warning("boundaries::bnd_prol_u", "Boundary flag unsupported!")
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bnd_prol_u
+#endif /* MPI */
 !
 !===============================================================================
 !

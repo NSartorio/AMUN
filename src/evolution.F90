@@ -113,17 +113,17 @@ module evolution
 !
     dtn = dx_min / max(cmax, 1.e-8)
 
-! check refinement and refine
+! ! check refinement and refine
+! !
+!     call start_timer(5)
+!     call update_mesh(0)
+!     call stop_timer(5)
 !
-    call start_timer(5)
-    call update_mesh(0)
-    call stop_timer(5)
-
-! update boundaries
-!
-    call start_timer(4)
-    call boundary
-    call stop_timer(4)
+! ! update boundaries
+! !
+!     call start_timer(4)
+!     call boundary
+!     call stop_timer(4)
 
 !-------------------------------------------------------------------------------
 !

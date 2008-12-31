@@ -126,5 +126,162 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end function is_master
+!
+!===============================================================================
+!
+! msendi: subroutine sends an array
+!
+!===============================================================================
+!
+  subroutine msendi(n, dst, tag, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer
+#endif /* MPI */
+
+    implicit none
+
+! arguments
+!
+    integer                      , intent(in)    :: n, dst, tag
+    integer(kind=4), dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer :: err
+!
+!----------------------------------------------------------------------
+!
+    call mpi_send(buf, n, mpi_integer, dst, tag, comm3d, err)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine msendi
+!
+!===============================================================================
+!
+! mrecvi: subroutine receives an array
+!
+!===============================================================================
+!
+  subroutine mrecvi(n, src, tag, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_status_size, mpi_integer
+#endif /* MPI */
+
+! arguments
+!
+    integer                      , intent(in)    :: n, src, tag
+    integer(kind=4), dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer :: err, status(mpi_status_size)
+!
+!----------------------------------------------------------------------
+!
+    call mpi_recv(buf, n, mpi_integer, src, tag, comm3d, status, err)
+#endif /* MPI */
+
+  end subroutine mrecvi
+!
+!===============================================================================
+!
+! msendf: subroutine sends an array
+!
+!===============================================================================
+!
+  subroutine msendf(n, dst, tag, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_real8
+#endif /* MPI */
+
+    implicit none
+
+! arguments
+!
+    integer                   , intent(in)    :: n, dst, tag
+    real(kind=8), dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer :: err
+!
+!----------------------------------------------------------------------
+!
+    call mpi_send(buf, n, mpi_real8, dst, tag, comm3d, err)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine msendf
+!
+!===============================================================================
+!
+! mrecvf: subroutine receives an array
+!
+!===============================================================================
+!
+  subroutine mrecvf(n, src, tag, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_status_size, mpi_real8
+#endif /* MPI */
+
+! arguments
+!
+    integer                   , intent(in)    :: n, src, tag
+    real(kind=8), dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer :: err, status(mpi_status_size)
+!
+!----------------------------------------------------------------------
+!
+    call mpi_recv(buf, n, mpi_real8, src, tag, comm3d, status, err)
+#endif /* MPI */
+
+  end subroutine mrecvf
+!
+!===============================================================================
+!
+! mallreducemaxl:
+!
+!===============================================================================
+!
+  subroutine mallreducemaxl(n, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer, mpi_max
+#endif /* MPI */
+
+! arguments
+!
+    integer              , intent(in)    :: n
+    integer, dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer, dimension(n) :: tbuf
+    integer               :: ierr
+!
+!----------------------------------------------------------------------
+!
+    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_max, comm3d, ierr)
+    buf(1:n) = tbuf(1:n)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreducemaxl
 
 end module
