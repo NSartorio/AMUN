@@ -45,7 +45,7 @@ module boundaries
     use config  , only : im, jm, km
     use blocks  , only : nv => nvars, block, plist, ndims, get_pointer, nblocks
     use error   , only : print_error
-    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl
+    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl, mbarrier
 
     implicit none
 
@@ -55,13 +55,14 @@ module boundaries
 
 #ifdef MPI
 
-    integer :: itag, rtag
+    integer :: itag, dm(1)
 
 ! local arrays
 !
-    integer(kind=4), dimension(:,:,:), allocatable  :: iblk
-    integer(kind=4), dimension(:,:)  , allocatable  :: ibuf, cn
-    real(kind=8)   , dimension(nv,im,jm,km)         :: rbuf
+    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: rbuf
+    integer(kind=4), dimension(:,:,:)    , allocatable :: iblk
+    integer(kind=4), dimension(:,:)      , allocatable :: ibuf
+    integer(kind=4), dimension(:)        , allocatable :: cn
 #endif /* MPI */
 
 ! local pointers
@@ -74,12 +75,12 @@ module boundaries
 ! allocate temporary arrays; since we have two blocks per boundary and 4 sides
 ! of each block we need to increase the second dimension
 !
-    allocate(cn  (0:ncpus-1,0:ncpus-1))
+    allocate(cn  (0:ncpus-1))
     allocate(iblk(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,6))
 
 ! reset the local arrays storing blocks to exchange
 !
-    cn(:,:)     = 0
+    cn(:)       = 0
     iblk(:,:,:) = 0
 #endif /* MPI */
 
@@ -144,16 +145,16 @@ module boundaries
 
 ! increase the number of blocks to retrieve from that CPU
 !
-                  cn(ncpu,p) = cn(ncpu,p) + 1
+                  cn(p) = cn(p) + 1
 
 ! fill out the info array
 !
-                  iblk(p,cn(ncpu,p),1) = pblock%id                ! 1: local block ID
-                  iblk(p,cn(ncpu,p),2) = pblock%level             ! 2: local block level
-                  iblk(p,cn(ncpu,p),3) = pblock%neigh(i,j,k)%id   ! 3: neighbor block ID
-                  iblk(p,cn(ncpu,p),4) = i                        ! 4: directions of boundary
-                  iblk(p,cn(ncpu,p),5) = j                        ! 5: side at the boundary
-                  iblk(p,cn(ncpu,p),6) = k                        ! 6: part of the boundary
+                  iblk(p,cn(p),1) = pblock%id                ! 1: local block ID
+                  iblk(p,cn(p),2) = pblock%level             ! 2: local block level
+                  iblk(p,cn(p),3) = pblock%neigh(i,j,k)%id   ! 3: neighbor block ID
+                  iblk(p,cn(p),4) = i                        ! 4: directions of boundary
+                  iblk(p,cn(p),5) = j                        ! 5: side at the boundary
+                  iblk(p,cn(p),6) = k                        ! 6: part of the boundary
 #endif /* MPI */
                 endif
 
@@ -178,66 +179,134 @@ module boundaries
 !       3) after receiving the block call bnd_copy, bnd_rest, or bnd_prol to update
 !          the boundary of destination block
 !
-    call mallreducemaxl(size(cn), cn)
-
-    allocate(ibuf(2**(NDIMS-1)*NDIMS*maxval(cn), 6))
-
     do i = 0, ncpus-1
       do j = 0, ncpus-1
         if (i .ne. j) then
           itag = 100*(i * ncpus + j)
-          rtag = 100*(i * ncpus + j)
-          ibuf(:,:) = 0
 
 ! if i == ncpu we are sending the data
 !
           if (ncpu .eq. i) then
-            ibuf(:,:) = iblk(j,:,:)
 
-            call msendi(size(ibuf), j, itag, ibuf(:,:))
+! allocate buffer for IDs and levels
+!
+            allocate(ibuf(cn(j),2))
 
-            do p = 1, cn(i,j)
-              pblock => get_pointer(iblk(j,p,1))
-
-              rbuf(:,:,:,:) = pblock%u(:,:,:,:)
-              call msendf(size(rbuf), j, rtag+p, rbuf)
+! find all blocks to send to this process
+!
+            l = 1
+            ibuf(l,1:2)  = iblk(j,1,1:2)
+            do p = 2, cn(j)
+              if (iblk(j,p,1) .ne. ibuf(l,1)) then
+                l = l + 1
+                ibuf(l,1:2)  = iblk(j,p,1:2)
+              endif
             end do
+
+! send number of blocks to send
+!
+            dm(1) = l
+            call msendi(1, j, itag, dm(:))
+
+! send blocks IDs and levels
+!
+            call msendi(size(ibuf(1:dm(1),:)), j, itag+1, ibuf(1:dm(1),:))
+
+! allocate space for variables
+!
+            allocate(rbuf(dm(1),nv,im,jm,km))
+
+! fill the buffer with data
+!
+            do l = 1, dm(1)
+              pblock => get_pointer(ibuf(l,1))
+
+              rbuf(l,:,:,:,:) = pblock%u(:,:,:,:)
+            end do
+
+! send data
+!
+            call msendf(size(rbuf), j, itag+2, rbuf)
+
+! deallocate buffers
+!
+            deallocate(rbuf)
+            deallocate(ibuf)
           endif
 
 ! if j == ncpu we are receiving the data
 !
           if (ncpu .eq. j) then
 
-            call mrecvi(size(ibuf), i, itag, ibuf(:,:))
+! receive the number of blocks
+!
+            call mrecvi(1, i, itag, dm(:))
 
-            do p = 1, cn(i,j)
-              call mrecvf(size(rbuf), i, rtag+p, rbuf)
+! allocate space for block IDs and levels
+!
+            allocate(ibuf(dm(1),2))
 
-              pblock => get_pointer(ibuf(p,3))
+! receive the block IDs and levels
+!
+            call mrecvi(size(ibuf), i, itag+1, ibuf(:,:))
 
-              dl = pblock%level - ibuf(p,2)
+! allocate space for variables
+!
+            allocate(rbuf(dm(1),nv,im,jm,km))
 
+! receive data
+!
+            call mrecvf(size(rbuf), i, itag+2, rbuf)
+
+! iterate over all blocks
+!
+            do p = 1, cn(i)
+
+! find the position of block iblk(i,p,3) in ibuf
+!
+              l = 1
+              do while(ibuf(l,1) .ne. iblk(i,p,3) .and. l .le. dm(1))
+                l = l + 1
+              end do
+
+! get pointer to the local block
+!
+              pblock => get_pointer(iblk(i,p,1))
+
+! get the level difference
+!
+              dl = iblk(i,p,2) - ibuf(l,2)
+
+! update boundaries
+!
               select case(dl)
               case(-1)  ! restriction
-                call bnd_rest_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+                call bnd_rest_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
               case(0)   ! the same level, copying
-                if (ibuf(p,6) .eq. 1) &
-                  call bnd_copy_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+                if (iblk(i,p,6) .eq. 1) &
+                  call bnd_copy_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
               case(1)   ! prolongation
-                call bnd_prol_u(pblock, rbuf, ibuf(p,4), 3-ibuf(p,5), ibuf(p,6))
+                call bnd_prol_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
               case default
                 call print_error("boundaries::boundary", "Level difference unsupported!")
               end select
+
             end do
+
+! deallocate buffers
+!
+            deallocate(rbuf)
+            deallocate(ibuf)
           endif
 
         endif
       end do
     end do
 
+    call mbarrier()
+
 ! deallocate temporary arrays
 !
-    if (allocated(ibuf)) deallocate(ibuf)
     if (allocated(iblk)) deallocate(iblk)
     if (allocated(cn)  ) deallocate(cn)
 #endif /* MPI */
@@ -882,8 +951,6 @@ module boundaries
     select case(ii)
     case(111)
 
-! neighbor to current
-!
       jl = ng / 2 + 1
       ju = jm / 2
       do k = 1, km
@@ -901,8 +968,6 @@ module boundaries
 
     case(112)
 
-! neighbor to current
-!
       jl = jm / 2 + 1
       ju = jm - ng / 2
       do k = 1, km
@@ -920,8 +985,6 @@ module boundaries
 
     case(121)
 
-! neighbor to current
-!
       jl = ng / 2 + 1
       ju = jm / 2
       do k = 1, km
@@ -939,8 +1002,6 @@ module boundaries
 
     case(122)
 
-! neighbor to current
-!
       jl = jm / 2 + 1
       ju = jm - ng / 2
       do k = 1, km
@@ -958,8 +1019,6 @@ module boundaries
 
     case(211)
 
-! neighbor to current
-!
       il = ng / 2 + 1
       iu = im / 2
       do k = 1, km
@@ -977,8 +1036,6 @@ module boundaries
 
     case(212)
 
-! neighbor to current
-!
       il = im / 2 + 1
       iu = im - ng / 2
       do k = 1, km
@@ -996,8 +1053,6 @@ module boundaries
 
     case(221)
 
-! neighbor to current
-!
       il = ng / 2 + 1
       iu = im / 2
       do k = 1, km
@@ -1015,8 +1070,6 @@ module boundaries
 
     case(222)
 
-! neighbor to current
-!
       il = im / 2 + 1
       iu = im - ng / 2
       do k = 1, km

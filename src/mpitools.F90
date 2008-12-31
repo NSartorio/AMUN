@@ -106,6 +106,33 @@ module mpitools
 !
 !===============================================================================
 !
+! mbarrier: subroutine synchronizes processes
+!
+!===============================================================================
+!
+  subroutine mbarrier
+
+    implicit none
+#ifdef MPI
+! local variables
+!
+    integer :: err
+#endif /* MPI */
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef MPI
+!  finalize the MPI interface
+!
+    call mpi_barrier(comm3d, err)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mbarrier
+!
+!===============================================================================
+!
 ! is_master: function returns true if it is the master node, otherwise it
 !            returns false
 !
@@ -253,7 +280,7 @@ module mpitools
 !
 !===============================================================================
 !
-! mallreducemaxl:
+! mallreducemaxl: subroutine finds maximum values over all proceeses
 !
 !===============================================================================
 !
