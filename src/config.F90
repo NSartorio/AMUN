@@ -90,6 +90,7 @@ module config
   real               , save :: x1c = 0.0, y1c = 0.0, z1c = 0.0, r1c = 0.1
   real               , save :: x2c = 0.0, y2c = 0.0, z2c = 0.0, r2c = 0.1
   real               , save :: dnfac = 1.0, dnrat = 1.0
+  real               , save :: v1ini = 0.0, v2ini = 2.0
 
 ! boundary conditions
 !
@@ -226,6 +227,10 @@ module config
       read(value,        *) dnfac
     case("dnrat")
       read(value,        *) dnrat
+    case("v1ini")
+      read(value,        *) v1ini
+    case("v2ini")
+      read(value,        *) v2ini
     case("crefmin")
       read(value,        *) crefmin
     case("crefmax")

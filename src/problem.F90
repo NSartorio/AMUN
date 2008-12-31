@@ -435,7 +435,7 @@ module problem
 
     use blocks, only : block, idn, imx, imy, imz, ien
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
-                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
+                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini    &
                      , csnd2, gamma, gammam1i
 
 ! input arguments
@@ -445,7 +445,7 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, dnamb, enamb
+    real    :: dx, dy, dz, dnamb, enamb, ekin
     real    :: dnstar1, enstar1, x1l, y1l, z1l, r1
     real    :: dnstar2, enstar2, x2l, y2l, z2l, r2
 
@@ -497,6 +497,9 @@ module problem
     z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
+
+    z1l  = 0.0
+    z2l  = 0.0
 #endif /* NDIMS == 3 */
 
 ! set variables
@@ -512,8 +515,10 @@ module problem
 ! set initial pressure
 !
     do k = 1, km
+#if NDIMS == 3
       z1l = z(k) - z1c
       z2l = z(k) - z2c
+#endif /* NDIMS == 3 */
 
       do j = 1, jm
         y1l = y(j) - y1c
@@ -528,15 +533,27 @@ module problem
 
           if (r1 .le. r1c) then
             pblock%u(idn,i,j,k) = dnstar1
+            pblock%u(imx,i,j,k) = dnstar1*v1ini*x1l
+            pblock%u(imy,i,j,k) = dnstar1*v1ini*y1l
+#if NDIMS == 3
+            pblock%u(imz,i,j,k) = dnstar1*v1ini*z1l
+#endif /* NDIMS == 3 */
+            ekin = 0.5 * dnstar1 * v1ini**2 * (x1l**2 + y1l**2 + z1l**2)
 #ifdef ADI
-            pblock%u(ien,i,j,k) = enstar1
+            pblock%u(ien,i,j,k) = enstar1 + ekin
 #endif /* ADI */
           endif
 
           if (r2 .le. r2c) then
             pblock%u(idn,i,j,k) = dnstar2
+            pblock%u(imx,i,j,k) = dnstar2*v2ini*x2l
+            pblock%u(imy,i,j,k) = dnstar2*v2ini*y2l
+#if NDIMS == 3
+            pblock%u(imz,i,j,k) = dnstar2*v2ini*z2l
+#endif /* NDIMS == 3 */
+            ekin = 0.5 * dnstar2 * v2ini**2 * (x2l**2 + y2l**2 + z2l**2)
 #ifdef ADI
-            pblock%u(ien,i,j,k) = enstar2
+            pblock%u(ien,i,j,k) = enstar2 + ekin
 #endif /* ADI */
           endif
         end do
@@ -610,13 +627,18 @@ module problem
     z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
+
+    z1l  = 0.0
+    z2l  = 0.0
 #endif /* NDIMS == 3 */
 
 ! reset update
 !
     do k = 1, km
+#if NDIMS == 3
       z1l = z(k) - z1c
       z2l = z(k) - z2c
+#endif /* NDIMS == 3 */
 
       do j = 1, jm
         y1l = y(j) - y1c
