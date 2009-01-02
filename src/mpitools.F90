@@ -30,7 +30,7 @@ module mpitools
 
 ! MPI global variables
 !
-  integer(kind=4), save                 :: comm3d
+  integer        , save                 :: comm3d
   integer(kind=4), save                 :: ncpu, ncpus
 
   contains
@@ -170,8 +170,8 @@ module mpitools
 
 ! arguments
 !
-    integer                      , intent(in)    :: n, dst, tag
-    integer(kind=4), dimension(n), intent(inout) :: buf
+    integer              , intent(in) :: n, dst, tag
+    integer, dimension(n), intent(in) :: buf
 
 #ifdef MPI
 ! local variables
@@ -180,7 +180,9 @@ module mpitools
 !
 !----------------------------------------------------------------------
 !
+    err = 0
     call mpi_send(buf, n, mpi_integer, dst, tag, comm3d, err)
+    if (err .ne. 0) print *, 'msendi: error', err
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -201,8 +203,8 @@ module mpitools
 
 ! arguments
 !
-    integer                      , intent(in)    :: n, src, tag
-    integer(kind=4), dimension(n), intent(inout) :: buf
+    integer              , intent(in)  :: n, src, tag
+    integer, dimension(n), intent(out) :: buf
 
 #ifdef MPI
 ! local variables
@@ -211,7 +213,10 @@ module mpitools
 !
 !----------------------------------------------------------------------
 !
+    err       = 0
+    status(:) = 0
     call mpi_recv(buf, n, mpi_integer, src, tag, comm3d, status, err)
+    if (err .ne. 0) print *, 'mrecvi: error', err
 #endif /* MPI */
 
   end subroutine mrecvi
@@ -299,11 +304,12 @@ module mpitools
 ! local variables
 !
     integer, dimension(n) :: tbuf
-    integer               :: ierr
+    integer               :: err
 !
 !----------------------------------------------------------------------
 !
-    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_max, comm3d, ierr)
+    err = 0
+    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_max, comm3d, err)
     buf(1:n) = tbuf(1:n)
 #endif /* MPI */
 

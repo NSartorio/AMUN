@@ -45,7 +45,7 @@ module boundaries
     use config  , only : im, jm, km
     use blocks  , only : nv => nvars, block, plist, ndims, get_pointer, nblocks
     use error   , only : print_error
-    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl, mbarrier
+    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl
 
     implicit none
 
@@ -55,13 +55,13 @@ module boundaries
 
 #ifdef MPI
 
-    integer :: itag, dm(1)
+    integer(kind=4) :: itag
 
 ! local arrays
 !
     real(kind=8)   , dimension(:,:,:,:,:), allocatable :: rbuf
     integer(kind=4), dimension(:,:,:)    , allocatable :: iblk
-    integer(kind=4), dimension(:,:)      , allocatable :: ibuf
+    integer(kind=4), dimension(:,:)      , allocatable :: ibuf, ll
     integer(kind=4), dimension(:)        , allocatable :: cn
 #endif /* MPI */
 
@@ -76,6 +76,7 @@ module boundaries
 ! of each block we need to increase the second dimension
 !
     allocate(cn  (0:ncpus-1))
+    allocate(ll  (0:ncpus-1,0:ncpus-1))
     allocate(iblk(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,6))
 
 ! reset the local arrays storing blocks to exchange
@@ -179,20 +180,46 @@ module boundaries
 !       3) after receiving the block call bnd_copy, bnd_rest, or bnd_prol to update
 !          the boundary of destination block
 !
+    ll(:,:) = 0
     do i = 0, ncpus-1
-      do j = 0, ncpus-1
-        if (i .ne. j) then
-          itag = 100*(i * ncpus + j)
+      if (cn(i) .gt. 0) then
+        l = 1
+        j = iblk(i,1,1)
+        do p = 2, cn(i)
+          if (iblk(i,p,1) .ne. j) then
+            l = l + 1
+            j = iblk(i,p,1)
+          endif
+        end do
+        ll(ncpu,i) = l
+      endif
+    end do
 
-! if i == ncpu we are sending the data
+! update number of blocks across all processes
 !
-          if (ncpu .eq. i) then
+    call mallreducemaxl(size(ll),ll)
 
 ! allocate buffer for IDs and levels
 !
-            allocate(ibuf(cn(j),2))
+    allocate(ibuf(maxval(ll),2))
 
-! find all blocks to send to this process
+    do i = 0, ncpus-1
+      do j = 0, ncpus-1
+        if (ll(i,j) .gt. 0) then
+
+! get the tag for communication
+!
+          itag = 10*(i * ncpus + j) + 1111
+
+! allocate space for variables
+!
+          allocate(rbuf(ll(i,j),nv,im,jm,km))
+
+! if i == ncpu we are sending the data
+!
+          if (i .eq. ncpu) then
+
+! find all blocks to send from this process
 !
             l = 1
             ibuf(l,1:2)  = iblk(j,1,1:2)
@@ -203,22 +230,14 @@ module boundaries
               endif
             end do
 
-! send number of blocks to send
+! send block IDs and levels
 !
-            dm(1) = l
-            call msendi(1, j, itag, dm(:))
-
-! send blocks IDs and levels
-!
-            call msendi(size(ibuf(1:dm(1),:)), j, itag+1, ibuf(1:dm(1),:))
-
-! allocate space for variables
-!
-            allocate(rbuf(dm(1),nv,im,jm,km))
+            l = ll(i,j)
+            call msendi(size(ibuf(1:l,:)), j, itag, ibuf(1:l,:))
 
 ! fill the buffer with data
 !
-            do l = 1, dm(1)
+            do l = 1, ll(i,j)
               pblock => get_pointer(ibuf(l,1))
 
               rbuf(l,:,:,:,:) = pblock%u(:,:,:,:)
@@ -226,37 +245,22 @@ module boundaries
 
 ! send data
 !
-            call msendf(size(rbuf), j, itag+2, rbuf)
+            call msendf(size(rbuf), j, itag+1, rbuf)
 
-! deallocate buffers
-!
-            deallocate(rbuf)
-            deallocate(ibuf)
           endif
 
 ! if j == ncpu we are receiving the data
 !
-          if (ncpu .eq. j) then
+          if (j .eq. ncpu) then
 
-! receive the number of blocks
+! receive block IDs and levels
 !
-            call mrecvi(1, i, itag, dm(:))
-
-! allocate space for block IDs and levels
-!
-            allocate(ibuf(dm(1),2))
-
-! receive the block IDs and levels
-!
-            call mrecvi(size(ibuf), i, itag+1, ibuf(:,:))
-
-! allocate space for variables
-!
-            allocate(rbuf(dm(1),nv,im,jm,km))
+            l = ll(i,j)
+            call mrecvi(size(ibuf(1:l,:)), i, itag, ibuf(1:l,:))
 
 ! receive data
 !
-            call mrecvf(size(rbuf), i, itag+2, rbuf)
+            call mrecvf(size(rbuf), i, itag+1, rbuf)
 
 ! iterate over all blocks
 !
@@ -265,7 +269,7 @@ module boundaries
 ! find the position of block iblk(i,p,3) in ibuf
 !
               l = 1
-              do while(ibuf(l,1) .ne. iblk(i,p,3) .and. l .le. dm(1))
+              do while(ibuf(l,1) .ne. iblk(i,p,3) .and. l .le. ll(i,j))
                 l = l + 1
               end do
 
@@ -293,22 +297,23 @@ module boundaries
 
             end do
 
-! deallocate buffers
-!
-            deallocate(rbuf)
-            deallocate(ibuf)
           endif
 
+! deallocate buffers
+!
+          deallocate(rbuf)
+
         endif
+
       end do
     end do
 
-    call mbarrier()
-
 ! deallocate temporary arrays
 !
-    if (allocated(iblk)) deallocate(iblk)
-    if (allocated(cn)  ) deallocate(cn)
+    deallocate(ibuf)
+    deallocate(iblk)
+    deallocate(ll)
+    deallocate(cn)
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
