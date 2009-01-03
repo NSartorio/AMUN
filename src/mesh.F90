@@ -296,6 +296,8 @@ module mesh
         end do
       end do
 
+! assign pointer to the next block
+!
       pblock => pblock%next
     end do
 

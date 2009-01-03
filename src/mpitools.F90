@@ -316,5 +316,38 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine mallreducemaxl
+!
+!===============================================================================
+!
+! mallreduceminr: subroutine finds the minimum value over all proceeses
+!
+!===============================================================================
+!
+  subroutine mallreduceminr(buf)
+
+#ifdef MPI
+    use mpi, only : mpi_real8, mpi_min
+#endif /* MPI */
+
+! arguments
+!
+    real(kind=8), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    real(kind=8)        :: tbuf
+    integer             :: err
+!
+!----------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce(buf, tbuf, 1, mpi_real8, mpi_min, comm3d, err)
+    buf = tbuf
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreduceminr
 
 end module

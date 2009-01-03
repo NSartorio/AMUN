@@ -56,6 +56,7 @@ module boundaries
 #ifdef MPI
 
     integer(kind=4) :: itag
+    logical         :: lf
 
 ! local arrays
 !
@@ -82,6 +83,7 @@ module boundaries
 ! reset the local arrays storing blocks to exchange
 !
     cn(:)       = 0
+    ll(:,:)     = 0
     iblk(:,:,:) = 0
 #endif /* MPI */
 
@@ -111,7 +113,7 @@ module boundaries
 
 ! neighbor associated; exchange boundaries
 !
-                if (pblock%neigh(i,j,k)%cpu .eq. pblock%cpu) then
+                if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
 
 ! neighbor is on the same CPU, update
 !
@@ -180,24 +182,32 @@ module boundaries
 !       3) after receiving the block call bnd_copy, bnd_rest, or bnd_prol to update
 !          the boundary of destination block
 !
-    ll(:,:) = 0
     do i = 0, ncpus-1
       if (cn(i) .gt. 0) then
+        allocate(ibuf(cn(i),1))
         l = 1
-        j = iblk(i,1,1)
+        ibuf(1,1) = iblk(i,1,1)
         do p = 2, cn(i)
-          if (iblk(i,p,1) .ne. j) then
+          lf = .true.
+          do k = 1, l
+            lf = lf .and. (iblk(i,p,1) .ne. ibuf(k,1))
+          end do
+
+          if (lf) then
             l = l + 1
-            j = iblk(i,p,1)
+            ibuf(l,1) = iblk(i,p,1)
           endif
         end do
         ll(ncpu,i) = l
+        deallocate(ibuf)
       endif
     end do
 
 ! update number of blocks across all processes
 !
     call mallreducemaxl(size(ll),ll)
+
+!     if (ncpu .eq. 0) print *, ll
 
 ! allocate buffer for IDs and levels
 !
@@ -224,7 +234,11 @@ module boundaries
             l = 1
             ibuf(l,1:2)  = iblk(j,1,1:2)
             do p = 2, cn(j)
-              if (iblk(j,p,1) .ne. ibuf(l,1)) then
+              lf = .true.
+              do k = 1, l
+                lf = lf .and. (iblk(j,p,1) .ne. ibuf(k,1))
+              end do
+              if (lf) then
                 l = l + 1
                 ibuf(l,1:2)  = iblk(j,p,1:2)
               endif
@@ -260,11 +274,15 @@ module boundaries
 
 ! receive data
 !
-            call mrecvf(size(rbuf), i, itag+1, rbuf)
+            call mrecvf(size(rbuf(1:l,:,:,:,:)), i, itag+1, rbuf(1:l,:,:,:,:))
 
 ! iterate over all blocks
 !
             do p = 1, cn(i)
+
+! get pointer to the local block
+!
+              pblock => get_pointer(iblk(i,p,1))
 
 ! find the position of block iblk(i,p,3) in ibuf
 !
@@ -273,24 +291,21 @@ module boundaries
                 l = l + 1
               end do
 
-! get pointer to the local block
-!
-              pblock => get_pointer(iblk(i,p,1))
-
 ! get the level difference
 !
-              dl = iblk(i,p,2) - ibuf(l,2)
+              dl = pblock%level - ibuf(l,2)
 
 ! update boundaries
 !
               select case(dl)
               case(-1)  ! restriction
-                call bnd_rest_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
+                call bnd_rest_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),iblk(i,p,6))
               case(0)   ! the same level, copying
                 if (iblk(i,p,6) .eq. 1) &
-                  call bnd_copy_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
+                  call bnd_copy_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),iblk(i,p,6))
               case(1)   ! prolongation
-                call bnd_prol_u(pblock, rbuf(l,:,:,:,:), iblk(i,p,4), iblk(i,p,5), iblk(i,p,6))
+                if (iblk(i,p,6) .eq. 1) &
+                  call bnd_prol_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),pblock%pos(3-iblk(i,p,4)))
               case default
                 call print_error("boundaries::boundary", "Level difference unsupported!")
               end select
@@ -937,10 +952,6 @@ module boundaries
 !
     integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
 
-! local arrays
-!
-    real, dimension(2*im,2*jm,km) :: ux
-
 ! local pointers
 !
     type(block), pointer :: pn1, pn2
@@ -1146,8 +1157,6 @@ module boundaries
 
     case(111)
 
-! current to neighbor
-!
       dm(1) = ng / 2 + 2
       dm(2) = jn / 2 + ng + 2
       dm(3) = km
@@ -1176,8 +1185,6 @@ module boundaries
 
     case(112)
 
-! current to neighbor
-!
       dm(1) = ng / 2 + 2
       dm(2) = jn / 2 + ng + 2
       dm(3) = km

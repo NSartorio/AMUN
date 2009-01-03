@@ -45,6 +45,9 @@ module evolution
     use blocks    , only : block, plist
     use boundaries, only : boundary
     use mesh      , only : dx_min, update_mesh
+#ifdef MPI
+    use mpitools  , only : mallreduceminr
+#endif /* MPI */
     use scheme    , only : maxspeed
     use timer     , only : start_timer, stop_timer
 
@@ -112,6 +115,12 @@ module evolution
 ! get maximum time step
 !
     dtn = dx_min / max(cmax, 1.e-8)
+
+#ifdef MPI
+! reduce new time step over all processes
+!
+    call mallreduceminr(dtn)
+#endif /* MPI */
 
 ! ! check refinement and refine
 ! !

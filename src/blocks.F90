@@ -74,6 +74,7 @@ module blocks
 
     character            :: config
     integer(kind=4)      :: refine
+    integer(kind=4)      :: pos(ndims)
 
 
     real                 :: xmin, xmax, ymin, ymax, zmin, zmax
@@ -505,6 +506,20 @@ module blocks
       pbr%leaf   = .true.
       ptl%leaf   = .true.
       ptr%leaf   = .true.
+
+! set positions
+!
+      pbl%pos(1) = 1
+      pbl%pos(2) = 1
+
+      pbr%pos(1) = 2
+      pbr%pos(2) = 1
+
+      ptl%pos(1) = 1
+      ptl%pos(2) = 2
+
+      ptr%pos(1) = 2
+      ptr%pos(2) = 2
 
 ! set bounds
 !

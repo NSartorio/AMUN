@@ -167,6 +167,17 @@ module problem
     ptr%config = 'N'
     pbr%config = 'C'
 
+! set positions
+!
+    pbl%pos(1) = 1
+    pbl%pos(2) = 1
+    pbr%pos(1) = 2
+    pbr%pos(2) = 1
+    ptl%pos(1) = 1
+    ptl%pos(2) = 2
+    ptr%pos(1) = 2
+    ptr%pos(2) = 2
+
 ! set leaf flags
 !
     pbl%leaf   = .true.
