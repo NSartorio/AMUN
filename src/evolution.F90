@@ -122,17 +122,17 @@ module evolution
     call mallreduceminr(dtn)
 #endif /* MPI */
 
-! ! check refinement and refine
-! !
-!     call start_timer(5)
-!     call update_mesh(0)
-!     call stop_timer(5)
+! check refinement and refine
 !
-! ! update boundaries
-! !
-!     call start_timer(4)
-!     call boundary
-!     call stop_timer(4)
+    call start_timer(5)
+    call update_mesh(0)
+    call stop_timer(5)
+
+! update boundaries
+!
+    call start_timer(4)
+    call boundary
+    call stop_timer(4)
 
 !-------------------------------------------------------------------------------
 !

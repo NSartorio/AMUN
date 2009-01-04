@@ -368,10 +368,14 @@ module mesh
 !
   subroutine update_mesh(ref)
 
-    use config , only : maxlev
-    use blocks , only : block, plist, ndims, nchild, refine_block, get_pointer
-    use error  , only : print_info
-    use problem, only : check_ref
+    use config  , only : maxlev
+    use blocks  , only : block, plist, ndims, nchild, nblocks, refine_block    &
+                       , get_pointer
+    use error   , only : print_info
+#ifdef MPI
+    use mpitools, only : ncpus, ncpu, mallreducemaxl, msendi, mrecvi
+#endif /* MPI */
+    use problem , only : check_ref
 
     implicit none
 
@@ -380,11 +384,37 @@ module mesh
 ! local variables
 !
     type(block), pointer :: pblock, pneigh, pchild, pparent
-    integer(kind=4)      :: l, i, j, k, n, p
+    integer(kind=4)      :: l, i, j, k, m, n, p, q
+
+#ifdef MPI
+    integer(kind=4)      :: itag
+
+! local arrays for MPI
+!
+    integer(kind=4), dimension(:,:,:)    , allocatable :: iblk, ichl
+    integer(kind=4), dimension(:,:)      , allocatable :: cn, cc, ibuf
+#endif /* MPI */
 
 !----------------------------------------------------------------------
 !
+#ifdef MPI
+! allocate temporary arrays; since we have two blocks per boundary and 4 sides
+! of each block we need to increase the second dimension
+!
+    allocate(cn  (0:ncpus-1,0:ncpus-1))
+    allocate(cc  (0:ncpus-1,0:ncpus-1))
+    allocate(iblk(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,3))
+    allocate(ichl(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,7))
+#endif /* MPI */
+
     do l = 1, maxlev
+
+#ifdef MPI
+! reset the local arrays storing blocks to exchange
+!
+      cn(:,:)     = 0
+      iblk(:,:,:) = 0
+#endif /* MPI */
 
 ! check refinement criterion
 !
@@ -410,7 +440,7 @@ module mesh
 
 ! refinement conditions for blocks:
 !
-! - all neighbors must be at the same or lower level
+! - all neighbors must be at the same or one level higher
 !
       do n = l, 2, -1
         pblock => plist
@@ -421,11 +451,36 @@ module mesh
               do i = 1, ndims
                 do j = 1, 2
                   do k = 1, 2
-                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-                    if (associated(pneigh)) then
-                      if (pneigh%level .lt. pblock%level) &
-                        pneigh%refine = 1
+#ifdef MPI
+                    if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+#endif /* MPI */
+                      pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+                      if (associated(pneigh)) then
+                        if (pneigh%level .lt. pblock%level) &
+                          pneigh%refine = 1
+                      endif
+#ifdef MPI
+                    else
+
+! TODO: fill temporary array with neighbors of the current block laying on other processes
+!       this array should store current block ID and level, and neighbor ID
+!
+! get the processor number of neighbor
+!
+                      p = pblock%neigh(i,j,k)%cpu
+
+! increase the number of blocks to retrieve from that CPU
+!
+                      cn(ncpu,p) = cn(ncpu,p) + 1
+
+! fill out the info array
+!
+                      iblk(p,cn(ncpu,p),1) = pblock%id
+                      iblk(p,cn(ncpu,p),2) = pblock%level
+                      iblk(p,cn(ncpu,p),3) = pblock%neigh(i,j,k)%id
+
                     endif
+#endif /* MPI */
 
                   end do
                 end do
@@ -435,9 +490,57 @@ module mesh
 
           pblock => pblock%next
         end do
+
+#ifdef MPI
+! TODO: after sweeping the current level, send the temporary array to neighbors
+!       and select them for refinement if their level is lower
+!
+! update number of blocks across all processes
+!
+        call mallreducemaxl(size(cn),cn)
+
+        if (maxval(cn) .gt. 0) then
+
+          allocate(ibuf(maxval(cn),3))
+
+          do p = 0, ncpus-1
+            do q = 0, ncpus-1
+
+              itag = 10*(p * ncpus + q) + 2111
+
+              if (cn(p,q) .gt. 0) then
+                if (ncpu .eq. p) then  ! sender
+                  call msendi(size(iblk(q,1:cn(p,q),:)), q, itag, iblk(q,1:cn(p,q),:))
+                endif
+                if (ncpu .eq. q) then  ! receiver
+                  call mrecvi(size(ibuf(1:cn(p,q),:)), p, itag, ibuf(1:cn(p,q),:))
+
+                  do i = 1, cn(p,q)
+                    pblock => get_pointer(ibuf(i,3))
+
+                   if (pblock%level .lt. ibuf(i,2)) &
+                     pblock%refine = 1
+                  end do
+                endif
+              endif
+            end do
+          end do
+
+          deallocate(ibuf)
+        endif
+#endif /* MPI */
       end do
 
+! after selecting blocks for refinement, do refine them gradually starting from
+! the lowest level in order to avoid situation when two neighbors have level
+! difference larger than 2
+!
       do n = 1, l
+#ifdef MPI
+        cc  (:,:)   = 0
+        ichl(:,:,:) = 0
+#endif /* MPI */
+
         pblock => plist
         do while (associated(pblock))
 
@@ -448,114 +551,206 @@ module mesh
 
               call refine_block(pblock)
               call prolong_block(pparent)
+
+#ifdef MPI
+! TODO: collect information about refined block in order to update neighbors
+!       laying on other processors
+
+              do i = 1, ndims
+                do j = 1, 2
+                  do k = 1, 2
+                    if (pparent%neigh(i,j,k)%cpu .ne. ncpu) then
+                      p = pparent%neigh(i,j,k)%cpu
+                      cc(ncpu,p) = cc(ncpu,p) + 1
+                      ichl(p,cc(ncpu,p),1) = pparent%neigh(i,j,k)%id
+                      ichl(p,cc(ncpu,p),2) = pparent%id
+                      ichl(p,cc(ncpu,p),3) = pparent%level
+                      ichl(p,cc(ncpu,p),4) = pparent%child(1)%id
+                      ichl(p,cc(ncpu,p),5) = pparent%child(2)%id
+                      ichl(p,cc(ncpu,p),6) = pparent%child(3)%id
+                      ichl(p,cc(ncpu,p),7) = pparent%child(4)%id
+                    endif
+                  end do
+                end do
+              end do
+#endif /* MPI */
+
+! TODO: remove parent after refinement
+!
             endif
           endif
 
           pblock => pblock%next
 
         end do
-      end do
 
-    end do
-
-! else
-
-    do l = maxlev, 1, -1
-
-! derefinement conditions for blocks:
+#ifdef MPI
+! TODO: exchange information about refined blocks in order to update neighbors
 !
-! - all neighbors must be at the same or lower level
-! - all neighbors at the same level must be not selected for refinement
-! - all sibling must be at the same level and marked for derefinement
-!
-! if all above conditions are fulfilled, select the refinement of
-! the parent of the current block to -1
-!
-! if at least one is not fulfilled, set all sibling to not do the refinement
-!
-      do n = l, maxlev
-      pblock => plist
-      do while (associated(pblock))
+        call mallreducemaxl(size(cc),cc)
 
-        if (pblock%level .eq. n) then
-          if (pblock%leaf .and. pblock%refine .eq. -1) then
-            do i = 1, ndims
-              do j = 1, 2
-                do k = 1, 2
-                  pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-                  if (associated(pneigh)) then
-                    if (pneigh%level .gt. pblock%level) &
-                      pblock%refine = 0
-                    if (pneigh%level .eq. pblock%level .and. pneigh%refine .eq. 1) &
-                      pblock%refine = 0
-                  endif
+        if (maxval(cc) .gt. 0) then
 
-                end do
-              end do
-            end do
+          allocate(ibuf(maxval(cc),7))
 
-            pparent => get_pointer(pblock%parent%id)
-            if (associated(pparent)) then
-              do p = 1, nchild
-                pchild => get_pointer(pparent%child(p)%id)
+          do p = 0, ncpus-1
+            do q = 0, ncpus-1
 
-                if (associated(pchild)) then
-                  if (pchild%refine .ne. -1 .or. pchild%level .ne. pblock%level) &
-                    pblock%refine = 0
+              itag = 10*(p * ncpus + q) + 3111
+
+              if (cc(p,q) .gt. 0) then
+                if (ncpu .eq. p) then  ! sender
+                  call msendi(size(ichl(q,1:cc(p,q),:)), q, itag, ichl(q,1:cc(p,q),:))
                 endif
-              end do
+                if (ncpu .eq. q) then  ! receiver
+                  call mrecvi(size(ibuf(1:cc(p,q),:)), p, itag, ibuf(1:cc(p,q),:))
 
-              if (pblock%refine .ne. -1) then
-                do p = 1, nchild
-                  pchild => get_pointer(pparent%child(p)%id)
+                  do m = 1, cn(p,q)
+                    pblock => get_pointer(ibuf(m,1))
 
-                  if (associated(pchild)) then
-                    if (pchild%refine .eq. -1 .and. pchild%level .eq. pblock%level) &
-                      pchild%refine = 0
-                  endif
-                end do
+                    if (pblock%leaf) then
+! TODO: if leaf, update its neighbors according to the information sent
+!
+                      do i = 1, ndims
+                        do j = 1, 2
+                          do k = 1, 2
+                            if (pblock%neigh(i,j,k)%cpu .eq. p) then
+                              if (pblock%neigh(i,j,k)%id .eq. ibuf(m,2)) then
+
+! TODO: depending in the level difference and side update neighbors
+!
+!                                 if (pblock%level .eq. ibuf(m,3) then
+!                                 endif
+!                                 pblock%neigh(i,j,k)%id =
+                              endif
+                            endif
+                          end do
+                        end do
+                      end do
+
+                    else
+! TODO: if not leaf, it means that the block has been refined in the meantime, so
+!       update its children
+!
+                    endif
+                  end do
+                endif
               endif
-            endif
+            end do
+          end do
 
-          endif
+          deallocate(ibuf)
         endif
-
-        pparent => get_pointer(pblock%parent%id)
-        if (associated(pparent) .and. pblock%refine .eq. -1) &
-          pparent%refine = -1
-
-! point to the next block
-!
-        pblock => pblock%next
-      end do
-      end do
-
-! perform derefinements for all selected blocks
-!
-      do n = maxlev, l, -1
-      pblock => plist
-      do while (associated(pblock))
-
-        if (pblock%level .eq. n) then
-          if (pblock%leaf .and. pblock%refine .eq. -1) then
-
-            pparent => get_pointer(pblock%parent%id)
-
-            if (associated(pparent) .and. pparent%refine .eq. -1) then
-!               print *, 'derefine block ', pparent%id
-              call restrict_block(pparent)
-              pblock => pparent
-            endif
-          endif
-        endif
-
-        pblock => pblock%next
-      end do
+#endif /* MPI */
       end do
 
     end do
 
-! endif
+! ! iterate starting from the maximum level and select blocks for derefinement
+! ! if they fullfil below conditions
+! !
+!     do l = maxlev, 1, -1
+!
+! ! derefinement conditions for blocks:
+! !
+! ! - all neighbors must be at the same or lower level
+! ! - all neighbors at the same level must be not selected for refinement
+! ! - all sibling must be at the same level and marked for derefinement
+! !
+! ! if all above conditions are fulfilled, select the refinement of
+! ! the parent of the current block to -1
+! !
+! ! if at least one is not fulfilled, set all sibling to not do the refinement
+! !
+!       do n = l, maxlev
+!       pblock => plist
+!       do while (associated(pblock))
+!
+!         if (pblock%level .eq. n) then
+!           if (pblock%leaf .and. pblock%refine .eq. -1) then
+!             do i = 1, ndims
+!               do j = 1, 2
+!                 do k = 1, 2
+!                   pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+!                   if (associated(pneigh)) then
+!                     if (pneigh%level .gt. pblock%level) &
+!                       pblock%refine = 0
+!                     if (pneigh%level .eq. pblock%level .and. pneigh%refine .eq. 1) &
+!                       pblock%refine = 0
+!                   endif
+!
+!                 end do
+!               end do
+!             end do
+!
+!             pparent => get_pointer(pblock%parent%id)
+!             if (associated(pparent)) then
+!               do p = 1, nchild
+!                 pchild => get_pointer(pparent%child(p)%id)
+!
+!                 if (associated(pchild)) then
+!                   if (pchild%refine .ne. -1 .or. pchild%level .ne. pblock%level) &
+!                     pblock%refine = 0
+!                 endif
+!               end do
+!
+!               if (pblock%refine .ne. -1) then
+!                 do p = 1, nchild
+!                   pchild => get_pointer(pparent%child(p)%id)
+!
+!                   if (associated(pchild)) then
+!                     if (pchild%refine .eq. -1 .and. pchild%level .eq. pblock%level) &
+!                       pchild%refine = 0
+!                   endif
+!                 end do
+!               endif
+!             endif
+!
+!           endif
+!         endif
+!
+!         pparent => get_pointer(pblock%parent%id)
+!         if (associated(pparent) .and. pblock%refine .eq. -1) &
+!           pparent%refine = -1
+!
+! ! point to the next block
+! !
+!         pblock => pblock%next
+!       end do
+!       end do
+!
+! ! perform derefinement for all selected blocks
+! !
+!       do n = maxlev, l, -1
+!       pblock => plist
+!       do while (associated(pblock))
+!
+!         if (pblock%level .eq. n) then
+!           if (pblock%leaf .and. pblock%refine .eq. -1) then
+!
+!             pparent => get_pointer(pblock%parent%id)
+!
+!             if (associated(pparent) .and. pparent%refine .eq. -1) then
+!               call restrict_block(pparent)
+!               pblock => pparent
+!             endif
+!           endif
+!         endif
+!
+!         pblock => pblock%next
+!       end do
+!       end do
+!
+!     end do
+
+#ifdef MPI
+! deallocate temporary arrays
+!
+    deallocate(cc)
+    deallocate(ichl)
+    deallocate(cn)
+    deallocate(iblk)
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !

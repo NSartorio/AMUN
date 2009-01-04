@@ -54,7 +54,6 @@ module boundaries
     integer :: i, j, k, p, l, dl
 
 #ifdef MPI
-
     integer(kind=4) :: itag
     logical         :: lf
 
@@ -111,9 +110,11 @@ module boundaries
 
               else
 
+#ifdef MPI
 ! neighbor associated; exchange boundaries
 !
                 if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+#endif /* MPI */
 
 ! neighbor is on the same CPU, update
 !
@@ -158,8 +159,9 @@ module boundaries
                   iblk(p,cn(p),4) = i                        ! 4: directions of boundary
                   iblk(p,cn(p),5) = j                        ! 5: side at the boundary
                   iblk(p,cn(p),6) = k                        ! 6: part of the boundary
-#endif /* MPI */
+
                 endif
+#endif /* MPI */
 
               endif
             end do
