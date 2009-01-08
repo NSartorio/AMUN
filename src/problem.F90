@@ -744,8 +744,8 @@ module problem
     dpmax = 0.0d0
 
     do k = kb, ke
-      do j = jb-1, je+1
-        do i = ib-1, ie+1
+      do j = jb-2, je+2
+        do i = ib-2, ie+2
           dnl = dn(i-1,j,k)
           dnr = dn(i+1,j,k)
           ddndx = abs(dnr-dnl)/(dnr+dnl)

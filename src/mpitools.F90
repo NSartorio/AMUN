@@ -285,6 +285,74 @@ module mpitools
 !
 !===============================================================================
 !
+! mallreducesuml: subroutine adds values over all proceeses
+!
+!===============================================================================
+!
+  subroutine mallreducesuml(n, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer, mpi_sum
+#endif /* MPI */
+
+! arguments
+!
+    integer              , intent(in)    :: n
+    integer, dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer, dimension(n) :: tbuf
+    integer               :: err
+!
+!----------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_sum, comm3d, err)
+    buf(1:n) = tbuf(1:n)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreducesuml
+!
+!===============================================================================
+!
+! mallreducesuml: subroutine adds values over all proceeses
+!
+!===============================================================================
+!
+  subroutine mallreduceprodl(n, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer, mpi_prod
+#endif /* MPI */
+
+! arguments
+!
+    integer              , intent(in)    :: n
+    integer, dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer, dimension(n) :: tbuf
+    integer               :: err
+!
+!----------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_prod, comm3d, err)
+    buf(1:n) = tbuf(1:n)
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreduceprodl
+!
+!===============================================================================
+!
 ! mallreducemaxl: subroutine finds maximum values over all proceeses
 !
 !===============================================================================
@@ -349,5 +417,36 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine mallreduceminr
+!
+!===============================================================================
+!
+! mfindmaxi: subroutine finds the maximum integer value across all proceeses
+!
+!===============================================================================
+!
+  subroutine mfindmaxi(buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer, mpi_max
+#endif /* MPI */
+
+! arguments
+!
+    integer(kind=4), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer(kind=4)     :: tbuf, err
+!
+!----------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce(buf, tbuf, 1, mpi_integer, mpi_max, comm3d, err)
+    buf = tbuf
+#endif /* MPI */
+!-------------------------------------------------------------------------------
+!
+  end subroutine mfindmaxi
 
 end module
