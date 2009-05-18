@@ -95,9 +95,9 @@ module blocks
 !
   integer(kind=4)     , save :: last_id
 
-! store number of allocated blocks
+! store number of allocated blocks and leafs
 !
-  integer(kind=4)     , save :: nblocks
+  integer(kind=4)     , save :: nblocks, nleafs
 
   contains
 !
@@ -128,9 +128,10 @@ module blocks
 !
     nullify(plist)
 
-! reset number of blocks
+! reset number of blocks and leafs
 !
     nblocks = 0
+    nleafs  = 0
 
 ! reset ID
 !
@@ -456,7 +457,10 @@ module blocks
 !
   subroutine refine_block(pblock)
 
-    use error, only : print_error
+    use error   , only : print_error
+#ifdef MPI
+    use mpitools, only : ncpu
+#endif /* MPI */
 
     implicit none
 
@@ -474,11 +478,6 @@ module blocks
 !
     if (associated(pblock)) then
 
-! unset the refinement and leaf flags for the parent block
-!
-      pblock%refine = 0
-      pblock%leaf   = .false.
-
 ! create 4 blocks
 !
       call allocate_block(pbl)
@@ -486,26 +485,41 @@ module blocks
       call allocate_block(ptl)
       call allocate_block(ptr)
 
+! unset the refinement and leaf flags for the parent block
+!
+      pblock%refine = 0
+      pblock%leaf   = .false.
+
+! set leaf flags
+!
+      pbl%leaf      = .true.
+      pbr%leaf      = .true.
+      ptl%leaf      = .true.
+      ptr%leaf      = .true.
+
+! increase the number of leafs
+!
+      nleafs        = nleafs + 3
+
 ! set parent
 !
-      pbl%parent%id = pblock%id
-      pbr%parent%id = pblock%id
-      ptl%parent%id = pblock%id
-      ptr%parent%id = pblock%id
+#ifdef MPI
+      pbl%parent%cpu = pblock%cpu
+      pbr%parent%cpu = pblock%cpu
+      ptl%parent%cpu = pblock%cpu
+      ptr%parent%cpu = pblock%cpu
+#endif /* MPI */
+      pbl%parent%id  = pblock%id
+      pbr%parent%id  = pblock%id
+      ptl%parent%id  = pblock%id
+      ptr%parent%id  = pblock%id
 
 ! set level
 !
       pbl%level = pblock%level + 1
-      pbr%level = pbl%level
-      ptl%level = pbl%level
-      ptr%level = pbl%level
-
-! set leaf flags
-!
-      pbl%leaf   = .true.
-      pbr%leaf   = .true.
-      ptl%leaf   = .true.
-      ptr%leaf   = .true.
+      pbr%level = pblock%level + 1
+      ptl%level = pblock%level + 1
+      ptr%level = pblock%level + 1
 
 ! set positions
 !
@@ -545,6 +559,28 @@ module blocks
 
 ! set neighbors to the refined blocks
 !
+#ifdef MPI
+      pbl%neigh(1,2,1)%cpu = ncpu  ! BL right  -> BR
+      pbl%neigh(1,2,2)%cpu = ncpu
+      pbl%neigh(2,2,1)%cpu = ncpu  ! BL top    -> TL
+      pbl%neigh(2,2,2)%cpu = ncpu
+
+      pbr%neigh(1,1,1)%cpu = ncpu  ! BR left   -> BL
+      pbr%neigh(1,1,2)%cpu = ncpu
+      pbr%neigh(2,2,1)%cpu = ncpu  ! BR top    -> TR
+      pbr%neigh(2,2,2)%cpu = ncpu
+
+      ptl%neigh(1,2,1)%cpu = ncpu  ! TL right  -> TR
+      ptl%neigh(1,2,2)%cpu = ncpu
+      ptl%neigh(2,1,1)%cpu = ncpu  ! TL bottom -> BL
+      ptl%neigh(2,1,2)%cpu = ncpu
+
+      ptr%neigh(1,1,1)%cpu = ncpu  ! TR left   -> TL
+      ptr%neigh(1,1,2)%cpu = ncpu
+      ptr%neigh(2,1,1)%cpu = ncpu  ! TR bottom -> BR
+      ptr%neigh(2,1,2)%cpu = ncpu
+#endif /* MPI */
+
       pbl%neigh(1,2,1)%id = pbr%id  ! BL right  -> BR
       pbl%neigh(1,2,2)%id = pbr%id
       pbl%neigh(2,2,1)%id = ptl%id  ! BL top    -> TL
@@ -567,6 +603,219 @@ module blocks
 
 ! set pointer to the neighbors of the parent block
 !
+#ifdef MPI
+! left neighbor of BL
+!
+      if (pblock%neigh(1,1,1)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
+!         if (.not. pneigh%leaf) &
+!             call print_error("blocks::refine_blocks","The left neighbor of BL is not a leaf!")
+        if (associated(pneigh)) then
+          pbl%neigh(1,1,1)%cpu = pneigh%cpu
+          pbl%neigh(1,1,2)%cpu = pneigh%cpu
+          pbl%neigh(1,1,1)%id  = pneigh%id
+          pbl%neigh(1,1,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the left neighbor of BL is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(1,2,1)%cpu = pbl%cpu
+            pneigh%neigh(1,2,1)%id  = pbl%id
+          endif
+          if (pneigh%level .eq. pbl%level) then
+            pneigh%neigh(1,2,1)%cpu = pbl%cpu
+            pneigh%neigh(1,2,2)%cpu = pbl%cpu
+            pneigh%neigh(1,2,1)%id  = pbl%id
+            pneigh%neigh(1,2,2)%id  = pbl%id
+          endif
+        endif
+      endif
+
+! bottom neighbor of BL
+!
+      if (pblock%neigh(2,1,1)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(2,1,1)%id)  ! bottom left neighbor
+        if (.not. pneigh%leaf) &
+            call print_error("blocks::refine_blocks","The bottom neighbor of BL is not a leaf!")
+        if (associated(pneigh)) then
+          pbl%neigh(2,1,1)%cpu = pneigh%cpu
+          pbl%neigh(2,1,2)%cpu = pneigh%cpu
+          pbl%neigh(2,1,1)%id  = pneigh%id
+          pbl%neigh(2,1,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the bottom neighbor of BL is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(2,2,1)%cpu = pbl%cpu
+            pneigh%neigh(2,2,1)%id  = pbl%id
+          endif
+          if (pneigh%level .eq. pbl%level) then
+            pneigh%neigh(2,2,1)%cpu = pbl%cpu
+            pneigh%neigh(2,2,2)%cpu = pbl%cpu
+            pneigh%neigh(2,2,1)%id  = pbl%id
+            pneigh%neigh(2,2,2)%id  = pbl%id
+          endif
+        endif
+      endif
+
+! bottom neighbor of BR
+!
+      if (pblock%neigh(2,1,2)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(2,1,2)%id)  ! bottom right neighbor
+        if (associated(pneigh)) then
+          pbr%neigh(2,1,1)%cpu = pneigh%cpu
+          pbr%neigh(2,1,2)%cpu = pneigh%cpu
+          pbr%neigh(2,1,1)%id  = pneigh%id
+          pbr%neigh(2,1,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the bottom neighbor of BR is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(2,2,2)%cpu = pbr%cpu
+            pneigh%neigh(2,2,2)%id  = pbr%id
+          endif
+          if (pneigh%level .eq. pbr%level) then
+            pneigh%neigh(2,2,1)%cpu = pbr%cpu
+            pneigh%neigh(2,2,2)%cpu = pbr%cpu
+            pneigh%neigh(2,2,1)%id  = pbr%id
+            pneigh%neigh(2,2,2)%id  = pbr%id
+          endif
+        endif
+      endif
+
+! right neighbor of BR
+!
+      if (pblock%neigh(1,2,1)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(1,2,1)%id) ! right lower neighbor
+        if (associated(pneigh)) then
+          pbr%neigh(1,2,1)%cpu = pneigh%cpu
+          pbr%neigh(1,2,2)%cpu = pneigh%cpu
+          pbr%neigh(1,2,1)%id  = pneigh%id
+          pbr%neigh(1,2,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the right neighbor of BR is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(1,1,1)%cpu = pbr%cpu
+            pneigh%neigh(1,1,1)%id  = pbr%id
+          endif
+          if (pneigh%level .eq. pbr%level) then
+            pneigh%neigh(1,1,1)%cpu = pbr%cpu
+            pneigh%neigh(1,1,2)%cpu = pbr%cpu
+            pneigh%neigh(1,1,1)%id  = pbr%id
+            pneigh%neigh(1,1,2)%id  = pbr%id
+          endif
+        endif
+      endif
+
+! right neighbor of TR
+!
+      if (pblock%neigh(1,2,2)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(1,2,2)%id) ! right upper neighbor
+        if (associated(pneigh)) then
+          ptr%neigh(1,2,1)%cpu = pneigh%cpu
+          ptr%neigh(1,2,2)%cpu = pneigh%cpu
+          ptr%neigh(1,2,1)%id  = pneigh%id
+          ptr%neigh(1,2,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the right neighbor of TR is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(1,1,2)%cpu = ptr%cpu
+            pneigh%neigh(1,1,2)%id  = ptr%id
+          endif
+          if (pneigh%level .eq. ptr%level) then
+            pneigh%neigh(1,1,1)%cpu = ptr%cpu
+            pneigh%neigh(1,1,2)%cpu = ptr%cpu
+            pneigh%neigh(1,1,1)%id  = ptr%id
+            pneigh%neigh(1,1,2)%id  = ptr%id
+          endif
+        endif
+      endif
+
+! top neighbor of TR
+!
+      if (pblock%neigh(2,2,2)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(2,2,2)%id)  ! top right neighbor
+        if (associated(pneigh)) then
+          ptr%neigh(2,2,1)%cpu = pneigh%cpu
+          ptr%neigh(2,2,2)%cpu = pneigh%cpu
+          ptr%neigh(2,2,1)%id  = pneigh%id
+          ptr%neigh(2,2,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the top neighbor of TR is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(2,1,2)%cpu = ptr%cpu
+            pneigh%neigh(2,1,2)%id  = ptr%id
+          endif
+          if (pneigh%level .eq. ptr%level) then
+            pneigh%neigh(2,1,1)%cpu = ptr%cpu
+            pneigh%neigh(2,1,2)%cpu = ptr%cpu
+            pneigh%neigh(2,1,1)%id  = ptr%id
+            pneigh%neigh(2,1,2)%id  = ptr%id
+          endif
+        endif
+      endif
+
+! top neighbor of TL
+!
+      if (pblock%neigh(2,2,1)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(2,2,1)%id)  ! top left neighbor
+        if (associated(pneigh)) then
+          ptl%neigh(2,2,1)%cpu = pneigh%cpu
+          ptl%neigh(2,2,2)%cpu = pneigh%cpu
+          ptl%neigh(2,2,1)%id  = pneigh%id
+          ptl%neigh(2,2,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the top neighbor of TL is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(2,1,1)%cpu = ptl%cpu
+            pneigh%neigh(2,1,1)%id  = ptl%id
+          endif
+          if (pneigh%level .eq. ptl%level) then
+            pneigh%neigh(2,1,1)%cpu = ptl%cpu
+            pneigh%neigh(2,1,2)%cpu = ptl%cpu
+            pneigh%neigh(2,1,1)%id  = ptl%id
+            pneigh%neigh(2,1,2)%id  = ptl%id
+          endif
+        endif
+      endif
+
+! left neighbor of TL
+!
+      if (pblock%neigh(1,1,2)%cpu .eq. ncpu) then
+        pneigh => get_pointer(pblock%neigh(1,1,2)%id) ! left upper neighbor
+        if (associated(pneigh)) then
+          ptl%neigh(1,1,1)%cpu = pneigh%cpu
+          ptl%neigh(1,1,2)%cpu = pneigh%cpu
+          ptl%neigh(1,1,1)%id  = pneigh%id
+          ptl%neigh(1,1,2)%id  = pneigh%id
+
+          if (pneigh%level .lt. pblock%level) then
+            call print_error("blocks::refine_blocks","Level of the left neighbor of TL is too low!")
+          endif
+          if (pneigh%level .eq. pblock%level) then
+            pneigh%neigh(1,2,2)%cpu = ptl%cpu
+            pneigh%neigh(1,2,2)%id  = ptl%id
+          endif
+          if (pneigh%level .eq. ptl%level) then
+            pneigh%neigh(1,2,1)%cpu = ptl%cpu
+            pneigh%neigh(1,2,2)%cpu = ptl%cpu
+            pneigh%neigh(1,2,1)%id  = ptl%id
+            pneigh%neigh(1,2,2)%id  = ptl%id
+          endif
+        endif
+      endif
+#else /* MPI */
       pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
       if (associated(pneigh)) then
         pbl%neigh(1,1,1)%id = pneigh%id
@@ -686,13 +935,20 @@ module blocks
           pneigh%neigh(2,1,2)%id = ptr%id
         endif
       endif
+#endif /* MPI */
 
 ! set children
 !
-      pblock%child(1)%id = pbl%id
-      pblock%child(2)%id = pbr%id
-      pblock%child(3)%id = ptl%id
-      pblock%child(4)%id = ptr%id
+#ifdef MPI
+      pblock%child(1)%cpu = pbl%cpu
+      pblock%child(2)%cpu = pbr%cpu
+      pblock%child(3)%cpu = ptl%cpu
+      pblock%child(4)%cpu = ptr%cpu
+#endif /* MPI */
+      pblock%child(1)%id  = pbl%id
+      pblock%child(2)%id  = pbr%id
+      pblock%child(3)%id  = ptl%id
+      pblock%child(4)%id  = ptr%id
 
 ! depending on the configuration of the parent block
 !
@@ -876,6 +1132,10 @@ module blocks
 !
   subroutine derefine_block(pblock)
 
+#ifdef MPI
+    use mpitools, only : ncpu
+#endif /* MPI */
+
     implicit none
 
 ! input parameters
@@ -901,6 +1161,16 @@ module blocks
 
 ! prepare neighbors
 !
+#ifdef MPI
+    pblock%neigh(1,1,1)%cpu = pbl%neigh(1,1,1)%cpu
+    pblock%neigh(1,1,2)%cpu = ptl%neigh(1,1,2)%cpu
+    pblock%neigh(1,2,1)%cpu = pbr%neigh(1,2,1)%cpu
+    pblock%neigh(1,2,2)%cpu = ptr%neigh(1,2,2)%cpu
+    pblock%neigh(2,1,1)%cpu = pbl%neigh(2,1,1)%cpu
+    pblock%neigh(2,1,2)%cpu = pbr%neigh(2,1,2)%cpu
+    pblock%neigh(2,2,1)%cpu = ptl%neigh(2,2,1)%cpu
+    pblock%neigh(2,2,2)%cpu = ptr%neigh(2,2,2)%cpu
+#endif /* MPI */
     pblock%neigh(1,1,1)%id = pbl%neigh(1,1,1)%id
     pblock%neigh(1,1,2)%id = ptl%neigh(1,1,2)%id
     pblock%neigh(1,2,1)%id = pbr%neigh(1,2,1)%id
@@ -910,6 +1180,71 @@ module blocks
     pblock%neigh(2,2,1)%id = ptl%neigh(2,2,1)%id
     pblock%neigh(2,2,2)%id = ptr%neigh(2,2,2)%id
 
+#ifdef MPI
+    if (pblock%neigh(1,1,1)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(1,1,1)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(1,2,1)%id = pblock%id
+        pneigh%neigh(1,2,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(1,1,2)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(1,1,2)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(1,2,1)%id = pblock%id
+        pneigh%neigh(1,2,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(1,2,1)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(1,2,1)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(1,1,1)%id = pblock%id
+        pneigh%neigh(1,1,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(1,2,2)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(1,2,2)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(1,1,1)%id = pblock%id
+        pneigh%neigh(1,1,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(2,1,1)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(2,1,1)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(2,2,1)%id = pblock%id
+        pneigh%neigh(2,2,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(2,1,2)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(2,1,2)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(2,2,1)%id = pblock%id
+        pneigh%neigh(2,2,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(2,2,1)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(2,2,1)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(2,1,1)%id = pblock%id
+        pneigh%neigh(2,1,2)%id = pblock%id
+      endif
+    endif
+
+    if (pblock%neigh(2,2,2)%cpu .eq. ncpu) then
+      pneigh => get_pointer(pblock%neigh(2,2,2)%id)
+      if (associated(pneigh)) then
+        pneigh%neigh(2,1,1)%id = pblock%id
+        pneigh%neigh(2,1,2)%id = pblock%id
+      endif
+    endif
+#else /* MPI */
     pneigh => get_pointer(pblock%neigh(1,1,1)%id)
     if (associated(pneigh)) then
       pneigh%neigh(1,2,1)%id = pblock%id
@@ -957,6 +1292,7 @@ module blocks
       pneigh%neigh(2,1,1)%id = pblock%id
       pneigh%neigh(2,1,2)%id = pblock%id
     endif
+#endif /* MPI */
 
 ! set the leaf flag for children
 !
@@ -965,6 +1301,10 @@ module blocks
     pbr%leaf    = .false.
     ptl%leaf    = .false.
     ptr%leaf    = .false.
+
+! decrease the number of leafs
+!
+    nleafs      = nleafs - 3
 
 ! prepare next and prev pointers
 !

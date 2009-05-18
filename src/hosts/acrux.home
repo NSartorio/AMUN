@@ -38,7 +38,7 @@ LD       = $(FC)
 ifeq ($(DEBUG),Y)
 FFLAGS   = -g -O3 -DDEBUG
 else
-FFLAGS   = -O3 -i4 -mtune=core2 -xT -fno-omit-frame-pointer -finline-limit=1000 -align -scalar_rep -prefetch
+FFLAGS   = -O3 -i4 -mtune=core2 -xS -fno-omit-frame-pointer -finline-limit=1000 -align -scalar_rep
 endif
 
 LDFLAGS  = $(FFLAGS)
@@ -74,7 +74,7 @@ endif
 endif # OMP == Y
 
 ifeq ($(OUTPUT),HDF5)
-FFLAGS  += -I${HDF5DIR}/lib
+FFLAGS  += -I${HDF5DIR}/include
 LIBS    += -L${HDF5DIR}/lib -lhdf5_fortran -lhdf5 -lz
 else
 FFLAGS  += -I${HDF4DIR}/include

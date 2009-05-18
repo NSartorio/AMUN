@@ -65,12 +65,12 @@ module io
 ! HDF5 variables
 !
     integer(hid_t)    :: fid, gid, sid, aid, did, bid
-    integer(hsize_t)  :: am(1), cm(2), dm(3)
+    integer(hsize_t)  :: am(1), cm(2), dm(3), pm(3)
 
 ! local variables
 !
     character(len=64) :: fl, gnm
-    integer           :: err, i, j, k, r
+    integer           :: err, i, j, k, r, neigh(2,2,2)
 
 ! pointers
 !
@@ -98,6 +98,10 @@ module io
       dm(1) = im
       dm(2) = jm
       dm(3) = km
+
+      pm(1) = 2
+      pm(2) = 2
+      pm(3) = 2
 
 ! create file
 !
@@ -305,6 +309,20 @@ module io
           call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%zmax,8), am, err)
           call h5aclose_f(aid, err)
 
+          call h5sclose_f(sid, err)
+
+          call h5screate_simple_f(3, pm(1:3), sid, err)
+          neigh(1,1,1) = pblock%neigh(1,1,1)%id
+          neigh(1,1,2) = pblock%neigh(1,1,2)%id
+          neigh(1,2,1) = pblock%neigh(1,2,1)%id
+          neigh(1,2,2) = pblock%neigh(1,2,2)%id
+          neigh(2,1,1) = pblock%neigh(2,1,1)%id
+          neigh(2,1,2) = pblock%neigh(2,1,2)%id
+          neigh(2,2,1) = pblock%neigh(2,2,1)%id
+          neigh(2,2,2) = pblock%neigh(2,2,2)%id
+          call h5acreate_f(bid, 'neigh', H5T_NATIVE_INTEGER, sid, aid, err)
+          call h5awrite_f(aid, H5T_NATIVE_INTEGER, neigh, pm, err)
+          call h5aclose_f(aid, err)
           call h5sclose_f(sid, err)
 
           r = check_ref(pblock)

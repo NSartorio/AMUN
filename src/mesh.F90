@@ -32,7 +32,7 @@ module mesh
 !
   real, save :: dx_min = 1.0
 
-! space steps for all levels of refinements
+! spatial coordinates for all levels of refinements
 !
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
   real, dimension(:  ), allocatable, save :: adx , ady , adz
@@ -53,7 +53,7 @@ module mesh
                        , ncells, maxlev
     use blocks  , only : list_allocated, init_blocks, clear_blocks             &
                        , deallocate_block, refine_block, get_pointer           &
-                       , block, nchild, ndims, plist, last_id, nblocks
+                       , block, nchild, ndims, plist, last_id, nblocks, nleafs
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -94,25 +94,25 @@ module mesh
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
-! is done yet; we fill out these blocks with the initial condition
+! is done yet; we fill out the coarse blocks with the initial condition
 !
-    pblock => plist
-    do while (associated(pblock))
-
-! set level
+!     pblock => plist
+!     do while (associated(pblock))
 !
-      pblock%level    = 1
-      pblock%refine   = 0
-
-! set initial conditions
+! ! set level
+! !
+!       pblock%level    = 1
+!       pblock%refine   = 0
 !
-      call init_problem(pblock)
-
-! assign pointer to the next block
+! ! set initial conditions
+! !
+!       call init_problem(pblock)
 !
-      pblock => pblock%next
-
-    end do
+! ! assign pointer to the next block
+! !
+!       pblock => pblock%next
+!
+!     end do
 
 ! TODO: refine blocks on master untill the total number of blocks exceeds
 !       the number of MPI processes, then interrupt refining and autobalance
@@ -137,29 +137,22 @@ module mesh
       write(*,"(4x,a,$)") "refining level         =    "
 
     l = 1
-    do while (l .lt. maxlev)
+    do while (l .le. maxlev)
 
 ! print the level processed
 !
       if (is_master()) &
         write(*,"(1x,i2,$)") l
 
-! iterate over all blocks at the current level and check the refinement
-! criterion
+! iterate over all blocks at the current level and initialize problem
 !
       pblock => plist
       do while (associated(pblock))
 
-! check refinements criterion for the current block;
-! do not allow for derefinement initially;
+! set initial conditions if the block at current level
 !
-        if (pblock%leaf) then
-          if (pblock%level .le. l) then
-            pblock%refine = max(0, check_ref(pblock))
-          else
-            pblock%refine = 0
-          endif
-        endif
+        if (pblock%level .le. l) &
+          call init_problem(pblock)
 
 ! assign pointer to the next block
 !
@@ -167,95 +160,107 @@ module mesh
 
       end do
 
-! iterate over all blocks of the current level and lower levels and select
-! the neighbors of refined blocks to be refine too
+! for the maximum level we only initialize problem (with not check of the
+! refinements criterion or the refinement)
 !
-      do n = l, 2, -1
+      if (l .lt. maxlev) then
+
+! iterate over all blocks at the current level and check the refinement
+! criterion; do not allow for derefinement
+!
         pblock => plist
         do while (associated(pblock))
 
-! check if the current block is a leaf, at the current level and selected
-! to be refined
+          if (pblock%level .eq. l) &
+            pblock%refine = max(0, check_ref(pblock))
+
+! assign pointer to the next block
 !
-          if (pblock%leaf) then
+          pblock => pblock%next
+
+        end do
+
+! walk through all levels down and check if the neighbors have to be refined
+! too; there is no need for checking the blocks at the lowest level;
+!
+        do n = l, 2, -1
+
+! iterate over all blocks of the current level and if the current block is
+! selected for the refinement and its neighbors are at lower levels select them
+! for refinement too;
+!
+          pblock => plist
+          do while (associated(pblock))
+
+! check if the current block is at the current level, a leaf, and selected for
+! refimenet
+!
             if (pblock%level .eq. n) then
-              if (pblock%refine .eq. 1) then
+              if (pblock%leaf) then
+                if (pblock%refine .eq. 1) then
 
 ! iterate over all neighbors
 !
-                do i = 1, ndims
-                  do j = 1, 2
-                    do k = 1, 2
+                  do i = 1, ndims
+                    do j = 1, 2
+                      do k = 1, 2
 
-                      pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+                        pneigh => get_pointer(pblock%neigh(i,j,k)%id)
 
 ! check if the neighbor is associated
 !
-                      if (associated(pneigh)) then
-                        if (pneigh%leaf) then
+                        if (associated(pneigh)) then
+                          if (pneigh%leaf) then
+
 
 ! if th eneighbor has lower level, select it to be refined too
 !
-                          if (pneigh%level .lt. pblock%level) &
-                            pneigh%refine = 1
-                        else
-                          call print_error("mesh::init_mesh", "Block is not a leaf!")
+                            if (pneigh%level .lt. pblock%level) &
+                              pneigh%refine = 1
+                          else
+                            call print_error("mesh::init_mesh", "Neighbor is not a leaf!")
+                          endif
                         endif
-                      endif
 
+                      end do
                     end do
                   end do
-                end do
 
+                endif
               endif
             endif
-          endif
 
 ! assign pointer to the next block
 !
-          pblock => pblock%next
+            pblock => pblock%next
 
+          end do
         end do
-      end do
 
-! iterate over all blocks and refine selected ones
+! walk through the levels starting from the lowest to the current
 !
-      do n = 1, l
-        pblock => plist
-        do while (associated(pblock))
+        do n = 1, l
 
-! check if the current block is a leaf, is at the current level and needs
-! to be refined
+! iterate over all blocks and refine selected
 !
-          if (pblock%leaf) then
-            if (pblock%level .eq. n) then
-              if (pblock%refine .eq. 1) then
+          pblock => plist
+          do while (associated(pblock))
 
-! refine this block
+! check if the current block is at the current level and selected for refinement
+! and perform the refinement
 !
-                call refine_block(pblock)
-
-! iterate over all children
-!
-                pparent => get_pointer(pblock%parent%id)
-                do p = 1, nchild
-                  pchild => get_pointer(pparent%child(p)%id)
-
-! initialize problem for that child
-!
-                  if (associated(pchild)) &
-                    call init_problem(pchild)
-                end do
-              endif
-            endif
-          endif
+            if (pblock%level .eq. n .and. pblock%refine .eq. 1) &
+              call refine_block(pblock)
 
 ! assign pointer to the next block
 !
-          pblock => pblock%next
+            pblock => pblock%next
+
+          end do
 
         end do
-      end do
+
+      endif
 
       l = l + 1
     end do
@@ -334,10 +339,14 @@ module mesh
 ! print information
 !
     if (is_master()) then
-      write(bstr,"(i)") last_id
+      write(bstr,"(i)") nblocks
       write(tstr,"(i)") (2**maxlev)**ndims
       write(*,*)
       write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
+
+      write(bstr,"(i)") nleafs
+      write(tstr,"(i)") (2**maxlev)**ndims
+      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "leafs/cover blocks     =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*nleafs)/(2**maxlev)**ndims
     endif
 
 ! allocating space for coordinate variables
@@ -409,10 +418,10 @@ module mesh
 
 ! local arrays for MPI
 !
-    integer(kind=4), dimension(:,:,:)    , allocatable :: iblk, idif
+    integer(kind=4), dimension(:,:,:)    , allocatable :: iblk, idif, ichl
 #endif /* MPI */
 
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
 #ifdef MPI
 ! find maximum number of blocks
@@ -424,117 +433,311 @@ module mesh
 !
     allocate(iblk(0:ncpus-1, mblk, 3))
     allocate(idif(0:ncpus-1, mblk, 2))
+    allocate(ichl(0:ncpus-1, mblk, 4))
     iblk(:,:,:) = 0
     idif(:,:,:) = 0
+    ichl(:,:,:) = 0
 
-! check blocks at the maximum level for derefinement
+! check the refinement criterion for all leafes
 !
     pblock => plist
     do while (associated(pblock))
+
       if (pblock%leaf) then
         pblock%refine = check_ref(pblock)
 
         if (pblock%level .eq. maxlev) &
           pblock%refine = min(0, pblock%refine)
-
-        if (pblock%level .eq. 1) &
-          pblock%refine = max(0, pblock%refine)
-
-        iblk(ncpu,pblock%id,1) = pblock%refine
-        iblk(ncpu,pblock%id,2) = pblock%level
-        iblk(ncpu,pblock%id,3) = 1
       endif
+
       pblock => pblock%next
     end do
 
-! exchange information about the block refinements
+! walk down from the highest level and select neighbors for refinement if they
+! are at lower levels
 !
-    call mallreducesuml(size(iblk), iblk)
+    do l = maxlev, 1, -1
 
-! go down to lower levels
+! iterate over all blocks at the current level and if the current block is
+! selected for refinement set the neighbor at lower level to be refined too
 !
-    do l = maxlev - 1, 1, -1
-
-      idif(:,:,:) = 0
-
       pblock => plist
       do while (associated(pblock))
-        if (pblock%leaf) then
-          if (pblock%level .eq. l) then
-            if (pblock%refine .eq. -1) then
-              do i = 1, ndims
-                do j = 1, 2
-                  do k = 1, 2
-                    if (pblock%neigh(i,j,k)%id .gt. 0) then
-                      if (iblk(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) .gt. pblock%level) then
-                        idif(ncpu,pblock%id,1) = 1
-                      endif
-                    endif
-                  end do
-                end do
-              end do
-            endif
 
-            if (pblock%refine .eq. 1) then
-              do i = 1, ndims
-                do j = 1, 2
-                  do k = 1, 2
-                    if (pblock%neigh(i,j,k)%id .gt. 0) then
-                      if (iblk(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) .lt. pblock%level) then
-                        idif(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) = 1
-                      endif
-                    endif
-                  end do
+        if (pblock%level .eq. l .and. pblock%leaf) then
+          if (pblock%refine .eq. 1) then
+
+            do i = 1, ndims
+              do j = 1, 2
+                do k = 1, 2
+                  if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+
+                    if (pneigh%level .lt. pblock%level) &
+                      pneigh%refine = 1
+
+                    if (pneigh%level .eq. pblock%level .and. pneigh%refine .eq. -1) &
+                      pneigh%refine = 0
+                  endif
                 end do
               end do
-            endif
+            end do
+
           endif
         endif
+
         pblock => pblock%next
       end do
 
+! check if all children are selected for derefinement; if this condition is not
+! fullfiled deselect all children from derefinement
+!
       pblock => plist
       do while (associated(pblock))
-        if (.not. pblock%leaf) then
+
+        if (pblock%level .eq. l-1 .and. .not. pblock%leaf) then
           flag = .true.
           do p = 1, nchild
-            if (pblock%child(p)%id .gt. 0) &
-              flag = flag .and. (iblk(pblock%child(p)%cpu,pblock%child(p)%id,1) .eq. -1) .and. (iblk(pblock%child(p)%cpu,pblock%child(p)%id,3) .eq. 1)
+            if (pblock%child(p)%cpu .eq. ncpu) then
+              pchild => get_pointer(pblock%child(p)%id)
+
+              flag = flag .and. (pchild%refine .eq. -1)
+            endif
           end do
           if (.not. flag) then
             do p = 1, nchild
-              if (pblock%child(p)%id .gt. 0) &
-                idif(pblock%child(p)%cpu,pblock%child(p)%id,1) = 1
+              if (pblock%child(p)%cpu .eq. ncpu) then
+                pchild => get_pointer(pblock%child(p)%id)
+
+                if (pchild%leaf) &
+                  pchild%refine = max(0, pchild%refine)
+              endif
             end do
           endif
         endif
+
         pblock => pblock%next
       end do
 
-      call mallreducemaxl(size(idif), idif)
+! deselect neighbors from derefinement if the current block is set for
+! refinement or it is at higher level and not selected for derefinement
+!
+      pblock => plist
+      do while (associated(pblock))
 
-      do i = 0, ncpus - 1
-        do j = 1, mblk
-          if (idif(i,j,1) .eq. 1) &
-            iblk(i,j,1) = max(0, iblk(i,j,1))
-          if (idif(i,j,2) .eq. 1) &
-            iblk(i,j,1) = 1
-        end do
-      end do
+        if (pblock%level .eq. l .and. pblock%leaf) then
 
-      do i = 1, mblk
-        if (iblk(ncpu,i,2) .gt. 0) then
-          pblock => get_pointer(i)
-          pblock%refine = iblk(ncpu,i,1)
+          if (pblock%refine .ne. -1) then
+
+            do i = 1, ndims
+              do j = 1, 2
+                do k = 1, 2
+                  if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
+                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
+
+                    if (pneigh%refine .eq. -1) then
+
+                      if (pneigh%level .lt. pblock%level) &
+                        pneigh%refine = 0
+
+                    endif
+
+                  endif
+                end do
+              end do
+            end do
+
+          endif
+
         endif
+
+        pblock => pblock%next
       end do
 
     end do
+
+! ! check blocks at the maximum level for derefinement
+! !
+!     pblock => plist
+!     do while (associated(pblock))
+!       if (pblock%leaf) then
+!         pblock%refine = check_ref(pblock)
+!
+!         if (pblock%level .eq. maxlev) &
+!           pblock%refine = min(0, pblock%refine)
+!
+!         if (pblock%level .eq. 1) &
+!           pblock%refine = max(0, pblock%refine)
+!
+!         iblk(ncpu,pblock%id,1) = pblock%refine
+!         iblk(ncpu,pblock%id,2) = pblock%level
+!         iblk(ncpu,pblock%id,3) = 1
+!       endif
+!       pblock => pblock%next
+!     end do
+!
+! ! exchange information about the block refinements
+! !
+!     call mallreducesuml(size(iblk), iblk)
+!
+! ! go down to lower levels
+! !
+!     do l = maxlev - 1, 1, -1
+!
+!       idif(:,:,:) = 0
+!
+!       pblock => plist
+!       do while (associated(pblock))
+!         if (pblock%leaf) then
+!           if (pblock%level .eq. l) then
+!             if (pblock%refine .eq. -1) then
+!               do i = 1, ndims
+!                 do j = 1, 2
+!                   do k = 1, 2
+!                     if (pblock%neigh(i,j,k)%id .gt. 0) then
+!                       if (iblk(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) .gt. pblock%level) then
+!                         idif(ncpu,pblock%id,1) = 1
+!                       endif
+!                     endif
+!                   end do
+!                 end do
+!               end do
+!             endif
+!
+!             if (pblock%refine .eq. 1) then
+!               do i = 1, ndims
+!                 do j = 1, 2
+!                   do k = 1, 2
+!                     if (pblock%neigh(i,j,k)%id .gt. 0) then
+!                       if (iblk(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) .lt. pblock%level) then
+!                         idif(pblock%neigh(i,j,k)%cpu,pblock%neigh(i,j,k)%id,2) = 1
+!                       endif
+!                     endif
+!                   end do
+!                 end do
+!               end do
+!             endif
+!           endif
+!         endif
+!         pblock => pblock%next
+!       end do
+!
+!       pblock => plist
+!       do while (associated(pblock))
+!         if (.not. pblock%leaf) then
+!           flag = .true.
+!           do p = 1, nchild
+!             if (pblock%child(p)%id .gt. 0) &
+!               flag = flag .and. (iblk(pblock%child(p)%cpu,pblock%child(p)%id,1) .eq. -1) .and. (iblk(pblock%child(p)%cpu,pblock%child(p)%id,3) .eq. 1)
+!           end do
+!           if (.not. flag) then
+!             do p = 1, nchild
+!               if (pblock%child(p)%id .gt. 0) &
+!                 idif(pblock%child(p)%cpu,pblock%child(p)%id,1) = 1
+!             end do
+!           endif
+!         endif
+!         pblock => pblock%next
+!       end do
+!
+!       call mallreducemaxl(size(idif), idif)
+!
+!       do i = 0, ncpus - 1
+!         do j = 1, mblk
+!           if (idif(i,j,1) .eq. 1) &
+!             iblk(i,j,1) = max(0, iblk(i,j,1))
+!           if (idif(i,j,2) .eq. 1) &
+!             iblk(i,j,1) = 1
+!         end do
+!       end do
+!
+!       do i = 1, mblk
+!         if (iblk(ncpu,i,2) .gt. 0) then
+!           pblock => get_pointer(i)
+!           pblock%refine = iblk(ncpu,i,1)
+!         endif
+!       end do
+!
+!     end do
+
+! perform the actual derefinement
+!
+    do l = maxlev, 2, -1
+
+      pblock => plist
+      do while (associated(pblock))
+
+        if (pblock%level .eq. l) then
+          if (pblock%leaf) then
+            if (pblock%refine .eq. -1) then
+              pparent => get_pointer(pblock%parent%id)
+
+              if (associated(pparent)) then
+                call restrict_block(pparent)
+                pblock => pparent
+              endif
+            endif
+          endif
+        endif
+
+        pblock => pblock%next
+      end do
+
+    end do
+
+! perform the actual refinement
+!
+    do l = 1, maxlev - 1
+
+      pblock => plist
+      do while (associated(pblock))
+
+        if (pblock%leaf) then
+          if (pblock%level .eq. l) then
+            if (pblock%refine .eq. 1) then
+              pparent => pblock
+
+              call refine_block(pblock)
+              call prolong_block(pparent)
+            endif
+          endif
+        endif
+
+        pblock => pblock%next
+
+      end do
+
+    end do
+
+
+! ! perform the actual refinement
+! !
+!     do l = 1, 3!maxlev - 1
+!       pblock => plist
+!       do while (associated(pblock))
+!         if (pblock%leaf) then
+!           if (pblock%level .eq. l) then
+!             if (pblock%refine .eq. 1) then
+!               pparent => pblock
+!
+!               call refine_block(pblock)
+!               call prolong_block(pparent)
+!
+!               do p = 1, nchild
+!                 ichl(ncpu,pparent%id,p) = pparent%child(p)%id
+!               end do
+!             endif
+!           endif
+!         endif
+!         pblock => pblock%next
+!       end do
+!     end do
 
 ! deallocate temporary arrays
 !
     deallocate(iblk)
     deallocate(idif)
+    deallocate(ichl)
 #else /* MPI */
 #endif /* MPI */
 

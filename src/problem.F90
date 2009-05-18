@@ -185,6 +185,13 @@ module problem
     ptl%leaf   = .true.
     ptr%leaf   = .true.
 
+! set levels
+!
+    pbl%level  = 1
+    pbr%level  = 1
+    ptl%level  = 1
+    ptr%level  = 1
+
 ! set neighbors
 !
     if (xlbndry .eq. 'periodic') &

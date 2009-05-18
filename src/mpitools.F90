@@ -210,9 +210,12 @@ module mpitools
 ! local variables
 !
     integer :: err, status(mpi_status_size)
+#endif /* MPI */
 !
 !----------------------------------------------------------------------
 !
+    buf(:)    = 0
+#ifdef MPI
     err       = 0
     status(:) = 0
     call mpi_recv(buf, n, mpi_integer, src, tag, comm3d, status, err)

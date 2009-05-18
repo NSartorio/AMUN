@@ -113,7 +113,7 @@ error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o mesh.o          \
                   mpitools.o problem.o scheme.o timer.o
 interpolation.o : interpolation.F90
-io.o            : io.F90 blocks.o error.o mpitools.o scheme.o
+io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o
 mpitools.o      : mpitools.F90
