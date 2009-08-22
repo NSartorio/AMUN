@@ -339,14 +339,20 @@ module mesh
 ! print information
 !
     if (is_master()) then
+      p = 0
+      do l = 1, maxlev
+        p = p + 2**((l-1)*ndims)
+      end do
+      p = p * 4
       write(bstr,"(i)") nblocks
-      write(tstr,"(i)") (2**maxlev)**ndims
+      write(tstr,"(i)") p
       write(*,*)
-      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/(2**maxlev)**ndims
+      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/p
 
+      p = 4*2**((maxlev-1)*ndims)
       write(bstr,"(i)") nleafs
-      write(tstr,"(i)") (2**maxlev)**ndims
-      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "leafs/cover blocks     =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*nleafs)/(2**maxlev)**ndims
+      write(tstr,"(i)") p
+      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "leafs/cover blocks     =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*nleafs)/p
     endif
 
 ! allocating space for coordinate variables
