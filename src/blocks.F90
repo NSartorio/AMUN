@@ -65,6 +65,55 @@ module blocks
     integer(kind=4)      :: cpu, id
   end type blockref
 
+! define pointers to block_meta and block_data structures
+!
+  type pointer_meta
+    type(block_meta), pointer :: ptr
+  end type pointer_meta
+
+  type pointer_data
+    type(block_data), pointer :: ptr
+  end type pointer_data
+
+! define block_meta structure
+!
+  type block_meta
+    type(block_meta)  , pointer :: prev             ! pointer to the previous block
+    type(block_meta)  , pointer :: next             ! pointer to the next block
+    type(block_meta)  , pointer :: parent           ! pointer to the parent block
+    type(pointer_meta)          :: child(nchild)    ! pointers to children
+    type(pointer_meta)          :: neigh(ndims,2,2) ! pointers to neighbors
+
+    type(block_data)  , pointer :: data             ! pointer to the data block
+
+    integer(kind=4)             :: id               ! block identificator
+    integer(kind=4)             :: cpu              ! the cpu id of the block
+    integer(kind=4)             :: level            ! refinement level
+    integer(kind=4)             :: refine           ! refinement flag:
+!                                                       -1 - derefine
+!                                                        0 - do nothing
+!                                                        1 - refine
+
+    logical                     :: leaf             ! leaf flag
+  end type block_meta
+
+! define block_data structure
+!
+  type block_data
+    type(block_data), pointer :: prev             ! pointer to the previous block
+    type(block_data), pointer :: next             ! pointer to the next block
+
+    type(block_meta), pointer :: meta             ! pointer to the metadata block
+
+    real                      :: xmin, xmax       ! bounds for the x direction
+    real                      :: ymin, ymax       ! bounds for the y direction
+    real                      :: zmin, zmax       ! bounds for the z direction
+
+    real, dimension(:,:,:,:), allocatable :: u    ! variable array
+    real, dimension(:,:,:)  , allocatable :: c    ! criterion array
+  end type block_data
+
+
   type block
     type(block), pointer :: next, prev
     type(blockref)       :: parent, child(nchild), neigh(ndims,2,2)
@@ -86,6 +135,11 @@ module blocks
 ! array of ID to pointer conversion
 !
   type(blockptr), dimension(:), allocatable, save :: idtoptr
+
+! chains of meta blocks and data blocks
+!
+  type(block_meta), pointer, save :: list_meta
+  type(block_data), pointer, save :: list_data
 
 ! stored pointers
 !
