@@ -709,7 +709,7 @@ module problem
   function check_ref(pblock)
 
     use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
-    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i            &
+    use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
                      , crefmin, crefmax
 
 ! input arguments
@@ -750,9 +750,9 @@ module problem
 !
     dpmax = 0.0d0
 
-    do k = kb, ke
-      do j = jb-2, je+2
-        do i = ib-2, ie+2
+    do k = kbl, keu
+      do j = jbl, jeu
+        do i = ibl, ieu
           dnl = dn(i-1,j,k)
           dnr = dn(i+1,j,k)
           ddndx = abs(dnr-dnl)/(dnr+dnl)
