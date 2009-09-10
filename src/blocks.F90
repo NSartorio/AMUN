@@ -173,6 +173,21 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+! check if metadata list is empty
+!
+    if (associated(list_meta)) &
+      call print_warning("blocks::init_blocks", "Block metadata list is already associated!")
+
+! check if data list is empty
+!
+    if (associated(list_data)) &
+      call print_warning("blocks::init_blocks", "Block data list is already associated!")
+
+! nullify all pointers
+!
+    nullify(list_meta)
+    nullify(list_data)
+
 ! first check if block list is empty
 !
     if (associated(plist)) &
@@ -218,9 +233,27 @@ module blocks
 ! pointers
 !
     type(block), pointer :: pblock
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
 !
 !-------------------------------------------------------------------------------
 !
+! clear all data blocks
+!
+    pblock_data => list_data
+    do while(associated(pblock_data))
+      call deallocate_datablock(pblock_data)
+      pblock_data => list_data
+    end do
+
+! clear all meta blocks
+!
+    pblock_meta => list_meta
+    do while(associated(pblock_meta))
+      call deallocate_metablock(pblock_meta)
+      pblock_meta => list_meta
+    end do
+
 ! untill the list is free, iterate over all chunks and deallocate blocks
 !
     pblock => plist
@@ -462,6 +495,126 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_block
+!
+!===============================================================================
+!
+! deallocate_metablock: subroutine deallocates space ocuppied by a given metablock
+!
+!===============================================================================
+!
+  subroutine deallocate_metablock(pblock)
+
+    implicit none
+
+! input arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+    if (associated(pblock)) then
+
+! if this is the first block in the list, update the plist pointer
+!
+      if (pblock%id .eq. list_meta%id) &
+        list_meta => pblock%next
+
+! update the pointer of previous and next blocks
+!
+      if (associated(pblock%prev)) &
+        pblock%prev%next => pblock%next
+
+      if (associated(pblock%next)) &
+        pblock%next%prev => pblock%prev
+
+! nullify children
+!
+      do i = 1, nchild
+        nullify(pblock%child(i)%ptr)
+      end do
+
+! nullify neighbors
+!
+      do k = 1, 2
+        do j = 1, 2
+          do i = 1, ndims
+            nullify(pblock%neigh(i,j,k)%ptr)
+          end do
+        end do
+      end do
+
+! nullify pointers
+!
+      nullify(pblock%next)
+      nullify(pblock%prev)
+      nullify(pblock%data)
+      nullify(pblock%parent)
+
+! free and nullify the block
+!
+      deallocate(pblock)
+      nullify(pblock)
+    endif
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine deallocate_metablock
+!
+!===============================================================================
+!
+! deallocate_datablock: subroutine deallocates space ocuppied by a given datablock
+!
+!===============================================================================
+!
+  subroutine deallocate_datablock(pblock)
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+    if (associated(pblock)) then
+
+! if this is the first block in the list, update the plist pointer
+!
+      if (pblock%meta%id .eq. list_data%meta%id) &
+        list_data => pblock%next
+
+! update the pointer of previous and next blocks
+!
+      if (associated(pblock%prev)) &
+        pblock%prev%next => pblock%next
+
+      if (associated(pblock%next)) &
+        pblock%next%prev => pblock%prev
+
+! deallocate variables
+!
+      deallocate(pblock%u)
+      deallocate(pblock%c)
+
+! nullify pointers
+!
+      nullify(pblock%next)
+      nullify(pblock%prev)
+      nullify(pblock%meta)
+
+! free and nullify the block
+!
+      deallocate(pblock)
+      nullify(pblock)
+    endif
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine deallocate_datablock
 !
 !===============================================================================
 !
