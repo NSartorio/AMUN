@@ -869,6 +869,104 @@ module blocks
 !
 !===============================================================================
 !
+! metablock_setleaf: subroutine sets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setleaf(pblock)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pblock%leaf = .true.
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setleaf
+!
+!===============================================================================
+!
+! metablock_unsetleaf: subroutine unsets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_unsetleaf(pblock)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pblock%leaf = .false.
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_unsetleaf
+!
+!===============================================================================
+!
+! metablock_setconfig: subroutine sets the config flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setconfig(pblock, config)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+    integer(kind=4)          , intent(in)    :: config
+!
+!-------------------------------------------------------------------------------
+!
+! set the config flag
+!
+    pblock%config = config
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setconfig
+!
+!===============================================================================
+!
+! metablock_setlevel: subroutine sets the level of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setlevel(pblock, level)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+    integer(kind=4)          , intent(in)    :: level
+!
+!-------------------------------------------------------------------------------
+!
+! set the refinement level
+!
+    pblock%level = level
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setlevel
+!
+!===============================================================================
+!
 ! datablock_setbounds: subroutine sets the bounds of data block
 !
 !===============================================================================
@@ -880,7 +978,7 @@ module blocks
 ! input/output arguments
 !
     type(block_data), pointer, intent(inout) :: pblock
-    real                                     :: xmin, xmax, ymin, ymax, zmin, zmax
+    real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
 !
 !-------------------------------------------------------------------------------
 !

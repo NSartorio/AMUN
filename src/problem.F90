@@ -139,7 +139,8 @@ module problem
 
     use blocks, only : block, block_meta, block_data, append_block             &
                      , append_metablock, append_datablock, associate_blocks    &
-                     , datablock_setbounds
+                     , metablock_setleaf, metablock_setconfig                  &
+                     , metablock_setlevel, datablock_setbounds
     use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
                      , xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -286,6 +287,18 @@ module problem
 ! create root meta blocks
 !
     call append_metablock(pblock_meta)
+
+! mark block as a leaf
+!
+    call metablock_setleaf(pblock_meta)
+
+! set block config flag
+!
+    call metablock_setconfig(pblock_meta, 1)
+
+! set block level
+!
+    call metablock_setlevel(pblock_meta, 0)
 
 ! create root data block
 !
