@@ -141,13 +141,14 @@ module problem
                      , append_metablock, append_datablock, associate_blocks    &
                      , metablock_setleaf, metablock_setconfig                  &
                      , metablock_setlevel, datablock_setbounds
-    use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax
 
     implicit none
 
 ! local variables
 !
+    integer :: i, j
     real :: xl, xc, xr, yl, yc, yr
 
 ! local pointers
@@ -299,6 +300,30 @@ module problem
 ! set block level
 !
     call metablock_setlevel(pblock_meta, 0)
+
+! if periodic boundary conditions set all neighbors to itself
+!
+    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
+      do j = 1, 2
+        do i = 1, 2
+          pblock_meta%neigh(1,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
+    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
+      do j = 1, 2
+        do i = 1, 2
+          pblock_meta%neigh(2,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
+    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
+      do j = 1, 2
+        do i = 1, 2
+          pblock_meta%neigh(3,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
 
 ! create root data block
 !
