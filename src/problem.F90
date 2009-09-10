@@ -137,7 +137,8 @@ module problem
 !
   subroutine domain_default
 
-    use blocks, only : block, append_block
+    use blocks, only : block, block_meta, block_data, append_block             &
+                     , append_metablock, append_datablock
     use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
                      , xmin, xmax, ymin, ymax
 
@@ -150,6 +151,8 @@ module problem
 ! local pointers
 !
     type(block), pointer :: pbl, pbr, ptl, ptr
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
 !
 !-------------------------------------------------------------------------------
 !
@@ -279,6 +282,14 @@ module problem
     pbr%ymin = yl
     pbr%ymax = yc
 
+! create root meta blocks
+!
+    call append_metablock(pblock_meta)
+
+! create root data block
+!
+    call append_datablock(pblock_data)
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine domain_default

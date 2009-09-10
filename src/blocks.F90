@@ -89,6 +89,7 @@ module blocks
     integer(kind=4)             :: id               ! block identificator
     integer(kind=4)             :: cpu              ! the cpu id of the block
     integer(kind=4)             :: level            ! refinement level
+    integer(kind=4)             :: config           ! configuration flag
     integer(kind=4)             :: refine           ! refinement flag:
 !                                                       -1 - derefine
 !                                                        0 - do nothing
@@ -138,8 +139,8 @@ module blocks
 
 ! chains of meta blocks and data blocks
 !
-  type(block_meta), pointer, save :: list_meta
-  type(block_data), pointer, save :: list_data
+  type(block_meta), pointer, save :: list_meta, last_meta
+  type(block_data), pointer, save :: list_data, last_data
 
 ! stored pointers
 !
@@ -439,6 +440,116 @@ module blocks
 !
 !===============================================================================
 !
+! allocate_metablock: subroutine allocates space for one meta block and returns
+!                     the pointer to this block
+!
+!===============================================================================
+!
+  subroutine allocate_metablock(pblock)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(out) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block structure
+!
+    allocate(pblock)
+
+! nullify pointers
+!
+    nullify(pblock%prev)
+    nullify(pblock%next)
+    nullify(pblock%parent)
+    nullify(pblock%data)
+    do i = 1, nchild
+      nullify(pblock%child(i)%ptr)
+    end do
+    do k = 1, 2
+      do j = 1, 2
+        do i = 1, ndims
+          nullify(pblock%neigh(i,j,k)%ptr)
+        end do
+      end do
+    end do
+
+! set unique ID
+!
+    pblock%id = increase_id()
+
+! unset the CPU number of current block, level, the configuration, refine and
+! leaf flags
+!
+    pblock%cpu    = -1
+    pblock%level  = -1
+    pblock%config = -1
+    pblock%refine =  0
+    pblock%leaf   = .false.
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_metablock
+!
+!===============================================================================
+!
+! allocate_datablock: subroutine allocates space for one data block and returns
+!                     the pointer to this block
+!
+!===============================================================================
+!
+  subroutine allocate_datablock(pblock)
+
+    use config, only : im, jm, km
+
+    implicit none
+
+! output arguments
+!
+    type(block_data), pointer, intent(out) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block structure
+!
+    allocate(pblock)
+
+! nullify pointers
+!
+    nullify(pblock%prev)
+    nullify(pblock%next)
+    nullify(pblock%meta)
+
+! allocate space for variables
+!
+    allocate(pblock%u(nvars,im,jm,km))
+    allocate(pblock%c(im,jm,km))
+
+! initialize bounds of the block
+!
+    pblock%xmin = 0.0
+    pblock%xmax = 1.0
+    pblock%ymin = 0.0
+    pblock%ymax = 1.0
+    pblock%zmin = 0.0
+    pblock%zmax = 1.0
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_datablock
+!
+!===============================================================================
+!
 ! deallocate_block: subroutine deallocates space ocuppied by a given block
 !
 !===============================================================================
@@ -655,6 +766,82 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine append_block
+!
+!===============================================================================
+!
+! append_metablock: subroutine allocates space for one meta block and appends it
+!                   to the meta block list
+!
+!===============================================================================
+!
+  subroutine append_metablock(pblock)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(out) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block
+!
+    call allocate_metablock(pblock)
+
+! add to the list
+!
+    if (associated(list_meta)) then
+      pblock%prev => last_meta
+      last_meta%next => pblock
+    else
+      list_meta => pblock
+    endif
+
+! set the pointer to the last block in the list
+!
+    last_meta => pblock
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_metablock
+!
+!===============================================================================
+!
+! append_datablock: subroutine allocates space for one data block and appends it
+!                   to the data block list
+!
+!===============================================================================
+!
+  subroutine append_datablock(pblock)
+
+    implicit none
+
+! output arguments
+!
+    type(block_data), pointer, intent(out) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block
+!
+    call allocate_datablock(pblock)
+
+! add to the list
+!
+    if (associated(list_data)) then
+      pblock%prev => last_data
+      last_data%next => pblock
+    else
+      list_data => pblock
+    endif
+
+! set the pointer to the last block in the list
+!
+    last_data => pblock
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_datablock
 !
 !===============================================================================
 !
