@@ -845,6 +845,60 @@ module blocks
 !
 !===============================================================================
 !
+! associate_blocks: subroutine associates a pair of meta and data blocks
+!
+!===============================================================================
+!
+  subroutine associate_blocks(pblock_meta, pblock_data)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock_meta
+    type(block_data), pointer, intent(inout) :: pblock_data
+!
+!-------------------------------------------------------------------------------
+!
+    pblock_meta%data => pblock_data
+    pblock_data%meta => pblock_meta
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine associate_blocks
+!
+!===============================================================================
+!
+! datablock_setbounds: subroutine sets the bounds of data block
+!
+!===============================================================================
+!
+  subroutine datablock_setbounds(pblock, xmin, xmax, ymin, ymax, zmin, zmax)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+    real                                     :: xmin, xmax, ymin, ymax, zmin, zmax
+!
+!-------------------------------------------------------------------------------
+!
+! set bounds of the block
+!
+    pblock%xmin = xmin
+    pblock%xmax = xmax
+    pblock%ymin = ymin
+    pblock%ymax = ymax
+    pblock%zmin = zmin
+    pblock%zmax = zmax
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine datablock_setbounds
+!
+!===============================================================================
+!
 ! refine_block: subroutine refines selected block
 !
 !===============================================================================

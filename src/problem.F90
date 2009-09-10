@@ -138,9 +138,10 @@ module problem
   subroutine domain_default
 
     use blocks, only : block, block_meta, block_data, append_block             &
-                     , append_metablock, append_datablock
+                     , append_metablock, append_datablock, associate_blocks    &
+                     , datablock_setbounds
     use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
-                     , xmin, xmax, ymin, ymax
+                     , xmin, xmax, ymin, ymax, zmin, zmax
 
     implicit none
 
@@ -289,6 +290,14 @@ module problem
 ! create root data block
 !
     call append_datablock(pblock_data)
+
+! set block bounds
+!
+    call datablock_setbounds(pblock_data, xmin, xmax, ymin, ymax, zmin, zmax)
+
+! associate root blocks
+!
+    call associate_blocks(pblock_meta, pblock_data)
 !
 !-------------------------------------------------------------------------------
 !
