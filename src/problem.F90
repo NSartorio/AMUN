@@ -60,16 +60,16 @@ module problem
 !
   subroutine init_problem(pblock)
 
-    use blocks, only : block
+    use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local arguments
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -99,17 +99,17 @@ module problem
 !
   subroutine update_shapes(pblock, du)
 
-    use blocks, only : block
+    use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block), pointer    , intent(inout) :: pblock
-    real, dimension(:,:,:,:), intent(inout) :: du
+    type(block_data), pointer, intent(inout) :: pblock
+    real, dimension(:,:,:,:) , intent(inout) :: du
 
 ! local arguments
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -137,10 +137,10 @@ module problem
 !
   subroutine domain_default
 
-    use blocks, only : block, block_meta, block_data, append_block             &
-                     , append_metablock, append_datablock, associate_blocks    &
-                     , metablock_setleaf, metablock_setconfig                  &
-                     , metablock_setlevel, datablock_setbounds
+    use blocks, only : block_meta, block_data, append_block, append_metablock  &
+                     , append_datablock, associate_blocks, metablock_setleaf   &
+                     , metablock_setconfig, metablock_setlevel                 &
+                     , datablock_setbounds, nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -149,142 +149,14 @@ module problem
 ! local variables
 !
     integer :: i, j
-    real :: xl, xc, xr, yl, yc, yr
 
 ! local pointers
 !
-    type(block), pointer :: pbl, pbr, ptl, ptr
     type(block_meta), pointer :: pblock_meta
     type(block_data), pointer :: pblock_data
 !
 !-------------------------------------------------------------------------------
 !
-! create root blocks
-!
-    call append_block(pbl)
-    call append_block(ptl)
-    call append_block(ptr)
-    call append_block(pbr)
-
-! set configurations
-!
-    pbl%config = 'D'
-    ptl%config = 'N'
-    ptr%config = 'N'
-    pbr%config = 'C'
-
-! set positions
-!
-    pbl%pos(1) = 1
-    pbl%pos(2) = 1
-    pbr%pos(1) = 2
-    pbr%pos(2) = 1
-    ptl%pos(1) = 1
-    ptl%pos(2) = 2
-    ptr%pos(1) = 2
-    ptr%pos(2) = 2
-
-! set leaf flags
-!
-    pbl%leaf   = .true.
-    pbr%leaf   = .true.
-    ptl%leaf   = .true.
-    ptr%leaf   = .true.
-
-! set levels
-!
-    pbl%level  = 1
-    pbr%level  = 1
-    ptl%level  = 1
-    ptr%level  = 1
-
-! set neighbors
-!
-    if (xlbndry .eq. 'periodic') &
-      pbl%neigh(1,1,:)%cpu = pbr%cpu
-    pbl%neigh(1,2,:)%cpu = pbr%cpu
-    if (ylbndry .eq. 'periodic') &
-      pbl%neigh(2,1,:)%cpu = ptl%cpu
-    pbl%neigh(2,2,:)%cpu = ptl%cpu
-
-    pbr%neigh(1,1,:)%cpu = pbl%cpu
-    if (xubndry .eq. 'periodic') &
-      pbr%neigh(1,2,:)%cpu = pbl%cpu
-    if (ylbndry .eq. 'periodic') &
-      pbr%neigh(2,1,:)%cpu = ptr%cpu
-    pbr%neigh(2,2,:)%cpu = ptr%cpu
-
-    if (xlbndry .eq. 'periodic') &
-      ptl%neigh(1,1,:)%cpu = ptr%cpu
-    ptl%neigh(1,2,:)%cpu = ptr%cpu
-    ptl%neigh(2,1,:)%cpu = pbl%cpu
-    if (yubndry .eq. 'periodic') &
-      ptl%neigh(2,2,:)%cpu = pbl%cpu
-
-    ptr%neigh(1,1,:)%cpu = ptl%cpu
-    if (xubndry .eq. 'periodic') &
-      ptr%neigh(1,2,:)%cpu = ptl%cpu
-    ptr%neigh(2,1,:)%cpu = pbr%cpu
-    if (yubndry .eq. 'periodic') &
-      ptr%neigh(2,2,:)%cpu = pbr%cpu
-
-    if (xlbndry .eq. 'periodic') &
-      pbl%neigh(1,1,:)%id = pbr%id
-    pbl%neigh(1,2,:)%id = pbr%id
-    if (ylbndry .eq. 'periodic') &
-      pbl%neigh(2,1,:)%id = ptl%id
-    pbl%neigh(2,2,:)%id = ptl%id
-
-    pbr%neigh(1,1,:)%id = pbl%id
-    if (xubndry .eq. 'periodic') &
-      pbr%neigh(1,2,:)%id = pbl%id
-    if (ylbndry .eq. 'periodic') &
-      pbr%neigh(2,1,:)%id = ptr%id
-    pbr%neigh(2,2,:)%id = ptr%id
-
-    if (xlbndry .eq. 'periodic') &
-      ptl%neigh(1,1,:)%id = ptr%id
-    ptl%neigh(1,2,:)%id = ptr%id
-    ptl%neigh(2,1,:)%id = pbl%id
-    if (yubndry .eq. 'periodic') &
-      ptl%neigh(2,2,:)%id = pbl%id
-
-    ptr%neigh(1,1,:)%id = ptl%id
-    if (xubndry .eq. 'periodic') &
-      ptr%neigh(1,2,:)%id = ptl%id
-    ptr%neigh(2,1,:)%id = pbr%id
-    if (yubndry .eq. 'periodic') &
-      ptr%neigh(2,2,:)%id = pbr%id
-
-! set the bounds of the blocks
-!
-    xl = xmin
-    xc = 0.5 * (xmax + xmin)
-    xr = xmax
-    yl = ymin
-    yc = 0.5 * (ymax + ymin)
-    yr = ymax
-
-    pbl%xmin = xl
-    pbl%xmax = xc
-    pbl%ymin = yl
-    pbl%ymax = yc
-
-    ptl%xmin = xl
-    ptl%xmax = xc
-    ptl%ymin = yc
-    ptl%ymax = yr
-
-    ptr%xmin = xc
-    ptr%xmax = xr
-    ptr%ymin = yc
-    ptr%ymax = yr
-
-    pbr%xmin = xc
-    pbr%xmax = xr
-    pbr%ymin = yl
-    pbr%ymax = yc
-
 ! create root meta blocks
 !
     call append_metablock(pblock_meta)
@@ -299,31 +171,33 @@ module problem
 
 ! set block level
 !
-    call metablock_setlevel(pblock_meta, 0)
+    call metablock_setlevel(pblock_meta, 1)
 
 ! if periodic boundary conditions set all neighbors to itself
 !
     if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
-      do j = 1, 2
-        do i = 1, 2
+      do j = 1, nfaces
+        do i = 1, nsides
           pblock_meta%neigh(1,i,j)%ptr => pblock_meta
         end do
       end do
     endif
     if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
-      do j = 1, 2
-        do i = 1, 2
+      do j = 1, nfaces
+        do i = 1, nsides
           pblock_meta%neigh(2,i,j)%ptr => pblock_meta
         end do
       end do
     endif
+#if NDIMS == 3
     if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
-      do j = 1, 2
-        do i = 1, 2
+      do j = 1, nfaces
+        do i = 1, nsides
           pblock_meta%neigh(3,i,j)%ptr => pblock_meta
         end do
       end do
     endif
+#endif /* NDIMS == 3 */
 
 ! create root data block
 !
@@ -349,12 +223,12 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : in, jn, kn, im, jm, km, ng, dens, pres, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -441,12 +315,12 @@ module problem
 !
   subroutine init_implosion(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -537,14 +411,14 @@ module problem
 !
   subroutine init_binaries(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
                      , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
                      , csnd2, gamma, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -667,15 +541,15 @@ module problem
 !
   subroutine shape_binaries(pblock, du)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
                      , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
                      , csnd2, gamma, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
-    real, dimension(:,:,:,:), intent(inout) :: du
+    type(block_data), pointer, intent(inout) :: pblock
+    real, dimension(:,:,:,:) , intent(inout) :: du
 
 ! local variables
 !
@@ -766,13 +640,13 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
+    use blocks, only : block_data, idn, imx, imy, imz, ien, nv => nvars
     use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
                      , crefmin, crefmax
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! return variable
 !

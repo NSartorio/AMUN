@@ -31,6 +31,8 @@ module blocks
 ! parameters
 !
   integer(kind=4), parameter :: ndims  = NDIMS
+  integer(kind=4), parameter :: nsides = 2
+  integer(kind=4), parameter :: nfaces = 2**(ndims-1)
   integer(kind=4), parameter :: nchild = 2**ndims
   integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4 &
                               , ivx = 2, ivy = 3, ivz = 4
@@ -152,7 +154,7 @@ module blocks
 
 ! store number of allocated blocks and leafs
 !
-  integer(kind=4)     , save :: nblocks, nleafs
+  integer(kind=4)     , save :: nblocks, dblocks, nleafs
 
   contains
 !
@@ -189,33 +191,15 @@ module blocks
     nullify(list_meta)
     nullify(list_data)
 
-! first check if block list is empty
-!
-    if (associated(plist)) &
-      call print_warning("blocks::init_blocks", "Block list already associated!")
-
-! nullify all pointers
-!
-    nullify(plist)
-
 ! reset number of blocks and leafs
 !
     nblocks = 0
+    dblocks = 0
     nleafs  = 0
 
 ! reset ID
 !
     last_id = 0
-
-! allocate space for ID to pointer array
-!
-    allocate(idtoptr(maxid))
-
-! nullify all pointers in ID to pointer array
-!
-    do p = 1, maxid
-      nullify(idtoptr(p)%ptr)
-    end do
 
 !-------------------------------------------------------------------------------
 !
@@ -233,7 +217,6 @@ module blocks
 
 ! pointers
 !
-    type(block), pointer :: pblock
     type(block_meta), pointer :: pblock_meta
     type(block_data), pointer :: pblock_data
 !
@@ -254,22 +237,6 @@ module blocks
       call deallocate_metablock(pblock_meta)
       pblock_meta => list_meta
     end do
-
-! untill the list is free, iterate over all chunks and deallocate blocks
-!
-    pblock => plist
-    do while(associated(pblock))
-
-! deallocate and nullify the current block
-!
-      call deallocate_block(pblock)
-
-      pblock => plist
-    end do
-
-! deallocate ID to pointer conversion array
-!
-    deallocate(idtoptr)
 
 !-------------------------------------------------------------------------------
 !
@@ -472,8 +439,8 @@ module blocks
     do i = 1, nchild
       nullify(pblock%child(i)%ptr)
     end do
-    do k = 1, 2
-      do j = 1, 2
+    do k = 1, nfaces
+      do j = 1, nsides
         do i = 1, ndims
           nullify(pblock%neigh(i,j,k)%ptr)
         end do
@@ -492,6 +459,10 @@ module blocks
     pblock%config = -1
     pblock%refine =  0
     pblock%leaf   = .false.
+
+! increase the number of allocated meta blocks
+!
+    nblocks = nblocks + 1
 
 !-------------------------------------------------------------------------------
 !
@@ -543,6 +514,10 @@ module blocks
     pblock%ymax = 1.0
     pblock%zmin = 0.0
     pblock%zmax = 1.0
+
+! increase the number of allocated meta blocks
+!
+    dblocks = dblocks + 1
 
 !-------------------------------------------------------------------------------
 !
@@ -650,8 +625,8 @@ module blocks
 
 ! nullify neighbors
 !
-      do k = 1, 2
-        do j = 1, 2
+      do k = 1, nfaces
+        do j = 1, nsides
           do i = 1, ndims
             nullify(pblock%neigh(i,j,k)%ptr)
           end do
@@ -886,6 +861,10 @@ module blocks
 ! set the leaf flag
 !
     pblock%leaf = .true.
+
+! increase the number of leafs
+!
+    nleafs = nleafs + 1
 !
 !-------------------------------------------------------------------------------
 !
@@ -910,6 +889,10 @@ module blocks
 ! set the leaf flag
 !
     pblock%leaf = .false.
+
+! decrease the number of leafs
+!
+    nleafs = nleafs - 1
 !
 !-------------------------------------------------------------------------------
 !
@@ -1001,7 +984,7 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine refine_block(pblock)
+  subroutine refine_block(pblock, falloc_data)
 
     use error   , only : print_error
 #ifdef MPI
@@ -1012,11 +995,22 @@ module blocks
 
 ! input parameters
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
+    logical                  , intent(in)    :: falloc_data
 
 ! pointers
 !
-    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
+    type(block_meta), pointer :: pneigh, pchild, pfirst, plast
+    type(block_data), pointer :: pdata
+
+! local arrays
+!
+    integer, dimension(nchild) :: config, order
+
+! local variables
+!
+    integer :: p, i, j, k
+    real    :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 !
 !-------------------------------------------------------------------------------
 !
@@ -1024,640 +1018,774 @@ module blocks
 !
     if (associated(pblock)) then
 
-! create 4 blocks
+! unset block leaf flag
 !
-      call allocate_block(pbl)
-      call allocate_block(pbr)
-      call allocate_block(ptl)
-      call allocate_block(ptr)
+      call metablock_unsetleaf(pblock)
 
-! unset the refinement and leaf flags for the parent block
+! reset refinement flag
 !
       pblock%refine = 0
-      pblock%leaf   = .false.
 
-! set leaf flags
+! iterate over all child blocks
 !
-      pbl%leaf      = .true.
-      pbr%leaf      = .true.
-      ptl%leaf      = .true.
-      ptr%leaf      = .true.
+      do p = 1, nchild
 
-! increase the number of leafs
+! create child meta and data blocks
 !
-      nleafs        = nleafs + 3
+        call allocate_metablock(pblock%child(p)%ptr)
 
-! set parent
+! set it as a leaf
 !
-#ifdef MPI
-      pbl%parent%cpu = pblock%cpu
-      pbr%parent%cpu = pblock%cpu
-      ptl%parent%cpu = pblock%cpu
-      ptr%parent%cpu = pblock%cpu
-#endif /* MPI */
-      pbl%parent%id  = pblock%id
-      pbr%parent%id  = pblock%id
-      ptl%parent%id  = pblock%id
-      ptr%parent%id  = pblock%id
+        call metablock_setleaf(pblock%child(p)%ptr)
 
-! set level
+! assign pointer to the parent block
 !
-      pbl%level = pblock%level + 1
-      pbr%level = pblock%level + 1
-      ptl%level = pblock%level + 1
-      ptr%level = pblock%level + 1
+        pblock%child(p)%ptr%parent => pblock
 
-! set positions
+! increase the refinement level
 !
-      pbl%pos(1) = 1
-      pbl%pos(2) = 1
+        pblock%child(p)%ptr%level = pblock%level + 1
 
-      pbr%pos(1) = 2
-      pbr%pos(2) = 1
-
-      ptl%pos(1) = 1
-      ptl%pos(2) = 2
-
-      ptr%pos(1) = 2
-      ptr%pos(2) = 2
-
-! set bounds
+! copy the parent cpu number to each child
 !
-      pbl%xmin = pblock%xmin
-      pbl%xmax = 0.5 * (pblock%xmax + pblock%xmin)
-      pbl%ymin = pblock%ymin
-      pbl%ymax = 0.5 * (pblock%ymax + pblock%ymin)
+        pblock%child(p)%ptr%cpu = pblock%cpu
 
-      pbr%xmin = pbl%xmax
-      pbr%xmax = pblock%xmax
-      pbr%ymin = pblock%ymin
-      pbr%ymax = pbl%ymax
+      end do
 
-      ptl%xmin = pblock%xmin
-      ptl%xmax = pbl%xmax
-      ptl%ymin = pbl%ymax
-      ptl%ymax = pblock%ymax
-
-      ptr%xmin = ptl%xmax
-      ptr%xmax = pblock%xmax
-      ptr%ymin = ptl%ymin
-      ptr%ymax = pblock%ymax
-
-! set neighbors to the refined blocks
+! assign neighbors of the child blocks
 !
-#ifdef MPI
-      pbl%neigh(1,2,1)%cpu = ncpu  ! BL right  -> BR
-      pbl%neigh(1,2,2)%cpu = ncpu
-      pbl%neigh(2,2,1)%cpu = ncpu  ! BL top    -> TL
-      pbl%neigh(2,2,2)%cpu = ncpu
+      do p = 1, nfaces
 
-      pbr%neigh(1,1,1)%cpu = ncpu  ! BR left   -> BL
-      pbr%neigh(1,1,2)%cpu = ncpu
-      pbr%neigh(2,2,1)%cpu = ncpu  ! BR top    -> TR
-      pbr%neigh(2,2,2)%cpu = ncpu
-
-      ptl%neigh(1,2,1)%cpu = ncpu  ! TL right  -> TR
-      ptl%neigh(1,2,2)%cpu = ncpu
-      ptl%neigh(2,1,1)%cpu = ncpu  ! TL bottom -> BL
-      ptl%neigh(2,1,2)%cpu = ncpu
-
-      ptr%neigh(1,1,1)%cpu = ncpu  ! TR left   -> TL
-      ptr%neigh(1,1,2)%cpu = ncpu
-      ptr%neigh(2,1,1)%cpu = ncpu  ! TR bottom -> BR
-      ptr%neigh(2,1,2)%cpu = ncpu
-#endif /* MPI */
-
-      pbl%neigh(1,2,1)%id = pbr%id  ! BL right  -> BR
-      pbl%neigh(1,2,2)%id = pbr%id
-      pbl%neigh(2,2,1)%id = ptl%id  ! BL top    -> TL
-      pbl%neigh(2,2,2)%id = ptl%id
-
-      pbr%neigh(1,1,1)%id = pbl%id  ! BR left   -> BL
-      pbr%neigh(1,1,2)%id = pbl%id
-      pbr%neigh(2,2,1)%id = ptr%id  ! BR top    -> TR
-      pbr%neigh(2,2,2)%id = ptr%id
-
-      ptl%neigh(1,2,1)%id = ptr%id  ! TL right  -> TR
-      ptl%neigh(1,2,2)%id = ptr%id
-      ptl%neigh(2,1,1)%id = pbl%id  ! TL bottom -> BL
-      ptl%neigh(2,1,2)%id = pbl%id
-
-      ptr%neigh(1,1,1)%id = ptl%id  ! TR left   -> TL
-      ptr%neigh(1,1,2)%id = ptl%id
-      ptr%neigh(2,1,1)%id = pbr%id  ! TR bottom -> BR
-      ptr%neigh(2,1,2)%id = pbr%id
-
-! set pointer to the neighbors of the parent block
+! X direction (left side)
 !
-#ifdef MPI
-! left neighbor of BL
+        pblock%child(1)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,1)%ptr
+        pblock%child(2)%ptr%neigh(1,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(3)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,2)%ptr
+        pblock%child(4)%ptr%neigh(1,1,p)%ptr => pblock%child(3)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,3)%ptr
+        pblock%child(6)%ptr%neigh(1,1,p)%ptr => pblock%child(5)%ptr
+        pblock%child(7)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,4)%ptr
+        pblock%child(8)%ptr%neigh(1,1,p)%ptr => pblock%child(7)%ptr
+#endif /* NDIMS == 3 */
+
+! X direction (right side)
 !
-      if (pblock%neigh(1,1,1)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
-!         if (.not. pneigh%leaf) &
-!             call print_error("blocks::refine_blocks","The left neighbor of BL is not a leaf!")
-        if (associated(pneigh)) then
-          pbl%neigh(1,1,1)%cpu = pneigh%cpu
-          pbl%neigh(1,1,2)%cpu = pneigh%cpu
-          pbl%neigh(1,1,1)%id  = pneigh%id
-          pbl%neigh(1,1,2)%id  = pneigh%id
+        pblock%child(1)%ptr%neigh(1,2,p)%ptr => pblock%child(2)%ptr
+        pblock%child(2)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,1)%ptr
+        pblock%child(3)%ptr%neigh(1,2,p)%ptr => pblock%child(4)%ptr
+        pblock%child(4)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,2)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(1,2,p)%ptr => pblock%child(6)%ptr
+        pblock%child(6)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,3)%ptr
+        pblock%child(7)%ptr%neigh(1,2,p)%ptr => pblock%child(8)%ptr
+        pblock%child(8)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,4)%ptr
+#endif /* NDIMS == 3 */
 
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the left neighbor of BL is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(1,2,1)%cpu = pbl%cpu
-            pneigh%neigh(1,2,1)%id  = pbl%id
-          endif
-          if (pneigh%level .eq. pbl%level) then
-            pneigh%neigh(1,2,1)%cpu = pbl%cpu
-            pneigh%neigh(1,2,2)%cpu = pbl%cpu
-            pneigh%neigh(1,2,1)%id  = pbl%id
-            pneigh%neigh(1,2,2)%id  = pbl%id
-          endif
-        endif
-      endif
-
-! bottom neighbor of BL
+! Y direction (left side)
 !
-      if (pblock%neigh(2,1,1)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(2,1,1)%id)  ! bottom left neighbor
-        if (.not. pneigh%leaf) &
-            call print_error("blocks::refine_blocks","The bottom neighbor of BL is not a leaf!")
-        if (associated(pneigh)) then
-          pbl%neigh(2,1,1)%cpu = pneigh%cpu
-          pbl%neigh(2,1,2)%cpu = pneigh%cpu
-          pbl%neigh(2,1,1)%id  = pneigh%id
-          pbl%neigh(2,1,2)%id  = pneigh%id
+        pblock%child(1)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,1)%ptr
+        pblock%child(2)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,2)%ptr
+        pblock%child(3)%ptr%neigh(2,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(4)%ptr%neigh(2,1,p)%ptr => pblock%child(2)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,3)%ptr
+        pblock%child(6)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,4)%ptr
+        pblock%child(7)%ptr%neigh(2,1,p)%ptr => pblock%child(5)%ptr
+        pblock%child(8)%ptr%neigh(2,1,p)%ptr => pblock%child(6)%ptr
+#endif /* NDIMS == 3 */
 
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the bottom neighbor of BL is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(2,2,1)%cpu = pbl%cpu
-            pneigh%neigh(2,2,1)%id  = pbl%id
-          endif
-          if (pneigh%level .eq. pbl%level) then
-            pneigh%neigh(2,2,1)%cpu = pbl%cpu
-            pneigh%neigh(2,2,2)%cpu = pbl%cpu
-            pneigh%neigh(2,2,1)%id  = pbl%id
-            pneigh%neigh(2,2,2)%id  = pbl%id
-          endif
-        endif
-      endif
-
-! bottom neighbor of BR
+! Y direction (right side)
 !
-      if (pblock%neigh(2,1,2)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(2,1,2)%id)  ! bottom right neighbor
-        if (associated(pneigh)) then
-          pbr%neigh(2,1,1)%cpu = pneigh%cpu
-          pbr%neigh(2,1,2)%cpu = pneigh%cpu
-          pbr%neigh(2,1,1)%id  = pneigh%id
-          pbr%neigh(2,1,2)%id  = pneigh%id
+        pblock%child(1)%ptr%neigh(2,2,p)%ptr => pblock%child(3)%ptr
+        pblock%child(2)%ptr%neigh(2,2,p)%ptr => pblock%child(4)%ptr
+        pblock%child(3)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,1)%ptr
+        pblock%child(4)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,2)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(2,2,p)%ptr => pblock%child(7)%ptr
+        pblock%child(6)%ptr%neigh(2,2,p)%ptr => pblock%child(8)%ptr
+        pblock%child(7)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,3)%ptr
+        pblock%child(8)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,4)%ptr
+#endif /* NDIMS == 3 */
 
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the bottom neighbor of BR is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(2,2,2)%cpu = pbr%cpu
-            pneigh%neigh(2,2,2)%id  = pbr%id
-          endif
-          if (pneigh%level .eq. pbr%level) then
-            pneigh%neigh(2,2,1)%cpu = pbr%cpu
-            pneigh%neigh(2,2,2)%cpu = pbr%cpu
-            pneigh%neigh(2,2,1)%id  = pbr%id
-            pneigh%neigh(2,2,2)%id  = pbr%id
-          endif
-        endif
-      endif
-
-! right neighbor of BR
+#if NDIMS == 3
+! Z direction (left side)
 !
-      if (pblock%neigh(1,2,1)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(1,2,1)%id) ! right lower neighbor
-        if (associated(pneigh)) then
-          pbr%neigh(1,2,1)%cpu = pneigh%cpu
-          pbr%neigh(1,2,2)%cpu = pneigh%cpu
-          pbr%neigh(1,2,1)%id  = pneigh%id
-          pbr%neigh(1,2,2)%id  = pneigh%id
+        pblock%child(1)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,1)%ptr
+        pblock%child(2)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,2)%ptr
+        pblock%child(3)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,3)%ptr
+        pblock%child(4)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,4)%ptr
+        pblock%child(5)%ptr%neigh(3,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(6)%ptr%neigh(3,1,p)%ptr => pblock%child(2)%ptr
+        pblock%child(7)%ptr%neigh(3,1,p)%ptr => pblock%child(3)%ptr
+        pblock%child(8)%ptr%neigh(3,1,p)%ptr => pblock%child(4)%ptr
 
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the right neighbor of BR is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(1,1,1)%cpu = pbr%cpu
-            pneigh%neigh(1,1,1)%id  = pbr%id
-          endif
-          if (pneigh%level .eq. pbr%level) then
-            pneigh%neigh(1,1,1)%cpu = pbr%cpu
-            pneigh%neigh(1,1,2)%cpu = pbr%cpu
-            pneigh%neigh(1,1,1)%id  = pbr%id
-            pneigh%neigh(1,1,2)%id  = pbr%id
-          endif
-        endif
-      endif
-
-! right neighbor of TR
+! Z direction (right side)
 !
-      if (pblock%neigh(1,2,2)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(1,2,2)%id) ! right upper neighbor
-        if (associated(pneigh)) then
-          ptr%neigh(1,2,1)%cpu = pneigh%cpu
-          ptr%neigh(1,2,2)%cpu = pneigh%cpu
-          ptr%neigh(1,2,1)%id  = pneigh%id
-          ptr%neigh(1,2,2)%id  = pneigh%id
+        pblock%child(1)%ptr%neigh(3,2,p)%ptr => pblock%child(5)%ptr
+        pblock%child(2)%ptr%neigh(3,2,p)%ptr => pblock%child(6)%ptr
+        pblock%child(3)%ptr%neigh(3,2,p)%ptr => pblock%child(7)%ptr
+        pblock%child(4)%ptr%neigh(3,2,p)%ptr => pblock%child(8)%ptr
+        pblock%child(5)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,1)%ptr
+        pblock%child(6)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,2)%ptr
+        pblock%child(7)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,3)%ptr
+        pblock%child(8)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,4)%ptr
+#endif /* NDIMS == 3 */
 
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the right neighbor of TR is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(1,1,2)%cpu = ptr%cpu
-            pneigh%neigh(1,1,2)%id  = ptr%id
-          endif
-          if (pneigh%level .eq. ptr%level) then
-            pneigh%neigh(1,1,1)%cpu = ptr%cpu
-            pneigh%neigh(1,1,2)%cpu = ptr%cpu
-            pneigh%neigh(1,1,1)%id  = ptr%id
-            pneigh%neigh(1,1,2)%id  = ptr%id
-          endif
-        endif
-      endif
+      end do
 
-! top neighbor of TR
+! set neighbor pointers of the neighbors to the current children
 !
-      if (pblock%neigh(2,2,2)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(2,2,2)%id)  ! top right neighbor
-        if (associated(pneigh)) then
-          ptr%neigh(2,2,1)%cpu = pneigh%cpu
-          ptr%neigh(2,2,2)%cpu = pneigh%cpu
-          ptr%neigh(2,2,1)%id  = pneigh%id
-          ptr%neigh(2,2,2)%id  = pneigh%id
-
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the top neighbor of TR is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(2,1,2)%cpu = ptr%cpu
-            pneigh%neigh(2,1,2)%id  = ptr%id
-          endif
-          if (pneigh%level .eq. ptr%level) then
-            pneigh%neigh(2,1,1)%cpu = ptr%cpu
-            pneigh%neigh(2,1,2)%cpu = ptr%cpu
-            pneigh%neigh(2,1,1)%id  = ptr%id
-            pneigh%neigh(2,1,2)%id  = ptr%id
-          endif
-        endif
-      endif
-
-! top neighbor of TL
+! X direction (left side)
 !
-      if (pblock%neigh(2,2,1)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(2,2,1)%id)  ! top left neighbor
-        if (associated(pneigh)) then
-          ptl%neigh(2,2,1)%cpu = pneigh%cpu
-          ptl%neigh(2,2,2)%cpu = pneigh%cpu
-          ptl%neigh(2,2,1)%id  = pneigh%id
-          ptl%neigh(2,2,2)%id  = pneigh%id
-
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the top neighbor of TL is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(2,1,1)%cpu = ptl%cpu
-            pneigh%neigh(2,1,1)%id  = ptl%id
-          endif
-          if (pneigh%level .eq. ptl%level) then
-            pneigh%neigh(2,1,1)%cpu = ptl%cpu
-            pneigh%neigh(2,1,2)%cpu = ptl%cpu
-            pneigh%neigh(2,1,1)%id  = ptl%id
-            pneigh%neigh(2,1,2)%id  = ptl%id
-          endif
-        endif
-      endif
-
-! left neighbor of TL
-!
-      if (pblock%neigh(1,1,2)%cpu .eq. ncpu) then
-        pneigh => get_pointer(pblock%neigh(1,1,2)%id) ! left upper neighbor
-        if (associated(pneigh)) then
-          ptl%neigh(1,1,1)%cpu = pneigh%cpu
-          ptl%neigh(1,1,2)%cpu = pneigh%cpu
-          ptl%neigh(1,1,1)%id  = pneigh%id
-          ptl%neigh(1,1,2)%id  = pneigh%id
-
-          if (pneigh%level .lt. pblock%level) then
-            call print_error("blocks::refine_blocks","Level of the left neighbor of TL is too low!")
-          endif
-          if (pneigh%level .eq. pblock%level) then
-            pneigh%neigh(1,2,2)%cpu = ptl%cpu
-            pneigh%neigh(1,2,2)%id  = ptl%id
-          endif
-          if (pneigh%level .eq. ptl%level) then
-            pneigh%neigh(1,2,1)%cpu = ptl%cpu
-            pneigh%neigh(1,2,2)%cpu = ptl%cpu
-            pneigh%neigh(1,2,1)%id  = ptl%id
-            pneigh%neigh(1,2,2)%id  = ptl%id
-          endif
-        endif
-      endif
-#else /* MPI */
-      pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
+      pneigh => pblock%neigh(1,1,1)%ptr
+      pchild => pblock%child(1)%ptr
       if (associated(pneigh)) then
-        pbl%neigh(1,1,1)%id = pneigh%id
-        pbl%neigh(1,1,2)%id = pneigh%id
-
         if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
+          pneigh%neigh(1,2,1)%ptr => pchild
         endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = pbl%id
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,2,p)%ptr => pchild
+          end do
         endif
       endif
 
-      pneigh => get_pointer(pblock%neigh(1,1,2)%id) ! left upper neighbor
+      pneigh => pblock%neigh(1,1,2)%ptr
+      pchild => pblock%child(3)%ptr
       if (associated(pneigh)) then
-        ptl%neigh(1,1,1)%id = pneigh%id
-        ptl%neigh(1,1,2)%id = pneigh%id
-
         if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
+          pneigh%neigh(1,2,2)%ptr => pchild
         endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%neigh(1,2,1)%id = ptl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,2,p)%ptr => pchild
+          end do
         endif
       endif
 
-      pneigh => get_pointer(pblock%neigh(1,2,1)%id) ! right lower neighbor
+#if NDIMS == 3
+      pneigh => pblock%neigh(1,1,3)%ptr
+      pchild => pblock%child(5)%ptr
       if (associated(pneigh)) then
-        pbr%neigh(1,2,1)%id = pneigh%id
-        pbr%neigh(1,2,2)%id = pneigh%id
-
         if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
+          pneigh%neigh(1,2,3)%ptr => pchild
         endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = pbr%id
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,2,p)%ptr => pchild
+          end do
         endif
       endif
 
-      pneigh => get_pointer(pblock%neigh(1,2,2)%id) ! right upper neighbor
+      pneigh => pblock%neigh(1,1,4)%ptr
+      pchild => pblock%child(7)%ptr
       if (associated(pneigh)) then
-        ptr%neigh(1,2,1)%id = pneigh%id
-        ptr%neigh(1,2,2)%id = pneigh%id
-
         if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
+          pneigh%neigh(1,2,4)%ptr => pchild
         endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%neigh(1,1,1)%id = ptr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,2,p)%ptr => pchild
+          end do
         endif
       endif
+#endif /* NDIMS == 3 */
 
-      pneigh => get_pointer(pblock%neigh(2,1,1)%id)  ! bottom left neighbor
-      if (associated(pneigh)) then
-        pbl%neigh(2,1,1)%id = pneigh%id
-        pbl%neigh(2,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,1,2)%id)  ! bottom right neighbor
-      if (associated(pneigh)) then
-        pbr%neigh(2,1,1)%id = pneigh%id
-        pbr%neigh(2,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%neigh(2,2,1)%id = pbr%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,2,1)%id)  ! top left neighbor
-      if (associated(pneigh)) then
-        ptl%neigh(2,2,1)%id = pneigh%id
-        ptl%neigh(2,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,2,2)%id)  ! top right neighbor
-      if (associated(pneigh)) then
-        ptr%neigh(2,2,1)%id = pneigh%id
-        ptr%neigh(2,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%neigh(2,1,1)%id = ptr%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-      endif
-#endif /* MPI */
-
-! set children
+! X direction (right side)
 !
-#ifdef MPI
-      pblock%child(1)%cpu = pbl%cpu
-      pblock%child(2)%cpu = pbr%cpu
-      pblock%child(3)%cpu = ptl%cpu
-      pblock%child(4)%cpu = ptr%cpu
-#endif /* MPI */
-      pblock%child(1)%id  = pbl%id
-      pblock%child(2)%id  = pbr%id
-      pblock%child(3)%id  = ptl%id
-      pblock%child(4)%id  = ptr%id
+      pneigh => pblock%neigh(1,2,1)%ptr
+      pchild => pblock%child(2)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,1)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,1,p)%ptr => pchild
+          end do
+        endif
+      endif
 
-! depending on the configuration of the parent block
+      pneigh => pblock%neigh(1,2,2)%ptr
+      pchild => pblock%child(4)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,2)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+#if NDIMS == 3
+      pneigh => pblock%neigh(1,2,3)%ptr
+      pchild => pblock%child(6)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,3)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(1,2,4)%ptr
+      pchild => pblock%child(8)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(1,1,4)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(1,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+#endif /* NDIMS == 3 */
+
+! Y direction (left side)
+!
+      pneigh => pblock%neigh(2,1,1)%ptr
+      pchild => pblock%child(1)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,1)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(2,1,2)%ptr
+      pchild => pblock%child(2)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,2)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+#if NDIMS == 3
+      pneigh => pblock%neigh(2,1,3)%ptr
+      pchild => pblock%child(5)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,3)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(2,1,4)%ptr
+      pchild => pblock%child(6)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,2,4)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+#endif /* NDIMS == 3 */
+
+! Y direction (right side)
+!
+      pneigh => pblock%neigh(2,2,1)%ptr
+      pchild => pblock%child(2)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,1)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(2,2,2)%ptr
+      pchild => pblock%child(4)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,2)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+#if NDIMS == 3
+      pneigh => pblock%neigh(2,2,3)%ptr
+      pchild => pblock%child(6)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,3)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(2,2,4)%ptr
+      pchild => pblock%child(8)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(2,1,4)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(2,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+! Z direction (left side)
+!
+      pneigh => pblock%neigh(3,1,1)%ptr
+      pchild => pblock%child(1)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,2,1)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,1,2)%ptr
+      pchild => pblock%child(2)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,2,2)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,1,3)%ptr
+      pchild => pblock%child(3)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,2,3)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,1,4)%ptr
+      pchild => pblock%child(4)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,2,4)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,2,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+! Z direction (right side)
+!
+      pneigh => pblock%neigh(3,2,1)%ptr
+      pchild => pblock%child(5)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,1,1)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,2,2)%ptr
+      pchild => pblock%child(6)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,1,2)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,2,3)%ptr
+      pchild => pblock%child(7)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,1,3)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+
+      pneigh => pblock%neigh(3,2,4)%ptr
+      pchild => pblock%child(8)%ptr
+      if (associated(pneigh)) then
+        if (pneigh%level .eq. pblock%level) then
+          pneigh%neigh(3,1,4)%ptr => pchild
+        endif
+        if (pneigh%level .eq. pchild%level) then
+          do p = 1, nfaces
+            pneigh%neigh(3,1,p)%ptr => pchild
+          end do
+        endif
+      endif
+#endif /* NDIMS == 3 */
+
+! set corresponding configuration of the new blocks
 !
       select case(pblock%config)
-      case('z', 'Z')
+      case(0) ! 'Z'
+
+#if NDIMS == 2
+        config(:) = (/ 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      case(1) ! 'N'
+
+#if NDIMS == 2
+        config(:) = (/ 2, 1, 1, 3 /)
+        order (:) = (/ 1, 3, 4, 2 /)
+#endif /* NDIMS == 2 */
+
+      case(2) ! 'D'
+
+#if NDIMS == 2
+        config(:) = (/ 1, 2, 2, 4 /)
+        order (:) = (/ 1, 2, 4, 3 /)
+#endif /* NDIMS == 2 */
+
+      case(3) ! 'C'
+
+#if NDIMS == 2
+        config(:) = (/ 4, 3, 3, 1 /)
+        order (:) = (/ 2, 1, 3, 4 /)
+#endif /* NDIMS == 2 */
+
+      case(4) ! 'U'
+
+#if NDIMS == 2
+        config(:) = (/ 3, 4, 4, 2 /)
+        order (:) = (/ 3, 1, 2, 4 /)
+#endif /* NDIMS == 2 */
+
+      end select
 
 ! set blocks configurations
 !
-        pbl%config = 'Z'
-        pbr%config = 'Z'
-        ptl%config = 'Z'
-        ptr%config = 'Z'
+      do p = 1, nchild
+        pblock%child(p)%ptr%config = config(p)
+      end do
 
-! connect blocks in a chain
+! connect blocks in chain
 !
-        pbl%next => pbr
-        pbr%next => ptl
-        ptl%next => ptr
-
-        pbr%prev => pbl
-        ptl%prev => pbr
-        ptr%prev => ptl
+      do p = 2, nchild
+        pblock%child(order(p  ))%ptr%prev => pblock%child(order(p-1))%ptr
+        pblock%child(order(p-1))%ptr%next => pblock%child(order(p  ))%ptr
+      end do
 
 ! insert this chain after the parent block
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptr
-          ptr%next => pb
+      pneigh => pblock%next
+      pfirst => pblock%child(order(     1))%ptr
+      plast  => pblock%child(order(nchild))%ptr
+      if (associated(pneigh)) then
+        pneigh%prev => plast
+        plast%next  => pneigh
+      else
+        last_meta => plast
+        nullify(plast%next)
+      endif
+
+      pblock%next => pfirst
+      pfirst%prev => pblock
+
+! allocate data blocks if necessary
+!
+      if (falloc_data) then
+
+! calculate the size of new blocks
+!
+        xln = 0.5 * (pblock%data%xmax - pblock%data%xmin)
+        yln = 0.5 * (pblock%data%ymax - pblock%data%ymin)
+#if NDIMS == 3
+        zln = 0.5 * (pblock%data%zmax - pblock%data%zmin)
+#else /* NDIMS == 3 */
+        zln =       (pblock%data%zmax - pblock%data%zmin)
+#endif /* NDIMS == 3 */
+
+! iterate over all children and allocate data blocks
+!
+        do p = 1, nchild
+
+! assign a pointer to the current child
+!
+          pchild => pblock%child(order(p))%ptr
+
+! allocate data block
+!
+          call allocate_datablock(pdata)
+
+! calculate block bounds
+!
+          i   = mod((p - 1)    ,2)
+          j   = mod((p - 1) / 2,2)
+          k   = mod((p - 1) / 4,2)
+
+          xmn = pblock%data%xmin + xln * i
+          ymn = pblock%data%xmin + yln * j
+          zmn = pblock%data%xmin + zln * k
+
+          xmx = xmn + xln
+          ymx = ymn + yln
+          zmx = zmn + zln
+
+! set block bounds
+!
+          call datablock_setbounds(pdata, xmn, xmx, ymn, ymx, zmn, zmx)
+
+! associate with the meta block
+!
+          call associate_blocks(pchild, pdata)
+
+        end do
+
+! connect blocks in chain
+!
+        do p = 2, nchild
+          pblock%child(order(p  ))%ptr%data%prev => pblock%child(order(p-1))%ptr%data
+          pblock%child(order(p-1))%ptr%data%next => pblock%child(order(p  ))%ptr%data
+        end do
+
+! insert this chain after the parent block
+!
+        pdata => pblock%data%next
+
+        pfirst => pblock%child(order(     1))%ptr
+        plast  => pblock%child(order(nchild))%ptr
+
+        if (associated(pdata)) then
+          pdata%prev => plast%data
+          plast%data%next  => pdata
         else
-          plast => ptr
-          nullify(ptr%next)
+          last_data => plast%data
+          nullify(plast%data%next)
         endif
-        pblock%next => pbl
-        pbl%prev => pblock
 
-        pblock => ptr
+        pblock%data%next => pfirst%data
+        pfirst%data%prev => pblock%data
 
-      case('n', 'N')
+      end if
 
-! set blocks configurations
+! point the current block to the last created one
 !
-        pbl%config = 'D'
-        ptl%config = 'N'
-        ptr%config = 'N'
-        pbr%config = 'C'
+      pblock => plast
 
-! connect blocks in a chain
+! ! depending on the configuration of the parent block
+! !
+!       select case(pblock%config)
+!       case('z', 'Z')
 !
-        pbl%next => ptl
-        ptl%next => ptr
-        ptr%next => pbr
-
-        ptl%prev => pbl
-        ptr%prev => ptl
-        pbr%prev => ptr
-
-! insert this chain after the parent the block
+! ! set blocks configurations
+! !
+!         pbl%config = 'Z'
+!         pbr%config = 'Z'
+!         ptl%config = 'Z'
+!         ptr%config = 'Z'
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => pbr
-          pbr%next => pb
-        endif
-        pbl%prev => pblock
-        pblock%next => pbl
-
-        pblock => pbr
-
-      case('d', 'D')
-
-! set blocks configurations
+! ! connect blocks in a chain
+! !
+!         pbl%next => pbr
+!         pbr%next => ptl
+!         ptl%next => ptr
 !
-        pbl%config = 'N'
-        pbr%config = 'D'
-        ptr%config = 'D'
-        ptl%config = 'U'
-
-! connect blocks in a chain
+!         pbr%prev => pbl
+!         ptl%prev => pbr
+!         ptr%prev => ptl
 !
-        pbl%next => pbr
-        pbr%next => ptr
-        ptr%next => ptl
-
-        pbr%prev => pbl
-        ptr%prev => pbr
-        ptl%prev => ptr
-
-! insert this chain in the block list
+! ! insert this chain after the parent block
+! !
+!         pb => pblock%next
+!         if (associated(pb)) then
+!           pb%prev => ptr
+!           ptr%next => pb
+!         else
+!           plast => ptr
+!           nullify(ptr%next)
+!         endif
+!         pblock%next => pbl
+!         pbl%prev => pblock
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptl
-          ptl%next => pb
-        endif
-        pbl%prev => pblock
-        pblock%next => pbl
-
-        pblock => ptl
-
-      case('c', 'C')
-
-! set blocks configurations
+!         pblock => ptr
 !
-        ptr%config = 'U'
-        ptl%config = 'C'
-        pbl%config = 'C'
-        pbr%config = 'N'
-
-! connect blocks in a chain
+!       case('n', 'N')
 !
-        ptr%next => ptl
-        ptl%next => pbl
-        pbl%next => pbr
-
-        ptl%prev => ptr
-        pbl%prev => ptl
-        pbr%prev => pbl
-
-! insert this chain in the block list
+! ! set blocks configurations
+! !
+!         pbl%config = 'D'
+!         ptl%config = 'N'
+!         ptr%config = 'N'
+!         pbr%config = 'C'
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => pbr
-          pbr%next => pb
-        endif
-        ptr%prev => pblock
-        pblock%next => ptr
-
-        pblock => pbr
-
-      case('u', 'U')
-
-! set blocks configurations
+! ! connect blocks in a chain
+! !
+!         pbl%next => ptl
+!         ptl%next => ptr
+!         ptr%next => pbr
 !
-        ptr%config = 'C'
-        pbr%config = 'U'
-        pbl%config = 'U'
-        ptl%config = 'D'
-
-! connect blocks in a chain
+!         ptl%prev => pbl
+!         ptr%prev => ptl
+!         pbr%prev => ptr
 !
-        ptr%next => pbr
-        pbr%next => pbl
-        pbl%next => ptl
-
-        pbr%prev => ptr
-        pbl%prev => pbr
-        ptl%prev => pbl
-
-! insert this chain in the block list
+! ! insert this chain after the parent the block
+! !
+!         pb => pblock%next
+!         if (associated(pb)) then
+!           pb%prev => pbr
+!           pbr%next => pb
+!         endif
+!         pbl%prev => pblock
+!         pblock%next => pbl
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptl
-          ptl%next => pb
-        endif
-        ptr%prev => pblock
-        pblock%next => ptr
-
-        pblock => ptl
-
-      end select
+!         pblock => pbr
+!
+!       case('d', 'D')
+!
+! ! set blocks configurations
+! !
+!         pbl%config = 'N'
+!         pbr%config = 'D'
+!         ptr%config = 'D'
+!         ptl%config = 'U'
+!
+! ! connect blocks in a chain
+! !
+!         pbl%next => pbr
+!         pbr%next => ptr
+!         ptr%next => ptl
+!
+!         pbr%prev => pbl
+!         ptr%prev => pbr
+!         ptl%prev => ptr
+!
+! ! insert this chain in the block list
+! !
+!         pb => pblock%next
+!         if (associated(pb)) then
+!           pb%prev => ptl
+!           ptl%next => pb
+!         endif
+!         pbl%prev => pblock
+!         pblock%next => pbl
+!
+!         pblock => ptl
+!
+!       case('c', 'C')
+!
+! ! set blocks configurations
+! !
+!         ptr%config = 'U'
+!         ptl%config = 'C'
+!         pbl%config = 'C'
+!         pbr%config = 'N'
+!
+! ! connect blocks in a chain
+! !
+!         ptr%next => ptl
+!         ptl%next => pbl
+!         pbl%next => pbr
+!
+!         ptl%prev => ptr
+!         pbl%prev => ptl
+!         pbr%prev => pbl
+!
+! ! insert this chain in the block list
+! !
+!         pb => pblock%next
+!         if (associated(pb)) then
+!           pb%prev => pbr
+!           pbr%next => pb
+!         endif
+!         ptr%prev => pblock
+!         pblock%next => ptr
+!
+!         pblock => pbr
+!
+!       case('u', 'U')
+!
+! ! set blocks configurations
+! !
+!         ptr%config = 'C'
+!         pbr%config = 'U'
+!         pbl%config = 'U'
+!         ptl%config = 'D'
+!
+! ! connect blocks in a chain
+! !
+!         ptr%next => pbr
+!         pbr%next => pbl
+!         pbl%next => ptl
+!
+!         pbr%prev => ptr
+!         pbl%prev => pbr
+!         ptl%prev => pbl
+!
+! ! insert this chain in the block list
+! !
+!         pb => pblock%next
+!         if (associated(pb)) then
+!           pb%prev => ptl
+!           ptl%next => pb
+!         endif
+!         ptr%prev => pblock
+!         pblock%next => ptr
+!
+!         pblock => ptl
+!
+!       end select
 
     else
 
@@ -1847,10 +1975,6 @@ module blocks
     pbr%leaf    = .false.
     ptl%leaf    = .false.
     ptr%leaf    = .false.
-
-! decrease the number of leafs
-!
-    nleafs      = nleafs - 3
 
 ! prepare next and prev pointers
 !

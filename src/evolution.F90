@@ -191,7 +191,7 @@ module evolution
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pb, du)
+!     call update_shapes(pb, du)
 #endif /* SHAPE */
 
 ! update solution
