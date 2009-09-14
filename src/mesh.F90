@@ -61,11 +61,13 @@ module mesh
 
     implicit none
 
-! local variables
+! local pointers
 !
     type(block_meta), pointer :: pmeta_block, pneigh
     type(block_data), pointer :: pdata_block
-!     type(block), pointer :: pblock, pparent, pchild, pneigh, pnext
+
+! local variables
+!
     integer(kind=4)      :: l, p, i, j, k, n
     character(len=32)    :: bstr, tstr
 
@@ -98,43 +100,6 @@ module mesh
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
 ! is done yet; we fill out the coarse blocks with the initial condition
-!
-!     pblock => plist
-!     do while (associated(pblock))
-!
-! ! set level
-! !
-!       pblock%level    = 1
-!       pblock%refine   = 0
-!
-! ! set initial conditions
-! !
-!       call init_problem(pblock)
-!
-! ! assign pointer to the next block
-! !
-!       pblock => pblock%next
-!
-!     end do
-
-! TODO: refine blocks on master untill the total number of blocks exceeds
-!       the number of MPI processes, then interrupt refining and autobalance
-!       the allocated blocks, after that continue refining on all processes
-!       autobalancing after each level refinement
-!
-
-! at this point the inital blocks are allocated and set for refinement,
-! so iterate over all levels from 1 to maxlevel and create sub-blocks,
-! set the initial conditions for each, check criterium and set for
-! refinement according to the criterium fullfilment
-!
-! TODO: refine blocks on master untill the total number of blocks exceeds
-!       the number of MPI processes, then interrupt refining and autobalance
-!       the allocated blocks, after that continue refining on all processes
-!       autobalancing after each level of refinement
-!
-! refine the blocks until the number of blocks is smaller than the number
-! of processes
 !
     if (is_master()) &
       write(*,"(4x,a,$)") "refining level         =    "
