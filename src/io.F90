@@ -39,7 +39,7 @@ module io
 !
   subroutine write_data(ftype, nfile, nproc)
 
-    use blocks  , only : block_data, list_data, nv => nvars
+    use blocks  , only : block_data, list_data, nv => nvars, nblocks, dblocks
     use config  , only : ncells, nghost, ngrids, igrids, jgrids, kgrids        &
                        , im, jm, km, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use error   , only : print_error
@@ -173,6 +173,14 @@ module io
 
         call h5acreate_f(gid, 'ncpu', H5T_NATIVE_INTEGER, sid, aid, err)
         call h5awrite_f(aid, H5T_NATIVE_INTEGER, ncpu, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'nblocks', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, nblocks, am, err)
+        call h5aclose_f(aid, err)
+
+        call h5acreate_f(gid, 'dblocks', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, dblocks, am, err)
         call h5aclose_f(aid, err)
 
         call h5sclose_f(sid, err)

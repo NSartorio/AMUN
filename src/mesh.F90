@@ -53,7 +53,7 @@ module mesh
                        , ncells, maxlev
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , list_allocated, init_blocks, clear_blocks             &
-                       , refine_block, get_pointer           &
+                       , refine_block, deallocate_datablock, get_pointer       &
                        , block, nchild, ndims, plist, last_id, nblocks, nleafs, nsides, nfaces
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
@@ -63,7 +63,7 @@ module mesh
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta_block, pneigh
+    type(block_meta), pointer :: pmeta_block, pneigh, pnext
     type(block_data), pointer :: pdata_block
 
 ! local variables
@@ -228,74 +228,35 @@ module mesh
     end do
 
 #ifdef MPI
-! ! divide all blocks between all processes
-! !
-!     l = 0
-!     pblock => plist
-!     do while (associated(pblock))
+! divide blocks between all processes
 !
-! ! assign the cpu to the current block
-! !
-!       pblock%cpu    = l * ncpus / nblocks
+    l = 0
+    pmeta_block => list_meta
+    do while (associated(pmeta_block))
+
+! assign the cpu to the current block
 !
-! ! assign pointer to the next block
-! !
-!       pblock => pblock%next
+      pmeta_block%cpu    = l * ncpus / nblocks
+
+! assign pointer to the next block
 !
-!       l = l + 1
-!     end do
+      pmeta_block => pmeta_block%next
+
+      l = l + 1
+    end do
+
+! remove all data blocks which don't belong to the current process
 !
-! ! update the cpu field of the neighbors, parent and children
-! !
-!     pblock => plist
-!     do while (associated(pblock))
-!
-! ! update neighbors
-! !
-!       do i = 1, ndims
-!         do j = 1, 2
-!           do k = 1, 2
-!
-!             pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-!
-!             if (associated(pneigh)) &
-!               pblock%neigh(i,j,k)%cpu = pneigh%cpu
-!
-!           end do
-!         end do
-!       end do
-!
-! ! update parent
-! !
-!       pparent => get_pointer(pblock%parent%id)
-!       if (associated(pparent)) &
-!         pblock%parent%cpu = pparent%cpu
-!
-! ! update children
-! !
-!       do p = 1, nchild
-!         pchild => get_pointer(pblock%child(p)%id)
-!
-!         if (associated(pchild)) &
-!           pblock%child(p)%cpu = pchild%cpu
-!       end do
-!
-! ! assign pointer to the next block
-! !
-!       pblock => pblock%next
-!     end do
-!
-! ! remove all blocks which don't belong to the current process
-! !
-!     pblock => plist
-!     do while (associated(pblock))
-!       pnext => pblock%next
-!
-!       if (pblock%cpu .ne. ncpu) &
-!         call deallocate_block(pblock)
-!
-!       pblock => pnext
-!     end do
+    pmeta_block => list_meta
+    do while (associated(pmeta_block))
+      pnext => pmeta_block%next
+
+      if (pmeta_block%cpu .ne. ncpu) then
+        call deallocate_datablock(pmeta_block%data)
+      end if
+
+      pmeta_block => pnext
+    end do
 #endif /* MPI */
 
 ! print information
