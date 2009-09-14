@@ -137,7 +137,7 @@ module problem
 !
   subroutine domain_default
 
-    use blocks, only : block_meta, block_data, append_block, append_metablock  &
+    use blocks, only : block_meta, block_data, append_metablock                &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
                      , datablock_setbounds, nsides, nfaces

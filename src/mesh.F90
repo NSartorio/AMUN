@@ -53,7 +53,7 @@ module mesh
                        , ncells, maxlev
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , list_allocated, init_blocks, clear_blocks             &
-                       , deallocate_block, refine_block, get_pointer           &
+                       , refine_block, get_pointer           &
                        , block, nchild, ndims, plist, last_id, nblocks, nleafs, nsides, nfaces
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
@@ -343,7 +343,7 @@ module mesh
       write(bstr,"(i)") nblocks
       write(tstr,"(i)") p
       write(*,*)
-      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*last_id)/p
+      write(*,"(4x,a,1x,a6,' / ',a,' = ',f8.4,' %')") "allocated/total blocks =", trim(adjustl(bstr)),trim(adjustl(tstr)), (100.0*nblocks)/p
 
       p = 2**((maxlev-1)*ndims)
       write(bstr,"(i)") nleafs

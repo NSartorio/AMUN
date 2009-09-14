@@ -228,8 +228,6 @@ module io
 
         do while(associated(pblock))
 
-          print *, pblock%meta%id, pblock%meta%leaf, pblock%meta%neigh(1,2,1)%ptr%id
-
           if (pblock%meta%leaf) then
 
             write(gnm,"('blk',i8.8)") pblock%meta%id

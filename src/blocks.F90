@@ -222,18 +222,11 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! clear all data blocks
-!
-    pblock_data => list_data
-    do while(associated(pblock_data))
-      call deallocate_datablock(pblock_data)
-      pblock_data => list_data
-    end do
-
 ! clear all meta blocks
 !
     pblock_meta => list_meta
     do while(associated(pblock_meta))
+!       print *, pblock_meta%level, pblock_meta%id, pblock_meta%neigh(1,1,1)%ptr%id, pblock_meta%neigh(1,2,1)%ptr%id, pblock_meta%neigh(2,1,1)%ptr%id, pblock_meta%neigh(2,2,1)%ptr%id
       call deallocate_metablock(pblock_meta)
       pblock_meta => list_meta
     end do
@@ -633,6 +626,11 @@ module blocks
         end do
       end do
 
+! if corresponding data block is allocated, deallocate it too
+!
+      if (associated(pblock%data)) &
+        call deallocate_datablock(pblock%data)
+
 ! nullify pointers
 !
       nullify(pblock%next)
@@ -644,6 +642,11 @@ module blocks
 !
       deallocate(pblock)
       nullify(pblock)
+
+! decrease the number of allocated blocks
+!
+      nblocks = nblocks - 1
+
     endif
 
 !-------------------------------------------------------------------------------
@@ -696,6 +699,11 @@ module blocks
 !
       deallocate(pblock)
       nullify(pblock)
+
+! decrease the number of allocated blocks
+!
+      dblocks = dblocks - 1
+
     endif
 
 !-------------------------------------------------------------------------------
@@ -1005,7 +1013,8 @@ module blocks
 
 ! local arrays
 !
-    integer, dimension(nchild) :: config, order
+    integer, dimension(nchild)              :: config, order
+    integer, dimension(ndims,nsides,nfaces) :: set
 
 ! local variables
 !
@@ -1054,71 +1063,106 @@ module blocks
 
 ! assign neighbors of the child blocks
 !
+! interior of the block
+!
       do p = 1, nfaces
 
 ! X direction (left side)
 !
-        pblock%child(1)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,1)%ptr
         pblock%child(2)%ptr%neigh(1,1,p)%ptr => pblock%child(1)%ptr
-        pblock%child(3)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,2)%ptr
         pblock%child(4)%ptr%neigh(1,1,p)%ptr => pblock%child(3)%ptr
 #if NDIMS == 3
-        pblock%child(5)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,3)%ptr
         pblock%child(6)%ptr%neigh(1,1,p)%ptr => pblock%child(5)%ptr
-        pblock%child(7)%ptr%neigh(1,1,p)%ptr => pblock%neigh(1,1,4)%ptr
         pblock%child(8)%ptr%neigh(1,1,p)%ptr => pblock%child(7)%ptr
 #endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(1,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(1,1,p)%ptr => pblock%child(2)%ptr
+            pblock%child(3)%ptr%neigh(1,1,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+            pblock%child(5)%ptr%neigh(1,1,p)%ptr => pblock%child(6)%ptr
+            pblock%child(7)%ptr%neigh(1,1,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+          endif
+        endif
 
 ! X direction (right side)
 !
         pblock%child(1)%ptr%neigh(1,2,p)%ptr => pblock%child(2)%ptr
-        pblock%child(2)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,1)%ptr
         pblock%child(3)%ptr%neigh(1,2,p)%ptr => pblock%child(4)%ptr
-        pblock%child(4)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,2)%ptr
 #if NDIMS == 3
         pblock%child(5)%ptr%neigh(1,2,p)%ptr => pblock%child(6)%ptr
-        pblock%child(6)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,3)%ptr
         pblock%child(7)%ptr%neigh(1,2,p)%ptr => pblock%child(8)%ptr
-        pblock%child(8)%ptr%neigh(1,2,p)%ptr => pblock%neigh(1,2,4)%ptr
 #endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(1,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(2)%ptr%neigh(1,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(4)%ptr%neigh(1,2,p)%ptr => pblock%child(3)%ptr
+#if NDIMS == 3
+            pblock%child(6)%ptr%neigh(1,2,p)%ptr => pblock%child(5)%ptr
+            pblock%child(8)%ptr%neigh(1,2,p)%ptr => pblock%child(7)%ptr
+#endif /* NDIMS == 3 */
+          endif
+        endif
 
 ! Y direction (left side)
 !
-        pblock%child(1)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,1)%ptr
-        pblock%child(2)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,2)%ptr
         pblock%child(3)%ptr%neigh(2,1,p)%ptr => pblock%child(1)%ptr
         pblock%child(4)%ptr%neigh(2,1,p)%ptr => pblock%child(2)%ptr
 #if NDIMS == 3
-        pblock%child(5)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,3)%ptr
-        pblock%child(6)%ptr%neigh(2,1,p)%ptr => pblock%neigh(2,1,4)%ptr
         pblock%child(7)%ptr%neigh(2,1,p)%ptr => pblock%child(5)%ptr
         pblock%child(8)%ptr%neigh(2,1,p)%ptr => pblock%child(6)%ptr
 #endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(2,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(2,1,p)%ptr => pblock%child(3)%ptr
+            pblock%child(2)%ptr%neigh(2,1,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+            pblock%child(5)%ptr%neigh(2,1,p)%ptr => pblock%child(7)%ptr
+            pblock%child(6)%ptr%neigh(2,1,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+          endif
+        endif
 
 ! Y direction (right side)
 !
         pblock%child(1)%ptr%neigh(2,2,p)%ptr => pblock%child(3)%ptr
         pblock%child(2)%ptr%neigh(2,2,p)%ptr => pblock%child(4)%ptr
-        pblock%child(3)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,1)%ptr
-        pblock%child(4)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,2)%ptr
 #if NDIMS == 3
         pblock%child(5)%ptr%neigh(2,2,p)%ptr => pblock%child(7)%ptr
         pblock%child(6)%ptr%neigh(2,2,p)%ptr => pblock%child(8)%ptr
-        pblock%child(7)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,3)%ptr
-        pblock%child(8)%ptr%neigh(2,2,p)%ptr => pblock%neigh(2,2,4)%ptr
 #endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(2,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(3)%ptr%neigh(2,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(4)%ptr%neigh(2,2,p)%ptr => pblock%child(2)%ptr
+#if NDIMS == 3
+            pblock%child(7)%ptr%neigh(2,2,p)%ptr => pblock%child(5)%ptr
+            pblock%child(8)%ptr%neigh(2,2,p)%ptr => pblock%child(6)%ptr
+#endif /* NDIMS == 3 */
+          endif
+        endif
 
 #if NDIMS == 3
 ! Z direction (left side)
 !
-        pblock%child(1)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,1)%ptr
-        pblock%child(2)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,2)%ptr
-        pblock%child(3)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,3)%ptr
-        pblock%child(4)%ptr%neigh(3,1,p)%ptr => pblock%neigh(3,1,4)%ptr
         pblock%child(5)%ptr%neigh(3,1,p)%ptr => pblock%child(1)%ptr
         pblock%child(6)%ptr%neigh(3,1,p)%ptr => pblock%child(2)%ptr
         pblock%child(7)%ptr%neigh(3,1,p)%ptr => pblock%child(3)%ptr
         pblock%child(8)%ptr%neigh(3,1,p)%ptr => pblock%child(4)%ptr
+        pneigh => pblock%neigh(3,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(3,1,p)%ptr => pblock%child(5)%ptr
+            pblock%child(2)%ptr%neigh(3,1,p)%ptr => pblock%child(6)%ptr
+            pblock%child(3)%ptr%neigh(3,1,p)%ptr => pblock%child(7)%ptr
+            pblock%child(4)%ptr%neigh(3,1,p)%ptr => pblock%child(8)%ptr
+          endif
+        endif
 
 ! Z direction (right side)
 !
@@ -1126,349 +1170,72 @@ module blocks
         pblock%child(2)%ptr%neigh(3,2,p)%ptr => pblock%child(6)%ptr
         pblock%child(3)%ptr%neigh(3,2,p)%ptr => pblock%child(7)%ptr
         pblock%child(4)%ptr%neigh(3,2,p)%ptr => pblock%child(8)%ptr
-        pblock%child(5)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,1)%ptr
-        pblock%child(6)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,2)%ptr
-        pblock%child(7)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,3)%ptr
-        pblock%child(8)%ptr%neigh(3,2,p)%ptr => pblock%neigh(3,2,4)%ptr
+        pneigh => pblock%neigh(3,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(5)%ptr%neigh(3,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(6)%ptr%neigh(3,2,p)%ptr => pblock%child(2)%ptr
+            pblock%child(7)%ptr%neigh(3,2,p)%ptr => pblock%child(3)%ptr
+            pblock%child(8)%ptr%neigh(3,2,p)%ptr => pblock%child(4)%ptr
+          endif
+        endif
 #endif /* NDIMS == 3 */
-
       end do
 
-! set neighbor pointers of the neighbors to the current children
+! prepare set array
 !
-! X direction (left side)
-!
-      pneigh => pblock%neigh(1,1,1)%ptr
-      pchild => pblock%child(1)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(1,1,2)%ptr
-      pchild => pblock%child(3)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-
+#if NDIMS == 2
+      set(1,1,:) = (/ 1, 3 /)
+      set(1,2,:) = (/ 2, 4 /)
+      set(2,1,:) = (/ 1, 2 /)
+      set(2,2,:) = (/ 3, 4 /)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-      pneigh => pblock%neigh(1,1,3)%ptr
-      pchild => pblock%child(5)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(1,1,4)%ptr
-      pchild => pblock%child(7)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,2,p)%ptr => pchild
-          end do
-        endif
-      endif
+      set(1,1,:) = (/ 1, 3, 5, 7 /)
+      set(1,2,:) = (/ 2, 4, 6, 8 /)
+      set(2,1,:) = (/ 1, 2, 5, 6 /)
+      set(2,2,:) = (/ 3, 4, 7, 8 /)
+      set(3,1,:) = (/ 1, 2, 3, 4 /)
+      set(3,2,:) = (/ 5, 6, 7, 8 /)
 #endif /* NDIMS == 3 */
 
-! X direction (right side)
+! set pointers to neighbors and update neighbors pointers
 !
-      pneigh => pblock%neigh(1,2,1)%ptr
-      pchild => pblock%child(2)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,1,p)%ptr => pchild
-          end do
-        endif
-      endif
+      do i = 1, ndims
+        do j = 1, nsides
+          do k = 1, nfaces
+            pneigh => pblock%neigh(i,j,k)%ptr
 
-      pneigh => pblock%neigh(1,2,2)%ptr
-      pchild => pblock%child(4)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,1,p)%ptr => pchild
-          end do
-        endif
-      endif
+            if (associated(pneigh)) then
+              if (pneigh%id .ne. pblock%id) then
 
-#if NDIMS == 3
-      pneigh => pblock%neigh(1,2,3)%ptr
-      pchild => pblock%child(6)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(1,2,4)%ptr
-      pchild => pblock%child(8)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(1,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-#endif /* NDIMS == 3 */
-
-! Y direction (left side)
+! point to the right neighbor
 !
-      pneigh => pblock%neigh(2,1,1)%ptr
-      pchild => pblock%child(1)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,2,p)%ptr => pchild
-          end do
-        endif
-      endif
+                do p = 1, nfaces
+                  pblock%child(set(i,j,k))%ptr%neigh(i,j,p)%ptr => pneigh
+                end do
 
-      pneigh => pblock%neigh(2,1,2)%ptr
-      pchild => pblock%child(2)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-#if NDIMS == 3
-      pneigh => pblock%neigh(2,1,3)%ptr
-      pchild => pblock%child(5)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(2,1,4)%ptr
-      pchild => pblock%child(6)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,2,p)%ptr => pchild
-          end do
-        endif
-      endif
-#endif /* NDIMS == 3 */
-
-! Y direction (right side)
+! neighbor level is the same as the refined block
 !
-      pneigh => pblock%neigh(2,2,1)%ptr
-      pchild => pblock%child(2)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,1,p)%ptr => pchild
-          end do
-        endif
-      endif
+                if (pneigh%level .eq. pblock%level) then
+                  pneigh%neigh(i,3-j,k)%ptr => pblock%child(set(i,j,k))%ptr
+                end if
 
-      pneigh => pblock%neigh(2,2,2)%ptr
-      pchild => pblock%child(4)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-#if NDIMS == 3
-      pneigh => pblock%neigh(2,2,3)%ptr
-      pchild => pblock%child(6)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(2,2,4)%ptr
-      pchild => pblock%child(8)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(2,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-! Z direction (left side)
+! neighbor level is the same as the child block
 !
-      pneigh => pblock%neigh(3,1,1)%ptr
-      pchild => pblock%child(1)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,2,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,2,p)%ptr => pchild
-          end do
-        endif
-      endif
+                if (pneigh%level .gt. pblock%level) then
+                  do p = 1, nfaces
+                    pneigh%neigh(i,3-j,p)%ptr => pblock%child(set(i,j,k))%ptr
+                  end do
+                end if
 
-      pneigh => pblock%neigh(3,1,2)%ptr
-      pchild => pblock%child(2)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,2,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,2,p)%ptr => pchild
-          end do
-        endif
-      endif
+              end if
 
-      pneigh => pblock%neigh(3,1,3)%ptr
-      pchild => pblock%child(3)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,2,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,2,p)%ptr => pchild
-          end do
-        endif
-      endif
+            end if
 
-      pneigh => pblock%neigh(3,1,4)%ptr
-      pchild => pblock%child(4)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,2,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,2,p)%ptr => pchild
           end do
-        endif
-      endif
-
-! Z direction (right side)
-!
-      pneigh => pblock%neigh(3,2,1)%ptr
-      pchild => pblock%child(5)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,1,1)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(3,2,2)%ptr
-      pchild => pblock%child(6)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,1,2)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(3,2,3)%ptr
-      pchild => pblock%child(7)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,1,3)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-
-      pneigh => pblock%neigh(3,2,4)%ptr
-      pchild => pblock%child(8)%ptr
-      if (associated(pneigh)) then
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(3,1,4)%ptr => pchild
-        endif
-        if (pneigh%level .eq. pchild%level) then
-          do p = 1, nfaces
-            pneigh%neigh(3,1,p)%ptr => pchild
-          end do
-        endif
-      endif
-#endif /* NDIMS == 3 */
+        end do
+      end do
 
 ! set corresponding configuration of the new blocks
 !
@@ -1490,6 +1257,10 @@ module blocks
         config(:) = (/ 2, 1, 1, 3 /)
         order (:) = (/ 1, 3, 4, 2 /)
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
 
       case(2) ! 'D'
 
@@ -1497,27 +1268,61 @@ module blocks
         config(:) = (/ 1, 2, 2, 4 /)
         order (:) = (/ 1, 2, 4, 3 /)
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
 
       case(3) ! 'C'
 
 #if NDIMS == 2
         config(:) = (/ 4, 3, 3, 1 /)
-        order (:) = (/ 2, 1, 3, 4 /)
+        order (:) = (/ 4, 3, 1, 2 /)
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
 
       case(4) ! 'U'
 
 #if NDIMS == 2
         config(:) = (/ 3, 4, 4, 2 /)
-        order (:) = (/ 3, 1, 2, 4 /)
+        order (:) = (/ 4, 2, 1, 3 /)
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+      case(5)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(6)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(7)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(8)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
 
       end select
 
 ! set blocks configurations
 !
       do p = 1, nchild
-        pblock%child(p)%ptr%config = config(p)
+        pblock%child(order(p))%ptr%config = config(p)
       end do
 
 ! connect blocks in chain
@@ -1537,7 +1342,6 @@ module blocks
         plast%next  => pneigh
       else
         last_meta => plast
-        nullify(plast%next)
       endif
 
       pblock%next => pfirst
@@ -1563,7 +1367,7 @@ module blocks
 
 ! assign a pointer to the current child
 !
-          pchild => pblock%child(order(p))%ptr
+          pchild => pblock%child(p)%ptr
 
 ! allocate data block
 !
@@ -1576,8 +1380,8 @@ module blocks
           k   = mod((p - 1) / 4,2)
 
           xmn = pblock%data%xmin + xln * i
-          ymn = pblock%data%xmin + yln * j
-          zmn = pblock%data%xmin + zln * k
+          ymn = pblock%data%ymin + yln * j
+          zmn = pblock%data%zmin + zln * k
 
           xmx = xmn + xln
           ymx = ymn + yln
@@ -1612,180 +1416,25 @@ module blocks
           plast%data%next  => pdata
         else
           last_data => plast%data
-          nullify(plast%data%next)
         endif
 
         pblock%data%next => pfirst%data
         pfirst%data%prev => pblock%data
 
+! prolongate data block
+!
+! TODO: call subroutine which prolongates data from parent block to children
+!
+
       end if
+
+! deallocate refined block
+!
+!       call deallocate_metablock(pblock)
 
 ! point the current block to the last created one
 !
       pblock => plast
-
-! ! depending on the configuration of the parent block
-! !
-!       select case(pblock%config)
-!       case('z', 'Z')
-!
-! ! set blocks configurations
-! !
-!         pbl%config = 'Z'
-!         pbr%config = 'Z'
-!         ptl%config = 'Z'
-!         ptr%config = 'Z'
-!
-! ! connect blocks in a chain
-! !
-!         pbl%next => pbr
-!         pbr%next => ptl
-!         ptl%next => ptr
-!
-!         pbr%prev => pbl
-!         ptl%prev => pbr
-!         ptr%prev => ptl
-!
-! ! insert this chain after the parent block
-! !
-!         pb => pblock%next
-!         if (associated(pb)) then
-!           pb%prev => ptr
-!           ptr%next => pb
-!         else
-!           plast => ptr
-!           nullify(ptr%next)
-!         endif
-!         pblock%next => pbl
-!         pbl%prev => pblock
-!
-!         pblock => ptr
-!
-!       case('n', 'N')
-!
-! ! set blocks configurations
-! !
-!         pbl%config = 'D'
-!         ptl%config = 'N'
-!         ptr%config = 'N'
-!         pbr%config = 'C'
-!
-! ! connect blocks in a chain
-! !
-!         pbl%next => ptl
-!         ptl%next => ptr
-!         ptr%next => pbr
-!
-!         ptl%prev => pbl
-!         ptr%prev => ptl
-!         pbr%prev => ptr
-!
-! ! insert this chain after the parent the block
-! !
-!         pb => pblock%next
-!         if (associated(pb)) then
-!           pb%prev => pbr
-!           pbr%next => pb
-!         endif
-!         pbl%prev => pblock
-!         pblock%next => pbl
-!
-!         pblock => pbr
-!
-!       case('d', 'D')
-!
-! ! set blocks configurations
-! !
-!         pbl%config = 'N'
-!         pbr%config = 'D'
-!         ptr%config = 'D'
-!         ptl%config = 'U'
-!
-! ! connect blocks in a chain
-! !
-!         pbl%next => pbr
-!         pbr%next => ptr
-!         ptr%next => ptl
-!
-!         pbr%prev => pbl
-!         ptr%prev => pbr
-!         ptl%prev => ptr
-!
-! ! insert this chain in the block list
-! !
-!         pb => pblock%next
-!         if (associated(pb)) then
-!           pb%prev => ptl
-!           ptl%next => pb
-!         endif
-!         pbl%prev => pblock
-!         pblock%next => pbl
-!
-!         pblock => ptl
-!
-!       case('c', 'C')
-!
-! ! set blocks configurations
-! !
-!         ptr%config = 'U'
-!         ptl%config = 'C'
-!         pbl%config = 'C'
-!         pbr%config = 'N'
-!
-! ! connect blocks in a chain
-! !
-!         ptr%next => ptl
-!         ptl%next => pbl
-!         pbl%next => pbr
-!
-!         ptl%prev => ptr
-!         pbl%prev => ptl
-!         pbr%prev => pbl
-!
-! ! insert this chain in the block list
-! !
-!         pb => pblock%next
-!         if (associated(pb)) then
-!           pb%prev => pbr
-!           pbr%next => pb
-!         endif
-!         ptr%prev => pblock
-!         pblock%next => ptr
-!
-!         pblock => pbr
-!
-!       case('u', 'U')
-!
-! ! set blocks configurations
-! !
-!         ptr%config = 'C'
-!         pbr%config = 'U'
-!         pbl%config = 'U'
-!         ptl%config = 'D'
-!
-! ! connect blocks in a chain
-! !
-!         ptr%next => pbr
-!         pbr%next => pbl
-!         pbl%next => ptl
-!
-!         pbr%prev => ptr
-!         pbl%prev => pbr
-!         ptl%prev => pbl
-!
-! ! insert this chain in the block list
-! !
-!         pb => pblock%next
-!         if (associated(pb)) then
-!           pb%prev => ptl
-!           ptl%next => pb
-!         endif
-!         ptr%prev => pblock
-!         pblock%next => ptr
-!
-!         pblock => ptl
-!
-!       end select
 
     else
 
