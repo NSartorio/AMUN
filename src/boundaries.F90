@@ -44,26 +44,37 @@ module boundaries
 
     use config  , only : im, jm, km
     use blocks  , only : nv => nvars, ndims, nsides, nfaces                    &
-                       , block_meta, list_meta, get_pointer, nblocks
+                       , block_meta, block_info, pointer_info, list_meta
     use error   , only : print_error
-    use mpitools, only : ncpus, ncpu, msendi, mrecvi, msendf, mrecvf, mallreducemaxl
+    use mpitools, only : ncpus, ncpu, msendf, mrecvf
 
     implicit none
 
 ! local variables
 !
-    integer :: i, j, k, p, l, dl
+    integer :: i, j, k, l, p, q, dl
 
 #ifdef MPI
-    integer(kind=4) :: itag
-    logical         :: lf
-
-! local arrays
+! MPI tag
 !
-    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: rbuf
-    integer(kind=4), dimension(:,:,:)    , allocatable :: iblk
-    integer(kind=4), dimension(:,:)      , allocatable :: ibuf, ll
-    integer(kind=4), dimension(:)        , allocatable :: cn
+    integer(kind=4)                                       :: itag
+
+! pointer to the list of pairs of blocks belonging to different processes for
+! which we perform the boundary exchange
+!
+    type(pointer_info), dimension(0:ncpus-1,0:ncpus-1)    :: block_array
+
+! declare pointer to the info block
+!
+    type(block_info), pointer                             :: pinfo
+
+! create counter for exchanged blocks
+!
+    integer(kind=4)   , dimension(0:ncpus-1,0:ncpus-1)    :: block_counter
+
+! local arrays for boundary exchange
+!
+    real(kind=8)      , dimension(:,:,:,:,:), allocatable :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -72,20 +83,16 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! #ifdef MPI
-! ! allocate temporary arrays; since we have two blocks per boundary and 4 sides
-! ! of each block we need to increase the second dimension
-! !
-!     allocate(cn  (0:ncpus-1))
-!     allocate(ll  (0:ncpus-1,0:ncpus-1))
-!     allocate(iblk(0:ncpus-1,2**(NDIMS-1)*NDIMS*nblocks,6))
+#ifdef MPI
+! nullify array pointers and reset the counter
 !
-! ! reset the local arrays storing blocks to exchange
-! !
-!     cn(:)       = 0
-!     ll(:,:)     = 0
-!     iblk(:,:,:) = 0
-! #endif /* MPI */
+    do p = 0, ncpus-1
+      do q = 0, ncpus-1
+        nullify(block_array(p,q)%ptr)
+        block_counter(p,q) = 0
+      end do
+    end do
+#endif /* MPI */
 
 ! iterate over all leaf blocks and perform boundary update
 !
@@ -112,10 +119,15 @@ module boundaries
               if (associated(pneigh)) then
 
 #ifdef MPI
+! get the processor number of the current block and its neighbor
+!
+                p = pblock%cpu
+                q = pneigh%cpu
+
 ! check if the neighbor is on the same cpu
 !
-                if (pneigh%cpu .eq. pblock%cpu) then
-                  if (pblock%cpu .eq. ncpu) then
+                if (p .eq. q) then
+                  if (p .eq. ncpu) then
 #endif /* MPI */
 
 ! calculate the difference of current and neighbor level
@@ -142,36 +154,40 @@ module boundaries
 ! neighbor is on another cpu, which means we have to update it later, so add it
 ! to the list of blocks to exchange
 !
+! allocate info block
+!
+                  allocate(pinfo)
 
-                endif
+! fill out its fields
+!
+                  pinfo%block            => pblock
+                  pinfo%neigh            => pneigh
+                  pinfo%direction        =  i
+                  pinfo%side             =  j
+                  pinfo%face             =  k
+                  pinfo%level_difference = pblock%level - pneigh%level
+
+! nullify pointers
+!
+                  nullify(pinfo%prev)
+                  nullify(pinfo%next)
+
+! if the list is not emply append the created block
+!
+                  if (associated(block_array(p,q)%ptr)) then
+                    pinfo%prev => block_array(p,q)%ptr
+                    nullify(pinfo%next)
+                  end if
+
+! point the list to the last created block
+!
+                  block_array(p,q)%ptr => pinfo
+
+! increase the counter
+!
+                  block_counter(p,q) = block_counter(p,q) + 1
+                end if
 #endif /* MPI */
-
-! #ifdef MPI
-!                 else
-!
-! ! in the array 'info' we store IDs of all blocks which have to be updated from
-! ! the blocks laying on the other processors
-! !
-! ! get the processor number of neighbor
-! !
-!                   p = pblock%neigh(i,j,k)%cpu
-!
-! ! increase the number of blocks to retrieve from that CPU
-! !
-!                   cn(p) = cn(p) + 1
-!
-! ! fill out the info array
-! !
-!                   iblk(p,cn(p),1) = pblock%id                ! 1: local block ID
-!                   iblk(p,cn(p),2) = pblock%level             ! 2: local block level
-!                   iblk(p,cn(p),3) = pblock%neigh(i,j,k)%id   ! 3: neighbor block ID
-!                   iblk(p,cn(p),4) = i                        ! 4: directions of boundary
-!                   iblk(p,cn(p),5) = j                        ! 5: side at the boundary
-!                   iblk(p,cn(p),6) = k                        ! 6: part of the boundary
-!
-!                 endif
-! #endif /* MPI */
-
               else
 
 ! neighbor is not associated, it means that we have non periodic boundary here
@@ -193,160 +209,126 @@ module boundaries
     end do
 
 #ifdef MPI
-! ! TODO: 1) update info globally, write an MPI subroutine to sum the variable
-! !          'info' over all processes
-! !       2) then iterate over all source and destination processes and send/receive
-! !          blocks
-! !       3) after receiving the block call bnd_copy, bnd_rest, or bnd_prol to update
-! !          the boundary of destination block
-! !
-!     do i = 0, ncpus-1
-!       if (cn(i) .gt. 0) then
-!         allocate(ibuf(cn(i),1))
-!         l = 1
-!         ibuf(1,1) = iblk(i,1,1)
-!         do p = 2, cn(i)
-!           lf = .true.
-!           do k = 1, l
-!             lf = lf .and. (iblk(i,p,1) .ne. ibuf(k,1))
-!           end do
+!! TO DO:
+!!
+!! - send/receive only boundaries, not whole blocks
+!!
 !
-!           if (lf) then
-!             l = l + 1
-!             ibuf(l,1) = iblk(i,p,1)
-!           endif
-!         end do
-!         ll(ncpu,i) = l
-!         deallocate(ibuf)
-!       endif
-!     end do
-!
-! ! update number of blocks across all processes
-! !
-!     call mallreducemaxl(size(ll),ll)
-!
-! !     if (ncpu .eq. 0) print *, ll
-!
-! ! allocate buffer for IDs and levels
-! !
-!     allocate(ibuf(maxval(ll),2))
-!
-!     do i = 0, ncpus-1
-!       do j = 0, ncpus-1
-!         if (ll(i,j) .gt. 0) then
-!
-! ! get the tag for communication
-! !
-!           itag = 10*(i * ncpus + j) + 1111
-!
-! ! allocate space for variables
-! !
-!           allocate(rbuf(ll(i,j),nv,im,jm,km))
-!
-! ! if i == ncpu we are sending the data
-! !
-!           if (i .eq. ncpu) then
-!
-! ! find all blocks to send from this process
-! !
-!             l = 1
-!             ibuf(l,1:2)  = iblk(j,1,1:2)
-!             do p = 2, cn(j)
-!               lf = .true.
-!               do k = 1, l
-!                 lf = lf .and. (iblk(j,p,1) .ne. ibuf(k,1))
-!               end do
-!               if (lf) then
-!                 l = l + 1
-!                 ibuf(l,1:2)  = iblk(j,p,1:2)
-!               endif
-!             end do
-!
-! ! send block IDs and levels
-! !
-!             l = ll(i,j)
-!             call msendi(size(ibuf(1:l,:)), j, itag, ibuf(1:l,:))
-!
-! ! fill the buffer with data
-! !
-!             do l = 1, ll(i,j)
-!               pblock => get_pointer(ibuf(l,1))
-!
-!               rbuf(l,:,:,:,:) = pblock%u(:,:,:,:)
-!             end do
-!
-! ! send data
-! !
-!             call msendf(size(rbuf), j, itag+1, rbuf)
-!
-!           endif
-!
-! ! if j == ncpu we are receiving the data
-! !
-!           if (j .eq. ncpu) then
-!
-! ! receive block IDs and levels
-! !
-!             l = ll(i,j)
-!             call mrecvi(size(ibuf(1:l,:)), i, itag, ibuf(1:l,:))
-!
-! ! receive data
-! !
-!             call mrecvf(size(rbuf(1:l,:,:,:,:)), i, itag+1, rbuf(1:l,:,:,:,:))
-!
-! ! iterate over all blocks
-! !
-!             do p = 1, cn(i)
-!
-! ! get pointer to the local block
-! !
-!               pblock => get_pointer(iblk(i,p,1))
-!
-! ! find the position of block iblk(i,p,3) in ibuf
-! !
-!               l = 1
-!               do while(ibuf(l,1) .ne. iblk(i,p,3) .and. l .le. ll(i,j))
-!                 l = l + 1
-!               end do
-!
-! ! get the level difference
-! !
-!               dl = pblock%level - ibuf(l,2)
-!
-! ! update boundaries
-! !
-!               select case(dl)
-!               case(-1)  ! restriction
-!                 call bnd_rest_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),iblk(i,p,6))
-!               case(0)   ! the same level, copying
-!                 if (iblk(i,p,6) .eq. 1) &
-!                   call bnd_copy_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),iblk(i,p,6))
-!               case(1)   ! prolongation
-!                 if (iblk(i,p,6) .eq. 1) &
-!                   call bnd_prol_u(pblock,rbuf(l,:,:,:,:),iblk(i,p,4),iblk(i,p,5),pblock%pos(3-iblk(i,p,4)))
-!               case default
-!                 call print_error("boundaries::boundary", "Level difference unsupported!")
-!               end select
-!
-!             end do
-!
-!           endif
-!
-! ! deallocate buffers
-! !
-!           deallocate(rbuf)
-!
-!         endif
-!
+!     if (ncpu .eq. 0) then
+!       do p = 0, ncpus-1
+!         write (*,"(8(1i3))") block_counter(p,:)
 !       end do
-!     end do
+!      end if
+
+! iterate over receiving and sending processors
 !
-! ! deallocate temporary arrays
-! !
-!     deallocate(ibuf)
-!     deallocate(iblk)
-!     deallocate(ll)
-!     deallocate(cn)
+    do p = 0, ncpus - 1
+      do q = 0, ncpus - 1
+
+        if (block_counter(p,q) .gt. 0) then
+
+! get the number of nodes to exchange
+!
+           l = block_counter(p,q)
+
+! get the tag for communication
+!
+          itag = p * ncpus + q + ncpus + 1
+
+! allocate space for variables
+!
+          allocate(rbuf(l,nv,im,jm,km))
+
+! if p == ncpu we are receiving data
+!
+          if (p .eq. ncpu) then
+
+! receive data
+!
+            call mrecvf(size(rbuf(:,:,:,:,:)), q, itag, rbuf(:,:,:,:,:))
+
+! iterate over all received blocks and update boundaries
+!
+            l = 1
+
+            pinfo => block_array(p,q)%ptr
+            do while(associated(pinfo))
+
+! set indices
+!
+              i  = pinfo%direction
+              j  = pinfo%side
+              k  = pinfo%face
+              dl = pinfo%level_difference
+
+! update boundaries
+!
+              select case(dl)
+              case(-1)  ! restriction
+                call bnd_rest_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+              case(0)   ! the same level, copying
+                if (k .eq. 1) &
+                  call bnd_copy_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+              case(1)   ! prolongation
+                if (k .eq. 1) &
+                  call bnd_prol_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+              case default
+                call print_error("boundaries::boundary", "Level difference unsupported!")
+              end select
+
+              pinfo => pinfo%prev
+              l = l + 1
+            end do
+
+          end if
+
+! if q == ncpu we are sending data
+!
+          if (q .eq. ncpu) then
+
+! fill out the buffer with block data
+!
+            l = 1
+
+            pinfo => block_array(p,q)%ptr
+            do while(associated(pinfo))
+
+              rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,:)
+
+              pinfo => pinfo%prev
+              l = l + 1
+            end do
+
+! send data buffer
+!
+            call msendf(size(rbuf), p, itag, rbuf)
+
+          end if
+
+! deallocate buffers
+!
+          deallocate(rbuf)
+
+! deallocate info blocks
+!
+            pinfo => block_array(p,q)%ptr
+            do while(associated(pinfo))
+              block_array(p,q)%ptr => pinfo%prev
+
+              nullify(pinfo%prev)
+              nullify(pinfo%next)
+              nullify(pinfo%block)
+              nullify(pinfo%neigh)
+
+              deallocate(pinfo)
+
+              pinfo => block_array(p,q)%ptr
+            end do
+
+        end if
+
+      end do
+    end do
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -868,7 +850,7 @@ module boundaries
 !
   subroutine bnd_copy_u(pb, un, id, is, ip)
 
-    use blocks, only : block, nv => nvars
+    use blocks, only : block_data, nv => nvars
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                 &
                      , jm, jb, jbl, jbu, je, jel, jeu                 &
                      , km, kb, kbl, kbu, ke, kel, keu
@@ -878,7 +860,7 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer                , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pb
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: id, is, ip
 
@@ -948,7 +930,7 @@ module boundaries
 !
   subroutine bnd_rest_u(pb, un, id, is, ip)
 
-    use blocks, only : block, nv => nvars
+    use blocks, only : block_data, nv => nvars
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
                          , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
@@ -958,7 +940,7 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer                , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pb
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: id, is, ip
 
@@ -1128,7 +1110,7 @@ module boundaries
 !
   subroutine bnd_prol_u(pb, un, id, is, ip)
 
-    use blocks, only : block, nv => nvars
+    use blocks, only : block_data, nv => nvars
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
                          , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
@@ -1139,7 +1121,7 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer                , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pb
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: id, is, ip
 

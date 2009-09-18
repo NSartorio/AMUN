@@ -130,7 +130,7 @@ module evolution
 ! update boundaries
 !
     call start_timer(4)
-!     call boundary
+    call boundary
     call stop_timer(4)
 
 !-------------------------------------------------------------------------------

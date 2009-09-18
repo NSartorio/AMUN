@@ -131,6 +131,10 @@ module blocks
     type(block_info)  , pointer :: next             ! pointer to the next block
     type(block_meta)  , pointer :: block            ! pointer to the meta block
     type(block_meta)  , pointer :: neigh            ! pointer to the neighbor block
+    integer(kind=4)             :: direction        ! direction of the neighbor block
+    integer(kind=4)             :: side             ! side of the neighbor block
+    integer(kind=4)             :: face             ! face of the neighbor block
+    integer(kind=4)             :: level_difference ! the difference of levels
   end type block_info
 
 
