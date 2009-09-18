@@ -87,7 +87,7 @@ module boundaries
 !     iblk(:,:,:) = 0
 ! #endif /* MPI */
 
-! iterate over all blocks and perform boundary update
+! iterate over all leaf blocks and perform boundary update
 !
     pblock => list_meta
     do while (associated(pblock))
@@ -96,7 +96,7 @@ module boundaries
 !
       if (pblock%leaf) then
 
-! iterate over all neighbor blocks
+! iterate over all neighbors
 !
         do i = 1, ndims
           do j = 1, nsides
@@ -111,57 +111,41 @@ module boundaries
 !
               if (associated(pneigh)) then
 
+#ifdef MPI
 ! check if the neighbor is on the same cpu
 !
-                if (pneigh%cpu .eq. ncpu) then
+                if (pneigh%cpu .eq. pblock%cpu) then
+                  if (pblock%cpu .eq. ncpu) then
+#endif /* MPI */
 
 ! calculate the difference of current and neighbor level
 !
-                  dl = pblock%level - pneigh%level
+                    dl = pblock%level - pneigh%level
 
-! ! depending on the level difference
-! !
-!                   select case(dl)
-!                   case(-1)  ! restriction and prolongation
-!                     call bnd_rest(pblock, pneigh, i, j, k)
-!                   case(0)   ! the same level, copying
-!                     if (k .eq. 1) &
-!                       call bnd_copy(pblock, pneigh, i, j, k)
-!                   case(1)   ! prolongation is handled by bnd_rest
-!                   case default
-!                     call print_error("boundaries::boundary", "Level difference unsupported!")
-!                   end select
+! depending on the level difference
+!
+                    select case(dl)
+                    case(-1)  ! restriction and prolongation
+                      call bnd_rest(pblock%data, pneigh%data, i, j, k)
+                    case(0)   ! the same level, copying
+                      if (k .eq. 1) &
+                        call bnd_copy(pblock%data, pneigh%data, i, j, k)
+                    case(1)   ! prolongation is handled by bnd_rest
+                    case default
+                      call print_error("boundaries::boundary", "Level difference unsupported!")
+                   end select
 
+#ifdef MPI
+                  end if
                 else
-                endif
 
-! #ifdef MPI
-! ! neighbor associated; exchange boundaries
-! !
-!                 if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
-! #endif /* MPI */
+! neighbor is on another cpu, which means we have to update it later, so add it
+! to the list of blocks to exchange
 !
-! ! neighbor is on the same CPU, update
-! !
-!                   pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-!
-! ! calculate the difference of current and neighbor levels
-! !
-!                   dl = pblock%level - pneigh%level
-!
-! ! depending on the level difference
-! !
-!                   select case(dl)
-!                   case(-1)  ! restriction and prolongation
-!                     call bnd_rest(pblock, pneigh, i, j, k)
-!                   case(0)   ! the same level, copying
-!                     if (k .eq. 1) &
-!                       call bnd_copy(pblock, pneigh, i, j, k)
-!                   case(1)   ! prolongation is handled by bnd_rest
-!                   case default
-!                     call print_error("boundaries::boundary", "Level difference unsupported!")
-!                   end select
-!
+
+                endif
+#endif /* MPI */
+
 ! #ifdef MPI
 !                 else
 !
@@ -192,8 +176,8 @@ module boundaries
 
 ! neighbor is not associated, it means that we have non periodic boundary here
 !
-!                 if (k .eq. 1) &
-!                   call bnd_spec(pblock, i, j, k)
+                if (k .eq. 1) &
+                  call bnd_spec(pblock%data, i, j, k)
 
               endif
             end do
@@ -208,7 +192,7 @@ module boundaries
 
     end do
 
-! #ifdef MPI
+#ifdef MPI
 ! ! TODO: 1) update info globally, write an MPI subroutine to sum the variable
 ! !          'info' over all processes
 ! !       2) then iterate over all source and destination processes and send/receive
@@ -363,7 +347,7 @@ module boundaries
 !     deallocate(iblk)
 !     deallocate(ll)
 !     deallocate(cn)
-! #endif /* MPI */
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
@@ -378,9 +362,9 @@ module boundaries
 !
   subroutine bnd_copy(pb, pn, id, is, ip)
 
-    use blocks, only : block, nv => nvars
-    use config, only : im, ib, ibl, ibu, ie, iel, ieu                 &
-                     , jm, jb, jbl, jbu, je, jel, jeu                 &
+    use blocks, only : block_data, nv => nvars
+    use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
+                     , jm, jb, jbl, jbu, je, jel, jeu                          &
                      , km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
 
@@ -388,8 +372,8 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer, intent(inout) :: pb, pn
-    integer             , intent(in)    :: id, is, ip
+    type(block_data), pointer, intent(inout) :: pb, pn
+    integer                  , intent(in)    :: id, is, ip
 
 ! local variables
 !
@@ -457,7 +441,7 @@ module boundaries
 !
   subroutine bnd_rest(pb, pn, id, is, ip)
 
-    use blocks, only : block, nv => nvars
+    use blocks, only : block_data, nv => nvars
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
                          , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
@@ -468,8 +452,8 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer, intent(inout) :: pb, pn
-    integer             , intent(in)    :: id, is, ip
+    type(block_data), pointer, intent(inout) :: pb, pn
+    integer                  , intent(in)    :: id, is, ip
 
 ! local variables
 !
@@ -479,10 +463,6 @@ module boundaries
 ! local arrays
 !
     real, dimension(2*im,2*jm,km) :: ux
-
-! local pointers
-!
-    type(block), pointer :: pn1, pn2
 !
 !-------------------------------------------------------------------------------
 !
@@ -985,10 +965,6 @@ module boundaries
 ! local variables
 !
     integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
-
-! local pointers
-!
-    type(block), pointer :: pn1, pn2
 !
 !-------------------------------------------------------------------------------
 !
@@ -1174,10 +1150,6 @@ module boundaries
 ! local arrays
 !
     real, dimension(2*im,2*jm,km) :: ux
-
-! local pointers
-!
-    type(block), pointer :: pn1, pn2
 !
 !-------------------------------------------------------------------------------
 !
@@ -1431,7 +1403,7 @@ module boundaries
 !
   subroutine bnd_spec(pb, id, il, ip)
 
-    use blocks, only : block, nv => nvars
+    use blocks, only : block_data, nv => nvars
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu      &
                      , kb, kbl, ke, keu
@@ -1442,8 +1414,8 @@ module boundaries
 
 ! arguments
 !
-    type(block), pointer, intent(inout) :: pb
-    integer             , intent(in)    :: id, il, ip
+    type(block_data), pointer, intent(inout) :: pb
+    integer                  , intent(in)    :: id, il, ip
 
 ! local variables
 !

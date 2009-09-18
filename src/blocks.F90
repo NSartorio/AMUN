@@ -57,6 +57,8 @@ module blocks
 #endif /* MHD */
   integer(kind=4), parameter :: maxid = 1000000
 
+!! BLOCK STRUCTURE POINTERS (have to be defined before structures)
+!!
 ! define block type
 !
   type blockptr
@@ -77,6 +79,12 @@ module blocks
     type(block_data), pointer :: ptr
   end type pointer_data
 
+  type pointer_info
+    type(block_info), pointer :: ptr
+  end type pointer_info
+
+!! BLOCK STRUCTURES
+!
 ! define block_meta structure
 !
   type block_meta
@@ -115,6 +123,15 @@ module blocks
     real, dimension(:,:,:,:), allocatable :: u    ! variable array
     real, dimension(:,:,:)  , allocatable :: c    ! criterion array
   end type block_data
+
+! define block_info structure for boundary exchange
+!
+  type block_info
+    type(block_info)  , pointer :: prev             ! pointer to the previous block
+    type(block_info)  , pointer :: next             ! pointer to the next block
+    type(block_meta)  , pointer :: block            ! pointer to the meta block
+    type(block_meta)  , pointer :: neigh            ! pointer to the neighbor block
+  end type block_info
 
 
   type block
