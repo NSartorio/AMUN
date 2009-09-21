@@ -246,7 +246,7 @@ module evolution
 
 ! local pointers
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !

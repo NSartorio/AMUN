@@ -43,7 +43,7 @@ module boundaries
   subroutine boundary
 
     use config  , only : im, jm, km
-    use blocks  , only : nv => nvars, ndims, nsides, nfaces                    &
+    use blocks  , only : nv => nvars, ndims, nsides, nfaces, nchild            &
                        , block_meta, block_info, pointer_info, list_meta
     use error   , only : print_error
     use mpitools, only : ncpus, ncpu, msendf, mrecvf
@@ -52,7 +52,7 @@ module boundaries
 
 ! local variables
 !
-    integer :: i, j, k, l, p, q, dl
+    integer :: i, j, k, l, m, p, q, dl
 
 #ifdef MPI
 ! MPI tag
@@ -137,12 +137,22 @@ module boundaries
 ! depending on the level difference
 !
                     select case(dl)
-                    case(-1)  ! restriction and prolongation
-                      call bnd_rest(pblock%data, pneigh%data, i, j, k)
+                    case(-1)  ! restriction
+                      call bnd_rest(pblock%data, pneigh%data%u, i, j, k)
                     case(0)   ! the same level, copying
                       if (k .eq. 1) &
-                        call bnd_copy(pblock%data, pneigh%data, i, j, k)
-                    case(1)   ! prolongation is handled by bnd_rest
+                        call bnd_copy(pblock%data, pneigh%data%u, i, j, k)
+                    case(1)   ! prolongation
+                      m = 1
+                      do while(pblock%id .eq. pneigh%neigh(i,3-j,m)%ptr%id .or. m .gt. nchild)
+                        m = m + 1
+                      end do
+                      if (m .le. nchild) then
+                        if (k .eq. 1) &
+                          call bnd_prol(pblock%data, pneigh%data%u, i, j, m)
+                      else
+                        call print_error("boundaries::boundary", "Index m out of the limit!")
+                      end if
                     case default
                       call print_error("boundaries::boundary", "Level difference unsupported!")
                    end select
@@ -268,10 +278,20 @@ module boundaries
                 call bnd_rest_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
               case(0)   ! the same level, copying
                 if (k .eq. 1) &
-                  call bnd_copy_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+                  call bnd_copy(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
               case(1)   ! prolongation
-                if (k .eq. 1) &
-                  call bnd_prol_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+                pblock => pinfo%block
+                pneigh => pblock%neigh(i,j,k)%ptr
+                m = 1
+                do while(pblock%id .eq. pneigh%neigh(i,3-j,m)%ptr%id .or. m .gt. nchild)
+                  m = m + 1
+                end do
+                if (m .le. nchild) then
+                  if (k .eq. 1) &
+                    call bnd_prol(pinfo%block%data,rbuf(l,:,:,:,:),i,j,m)
+                  else
+                    call print_error("boundaries::boundary", "Index m out of the limit!")
+                end if
               case default
                 call print_error("boundaries::boundary", "Level difference unsupported!")
               end select
@@ -337,522 +357,16 @@ module boundaries
 !
 !===============================================================================
 !
-! bnd_copy: subroutine copies the interior of neighbor to update the boundaries
-!           of current block
+! bnd_copy: subroutine copies the interior of neighbor to update the
+!           boundaries of current block
 !
 !===============================================================================
 !
-  subroutine bnd_copy(pb, pn, id, is, ip)
+  subroutine bnd_copy(pb, un, id, is, ip)
 
     use blocks, only : block_data, nv => nvars
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
-                     , km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_warning
-
-    implicit none
-
-! arguments
-!
-    type(block_data), pointer, intent(inout) :: pb, pn
-    integer                  , intent(in)    :: id, is, ip
-
-! local variables
-!
-    integer :: ii, i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-! calcuate the flag determinig the side of boundary to update
-!
-    ii = 100 * id + 10 * is
-
-! perform update according to the flag
-!
-    select case(ii)
-    case(110)
-      do k = 1, km
-        do j = 1, jm
-          pb%u(1:nv,1:ibl,j,k) = pn%u(1:nv,iel:ie,j,k)
-        end do
-      end do
-    case(120)
-      do k = 1, km
-        do j = 1, jm
-          pb%u(1:nv,ieu:im,j,k) = pn%u(1:nv,ib:ibu,j,k)
-        end do
-      end do
-    case(210)
-      do k = 1, km
-        do i = 1, im
-          pb%u(1:nv,i,1:jbl,k) = pn%u(1:nv,i,jel:je,k)
-        end do
-      end do
-    case(220)
-      do k = 1, km
-        do i = 1, im
-          pb%u(1:nv,i,jeu:jm,k) = pn%u(1:nv,i,jb:jbu,k)
-        end do
-      end do
-    case(310)
-      do j = 1, jm
-        do i = 1, im
-          pb%u(1:nv,i,j,1:kbl) = pn%u(1:nv,i,j,kel:ke)
-        end do
-      end do
-    case(320)
-      do j = 1, jm
-        do i = 1, im
-          pb%u(1:nv,i,j,keu:km) = pn%u(1:nv,i,j,kb:kbu)
-        end do
-      end do
-    case default
-      call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine bnd_copy
-!
-!===============================================================================
-!
-! bnd_rest: subroutine copies the interior of neighbor to update the boundaries
-!           of current block
-!
-!===============================================================================
-!
-  subroutine bnd_rest(pb, pn, id, is, ip)
-
-    use blocks, only : block_data, nv => nvars
-    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
-                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
-                         , kn, km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_warning
-    use interpolation, only : expand
-
-    implicit none
-
-! arguments
-!
-    type(block_data), pointer, intent(inout) :: pb, pn
-    integer                  , intent(in)    :: id, is, ip
-
-! local variables
-!
-    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
-    real    :: dup, dum, du0, ds, du
-
-! local arrays
-!
-    real, dimension(2*im,2*jm,km) :: ux
-!
-!-------------------------------------------------------------------------------
-!
-! calcuate the flag determinig the side of boundary to update
-!
-    ii = 100 * id + 10 * is + ip
-
-! perform update according to the flag
-!
-    select case(ii)
-    case(111)
-
-! neighbor to current
-!
-      jl = ng / 2 + 1
-      ju = jm / 2
-      do k = 1, km
-        do j = jl, ju
-          j2 = 2 * j - ng
-          j1 = j2 - 1
-          do i = 1, ng
-            i2 = ie + 2 * (i - ng)
-            i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = ng
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + ng - 1
-      j0 = ng / 2
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(112)
-
-! neighbor to current
-!
-      jl = jm / 2 + 1
-      ju = jm - ng / 2
-      do k = 1, km
-        do j = jl, ju
-          j2 = 2 * j - jm + ng
-          j1 = j2 - 1
-          do i = 1, ng
-            i2 = ie + 2 * (i - ng)
-            i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = ng
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + ng - 1
-      j0 = jm / 2 - ng / 2
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(121)
-
-! neighbor to current
-!
-      jl = ng / 2 + 1
-      ju = jm / 2
-      do k = 1, km
-        do j = jl, ju
-          j2 = 2 * j - ng
-          j1 = j2 - 1
-          do i = ieu, im
-            i2 = ng + 2 * (i - ie)
-            i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i1 = ie + 1
-      i0 = i1 - dm(1) + 1
-      il = 3
-      iu = il + ng - 1
-      j0 = ng / 2
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(122)
-
-! neighbor to current
-!
-      jl = jm / 2 + 1
-      ju = jm - ng / 2
-      do k = 1, km
-        do j = jl, ju
-          j2 = 2 * j - jm + ng
-          j1 = j2 - 1
-          do i = ieu, im
-            i2 = ng + 2 * (i - ie)
-            i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-
-! current to neighbor
-!
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i1 = ie + 1
-      i0 = i1 - dm(1) + 1
-      il = 3
-      iu = il + ng - 1
-      j0 = jm / 2 - ng / 2
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(211)
-
-! neighbor to current
-!
-      il = ng / 2 + 1
-      iu = im / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
-          do j = 1, ng
-            j2 = je + 2 * (j - ng)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = ng / 2
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-      j0 = ng
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(212)
-
-! neighbor to current
-!
-      il = im / 2 + 1
-      iu = im - ng / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-          do j = 1, ng
-            j2 = je + 2 * (j - ng)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = im / 2 - ng / 2
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-      j0 = ng
-      j1 = j0 + dm(2) - 1
-      jl = 3
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(221)
-
-! neighbor to current
-!
-      il = ng / 2 + 1
-      iu = im / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
-          do j = jeu, jm
-            j2 = ng + 2 * (j - je)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = ng / 2
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-      j1 = je + 1
-      j0 = j1 - dm(2) + 1
-      jl = 3
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-
-    case(222)
-
-! neighbor to current
-!
-      il = im / 2 + 1
-      iu = im - ng / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-          do j = jeu, jm
-            j2 = ng + 2 * (j - je)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (pn%u(1:nv,i1,j1,k) + pn%u(1:nv,i1,j2,k) &
-                                     + pn%u(1:nv,i2,j1,k) + pn%u(1:nv,i2,j2,k))
-          end do
-        end do
-      end do
-
-! current to neighbor
-!
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = im / 2 - ng / 2
-      i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-
-      j1 = je + 1
-      j0 = j1 - dm(2) + 1
-      jl = 3
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,pb%u(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pn%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
-    case default
-      call print_warning("boundaries::bnd_rest", "Boundary flag unsupported!")
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine bnd_rest
-#ifdef MPI
-!
-!===============================================================================
-!
-! bnd_copy_u: subroutine copies the interior of neighbor to update the
-!             boundaries of current block
-!
-!===============================================================================
-!
-  subroutine bnd_copy_u(pb, un, id, is, ip)
-
-    use blocks, only : block_data, nv => nvars
-    use config, only : im, ib, ibl, ibu, ie, iel, ieu                 &
-                     , jm, jb, jbl, jbu, je, jel, jeu                 &
                      , km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
 
@@ -919,16 +433,16 @@ module boundaries
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine bnd_copy_u
+  end subroutine bnd_copy
 !
 !===============================================================================
 !
-! bnd_rest_u: subroutine copies the interior of neighbor to update the
-!             boundaries of current block
+! bnd_rest: subroutine copies the interior of neighbor to update the boundaries
+!           of current block
 !
 !===============================================================================
 !
-  subroutine bnd_rest_u(pb, un, id, is, ip)
+  subroutine bnd_rest(pb, un, id, is, ip)
 
     use blocks, only : block_data, nv => nvars
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
@@ -1099,20 +613,20 @@ module boundaries
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine bnd_rest_u
+  end subroutine bnd_rest
 !
 !===============================================================================
 !
-! bnd_prol_u: subroutine copies the interior of neighbor to update the
-!             boundaries of current block
+! bnd_prol: subroutine copies the interior of neighbor to update the boundaries
+!           of current block
 !
 !===============================================================================
 !
-  subroutine bnd_prol_u(pb, un, id, is, ip)
+  subroutine bnd_prol(pb, un, id, is, ip)
 
     use blocks, only : block_data, nv => nvars
-    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
-                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
+    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                  &
+                         , jn, jm, jb, jbl, jbu, je, jel, jeu                  &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
     use interpolation, only : expand
@@ -1127,7 +641,12 @@ module boundaries
 
 ! local variables
 !
-    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
+    integer               :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju
+    integer, dimension(3) :: dm(3), fm(3)
+
+! parameters
+!
+    integer :: del = 1
 
 ! local arrays
 !
@@ -1145,20 +664,21 @@ module boundaries
 
     case(111)
 
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
+      dm(1) = ng / 2 + 2 * del
+      dm(2) = jm / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i1 = ie + 1
-      i0 = i1 - dm(1) + 1
-      il = 3
-      iu = il + ng - 1
-      j0 = ng / 2
+      i0 = ie - ng / 2 - del + 1
+      i1 = i0 + dm(1) - 1
+      j0 = jm / 2 - ng / 2 - del + 1
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + ng - 1
+      jl = 2 * del + 1
       ju = jl + jm - 1
 
 ! expand cube
@@ -1173,20 +693,21 @@ module boundaries
 
     case(112)
 
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
+      dm(1) = ng / 2 + 2 * del
+      dm(2) = jm / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i1 = ie + 1
-      i0 = i1 - dm(1) + 1
-      il = 3
-      iu = il + ng - 1
-      j0 = jm / 2 - ng / 2
+      i0 = ie - ng / 2 - del + 1
+      i1 = i0 + dm(1) - 1
+      j0 = jb - ng / 2 - del
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + ng - 1
+      jl = 2 * del + 1
       ju = jl + jm - 1
 
 ! expand cube
@@ -1201,20 +722,21 @@ module boundaries
 
     case(121)
 
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
+      dm(1) = ng / 2 + 2 * del
+      dm(2) = jm / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = ng
+      i0 = ib - del
       i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + ng - 1
-      j0 = ng / 2
+      j0 = jm / 2 - ng / 2 - del + 1
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + ng - 1
+      jl = 2 * del + 1
       ju = jl + jm - 1
 
 ! expand cube
@@ -1229,20 +751,21 @@ module boundaries
 
     case(122)
 
-      dm(1) = ng / 2 + 2
-      dm(2) = jn / 2 + ng + 2
+      dm(1) = ng / 2 + 2 * del
+      dm(2) = jm / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = ng
+      i0 = ib - del
       i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + ng - 1
-      j0 = jm / 2 - ng / 2
+      j0 = jb - ng / 2 - del
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + ng - 1
+      jl = 2 * del + 1
       ju = jl + jm - 1
 
 ! expand cube
@@ -1257,20 +780,21 @@ module boundaries
 
     case(211)
 
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
+      dm(1) = im / 2 + 2 * del
+      dm(2) = ng / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = ng / 2
+      i0 = im / 2 - ng / 2 - del + 1
       i1 = i0 + dm(1) - 1
-      il = 3
+      j0 = je - ng / 2 - del + 1
+      j1 = j0 + dm(2) - 1
+
+      il = 2 * del + 1
       iu = il + im - 1
-      j1 = je + 1
-      j0 = j1 - dm(2) + 1
-      jl = 3
+      jl = 2 * del + 1
       ju = jl + ng - 1
 
 ! expand cube
@@ -1285,21 +809,21 @@ module boundaries
 
     case(212)
 
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
+      dm(1) = im / 2 + 2 * del
+      dm(2) = ng / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = im / 2 - ng / 2
+      i0 = ib - ng / 2 - del
       i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
+      j0 = je - ng / 2 - del + 1
+      j1 = j0 + dm(2) - 1
 
-      j1 = je + 1
-      j0 = j1 - dm(2) + 1
-      jl = 3
+      il = 2 * del + 1
+      iu = il + im - 1
+      jl = 2 * del + 1
       ju = jl + ng - 1
 
 ! expand cube
@@ -1314,20 +838,21 @@ module boundaries
 
     case(221)
 
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
+      dm(1) = im / 2 + 2 * del
+      dm(2) = ng / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = ng / 2
+      i0 = im / 2 - ng / 2 - del + 1
       i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-      j0 = ng
+      j0 = jb - del
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + im - 1
+      jl = 2 * del + 1
       ju = jl + ng - 1
 
 ! expand cube
@@ -1342,20 +867,21 @@ module boundaries
 
     case(222)
 
-      dm(1) = in / 2 + ng + 2
-      dm(2) = ng / 2 + 2
+      dm(1) = im / 2 + 2 * del
+      dm(2) = ng / 2 + 2 * del
       dm(3) = km
       fm(1) = 2 * dm(1)
       fm(2) = 2 * dm(2)
       fm(3) = km
 
-      i0 = im / 2 - ng / 2
+      i0 = ib - ng / 2 - del
       i1 = i0 + dm(1) - 1
-      il = 3
-      iu = il + im - 1
-      j0 = ng
+      j0 = jb - del
       j1 = j0 + dm(2) - 1
-      jl = 3
+
+      il = 2 * del + 1
+      iu = il + im - 1
+      jl = 2 * del + 1
       ju = jl + ng - 1
 
 ! expand cube
@@ -1374,8 +900,7 @@ module boundaries
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine bnd_prol_u
-#endif /* MPI */
+  end subroutine bnd_prol
 !
 !===============================================================================
 !
