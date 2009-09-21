@@ -124,7 +124,7 @@ module evolution
 ! check refinement and refine
 !
     call start_timer(5)
-!     call update_mesh(0)
+    call update_mesh
     call stop_timer(5)
 
 ! update boundaries

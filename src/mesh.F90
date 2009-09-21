@@ -320,53 +320,84 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine update_mesh(ref)
+  subroutine update_mesh
 
     use config  , only : maxlev
-    use blocks  , only : block, plist, ndims, nchild, nblocks, refine_block    &
-                       , get_pointer, maxid, last_id
+    use blocks  , only : block_meta, block_data, list_meta, list_data, nleafs  &
+                       , nchild, ndims, nsides, nfaces                         &
+                       , refine_block, derefine_block
     use error   , only : print_info
 #ifdef MPI
-    use mpitools, only : ncpus, ncpu, mfindmaxi, mallreducesuml, mallreducemaxl, msendi, mrecvi
+    use mpitools, only : ncpu, is_master, mallreducesuml
 #endif /* MPI */
     use problem , only : check_ref
 
     implicit none
 
-    integer, intent(in) :: ref
-
 ! local variables
 !
-    type(block), pointer :: pblock, pneigh, pchild, pparent
-    integer(kind=4)      :: l, i, j, k, m, n, p, q
+    logical         :: flag
+    integer(kind=4) :: i, j, k, l, p
 
 #ifdef MPI
-    logical              :: flag
+! allocatable array for update the refinement flag on all processors
+!
+    integer(kind=4), dimension(nleafs) :: ibuf
 #endif /* MPI */
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh, pchild, pparent
+    type(block_data), pointer :: pdata
 
 !-------------------------------------------------------------------------------
 !
-#ifdef MPI
 ! check the refinement criterion for all leafs
 !
-    pblock => plist
-    do while (associated(pblock))
+    pdata => list_data
+    do while (associated(pdata))
+      pmeta => pdata%meta
 
-      if (pblock%leaf) then
-!         pblock%refine = check_ref(pblock)
+      if (pmeta%leaf) then
+        pmeta%refine = check_ref(pdata)
 
-        if (pblock%level .eq. maxlev) &
-          pblock%refine = min(0, pblock%refine)
-      endif
+        if (pmeta%level .eq. maxlev) &
+          pmeta%refine = min(0, pmeta%refine)
+      end if
 
-      pblock => pblock%next
+      pdata => pdata%next
     end do
 
-! TODO: create an array storing information of all blocks from all cpus, update
-! all information across all cpus, and check all conditions at each cpu for all
-! blocks independently, in this way we don't have to use MPI to find which
-! blocks should be refined/derefined
+#ifdef MPI
+! store refinement flags for all blocks for exchange between processors
 !
+    l = 1
+    pmeta => list_meta
+    do while (associated(pmeta))
+      if (pmeta%leaf) then
+        ibuf(l) = pmeta%refine
+        l = l + 1
+      end if
+      pmeta => pmeta%next
+    end do
+
+! update information across all processors
+!
+    call mallreducesuml(nleafs, ibuf)
+
+! update non-local block refinement flags
+!
+    l = 1
+    pmeta => list_meta
+    do while (associated(pmeta))
+      if (pmeta%leaf) then
+        if (pmeta%cpu .ne. ncpu) &
+          pmeta%refine = ibuf(l)
+        l = l + 1
+      end if
+      pmeta => pmeta%next
+    end do
+#endif /* MPI */
 
 ! walk down from the highest level and select neighbors for refinement if they
 ! are at lower levels
@@ -376,151 +407,143 @@ module mesh
 ! iterate over all blocks at the current level and if the current block is
 ! selected for refinement set the neighbor at lower level to be refined too
 !
-      pblock => plist
-      do while (associated(pblock))
+      pmeta => list_meta
+      do while (associated(pmeta))
 
-        if (pblock%level .eq. l .and. pblock%leaf) then
-          if (pblock%refine .eq. 1) then
+        if (pmeta%level .eq. l .and. pmeta%leaf) then
+          if (pmeta%refine .eq. 1) then
 
             do i = 1, ndims
-              do j = 1, 2
-                do k = 1, 2
-                  if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
-                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-
-                    if (pneigh%level .lt. pblock%level) &
+              do j = 1, nsides
+                do k = 1, nfaces
+                  pneigh => pmeta%neigh(i,j,k)%ptr
+                  if (associated(pneigh)) then
+                    if (pneigh%level .lt. pmeta%level) &
                       pneigh%refine = 1
 
-                    if (pneigh%level .eq. pblock%level .and. pneigh%refine .eq. -1) &
+                    if (pneigh%level .eq. pmeta%level .and. pneigh%refine .eq. -1) &
                       pneigh%refine = 0
-                  endif
+                  end if
                 end do
               end do
             end do
 
-          endif
-        endif
+          end if
+        end if
 
-        pblock => pblock%next
+        pmeta => pmeta%next
       end do
 
 ! check if all children are selected for derefinement; if this condition is not
 ! fullfiled deselect all children from derefinement
 !
-      pblock => plist
-      do while (associated(pblock))
+      pmeta => list_meta
+      do while (associated(pmeta))
 
-        if (pblock%level .eq. l-1 .and. .not. pblock%leaf) then
+        if (pmeta%level .eq. (l - 1) .and. .not. pmeta%leaf) then
           flag = .true.
           do p = 1, nchild
-            if (pblock%child(p)%cpu .eq. ncpu) then
-              pchild => get_pointer(pblock%child(p)%id)
+            pchild => pmeta%child(p)%ptr
 
-              flag = flag .and. (pchild%refine .eq. -1)
-            endif
+            flag = flag .and. (pchild%refine .eq. -1)
           end do
           if (.not. flag) then
             do p = 1, nchild
-              if (pblock%child(p)%cpu .eq. ncpu) then
-                pchild => get_pointer(pblock%child(p)%id)
-
-                if (pchild%leaf) &
-                  pchild%refine = max(0, pchild%refine)
-              endif
+              pchild => pmeta%child(p)%ptr
+              if (pchild%leaf) &
+                pchild%refine = max(0, pchild%refine)
             end do
-          endif
-        endif
+          end if
+        end if
 
-        pblock => pblock%next
+        pmeta => pmeta%next
       end do
 
 ! deselect neighbors from derefinement if the current block is set for
 ! refinement or it is at higher level and not selected for derefinement
 !
-      pblock => plist
-      do while (associated(pblock))
+      pmeta => list_meta
+      do while (associated(pmeta))
 
-        if (pblock%level .eq. l .and. pblock%leaf) then
+        if (pmeta%level .eq. l .and. pmeta%leaf) then
 
-          if (pblock%refine .ne. -1) then
+          if (pmeta%refine .ne. -1) then
 
             do i = 1, ndims
-              do j = 1, 2
-                do k = 1, 2
-                  if (pblock%neigh(i,j,k)%cpu .eq. ncpu) then
-                    pneigh => get_pointer(pblock%neigh(i,j,k)%id)
-
+              do j = 1, nsides
+                do k = 1, nfaces
+                  pneigh => pmeta%neigh(i,j,k)%ptr
+                  if (associated(pneigh)) then
                     if (pneigh%refine .eq. -1) then
-
-                      if (pneigh%level .lt. pblock%level) &
+                      if (pneigh%level .lt. pmeta%level) &
                         pneigh%refine = 0
-
-                    endif
-
-                  endif
+                    end if
+                  end if
                 end do
               end do
             end do
 
-          endif
+          end if
 
-        endif
+        end if
 
-        pblock => pblock%next
+        pmeta => pmeta%next
       end do
 
     end do
 
-! ! perform the actual derefinement
-! !
-!     do l = maxlev, 2, -1
+! perform the actual derefinement
 !
-!       pblock => plist
-!       do while (associated(pblock))
-!
-!         if (pblock%level .eq. l) then
-!           if (pblock%leaf) then
-!             if (pblock%refine .eq. -1) then
-!               pparent => get_pointer(pblock%parent%id)
-!
-!               if (associated(pparent)) then
-!                 call restrict_block(pparent)
-!                 pblock => pparent
-!               endif
-!             endif
-!           endif
-!         endif
-!
-!         pblock => pblock%next
-!       end do
-!
-!     end do
+    do l = maxlev, 2, -1
 
-! ! perform the actual refinement
-! !
-!     do l = 1, maxlev - 1
+      pmeta => list_meta
+      do while (associated(pmeta))
+
+        if (pmeta%level .eq. l) then
+          if (pmeta%leaf) then
+            if (pmeta%refine .eq. -1) then
+              pparent => pmeta%parent
+
+              if (associated(pparent)) then
+                if (pmeta%cpu .eq. ncpu) &
+                  call restrict_block(pparent)
+                call derefine_block(pparent)
+                pmeta => pparent
+              endif
+            end if
+          end if
+        end if
+
+        pmeta => pmeta%next
+      end do
+
+    end do
+
+! perform the actual refinement
 !
-!       pblock => plist
-!       do while (associated(pblock))
-!
-!         if (pblock%leaf) then
-!           if (pblock%level .eq. l) then
-!             if (pblock%refine .eq. 1) then
-!               pparent => pblock
-!
-!               call refine_block(pblock)
-!               call prolong_block(pparent)
-!             endif
-!           endif
-!         endif
-!
-!         pblock => pblock%next
-!
-!       end do
-!
-!     end do
-#else /* MPI */
-#endif /* MPI */
+    do l = 1, maxlev - 1
+
+      pmeta => list_meta
+      do while (associated(pmeta))
+        if (pmeta%leaf) then
+          if (pmeta%level .eq. l) then
+            if (pmeta%refine .eq. 1) then
+              pparent => pmeta
+              if (pmeta%cpu .eq. ncpu) then
+                call refine_block(pmeta, .true.)
+                call prolong_block(pparent)
+              else
+                call refine_block(pmeta, .false.)
+              end if
+              pparent%refine = 0
+              pparent%leaf   = .false.
+            end if
+          end if
+        end if
+        pmeta => pmeta%next
+      end do
+
+    end do
 
 !-------------------------------------------------------------------------------
 !
@@ -534,7 +557,7 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block, nv => nvars, get_pointer
+    use blocks       , only : block_meta, block_data, nv => nvars
     use config       , only : in, jn, kn, im, jm, km, ng
     use interpolation, only : expand
 
@@ -542,7 +565,7 @@ module mesh
 
 ! input arguments
 !
-    type(block), pointer :: pblock, pchild
+    type(block_meta), pointer :: pblock, pchild
 
 ! local variables
 !
@@ -564,7 +587,7 @@ module mesh
 ! first expand variables
 !
     do q = 1, nv
-      call expand(dm,fm,ng,pblock%u(q,:,:,:),u(q,:,:,:),'t','t','t')
+      call expand(dm,fm,ng,pblock%data%u(q,:,:,:),u(q,:,:,:),'t','t','t')
     end do
 
 ! fill values of children
@@ -573,36 +596,36 @@ module mesh
     iu = il + im - 1
     jl = 1
     ju = jl + jm - 1
-    pchild => get_pointer(pblock%child(1)%id)
+    pchild => pblock%child(1)%ptr
     do k = 1, km
-      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
     iu = il + im - 1
     jl = 1
     ju = jl + jm - 1
-    pchild => get_pointer(pblock%child(2)%id)
+    pchild => pblock%child(2)%ptr
     do k = 1, km
-      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = 1
     iu = il + im - 1
     jl = in + 1
     ju = jl + jm - 1
-    pchild => get_pointer(pblock%child(3)%id)
+    pchild => pblock%child(3)%ptr
     do k = 1, km
-      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
     il = in + 1
     iu = il + im - 1
     jl = in + 1
     ju = jl + jm - 1
-    pchild => get_pointer(pblock%child(4)%id)
+    pchild => pblock%child(4)%ptr
     do k = 1, km
-      pchild%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
     end do
 
 !-------------------------------------------------------------------------------
@@ -617,14 +640,14 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block, nv => nvars, derefine_block, get_pointer
+    use blocks       , only : block_meta, nv => nvars
     use config       , only : in, jn, kn, im, jm, km, ng
 
     implicit none
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -632,14 +655,14 @@ module mesh
 
 ! local pointers
 !
-    type(block), pointer :: pbl, pbr, ptl, ptr, pb
+    type(block_meta), pointer :: pbl, pbr, ptl, ptr, pb
 
 !-------------------------------------------------------------------------------
 !
-    pbl => get_pointer(pblock%child(1)%id)
-    pbr => get_pointer(pblock%child(2)%id)
-    ptl => get_pointer(pblock%child(3)%id)
-    ptr => get_pointer(pblock%child(4)%id)
+    pbl => pblock%child(1)%ptr
+    pbr => pblock%child(2)%ptr
+    ptl => pblock%child(3)%ptr
+    ptr => pblock%child(4)%ptr
 
 ! BL
 !
@@ -655,8 +678,10 @@ module mesh
           i2 = 2 * i - ng
           i1 = i2 - 1
 
-          pblock%u(1:nv,i,j,k) = 0.25 * (pbl%u(1:nv,i1,j1,k) + pbl%u(1:nv,i1,j2,k) &
-                                       + pbl%u(1:nv,i2,j1,k) + pbl%u(1:nv,i2,j2,k))
+          pblock%data%u(1:nv,i,j,k) = 0.25 * (pbl%data%u(1:nv,i1,j1,k)         &
+                                            + pbl%data%u(1:nv,i1,j2,k)         &
+                                            + pbl%data%u(1:nv,i2,j1,k)         &
+                                            + pbl%data%u(1:nv,i2,j2,k))
         end do
       end do
     end do
@@ -675,8 +700,10 @@ module mesh
           i2 = 2 * i - im + ng
           i1 = i2 - 1
 
-          pblock%u(1:nv,i,j,k) = 0.25 * (pbr%u(1:nv,i1,j1,k) + pbr%u(1:nv,i1,j2,k) &
-                                       + pbr%u(1:nv,i2,j1,k) + pbr%u(1:nv,i2,j2,k))
+          pblock%data%u(1:nv,i,j,k) = 0.25 * (pbr%data%u(1:nv,i1,j1,k)         &
+                                            + pbr%data%u(1:nv,i1,j2,k)         &
+                                            + pbr%data%u(1:nv,i2,j1,k)         &
+                                            + pbr%data%u(1:nv,i2,j2,k))
         end do
       end do
     end do
@@ -695,8 +722,10 @@ module mesh
           i2 = 2 * i - ng
           i1 = i2 - 1
 
-          pblock%u(1:nv,i,j,k) = 0.25 * (ptl%u(1:nv,i1,j1,k) + ptl%u(1:nv,i1,j2,k) &
-                                       + ptl%u(1:nv,i2,j1,k) + ptl%u(1:nv,i2,j2,k))
+          pblock%data%u(1:nv,i,j,k) = 0.25 * (ptl%data%u(1:nv,i1,j1,k)         &
+                                            + ptl%data%u(1:nv,i1,j2,k)         &
+                                            + ptl%data%u(1:nv,i2,j1,k)         &
+                                            + ptl%data%u(1:nv,i2,j2,k))
         end do
       end do
     end do
@@ -715,18 +744,16 @@ module mesh
           i2 = 2 * i - im + ng
           i1 = i2 - 1
 
-          pblock%u(1:nv,i,j,k) = 0.25 * (ptr%u(1:nv,i1,j1,k) + ptr%u(1:nv,i1,j2,k) &
-                                       + ptr%u(1:nv,i2,j1,k) + ptr%u(1:nv,i2,j2,k))
+          pblock%data%u(1:nv,i,j,k) = 0.25 * (ptr%data%u(1:nv,i1,j1,k)         &
+                                            + ptr%data%u(1:nv,i1,j2,k)         &
+                                            + ptr%data%u(1:nv,i2,j1,k)         &
+                                            + ptr%data%u(1:nv,i2,j2,k))
         end do
       end do
     end do
 
 ! derefine block
 !
-    pb => pblock
-    call derefine_block(pb)
-
-    nullify(pb)
     nullify(pbl)
     nullify(pbr)
     nullify(ptl)

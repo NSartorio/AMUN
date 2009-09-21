@@ -1442,11 +1442,6 @@ module blocks
         pblock%data%next => pfirst%data
         pfirst%data%prev => pblock%data
 
-! prolongate data block
-!
-! TODO: call subroutine which prolongates data from parent block to children
-!
-
       end if
 
 ! deallocate refined block
@@ -1476,232 +1471,97 @@ module blocks
 !
   subroutine derefine_block(pblock)
 
-#ifdef MPI
-    use mpitools, only : ncpu
-#endif /* MPI */
-
     implicit none
 
 ! input parameters
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
 
 ! local variables
 !
-    integer :: p
+    integer :: i, j, k, l, p
 
 ! pointers
 !
-    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
+    type(block_meta), pointer :: pchild, pneigh
 !
 !-------------------------------------------------------------------------------
 !
-! prepare pointers to children
+! update parent neighbor fields from the children
 !
-    pbl => get_pointer(pblock%child(1)%id)
-    pbr => get_pointer(pblock%child(2)%id)
-    ptl => get_pointer(pblock%child(3)%id)
-    ptr => get_pointer(pblock%child(4)%id)
+    pchild => pblock%child(1)%ptr
+    pblock%neigh(1,1,1)%ptr => pchild%neigh(1,1,1)%ptr
+    pblock%neigh(2,1,1)%ptr => pchild%neigh(2,1,1)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,1)%ptr => pchild%neigh(3,1,1)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(2)%ptr
+    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
+    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,2)%ptr => pchild%neigh(3,1,2)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(3)%ptr
+    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
+    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,3)%ptr => pchild%neigh(3,1,3)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(4)%ptr
+    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
+    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,4)%ptr => pchild%neigh(3,1,4)%ptr
+#endif /* NDIMS == 3 */
+#if NDIMS == 3
+    pchild => pblock%child(5)%ptr
+    pblock%neigh(1,1,3)%ptr => pchild%neigh(1,1,3)%ptr
+    pblock%neigh(2,1,3)%ptr => pchild%neigh(2,1,3)%ptr
+    pblock%neigh(3,2,1)%ptr => pchild%neigh(3,2,1)%ptr
+    pchild => pblock%child(6)%ptr
+    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
+    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
+    pblock%neigh(3,2,2)%ptr => pchild%neigh(3,2,2)%ptr
+    pchild => pblock%child(7)%ptr
+    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
+    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
+    pblock%neigh(3,2,3)%ptr => pchild%neigh(3,2,3)%ptr
+    pchild => pblock%child(8)%ptr
+    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
+    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
+    pblock%neigh(3,2,4)%ptr => pchild%neigh(3,2,4)%ptr
+#endif /* NDIMS == 3 */
 
-! prepare neighbors
+! update the neighbor fields of neighbors
 !
-#ifdef MPI
-    pblock%neigh(1,1,1)%cpu = pbl%neigh(1,1,1)%cpu
-    pblock%neigh(1,1,2)%cpu = ptl%neigh(1,1,2)%cpu
-    pblock%neigh(1,2,1)%cpu = pbr%neigh(1,2,1)%cpu
-    pblock%neigh(1,2,2)%cpu = ptr%neigh(1,2,2)%cpu
-    pblock%neigh(2,1,1)%cpu = pbl%neigh(2,1,1)%cpu
-    pblock%neigh(2,1,2)%cpu = pbr%neigh(2,1,2)%cpu
-    pblock%neigh(2,2,1)%cpu = ptl%neigh(2,2,1)%cpu
-    pblock%neigh(2,2,2)%cpu = ptr%neigh(2,2,2)%cpu
-#endif /* MPI */
-    pblock%neigh(1,1,1)%id = pbl%neigh(1,1,1)%id
-    pblock%neigh(1,1,2)%id = ptl%neigh(1,1,2)%id
-    pblock%neigh(1,2,1)%id = pbr%neigh(1,2,1)%id
-    pblock%neigh(1,2,2)%id = ptr%neigh(1,2,2)%id
-    pblock%neigh(2,1,1)%id = pbl%neigh(2,1,1)%id
-    pblock%neigh(2,1,2)%id = pbr%neigh(2,1,2)%id
-    pblock%neigh(2,2,1)%id = ptl%neigh(2,2,1)%id
-    pblock%neigh(2,2,2)%id = ptr%neigh(2,2,2)%id
+    do i = 1, ndims
+      do j = 1, nsides
+        do k = 1, nfaces
+          pneigh => pblock%neigh(i,j,k)%ptr
+          if (associated(pneigh)) then
+            l = 3 - j
+            do p = 1, nfaces
+              pneigh%neigh(i,l,p)%ptr => pblock
+            end do
+          end if
+        end do
+      end do
+    end do
 
-#ifdef MPI
-    if (pblock%neigh(1,1,1)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(1,1,1)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(1,2,1)%id = pblock%id
-        pneigh%neigh(1,2,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(1,1,2)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(1,1,2)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(1,2,1)%id = pblock%id
-        pneigh%neigh(1,2,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(1,2,1)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(1,2,1)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(1,1,1)%id = pblock%id
-        pneigh%neigh(1,1,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(1,2,2)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(1,2,2)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(1,1,1)%id = pblock%id
-        pneigh%neigh(1,1,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(2,1,1)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(2,1,1)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(2,2,1)%id = pblock%id
-        pneigh%neigh(2,2,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(2,1,2)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(2,1,2)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(2,2,1)%id = pblock%id
-        pneigh%neigh(2,2,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(2,2,1)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(2,2,1)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(2,1,1)%id = pblock%id
-        pneigh%neigh(2,1,2)%id = pblock%id
-      endif
-    endif
-
-    if (pblock%neigh(2,2,2)%cpu .eq. ncpu) then
-      pneigh => get_pointer(pblock%neigh(2,2,2)%id)
-      if (associated(pneigh)) then
-        pneigh%neigh(2,1,1)%id = pblock%id
-        pneigh%neigh(2,1,2)%id = pblock%id
-      endif
-    endif
-#else /* MPI */
-    pneigh => get_pointer(pblock%neigh(1,1,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,2,1)%id = pblock%id
-      pneigh%neigh(1,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,1,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,2,1)%id = pblock%id
-      pneigh%neigh(1,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,2,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,1,1)%id = pblock%id
-      pneigh%neigh(1,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,2,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,1,1)%id = pblock%id
-      pneigh%neigh(1,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,1,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,2,1)%id = pblock%id
-      pneigh%neigh(2,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,1,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,2,1)%id = pblock%id
-      pneigh%neigh(2,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,2,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,1,1)%id = pblock%id
-      pneigh%neigh(2,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,2,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,1,1)%id = pblock%id
-      pneigh%neigh(2,1,2)%id = pblock%id
-    endif
-#endif /* MPI */
-
-! set the leaf flag for children
+! set the leaf flag of parent block
 !
     pblock%leaf = .true.
-    pbl%leaf    = .false.
-    pbr%leaf    = .false.
-    ptl%leaf    = .false.
-    ptr%leaf    = .false.
 
-! prepare next and prev pointers
+! reset the refinement flag of the parent block
 !
-    select case(pblock%config)
-      case('z', 'Z')
-        pb => ptr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('n', 'N')
-        pb => pbr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('d', 'D')
-        pb => ptl%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('c', 'C')
-        pb => pbr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('u', 'U')
-        pb => ptl%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-    end select
-
     pblock%refine = 0
-    pbl%refine = 0
-    pbr%refine = 0
-    ptl%refine = 0
-    ptr%refine = 0
 
-    call deallocate_block(pbl)
-    call deallocate_block(pbr)
-    call deallocate_block(ptl)
-    call deallocate_block(ptr)
-
+! deallocate child blocks
+!
+    do p = 1, nchild
+      call deallocate_metablock(pblock%child(p)%ptr)
+    end do
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine derefine_block
