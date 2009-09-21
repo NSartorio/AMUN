@@ -275,7 +275,7 @@ module boundaries
 !
               select case(dl)
               case(-1)  ! restriction
-                call bnd_rest_u(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
+                call bnd_rest(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
               case(0)   ! the same level, copying
                 if (k .eq. 1) &
                   call bnd_copy(pinfo%block%data,rbuf(l,:,:,:,:),i,j,k)
