@@ -1550,7 +1550,7 @@ module blocks
 
 ! set the leaf flag of parent block
 !
-    pblock%leaf = .true.
+    call metablock_setleaf(pblock)
 
 ! reset the refinement flag of the parent block
 !
@@ -1559,6 +1559,7 @@ module blocks
 ! deallocate child blocks
 !
     do p = 1, nchild
+      call metablock_unsetleaf(pblock%child(p)%ptr)
       call deallocate_metablock(pblock%child(p)%ptr)
     end do
 !
