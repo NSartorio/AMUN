@@ -52,9 +52,9 @@ module mesh
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
                        , ncells, maxlev
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
-                       , list_allocated, init_blocks, clear_blocks             &
-                       , refine_block, deallocate_datablock, get_pointer       &
-                       , block, nchild, ndims, plist, last_id, nblocks, nleafs, nsides, nfaces
+                       , init_blocks, clear_blocks, refine_block               &
+                       , deallocate_datablock, nchild, nblocks, nleafs         &
+                       , ndims, nsides, nfaces
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -75,7 +75,7 @@ module mesh
 !
 ! check if the list is allocated, if yes deallocate it
 !
-    if (list_allocated()) then
+    if (associated(list_meta)) then
       call print_info("mesh::init_mesh", "Block list is allocated, deallocate it!")
 
       call clear_blocks

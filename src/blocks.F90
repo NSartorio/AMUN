@@ -59,16 +59,6 @@ module blocks
 
 !! BLOCK STRUCTURE POINTERS (have to be defined before structures)
 !!
-! define block type
-!
-  type blockptr
-    type(block), pointer :: ptr
-  end type blockptr
-
-  type blockref
-    integer(kind=4)      :: cpu, id
-  end type blockref
-
 ! define pointers to block_meta and block_data structures
 !
   type pointer_meta
@@ -137,37 +127,10 @@ module blocks
     integer(kind=4)             :: level_difference ! the difference of levels
   end type block_info
 
-
-  type block
-    type(block), pointer :: next, prev
-    type(blockref)       :: parent, child(nchild), neigh(ndims,2,2)
-
-    logical              :: leaf
-    integer(kind=4)      :: cpu, id, level
-
-    character            :: config
-    integer(kind=4)      :: refine
-    integer(kind=4)      :: pos(ndims)
-
-
-    real                 :: xmin, xmax, ymin, ymax, zmin, zmax
-
-    real, dimension(:,:,:,:), allocatable :: u
-    real, dimension(:,:,:)  , allocatable :: c
-  end type block
-
-! array of ID to pointer conversion
-!
-  type(blockptr), dimension(:), allocatable, save :: idtoptr
-
 ! chains of meta blocks and data blocks
 !
   type(block_meta), pointer, save :: list_meta, last_meta
   type(block_data), pointer, save :: list_data, last_data
-
-! stored pointers
-!
-  type(block), pointer, save :: plist, plast
 
 ! stored last id (should always increase)
 !
@@ -221,7 +184,7 @@ module blocks
 ! reset ID
 !
     last_id = 0
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine init_blocks
@@ -247,39 +210,13 @@ module blocks
 !
     pblock_meta => list_meta
     do while(associated(pblock_meta))
-!       print *, pblock_meta%level, pblock_meta%id, pblock_meta%neigh(1,1,1)%ptr%id, pblock_meta%neigh(1,2,1)%ptr%id, pblock_meta%neigh(2,1,1)%ptr%id, pblock_meta%neigh(2,2,1)%ptr%id
       call deallocate_metablock(pblock_meta)
       pblock_meta => list_meta
     end do
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_blocks
-!
-!===============================================================================
-!
-! list_allocated: function returns true if the block list is allocated,
-!                 otherwise it returns false
-!
-!===============================================================================
-!
-  function list_allocated
-
-    implicit none
-
-! output arguments
-!
-    logical :: list_allocated
-!
-!-------------------------------------------------------------------------------
-!
-    list_allocated = associated(plist)
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function list_allocated
 !
 !===============================================================================
 !
@@ -306,118 +243,10 @@ module blocks
     increase_id = last_id
 
     return
-
+!
 !-------------------------------------------------------------------------------
 !
   end function increase_id
-!
-!===============================================================================
-!
-! get_pointer: function returns a pointer to the block with requested ID
-!
-!===============================================================================
-!
-  function get_pointer(id)
-
-    implicit none
-
-! input argument
-!
-    integer(kind=4) :: id
-
-! return variable
-!
-    type(block), pointer :: get_pointer
-!
-!-------------------------------------------------------------------------------
-!
-    nullify(get_pointer)
-
-    if (id .ge. 1 .and. id .le. maxid) &
-      get_pointer => idtoptr(id)%ptr
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_pointer
-!
-!===============================================================================
-!
-! allocate_block: subroutine allocates space for one block and returns the
-!                 pointer to this block
-!
-!===============================================================================
-!
-  subroutine allocate_block(pblock)
-
-    use config  , only : im, jm, km
-    use mpitools, only : ncpu
-
-    implicit none
-
-! output arguments
-!
-    type(block), pointer, intent(out) :: pblock
-
-! local variables
-!
-    integer :: i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-! allocate block structure
-!
-    allocate(pblock)
-
-! set unique ID
-!
-    pblock%id = increase_id()   ! TODO: replace with get_free_id() which return the first free id
-
-! set configuration and leaf flags
-!
-    pblock%config = 'N'         ! TODO: replace with an integer number
-    pblock%leaf   = .false.
-
-! set the cpu of current block
-!
-    pblock%cpu    = ncpu
-
-! initialize the refinement flag
-!
-    pblock%refine = 0
-
-! nullify pointers
-!
-    nullify(pblock%next)
-    nullify(pblock%prev)
-
-! reset parent block
-!
-    pblock%parent%cpu = -1
-    pblock%parent%id  = -1
-
-! reset neighbors
-!
-    pblock%neigh(:,:,:)%cpu = -1
-    pblock%neigh(:,:,:)%id  = -1
-
-! allocate space for variables
-!
-    allocate(pblock%u(nvars,im,jm,km))
-    allocate(pblock%c(im,jm,km))
-
-! set the correspponding pointer in the ID to pointer array to the current block
-!
-    idtoptr(pblock%id)%ptr => pblock
-
-! increase the number of allocated blocks
-!
-    nblocks = nblocks + 1
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine allocate_block
 !
 !===============================================================================
 !
@@ -477,7 +306,7 @@ module blocks
 ! increase the number of allocated meta blocks
 !
     nblocks = nblocks + 1
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_metablock
@@ -532,69 +361,10 @@ module blocks
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_datablock
-!
-!===============================================================================
-!
-! deallocate_block: subroutine deallocates space ocuppied by a given block
-!
-!===============================================================================
-!
-  subroutine deallocate_block(pblock)
-
-    implicit none
-
-! input arguments
-!
-    type(block), pointer, intent(inout) :: pblock
-!
-!-------------------------------------------------------------------------------
-!
-    if (associated(pblock)) then
-
-! if this is the first block in the list, update the plist pointer
-!
-      if (pblock%id .eq. plist%id) &
-        plist => pblock%next
-
-! update the pointer of previous and next blocks
-!
-      if (associated(pblock%prev)) &
-        pblock%prev%next => pblock%next
-
-      if (associated(pblock%next)) &
-        pblock%next%prev => pblock%prev
-
-! deallocate variables
-!
-      deallocate(pblock%u)
-      deallocate(pblock%c)
-
-! nullify pointers
-!
-      nullify(pblock%next)
-      nullify(pblock%prev)
-
-! nullify the corresponding pointer in the ID to pointer array
-!
-      nullify(idtoptr(pblock%id)%ptr)
-
-! free and nullify the block
-!
-      deallocate(pblock)
-      nullify(pblock)
-
-! decrease the number of allocated blocks
-!
-      nblocks = nblocks - 1
-    endif
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine deallocate_block
 !
 !===============================================================================
 !
@@ -668,8 +438,8 @@ module blocks
 !
       nblocks = nblocks - 1
 
-    endif
-
+    end if
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_metablock
@@ -725,51 +495,11 @@ module blocks
 !
       dblocks = dblocks - 1
 
-    endif
-
+    end if
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_datablock
-!
-!===============================================================================
-!
-! append_block: subroutine allocates space for one block and appends it to
-!               the list
-!
-!===============================================================================
-!
-  subroutine append_block(pblock)
-
-    implicit none
-
-! output arguments
-!
-    type(block), pointer, intent(out) :: pblock
-!
-!-------------------------------------------------------------------------------
-!
-! allocate block
-!
-    call allocate_block(pblock)
-
-! add to the list
-!
-    if (list_allocated()) then
-      pblock%prev => plast
-      nullify(pblock%next)
-      plast%next => pblock
-
-      plast => pblock
-    else
-      plist => pblock
-      plast => pblock
-      nullify(pblock%prev)
-      nullify(pblock%next)
-    endif
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine append_block
 !
 !===============================================================================
 !
@@ -799,12 +529,12 @@ module blocks
       last_meta%next => pblock
     else
       list_meta => pblock
-    endif
+    end if
 
 ! set the pointer to the last block in the list
 !
     last_meta => pblock
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine append_metablock
@@ -837,12 +567,12 @@ module blocks
       last_data%next => pblock
     else
       list_data => pblock
-    endif
+    end if
 
 ! set the pointer to the last block in the list
 !
     last_data => pblock
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine append_datablock
@@ -1105,8 +835,8 @@ module blocks
             pblock%child(5)%ptr%neigh(1,1,p)%ptr => pblock%child(6)%ptr
             pblock%child(7)%ptr%neigh(1,1,p)%ptr => pblock%child(8)%ptr
 #endif /* NDIMS == 3 */
-          endif
-        endif
+          end if
+        end if
 
 ! X direction (right side)
 !
@@ -1125,8 +855,8 @@ module blocks
             pblock%child(6)%ptr%neigh(1,2,p)%ptr => pblock%child(5)%ptr
             pblock%child(8)%ptr%neigh(1,2,p)%ptr => pblock%child(7)%ptr
 #endif /* NDIMS == 3 */
-          endif
-        endif
+          end if
+        end if
 
 ! Y direction (left side)
 !
@@ -1145,8 +875,8 @@ module blocks
             pblock%child(5)%ptr%neigh(2,1,p)%ptr => pblock%child(7)%ptr
             pblock%child(6)%ptr%neigh(2,1,p)%ptr => pblock%child(8)%ptr
 #endif /* NDIMS == 3 */
-          endif
-        endif
+          end if
+        end if
 
 ! Y direction (right side)
 !
@@ -1165,8 +895,8 @@ module blocks
             pblock%child(7)%ptr%neigh(2,2,p)%ptr => pblock%child(5)%ptr
             pblock%child(8)%ptr%neigh(2,2,p)%ptr => pblock%child(6)%ptr
 #endif /* NDIMS == 3 */
-          endif
-        endif
+          end if
+        end if
 
 #if NDIMS == 3
 ! Z direction (left side)
@@ -1182,8 +912,8 @@ module blocks
             pblock%child(2)%ptr%neigh(3,1,p)%ptr => pblock%child(6)%ptr
             pblock%child(3)%ptr%neigh(3,1,p)%ptr => pblock%child(7)%ptr
             pblock%child(4)%ptr%neigh(3,1,p)%ptr => pblock%child(8)%ptr
-          endif
-        endif
+          end if
+        end if
 
 ! Z direction (right side)
 !
@@ -1198,8 +928,8 @@ module blocks
             pblock%child(6)%ptr%neigh(3,2,p)%ptr => pblock%child(2)%ptr
             pblock%child(7)%ptr%neigh(3,2,p)%ptr => pblock%child(3)%ptr
             pblock%child(8)%ptr%neigh(3,2,p)%ptr => pblock%child(4)%ptr
-          endif
-        endif
+          end if
+        end if
 #endif /* NDIMS == 3 */
       end do
 
@@ -1363,7 +1093,7 @@ module blocks
         plast%next  => pneigh
       else
         last_meta => plast
-      endif
+      end if
 
       pblock%next => pfirst
       pfirst%prev => pblock
@@ -1437,7 +1167,7 @@ module blocks
           plast%data%next  => pdata
         else
           last_data => plast%data
-        endif
+        end if
 
         pblock%data%next => pfirst%data
         pfirst%data%prev => pblock%data
@@ -1457,8 +1187,8 @@ module blocks
 ! terminate program if the pointer passed by argument is not associated
 !
       call print_error("blocks::refine_blocks","Input pointer is not associated! Terminating!")
-    endif
-
+    end if
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine refine_block
