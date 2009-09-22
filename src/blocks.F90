@@ -1174,10 +1174,6 @@ module blocks
 
       end if
 
-! deallocate refined block
-!
-!       call deallocate_metablock(pblock)
-
 ! point the current block to the last created one
 !
       pblock => plast
