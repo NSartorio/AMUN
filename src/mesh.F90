@@ -50,7 +50,7 @@ module mesh
   subroutine init_mesh
 
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
-                       , ncells, maxlev
+                       , ncells, maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , init_blocks, clear_blocks, refine_block               &
                        , deallocate_datablock, nchild, nblocks, nleafs         &
@@ -81,14 +81,6 @@ module mesh
       call clear_blocks
     endif
 
-! print information
-!
-    if (is_master()) then
-      write(*,"(1x,a)"      ) "Generating initial mesh:"
-      write(*,"(4x,a,1x,i6)") "refining to max. level =", maxlev
-      write(*,"(4x,a,1x,i6)") "effective resolution   =", ncells*2**(maxlev-1)
-    endif
-
 ! initialize blocks
 !
     call init_blocks
@@ -96,6 +88,15 @@ module mesh
 ! allocate the initial structure of blocks according to the problem
 !
     call init_domain
+
+! print general information about resolutions
+!
+    if (is_master()) then
+      write(*,"(1x,a)"         ) "Generating initial mesh:"
+      write(*,"(4x,a,  1x,i6)" ) "refining to max. level  =", maxlev
+      write(*,"(4x,a,3(1x,i6))") "lowest level resolution =", rdims(1:ndims) * ncells
+      write(*,"(4x,a,3(1x,i6))") "effective resolution    =", rdims(1:ndims) * ncells * 2**(maxlev - 1)
+    endif
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
@@ -292,12 +293,12 @@ module mesh
 ! generating coordinates for all levels
 !
     do l = 1, maxlev
-      adx (l) = (xmax - xmin) / (ncells*2**(l-1))
+      adx (l) = (xmax - xmin) / (ncells*2**(l-1)) / rdims(1)
       adxi(l) = 1.0 / adx(l)
-      ady (l) = (ymax - ymin) / (ncells*2**(l-1))
+      ady (l) = (ymax - ymin) / (ncells*2**(l-1)) / rdims(2)
       adyi(l) = 1.0 / ady(l)
 #if NDIMS == 3
-      adz (l) = (zmax - zmin) / (ncells*2**(l-1))
+      adz (l) = (zmax - zmin) / (ncells*2**(l-1)) / rdims(3)
 #else
       adz (l) = 1.0
 #endif

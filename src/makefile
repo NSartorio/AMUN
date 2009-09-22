@@ -117,7 +117,7 @@ io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o
 mpitools.o      : mpitools.F90
-problem.o       : problem.F90 blocks.o
+problem.o       : problem.F90 blocks.o scheme.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o
 timer.o         : timer.F90
 

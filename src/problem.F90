@@ -43,6 +43,8 @@ module problem
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
+    case("blast")
+      call domain_blast()
     case default
       call domain_default()
     end select
@@ -217,14 +219,186 @@ module problem
 !
 !===============================================================================
 !
+! domain_default: subroutine initializes the default domain of 2x2 blocks in
+!                'N' configuration
+!
+!===============================================================================
+!
+  subroutine domain_blast
+
+    use blocks, only : block_meta, block_data, pointer_meta, append_metablock  &
+                     , append_datablock, associate_blocks, metablock_setleaf   &
+                     , metablock_setconfig, metablock_setlevel                 &
+                     , datablock_setbounds, nsides, nfaces
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
+
+    implicit none
+
+! local variables
+!
+    integer :: i, j
+    real    :: xm, yl, yu
+
+! local pointers
+!
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
+
+! local pointer array
+!
+    type(pointer_meta)        :: block_array(2,3)
+!
+!-------------------------------------------------------------------------------
+!
+!! TO DO:
+!!
+!! create a general way to initiate NxM blocks at level 1
+!!
+!!
+! create root meta blocks
+!
+    call append_metablock(block_array(1,1)%ptr)
+    call append_metablock(block_array(2,1)%ptr)
+    call append_metablock(block_array(2,2)%ptr)
+    call append_metablock(block_array(1,2)%ptr)
+    call append_metablock(block_array(1,3)%ptr)
+    call append_metablock(block_array(2,3)%ptr)
+
+! mark block as a leaf
+!
+    call metablock_setleaf(block_array(1,1)%ptr)
+    call metablock_setleaf(block_array(2,1)%ptr)
+    call metablock_setleaf(block_array(2,2)%ptr)
+    call metablock_setleaf(block_array(1,2)%ptr)
+    call metablock_setleaf(block_array(1,3)%ptr)
+    call metablock_setleaf(block_array(2,3)%ptr)
+
+! set block config flag
+!
+    call metablock_setconfig(block_array(1,1)%ptr, 1)
+    call metablock_setconfig(block_array(2,1)%ptr, 2)
+    call metablock_setconfig(block_array(2,2)%ptr, 2)
+    call metablock_setconfig(block_array(1,2)%ptr, 4)
+    call metablock_setconfig(block_array(1,3)%ptr, 1)
+    call metablock_setconfig(block_array(2,3)%ptr, 1)
+
+! set block level
+!
+    call metablock_setlevel(block_array(1,1)%ptr, 1)
+    call metablock_setlevel(block_array(2,1)%ptr, 1)
+    call metablock_setlevel(block_array(2,2)%ptr, 1)
+    call metablock_setlevel(block_array(1,2)%ptr, 1)
+    call metablock_setlevel(block_array(1,3)%ptr, 1)
+    call metablock_setlevel(block_array(2,3)%ptr, 1)
+
+! set boundary conditions
+!
+    block_array(1,1)%ptr%neigh(1,1,1)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,1,2)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,2,1)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,2,2)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(2,1,1)%ptr => block_array(1,3)%ptr
+    block_array(1,1)%ptr%neigh(2,1,2)%ptr => block_array(1,3)%ptr
+    block_array(1,1)%ptr%neigh(2,2,1)%ptr => block_array(1,2)%ptr
+    block_array(1,1)%ptr%neigh(2,2,2)%ptr => block_array(1,2)%ptr
+
+    block_array(1,2)%ptr%neigh(1,1,1)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,1,2)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,2,1)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,2,2)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(2,1,1)%ptr => block_array(1,1)%ptr
+    block_array(1,2)%ptr%neigh(2,1,2)%ptr => block_array(1,1)%ptr
+    block_array(1,2)%ptr%neigh(2,2,1)%ptr => block_array(1,3)%ptr
+    block_array(1,2)%ptr%neigh(2,2,2)%ptr => block_array(1,3)%ptr
+
+    block_array(1,3)%ptr%neigh(1,1,1)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,1,2)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,2,1)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,2,2)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(2,1,1)%ptr => block_array(1,2)%ptr
+    block_array(1,3)%ptr%neigh(2,1,2)%ptr => block_array(1,2)%ptr
+    block_array(1,3)%ptr%neigh(2,2,1)%ptr => block_array(1,1)%ptr
+    block_array(1,3)%ptr%neigh(2,2,2)%ptr => block_array(1,1)%ptr
+
+    block_array(2,1)%ptr%neigh(1,1,1)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,1,2)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,2,1)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,2,2)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(2,1,1)%ptr => block_array(2,3)%ptr
+    block_array(2,1)%ptr%neigh(2,1,2)%ptr => block_array(2,3)%ptr
+    block_array(2,1)%ptr%neigh(2,2,1)%ptr => block_array(2,2)%ptr
+    block_array(2,1)%ptr%neigh(2,2,2)%ptr => block_array(2,2)%ptr
+
+    block_array(2,2)%ptr%neigh(1,1,1)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,1,2)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,2,1)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,2,2)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(2,1,1)%ptr => block_array(2,1)%ptr
+    block_array(2,2)%ptr%neigh(2,1,2)%ptr => block_array(2,1)%ptr
+    block_array(2,2)%ptr%neigh(2,2,1)%ptr => block_array(2,3)%ptr
+    block_array(2,2)%ptr%neigh(2,2,2)%ptr => block_array(2,3)%ptr
+
+    block_array(2,3)%ptr%neigh(1,1,1)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,1,2)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,2,1)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,2,2)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(2,1,1)%ptr => block_array(2,2)%ptr
+    block_array(2,3)%ptr%neigh(2,1,2)%ptr => block_array(2,2)%ptr
+    block_array(2,3)%ptr%neigh(2,2,1)%ptr => block_array(2,1)%ptr
+    block_array(2,3)%ptr%neigh(2,2,2)%ptr => block_array(2,1)%ptr
+
+! create root data block
+!
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,1)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,1)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,2)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,2)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,3)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,3)%ptr, pblock_data)
+
+! calculate bounds
+!
+    xm = 0.5 * (xmin + xmax)
+    yl = (ymax - ymin) / 3.0 + ymin
+    yu = (ymax - ymin) / 3.0 + yl
+
+! set block bounds
+!
+    call datablock_setbounds(block_array(1,1)%ptr%data, xmin, xm  , ymin, yl  , zmin, zmax)
+    call datablock_setbounds(block_array(2,1)%ptr%data, xm  , xmax, ymin, yl  , zmin, zmax)
+    call datablock_setbounds(block_array(2,2)%ptr%data, xm  , xmax, yl  , yu  , zmin, zmax)
+    call datablock_setbounds(block_array(1,2)%ptr%data, xmin, xm  , yl  , yu  , zmin, zmax)
+    call datablock_setbounds(block_array(1,3)%ptr%data, xmin, xm  , yu  , ymax, zmin, zmax)
+    call datablock_setbounds(block_array(2,3)%ptr%data, xm  , xmax, yu  , ymax, zmin, zmax)
+
+! set block dimensions for the lowest level
+!
+    rdims(1) = 2
+    rdims(2) = 3
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine domain_blast
+!
+!===============================================================================
+!
 ! init_blast: subroutine initializes the variables for the blast problem
 !
 !===============================================================================
 !
   subroutine init_blast(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien
-    use config, only : in, jn, kn, im, jm, km, ng, dens, pres, gammam1i
+    use blocks, only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr
+    use config, only : in, jn, kn, im, jm, km, ng                              &
+                     , gamma, csnd2, rcut, dens, dnrat
+    use scheme, only : prim2cons
 
 ! input arguments
 !
@@ -234,18 +408,18 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: r, dx, dy, dz, en, enamb
+    real                          :: r, dx, dy, dz, pr
 
 ! local arrays
 !
-    real, dimension(:), allocatable :: x, y, z
+    real, dimension(:)  , allocatable :: x, y, z
+    real, dimension(:,:), allocatable :: q
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate parameters
 !
-    enamb = gammam1i * pres
-    en    = 100.0 * enamb
+    pr = dens * csnd2 / gamma
 
 ! allocate coordinates
 !
@@ -273,32 +447,44 @@ module problem
     z(1) = 0.0
 #endif /* NDIMS == 3 */
 
+! allocate primitive variables
+!
+    allocate(q(nv,im))
+
 ! set variables
 !
-    pblock%u(idn,:,:,:) = dens
-    pblock%u(imx,:,:,:) = 0.0d0
-    pblock%u(imy,:,:,:) = 0.0d0
-    pblock%u(imz,:,:,:) = 0.0d0
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
 
 ! set initial pressure
 !
     do k = 1, km
       do j = 1, jm
+
         do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          if (r .le. 0.1) then
-            pblock%u(ien,i,j,k) = en
+
+          if (r .lt. rcut) then
+            q(ipr,i) = pr * dnrat
           else
-            pblock%u(ien,i,j,k) = enamb
+            q(ipr,i) = pr
           endif
 
         end do
+
+! convert primitive variables to conserved
+!
+        call prim2cons(nv, im, q(1:nv,1:im), pblock%u(1:nv,1:im,j,k))
+
       end do
     end do
 
 ! deallocate coordinates
 !
+    deallocate(q)
     deallocate(x)
     deallocate(y)
     deallocate(z)
