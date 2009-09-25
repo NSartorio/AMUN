@@ -53,8 +53,8 @@ module mesh
                        , ncells, maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , init_blocks, clear_blocks, refine_block               &
-                       , deallocate_datablock, nchild, nblocks, nleafs         &
-                       , ndims, nsides, nfaces
+                       , deallocate_datablock, nblocks, nleafs, dblocks        &
+                       , nchild, ndims, nsides, nfaces
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -244,23 +244,41 @@ module mesh
     end do
 
 #ifdef MPI
-! divide blocks between all processes
+! divide blocks between all processes, use the number of data blocks to do this,
+! but keep blocks from the top level which have the same parent packed together
 !
+    l = dblocks / ncpus
     n = 0
+    p = 0
+
     pmeta_block => list_meta
     do while (associated(pmeta_block))
 
 ! assign the cpu to the current block
 !
-      pmeta_block%cpu    = n * ncpus / nblocks
+      pmeta_block%cpu = n
+
+! increase the number of blocks on the current process; if it exceeds the
+! allowed number reset the counter and increase the processor number
+!
+      if (associated(pmeta_block%data)) then
+        p = p + 1
+
+        if (p .gt. l) then
+          n = n + 1
+          p = 0
+        end if
+      end if
+
+! keep blocks from the top level to be packed at the same processor if they have
+! the same parent
+!
+      if (pmeta_block%level .eq. maxlev) &
+        pmeta_block%cpu = pmeta_block%parent%next%cpu
 
 ! assign pointer to the next block
 !
       pmeta_block => pmeta_block%next
-
-! increase the number of cpu
-!
-      n = n + 1
     end do
 
 ! remove all data blocks which do not belong to the current process
