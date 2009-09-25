@@ -142,7 +142,7 @@ module problem
     use blocks, only : block_meta, block_data, append_metablock                &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
-                     , datablock_setbounds, nsides, nfaces
+                     , metablock_setbounds, nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -201,13 +201,13 @@ module problem
     endif
 #endif /* NDIMS == 3 */
 
+! set block bounds
+!
+    call metablock_setbounds(pblock_meta, xmin, xmax, ymin, ymax, zmin, zmax)
+
 ! create root data block
 !
     call append_datablock(pblock_data)
-
-! set block bounds
-!
-    call datablock_setbounds(pblock_data, xmin, xmax, ymin, ymax, zmin, zmax)
 
 ! associate root blocks
 !
@@ -229,7 +229,7 @@ module problem
     use blocks, only : block_meta, block_data, pointer_meta, append_metablock  &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
-                     , datablock_setbounds, nsides, nfaces
+                     , metablock_setbounds, nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax, rdims
 
@@ -348,6 +348,21 @@ module problem
     block_array(2,3)%ptr%neigh(2,2,1)%ptr => block_array(2,1)%ptr
     block_array(2,3)%ptr%neigh(2,2,2)%ptr => block_array(2,1)%ptr
 
+! calculate bounds
+!
+    xm = 0.5 * (xmin + xmax)
+    yl = (ymax - ymin) / 3.0 + ymin
+    yu = (ymax - ymin) / 3.0 + yl
+
+! set block bounds
+!
+    call metablock_setbounds(block_array(1,1)%ptr, xmin, xm  , ymin, yl  , zmin, zmax)
+    call metablock_setbounds(block_array(2,1)%ptr, xm  , xmax, ymin, yl  , zmin, zmax)
+    call metablock_setbounds(block_array(2,2)%ptr, xm  , xmax, yl  , yu  , zmin, zmax)
+    call metablock_setbounds(block_array(1,2)%ptr, xmin, xm  , yl  , yu  , zmin, zmax)
+    call metablock_setbounds(block_array(1,3)%ptr, xmin, xm  , yu  , ymax, zmin, zmax)
+    call metablock_setbounds(block_array(2,3)%ptr, xm  , xmax, yu  , ymax, zmin, zmax)
+
 ! create root data block
 !
     call append_datablock(pblock_data)
@@ -362,21 +377,6 @@ module problem
     call associate_blocks(block_array(1,3)%ptr, pblock_data)
     call append_datablock(pblock_data)
     call associate_blocks(block_array(2,3)%ptr, pblock_data)
-
-! calculate bounds
-!
-    xm = 0.5 * (xmin + xmax)
-    yl = (ymax - ymin) / 3.0 + ymin
-    yu = (ymax - ymin) / 3.0 + yl
-
-! set block bounds
-!
-    call datablock_setbounds(block_array(1,1)%ptr%data, xmin, xm  , ymin, yl  , zmin, zmax)
-    call datablock_setbounds(block_array(2,1)%ptr%data, xm  , xmax, ymin, yl  , zmin, zmax)
-    call datablock_setbounds(block_array(2,2)%ptr%data, xm  , xmax, yl  , yu  , zmin, zmax)
-    call datablock_setbounds(block_array(1,2)%ptr%data, xmin, xm  , yl  , yu  , zmin, zmax)
-    call datablock_setbounds(block_array(1,3)%ptr%data, xmin, xm  , yu  , ymax, zmin, zmax)
-    call datablock_setbounds(block_array(2,3)%ptr%data, xm  , xmax, yu  , ymax, zmin, zmax)
 
 ! set block dimensions for the lowest level
 !
@@ -429,20 +429,20 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */
@@ -527,16 +527,16 @@ module problem
 
 ! calculate cell sizes
 !
-    dx  = (pblock%xmax - pblock%xmin) / in
-    dy  = (pblock%ymax - pblock%ymin) / jn
+    dx  = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy  = (pblock%meta%ymax - pblock%meta%ymin) / jn
     dxh = 0.5d0 * dx
     dyh = 0.5d0 * dy
     ds  = dx * dy
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%meta%ymin
 
 ! set variables
 !
@@ -645,20 +645,20 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */
@@ -758,20 +758,20 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */

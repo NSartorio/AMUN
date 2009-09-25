@@ -269,27 +269,27 @@ module io
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'xmin', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%xmin,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%xmin,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'xmax', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%xmax,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%xmax,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'ymin', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%ymin,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%ymin,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'ymax', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%ymax,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%ymax,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'zmin', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%zmin,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%zmin,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5acreate_f(bid, 'zmax', H5T_NATIVE_DOUBLE, sid, aid, err)
-            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%zmax,8), am, err)
+            call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(pblock%meta%zmax,8), am, err)
             call h5aclose_f(aid, err)
 
             call h5sclose_f(sid, err)

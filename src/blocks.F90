@@ -96,6 +96,10 @@ module blocks
 !                                                        1 - refine
 
     logical                     :: leaf             ! leaf flag
+
+    real                        :: xmin, xmax       ! bounds for the x direction
+    real                        :: ymin, ymax       ! bounds for the y direction
+    real                        :: zmin, zmax       ! bounds for the z direction
   end type block_meta
 
 ! define block_data structure
@@ -105,10 +109,6 @@ module blocks
     type(block_data), pointer :: next             ! pointer to the next block
 
     type(block_meta), pointer :: meta             ! pointer to the metadata block
-
-    real                      :: xmin, xmax       ! bounds for the x direction
-    real                      :: ymin, ymax       ! bounds for the y direction
-    real                      :: zmin, zmax       ! bounds for the z direction
 
     real, dimension(:,:,:,:), allocatable :: u    ! variable array
     real, dimension(:,:,:)  , allocatable :: c    ! criterion array
@@ -303,6 +303,15 @@ module blocks
     pblock%refine =  0
     pblock%leaf   = .false.
 
+! initialize bounds of the block
+!
+    pblock%xmin = 0.0
+    pblock%xmax = 1.0
+    pblock%ymin = 0.0
+    pblock%ymax = 1.0
+    pblock%zmin = 0.0
+    pblock%zmax = 1.0
+
 ! increase the number of allocated meta blocks
 !
     nblocks = nblocks + 1
@@ -348,15 +357,6 @@ module blocks
 !
     allocate(pblock%u(nvars,im,jm,km))
     allocate(pblock%c(im,jm,km))
-
-! initialize bounds of the block
-!
-    pblock%xmin = 0.0
-    pblock%xmax = 1.0
-    pblock%ymin = 0.0
-    pblock%ymax = 1.0
-    pblock%zmin = 0.0
-    pblock%zmax = 1.0
 
 ! increase the number of allocated meta blocks
 !
@@ -709,17 +709,17 @@ module blocks
 !
 !===============================================================================
 !
-! datablock_setbounds: subroutine sets the bounds of data block
+! metablock_setbounds: subroutine sets the bounds of data block
 !
 !===============================================================================
 !
-  subroutine datablock_setbounds(pblock, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine metablock_setbounds(pblock, xmin, xmax, ymin, ymax, zmin, zmax)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
     real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
 !
 !-------------------------------------------------------------------------------
@@ -735,7 +735,7 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine datablock_setbounds
+  end subroutine metablock_setbounds
 !
 !===============================================================================
 !
@@ -746,9 +746,6 @@ module blocks
   subroutine refine_block(pblock, falloc_data)
 
     use error   , only : print_error
-#ifdef MPI
-    use mpitools, only : ncpu
-#endif /* MPI */
 
     implicit none
 
@@ -1098,19 +1095,47 @@ module blocks
       pblock%next => pfirst
       pfirst%prev => pblock
 
+! calculate the size of new blocks
+!
+      xln = 0.5 * (pblock%xmax - pblock%xmin)
+      yln = 0.5 * (pblock%ymax - pblock%ymin)
+#if NDIMS == 3
+      zln = 0.5 * (pblock%zmax - pblock%zmin)
+#else /* NDIMS == 3 */
+      zln =       (pblock%zmax - pblock%zmin)
+#endif /* NDIMS == 3 */
+
+! iterate over all children and allocate data blocks
+!
+      do p = 1, nchild
+
+! assign a pointer to the current child
+!
+        pchild => pblock%child(p)%ptr
+
+! calculate block bounds
+!
+        i   = mod((p - 1)    ,2)
+        j   = mod((p - 1) / 2,2)
+        k   = mod((p - 1) / 4,2)
+
+        xmn = pblock%xmin + xln * i
+        ymn = pblock%ymin + yln * j
+        zmn = pblock%zmin + zln * k
+
+        xmx = xmn + xln
+        ymx = ymn + yln
+        zmx = zmn + zln
+
+! set block bounds
+!
+        call metablock_setbounds(pchild, xmn, xmx, ymn, ymx, zmn, zmx)
+
+      end do
+
 ! allocate data blocks if necessary
 !
       if (falloc_data) then
-
-! calculate the size of new blocks
-!
-        xln = 0.5 * (pblock%data%xmax - pblock%data%xmin)
-        yln = 0.5 * (pblock%data%ymax - pblock%data%ymin)
-#if NDIMS == 3
-        zln = 0.5 * (pblock%data%zmax - pblock%data%zmin)
-#else /* NDIMS == 3 */
-        zln =       (pblock%data%zmax - pblock%data%zmin)
-#endif /* NDIMS == 3 */
 
 ! iterate over all children and allocate data blocks
 !
@@ -1123,24 +1148,6 @@ module blocks
 ! allocate data block
 !
           call allocate_datablock(pdata)
-
-! calculate block bounds
-!
-          i   = mod((p - 1)    ,2)
-          j   = mod((p - 1) / 2,2)
-          k   = mod((p - 1) / 4,2)
-
-          xmn = pblock%data%xmin + xln * i
-          ymn = pblock%data%ymin + yln * j
-          zmn = pblock%data%zmin + zln * k
-
-          xmx = xmn + xln
-          ymx = ymn + yln
-          zmx = zmn + zln
-
-! set block bounds
-!
-          call datablock_setbounds(pdata, xmn, xmx, ymn, ymx, zmn, zmx)
 
 ! associate with the meta block
 !
