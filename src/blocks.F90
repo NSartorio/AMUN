@@ -336,10 +336,6 @@ module blocks
 ! output arguments
 !
     type(block_data), pointer, intent(out) :: pblock
-
-! local variables
-!
-    integer :: i, j, k
 !
 !-------------------------------------------------------------------------------
 !
@@ -462,10 +458,15 @@ module blocks
 !
     if (associated(pblock)) then
 
-! if this is the first block in the list, update the plist pointer
+! if this is the first block in the list, update the list_data pointer
 !
       if (pblock%meta%id .eq. list_data%meta%id) &
         list_data => pblock%next
+
+! if this is the last block in the list, update the last_data pointer
+!
+      if (pblock%meta%id .eq. last_data%meta%id) &
+        last_data => pblock%prev
 
 ! update the pointer of previous and next blocks
 !

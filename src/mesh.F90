@@ -243,19 +243,6 @@ module mesh
       l = l + 1
     end do
 
-! ! deallocate data blocks of non leafs
-! !
-!     pmeta_block => list_meta
-!     do while (associated(pmeta_block))
-!
-!       if (.not. pmeta_block%leaf) &
-!         call deallocate_datablock(pmeta_block%data)
-!
-! ! assign pointer to the next block
-! !
-!       pmeta_block => pmeta_block%next
-!     end do
-
 #ifdef MPI
 ! divide blocks between all processes
 !
@@ -293,6 +280,19 @@ module mesh
       pmeta_block => pnext
     end do
 #endif /* MPI */
+
+! deallocate data blocks of non leafs
+!
+    pmeta_block => list_meta
+    do while (associated(pmeta_block))
+
+      if (.not. pmeta_block%leaf) &
+        call deallocate_datablock(pmeta_block%data)
+
+! assign pointer to the next block
+!
+      pmeta_block => pmeta_block%next
+    end do
 
 ! print information about the generated geometry
 !
@@ -365,7 +365,8 @@ module mesh
     use config  , only : maxlev
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , nleafs, dblocks, nchild, ndims, nsides, nfaces        &
-                       , refine_block, derefine_block
+                       , refine_block, derefine_block, append_datablock        &
+                       , associate_blocks, deallocate_datablock
     use error   , only : print_info
 #ifdef MPI
     use mpitools, only : ncpus, ncpu, is_master, mallreducesuml
@@ -543,14 +544,20 @@ module mesh
       pmeta => list_meta
       do while (associated(pmeta))
 
-        if (pmeta%level .eq. l) then
-          if (pmeta%leaf) then
+        if (pmeta%leaf) then
+          if (pmeta%level .eq. l) then
             if (pmeta%refine .eq. -1) then
               pparent => pmeta%parent
 
               if (associated(pparent)) then
-                if (pmeta%cpu .eq. ncpu) &
+                if (pmeta%cpu .eq. ncpu) then
+                  if (.not. associated(pparent%data)) then
+                    call append_datablock(pdata)
+                    call associate_blocks(pparent, pdata)
+                  end if
                   call restrict_block(pparent)
+                end if
+
                 call derefine_block(pparent)
                 pmeta => pparent
               end if
@@ -576,11 +583,10 @@ module mesh
               if (pmeta%cpu .eq. ncpu) then
                 call refine_block(pmeta, .true.)
                 call prolong_block(pparent)
+                call deallocate_datablock(pparent%data)
               else
                 call refine_block(pmeta, .false.)
               end if
-              pparent%refine = 0
-              pparent%leaf   = .false.
             end if
           end if
         end if
@@ -588,19 +594,6 @@ module mesh
       end do
 
     end do
-
-! ! deallocate data blocks of non leafs
-! !
-!     pmeta_block => list_meta
-!     do while (associated(pmeta_block))
-!
-!       if (.not. pmeta_block%leaf) &
-!         call deallocate_datablock(pmeta_block%data)
-!
-! ! assign pointer to the next block
-! !
-!       pmeta_block => pmeta_block%next
-!     end do
 
 #ifdef MPI
 !! TO DO
