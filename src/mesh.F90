@@ -380,14 +380,14 @@ module mesh
 !
   subroutine update_mesh
 
-    use config  , only : maxlev
+    use config  , only : maxlev, im, jm, km
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , nleafs, dblocks, nchild, ndims, nsides, nfaces        &
                        , refine_block, derefine_block, append_datablock        &
-                       , associate_blocks, deallocate_datablock
+                       , associate_blocks, deallocate_datablock, nv => nvars
     use error   , only : print_info
 #ifdef MPI
-    use mpitools, only : ncpus, ncpu, is_master, mallreducesuml
+    use mpitools, only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
 #endif /* MPI */
     use problem , only : check_ref
 
@@ -399,6 +399,11 @@ module mesh
     integer(kind=4) :: i, j, k, l, p
 
 #ifdef MPI
+! tag for data exchange
+!
+    integer(kind=4)                       :: itag
+
+
 ! array for the update of the refinement flag on all processors
 !
     integer(kind=4), dimension(nleafs)    :: ibuf
@@ -406,6 +411,10 @@ module mesh
 ! array for number of data blocks at each processors
 !
     integer(kind=4), dimension(0:ncpus-1) :: nblk
+
+! local buffer for data block exchange
+!
+    real(kind=8)   , dimension(nv,im,jm,km) :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -554,6 +563,88 @@ module mesh
       end do
 
     end do
+
+#ifdef MPI
+! find all sibling blocks which are spread over different processors
+!
+    pmeta => list_meta
+    do while (associated(pmeta))
+      if (.not. pmeta%leaf) then
+        if (pmeta%child(1)%ptr%refine .eq. -1) then
+
+! check if the parent blocks is on the same processor as the next block, if not
+! move it to the same processor
+!
+          if (pmeta%cpu .ne. pmeta%next%cpu) then
+            pmeta%cpu = pmeta%next%cpu
+          end if
+
+! find the case when child blocks are spread across at least 2 processors
+!
+          flag = .false.
+          do p = 1, nchild
+            flag = flag .or. (pmeta%child(p)%ptr%cpu .ne. pmeta%cpu)
+          end do
+
+          if (flag) then
+
+! iterate over all children
+!
+            do p = 1, nchild
+
+! get the tag for communication
+!
+              itag = pmeta%child(p)%ptr%cpu * ncpus + pmeta%cpu + ncpus + p + 1
+
+! if the current children is not on the same processor, then ...
+!
+              if (pmeta%child(p)%ptr%cpu .ne. pmeta%cpu) then
+
+! allocate data blocks for children on the processor which will receive data
+!
+                if (pmeta%cpu .eq. ncpu) then
+                  call append_datablock(pdata)
+                  call associate_blocks(pmeta%child(p)%ptr, pdata)
+
+! receive the data
+!
+                  call mrecvf(size(rbuf), pmeta%child(p)%ptr%cpu, itag, rbuf)
+
+! coppy buffer to data
+!
+                  pmeta%child(p)%ptr%data%u(:,:,:,:) = rbuf(:,:,:,:)
+                end if
+
+! send data to the right processor and deallocate data block
+!
+                if (pmeta%child(p)%ptr%cpu .eq. ncpu) then
+
+! copy data to buffer
+!
+                  rbuf(:,:,:,:) = pmeta%child(p)%ptr%data%u(:,:,:,:)
+
+! send data
+!
+                  call msendf(size(rbuf), pmeta%cpu, itag, rbuf)
+
+! deallocate data block
+!
+                  call deallocate_datablock(pmeta%child(p)%ptr%data)
+
+! set the current processor of the block
+!
+                  pmeta%child(p)%ptr%cpu = pmeta%cpu
+                end if
+              end if
+            end do
+
+          end if
+        end if
+      end if
+
+      pmeta => pmeta%next
+    end do
+#endif /* MPI */
 
 ! perform the actual derefinement
 !
