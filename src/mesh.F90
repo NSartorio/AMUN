@@ -276,7 +276,6 @@ module mesh
 !
       if (pmeta_block%leaf) then
         p = p + 1
-
         if (p .ge. l) then
           n = min(ncpus - 1, n + 1)
           p = 0
@@ -390,21 +389,16 @@ module mesh
 ! local variables
 !
     logical         :: flag
-    integer(kind=4) :: i, j, k, l, p
+    integer(kind=4) :: i, j, k, l, n, p
 
 #ifdef MPI
 ! tag for data exchange
 !
-    integer(kind=4)                       :: itag
-
+    integer(kind=4)                         :: itag
 
 ! array for the update of the refinement flag on all processors
 !
-    integer(kind=4), dimension(nleafs)    :: ibuf
-
-! array for number of data blocks at each processors
-!
-    integer(kind=4), dimension(0:ncpus-1) :: nblk
+    integer(kind=4), dimension(nleafs)      :: ibuf
 
 ! local buffer for data block exchange
 !
@@ -585,7 +579,7 @@ module mesh
 !
             do p = 1, nchild
 
-! get the tag for communication
+! generate the tag for communication
 !
               itag = pmeta%child(p)%ptr%cpu * ncpus + pmeta%cpu + ncpus + p + 1
 
@@ -698,27 +692,89 @@ module mesh
     end do
 
 #ifdef MPI
-!! TO DO
+!! AUTO BALANCING
 !!
-!! - perform auto balancing of the blocks
-!! - to do this correctly, we need to deallocate all data blocks for non-leafs
-!!
-! reset buffer
+! calculate the new division
 !
-    nblk(:) = 0
+    l = nleafs / ncpus
 
-! set the number of data blocks for the current processor
+! iterate over all metablocks and reassign the processor numbers
 !
-    nblk(ncpu) = dblocks
+    n = 0
+    p = 0
 
-! update information across all processors
-!
-    call mallreducesuml(ncpus, nblk)
+    pmeta => list_meta
+    do while (associated(pmeta))
 
-! print information
+! assign the cpu to the current block
 !
-!     if (is_master()) &
-!       print *, nleafs, nleafs / ncpus, sum(nblk(:)), ':', nblk(:)
+      if (pmeta%cpu .ne. n) then
+
+        if (pmeta%leaf) then
+
+! generate the tag for communication
+!
+          itag = pmeta%cpu * ncpus + n + ncpus + 1
+
+          if (ncpu .eq. pmeta%cpu) then
+
+! copy data to buffer
+!
+            rbuf(:,:,:,:) = pmeta%data%u(:,:,:,:)
+
+! send data
+!
+            call msendf(size(rbuf), n, itag, rbuf)
+
+! deallocate data block
+!
+             call deallocate_datablock(pmeta%data)
+
+! send data block
+!
+          end if
+
+          if (ncpu .eq. n) then
+
+! allocate data block for the current block
+!
+            call append_datablock(pdata)
+            call associate_blocks(pmeta, pdata)
+
+! receive the data
+!
+            call mrecvf(size(rbuf), pmeta%cpu, itag, rbuf)
+
+! coppy buffer to data
+!
+            pmeta%data%u(:,:,:,:) = rbuf(:,:,:,:)
+
+! receive data block
+!
+          end if
+        end if
+
+! set new processor number
+!
+        pmeta%cpu = n
+
+      end if
+
+! increase the number of blocks on the current process; if it exceeds the
+! allowed number reset the counter and increase the processor number
+!
+      if (pmeta%leaf) then
+        p = p + 1
+        if (p .ge. l) then
+          n = min(ncpus - 1, n + 1)
+          p = 0
+        end if
+      end if
+
+! assign pointer to the next block
+!
+      pmeta => pmeta%next
+    end do
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
