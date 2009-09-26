@@ -575,9 +575,8 @@ module mesh
 ! check if the parent blocks is on the same processor as the next block, if not
 ! move it to the same processor
 !
-          if (pmeta%cpu .ne. pmeta%next%cpu) then
+          if (pmeta%cpu .ne. pmeta%next%cpu) &
             pmeta%cpu = pmeta%next%cpu
-          end if
 
 ! find the case when child blocks are spread across at least 2 processors
 !
@@ -630,11 +629,11 @@ module mesh
 ! deallocate data block
 !
                   call deallocate_datablock(pmeta%child(p)%ptr%data)
+                end if
 
 ! set the current processor of the block
 !
-                  pmeta%child(p)%ptr%cpu = pmeta%cpu
-                end if
+                pmeta%child(p)%ptr%cpu = pmeta%cpu
               end if
             end do
 
