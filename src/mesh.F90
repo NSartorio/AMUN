@@ -243,11 +243,24 @@ module mesh
       l = l + 1
     end do
 
+! deallocate data blocks of non leafs
+!
+    pmeta_block => list_meta
+    do while (associated(pmeta_block))
+
+      if (.not. pmeta_block%leaf) &
+        call deallocate_datablock(pmeta_block%data)
+
+! assign pointer to the next block
+!
+      pmeta_block => pmeta_block%next
+    end do
+
 #ifdef MPI
 ! divide blocks between all processes, use the number of data blocks to do this,
 ! but keep blocks from the top level which have the same parent packed together
 !
-    l = dblocks / ncpus
+    l = nleafs / ncpus
     n = 0
     p = 0
 
@@ -261,20 +274,14 @@ module mesh
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
-      if (associated(pmeta_block%data)) then
+      if (pmeta_block%leaf) then
         p = p + 1
 
-        if (p .gt. l) then
-          n = n + 1
+        if (p .ge. l) then
+          n = min(ncpus - 1, n + 1)
           p = 0
         end if
       end if
-
-! keep blocks from the top level to be packed at the same processor if they have
-! the same parent
-!
-      if (pmeta_block%level .eq. maxlev) &
-        pmeta_block%cpu = pmeta_block%parent%next%cpu
 
 ! assign pointer to the next block
 !
@@ -298,19 +305,6 @@ module mesh
       pmeta_block => pnext
     end do
 #endif /* MPI */
-
-! deallocate data blocks of non leafs
-!
-    pmeta_block => list_meta
-    do while (associated(pmeta_block))
-
-      if (.not. pmeta_block%leaf) &
-        call deallocate_datablock(pmeta_block%data)
-
-! assign pointer to the next block
-!
-      pmeta_block => pmeta_block%next
-    end do
 
 ! print information about the generated geometry
 !
@@ -724,7 +718,7 @@ module mesh
 ! print information
 !
 !     if (is_master()) &
-!       print *, nblk(:)
+!       print *, nleafs, nleafs / ncpus, sum(nblk(:)), ':', nblk(:)
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
