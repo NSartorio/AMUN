@@ -103,20 +103,21 @@ clean-all:
 
 #-------------------------------------------------------------------------------
 
-blocks.o        : blocks.F90 config.o error.o
-boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o
+blocks.o        : blocks.F90 config.o error.o mpitools.o
+boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
+                  mpitools.o
 config.o        : config.F90 error.o
 driver.o        : driver.F90 config.o evolution.o io.o mesh.o mpitools.o       \
                   timer.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o mesh.o          \
-                  problem.o scheme.o timer.o
+                  mpitools.o problem.o scheme.o timer.o
 interpolation.o : interpolation.F90
-io.o            : io.F90 blocks.o error.o scheme.o
+io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o
 mpitools.o      : mpitools.F90
-problem.o       : problem.F90 blocks.o
+problem.o       : problem.F90 blocks.o scheme.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o
 timer.o         : timer.F90
 

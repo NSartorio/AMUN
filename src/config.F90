@@ -43,6 +43,10 @@ module config
                          , jn, jm, jb, je, jbl, jbu, jel, jeu       &
                          , kn, km, kb, ke, kbl, kbu, kel, keu
 
+! the dimensions of the lowest level
+!
+  integer(kind=4), dimension(3), save :: rdims = (/ 1, 1, 1 /)
+
 ! mesh refinement control
 !
   integer(kind=4), save :: maxlev  = 2
@@ -86,7 +90,7 @@ module config
 
 ! initial values
 !
-  real               , save :: dens = 1.0, pres = 1.0, rmid = 0.5
+  real               , save :: dens = 1.0, pres = 1.0, rmid = 0.5, rcut = 0.1
   real               , save :: x1c = 0.0, y1c = 0.0, z1c = 0.0, r1c = 0.1
   real               , save :: x2c = 0.0, y2c = 0.0, z2c = 0.0, r2c = 0.1
   real               , save :: dnfac = 1.0, dnrat = 1.0
@@ -166,6 +170,14 @@ module config
     case("kblocks")
       read(value, "(i9.9)") kblocks
 #endif /* NDIMS == 3 */
+    case("rdimsx")
+      read(value, "(i9.9)") rdims(1)
+    case("rdimsy")
+      read(value, "(i9.9)") rdims(2)
+#if NDIMS == 3
+    case("rdimsz")
+      read(value, "(i9.9)") rdims(3)
+#endif /* NDIMS == 3 */
     case("ncells")
       read(value, "(i9.9)") ncells
     case("nghost")
@@ -207,6 +219,8 @@ module config
       read(value,        *) pres
     case("rmid")
       read(value,        *) rmid
+    case("rcut")
+      read(value,        *) rcut
     case("x1c")
       read(value,        *) x1c
     case("y1c")

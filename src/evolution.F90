@@ -42,9 +42,12 @@ module evolution
 !
   subroutine evolve
 
-    use blocks    , only : block, plist
+    use blocks    , only : block_data, list_data
     use boundaries, only : boundary
     use mesh      , only : dx_min, update_mesh
+#ifdef MPI
+    use mpitools  , only : mallreduceminr
+#endif /* MPI */
     use scheme    , only : maxspeed
     use timer     , only : start_timer, stop_timer
 
@@ -52,24 +55,23 @@ module evolution
 
 ! local variables
 !
-    type(block), pointer :: pblock
-    real                 :: cmax, cm
+    type(block_data), pointer :: pblock
+    real                      :: cmax, cm
 !
 !-------------------------------------------------------------------------------
 !
-! iterate over all blocks and perform one step of time evolution
+! iterate over all data blocks and perform one step of time evolution
 !
-    pblock => plist
+    pblock => list_data
     do while (associated(pblock))
 
 ! check if this block is a leaf
 !
+      if (pblock%meta%leaf) &
 #ifdef EULER
-      if (pblock%leaf) &
         call evolve_euler(pblock)
 #endif /* EULER */
 #ifdef RK2
-      if (pblock%leaf) &
         call evolve_rk2(pblock)
 #endif /* RK2 */
 
@@ -91,12 +93,12 @@ module evolution
 
 ! iterate over all blocks in order to find the maximum speed
 !
-    pblock => plist
+    pblock => list_data
     do while (associated(pblock))
 
 ! check if this block is a leaf
 !
-      if (pblock%leaf) &
+      if (pblock%meta%leaf) &
         cm = maxspeed(pblock%u)
 
 ! compare global and local maximum speeds
@@ -113,10 +115,16 @@ module evolution
 !
     dtn = dx_min / max(cmax, 1.e-8)
 
+#ifdef MPI
+! reduce new time step over all processes
+!
+    call mallreduceminr(dtn)
+#endif /* MPI */
+
 ! check refinement and refine
 !
     call start_timer(5)
-    call update_mesh(0)
+    call update_mesh
     call stop_timer(5)
 
 ! update boundaries
@@ -138,7 +146,7 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks , only : block, nv => nvars
+    use blocks , only : block_data, nv => nvars
     use config , only : im, jm, km
     use mesh   , only : adxi, adyi, adzi
 #ifdef SHAPE
@@ -150,7 +158,7 @@ module evolution
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -163,7 +171,7 @@ module evolution
 
 ! local pointers
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -171,9 +179,9 @@ module evolution
 
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pb%level)
-    dyi = adyi(pb%level)
-    dzi = adzi(pb%level)
+    dxi = adxi(pb%meta%level)
+    dyi = adyi(pb%meta%level)
+    dzi = adzi(pb%meta%level)
 
 ! 1st step of integration
 !
@@ -213,7 +221,7 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks , only : block, nv => nvars
+    use blocks , only : block_data, nv => nvars
     use config , only : im, jm, km
     use mesh   , only : adxi, adyi, adzi
 #ifdef SHAPE
@@ -225,7 +233,7 @@ module evolution
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -238,7 +246,7 @@ module evolution
 
 ! local pointers
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -246,9 +254,9 @@ module evolution
 
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pb%level)
-    dyi = adyi(pb%level)
-    dzi = adzi(pb%level)
+    dxi = adxi(pb%meta%level)
+    dyi = adyi(pb%meta%level)
+    dzi = adzi(pb%meta%level)
 
 ! 1st step of integration
 !

@@ -31,6 +31,8 @@ module blocks
 ! parameters
 !
   integer(kind=4), parameter :: ndims  = NDIMS
+  integer(kind=4), parameter :: nsides = 2
+  integer(kind=4), parameter :: nfaces = 2**(ndims-1)
   integer(kind=4), parameter :: nchild = 2**ndims
   integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4 &
                               , ivx = 2, ivy = 3, ivz = 4
@@ -55,48 +57,88 @@ module blocks
 #endif /* MHD */
   integer(kind=4), parameter :: maxid = 1000000
 
-! define block type
+!! BLOCK STRUCTURE POINTERS (have to be defined before structures)
+!!
+! define pointers to block_meta and block_data structures
 !
-  type blockptr
-    type(block), pointer :: ptr
-  end type blockptr
+  type pointer_meta
+    type(block_meta), pointer :: ptr
+  end type pointer_meta
 
-  type blockref
-    integer(kind=4)      :: cpu, id
-  end type blockref
+  type pointer_data
+    type(block_data), pointer :: ptr
+  end type pointer_data
 
-  type block
-    type(block), pointer :: next, prev
-    type(blockref)       :: parent, child(nchild), neigh(ndims,2,2)
+  type pointer_info
+    type(block_info), pointer :: ptr
+  end type pointer_info
 
-    logical              :: leaf
-    integer(kind=4)      :: cpu, id, level
-
-    character            :: config
-    integer(kind=4)      :: refine
-
-
-    real                 :: xmin, xmax, ymin, ymax, zmin, zmax
-
-    real, dimension(:,:,:,:), allocatable :: u
-    real, dimension(:,:,:)  , allocatable :: c
-  end type block
-
-! array of ID to pointer conversion
+!! BLOCK STRUCTURES
 !
-  type(blockptr), dimension(:), allocatable, save :: idtoptr
-
-! stored pointers
+! define block_meta structure
 !
-  type(block), pointer, save :: plist, plast
+  type block_meta
+    type(block_meta)  , pointer :: prev             ! pointer to the previous block
+    type(block_meta)  , pointer :: next             ! pointer to the next block
+    type(block_meta)  , pointer :: parent           ! pointer to the parent block
+    type(pointer_meta)          :: child(nchild)    ! pointers to children
+    type(pointer_meta)          :: neigh(ndims,2,2) ! pointers to neighbors
+
+    type(block_data)  , pointer :: data             ! pointer to the data block
+
+    integer(kind=4)             :: id               ! block identificator
+    integer(kind=4)             :: cpu              ! the cpu id of the block
+    integer(kind=4)             :: level            ! refinement level
+    integer(kind=4)             :: config           ! configuration flag
+    integer(kind=4)             :: refine           ! refinement flag:
+!                                                       -1 - derefine
+!                                                        0 - do nothing
+!                                                        1 - refine
+
+    logical                     :: leaf             ! leaf flag
+
+    real                        :: xmin, xmax       ! bounds for the x direction
+    real                        :: ymin, ymax       ! bounds for the y direction
+    real                        :: zmin, zmax       ! bounds for the z direction
+  end type block_meta
+
+! define block_data structure
+!
+  type block_data
+    type(block_data), pointer :: prev             ! pointer to the previous block
+    type(block_data), pointer :: next             ! pointer to the next block
+
+    type(block_meta), pointer :: meta             ! pointer to the metadata block
+
+    real, dimension(:,:,:,:), allocatable :: u    ! variable array
+    real, dimension(:,:,:)  , allocatable :: c    ! criterion array
+  end type block_data
+
+! define block_info structure for boundary exchange
+!
+  type block_info
+    type(block_info)  , pointer :: prev             ! pointer to the previous block
+    type(block_info)  , pointer :: next             ! pointer to the next block
+    type(block_meta)  , pointer :: block            ! pointer to the meta block
+    type(block_meta)  , pointer :: neigh            ! pointer to the neighbor block
+    integer(kind=4)             :: direction        ! direction of the neighbor block
+    integer(kind=4)             :: side             ! side of the neighbor block
+    integer(kind=4)             :: face             ! face of the neighbor block
+    integer(kind=4)             :: level_difference ! the difference of levels
+  end type block_info
+
+! chains of meta blocks and data blocks
+!
+  type(block_meta), pointer, save :: list_meta, last_meta
+  type(block_data), pointer, save :: list_data, last_data
 
 ! stored last id (should always increase)
 !
   integer(kind=4)     , save :: last_id
 
-! store number of allocated blocks
+! store number of allocated blocks and leafs
 !
-  integer(kind=4)     , save :: nblocks
+  integer(kind=4)     , save :: nblocks, dblocks, nleafs
 
   contains
 !
@@ -118,33 +160,31 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! first check if block list is empty
+! check if metadata list is empty
 !
-    if (associated(plist)) &
-      call print_warning("blocks::init_blocks", "Block list already associated!")
+    if (associated(list_meta)) &
+      call print_warning("blocks::init_blocks", "Block metadata list is already associated!")
+
+! check if data list is empty
+!
+    if (associated(list_data)) &
+      call print_warning("blocks::init_blocks", "Block data list is already associated!")
 
 ! nullify all pointers
 !
-    nullify(plist)
+    nullify(list_meta)
+    nullify(list_data)
 
-! reset number of blocks
+! reset number of blocks and leafs
 !
     nblocks = 0
+    dblocks = 0
+    nleafs  = 0
 
 ! reset ID
 !
     last_id = 0
-
-! allocate space for ID to pointer array
 !
-    allocate(idtoptr(maxid))
-
-! nullify all pointers in ID to pointer array
-!
-    do p = 1, maxid
-      nullify(idtoptr(p)%ptr)
-    end do
-
 !-------------------------------------------------------------------------------
 !
   end subroutine init_blocks
@@ -161,60 +201,22 @@ module blocks
 
 ! pointers
 !
-    type(block), pointer :: pnext
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
 !
 !-------------------------------------------------------------------------------
 !
-! untill the list is free, iterate over all chunks and deallocate blocks
+! clear all meta blocks
 !
-    do while(associated(plist))
-
-! assign temporary pointer to the next chunk
-!
-      pnext => plist%next
-
-! deallocate and nullify the current block
-!
-      call deallocate_block(plist)
-
-! assign pointer to the current chunk
-!
-      plist => pnext
-
+    pblock_meta => list_meta
+    do while(associated(pblock_meta))
+      call deallocate_metablock(pblock_meta)
+      pblock_meta => list_meta
     end do
-
-! deallocate ID to pointer conversion array
 !
-    deallocate(idtoptr)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_blocks
-!
-!===============================================================================
-!
-! list_allocated: function returns true if the block list is allocated,
-!                 otherwise it returns false
-!
-!===============================================================================
-!
-  function list_allocated
-
-    implicit none
-
-! output arguments
-!
-    logical :: list_allocated
-!
-!-------------------------------------------------------------------------------
-!
-    list_allocated = associated(plist)
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function list_allocated
 !
 !===============================================================================
 !
@@ -241,58 +243,25 @@ module blocks
     increase_id = last_id
 
     return
-
+!
 !-------------------------------------------------------------------------------
 !
   end function increase_id
 !
 !===============================================================================
 !
-! get_pointer: function returns a pointer to the block with requested ID
+! allocate_metablock: subroutine allocates space for one meta block and returns
+!                     the pointer to this block
 !
 !===============================================================================
 !
-  function get_pointer(id)
-
-    implicit none
-
-! input argument
-!
-    integer(kind=4) :: id
-
-! return variable
-!
-    type(block), pointer :: get_pointer
-!
-!-------------------------------------------------------------------------------
-!
-    nullify(get_pointer)
-
-    if (id .ge. 1 .and. id .le. maxid) &
-      get_pointer => idtoptr(id)%ptr
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_pointer
-!
-!===============================================================================
-!
-! allocate_block: subroutine allocates space for one block and returns the
-!                 pointer to this block
-!
-!===============================================================================
-!
-  subroutine allocate_block(pblock)
-
-    use config, only : im, jm, km
+  subroutine allocate_metablock(pblock)
 
     implicit none
 
 ! output arguments
 !
-    type(block), pointer, intent(out) :: pblock
+    type(block_meta), pointer, intent(out) :: pblock
 
 ! local variables
 !
@@ -304,133 +273,470 @@ module blocks
 !
     allocate(pblock)
 
+! nullify pointers
+!
+    nullify(pblock%prev)
+    nullify(pblock%next)
+    nullify(pblock%parent)
+    nullify(pblock%data)
+    do i = 1, nchild
+      nullify(pblock%child(i)%ptr)
+    end do
+    do k = 1, nfaces
+      do j = 1, nsides
+        do i = 1, ndims
+          nullify(pblock%neigh(i,j,k)%ptr)
+        end do
+      end do
+    end do
+
 ! set unique ID
 !
-    pblock%id = increase_id()   ! TODO: replace with get_free_id() which return the first free id
+    pblock%id = increase_id()
 
-! set configuration and leaf flags
+! unset the CPU number of current block, level, the configuration, refine and
+! leaf flags
 !
-    pblock%config = 'N'         ! TODO: replace with an integer number
+    pblock%cpu    = -1
+    pblock%level  = -1
+    pblock%config = -1
+    pblock%refine =  0
     pblock%leaf   = .false.
 
-! initialize the refinement flag
+! initialize bounds of the block
 !
-    pblock%refine = 0
+    pblock%xmin = 0.0
+    pblock%xmax = 1.0
+    pblock%ymin = 0.0
+    pblock%ymax = 1.0
+    pblock%zmin = 0.0
+    pblock%zmax = 1.0
+
+! increase the number of allocated meta blocks
+!
+    nblocks = nblocks + 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_metablock
+!
+!===============================================================================
+!
+! allocate_datablock: subroutine allocates space for one data block and returns
+!                     the pointer to this block
+!
+!===============================================================================
+!
+  subroutine allocate_datablock(pblock)
+
+    use config, only : im, jm, km
+
+    implicit none
+
+! output arguments
+!
+    type(block_data), pointer, intent(out) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block structure
+!
+    allocate(pblock)
 
 ! nullify pointers
 !
-    nullify(pblock%next)
     nullify(pblock%prev)
-
-! reset parent block
-!
-    pblock%parent%cpu = -1
-    pblock%parent%id  = -1
-
-! reset neighbors
-!
-    pblock%neigh(:,:,:)%cpu = -1
-    pblock%neigh(:,:,:)%id  = -1
+    nullify(pblock%next)
+    nullify(pblock%meta)
 
 ! allocate space for variables
 !
     allocate(pblock%u(nvars,im,jm,km))
     allocate(pblock%c(im,jm,km))
 
-! set the correspponding pointer in the ID to pointer array to the current block
+! increase the number of allocated meta blocks
 !
-    idtoptr(pblock%id)%ptr => pblock
-
-! increase the number of allocated blocks
+    dblocks = dblocks + 1
 !
-    nblocks = nblocks + 1
-
 !-------------------------------------------------------------------------------
 !
-  end subroutine allocate_block
+  end subroutine allocate_datablock
 !
 !===============================================================================
 !
-! deallocate_block: subroutine deallocates space ocuppied by a given block
+! deallocate_metablock: subroutine deallocates space ocuppied by a given metablock
 !
 !===============================================================================
 !
-  subroutine deallocate_block(pblock)
+  subroutine deallocate_metablock(pblock)
 
     implicit none
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer :: i, j, k
 !
 !-------------------------------------------------------------------------------
 !
-! deallocate variables
+    if (associated(pblock)) then
+
+! if this is the first block in the list, update the plist pointer
 !
-    deallocate(pblock%u)
-    deallocate(pblock%c)
+      if (pblock%id .eq. list_meta%id) &
+        list_meta => pblock%next
+
+! update the pointer of previous and next blocks
+!
+      if (associated(pblock%prev)) &
+        pblock%prev%next => pblock%next
+
+      if (associated(pblock%next)) &
+        pblock%next%prev => pblock%prev
+
+! nullify children
+!
+      do i = 1, nchild
+        nullify(pblock%child(i)%ptr)
+      end do
+
+! nullify neighbors
+!
+      do k = 1, nfaces
+        do j = 1, nsides
+          do i = 1, ndims
+            nullify(pblock%neigh(i,j,k)%ptr)
+          end do
+        end do
+      end do
+
+! if corresponding data block is allocated, deallocate it too
+!
+      if (associated(pblock%data)) &
+        call deallocate_datablock(pblock%data)
 
 ! nullify pointers
 !
-    nullify(pblock%next)
-    nullify(pblock%prev)
-
-! nullify the corresponding pointer in the ID to pointer array
-!
-    nullify(idtoptr(pblock%id)%ptr)
+      nullify(pblock%next)
+      nullify(pblock%prev)
+      nullify(pblock%data)
+      nullify(pblock%parent)
 
 ! free and nullify the block
 !
-    deallocate(pblock)
-    nullify(pblock)
+      deallocate(pblock)
+      nullify(pblock)
 
 ! decrease the number of allocated blocks
 !
-    nblocks = nblocks - 1
+      nblocks = nblocks - 1
 
+    end if
+!
 !-------------------------------------------------------------------------------
 !
-  end subroutine deallocate_block
+  end subroutine deallocate_metablock
 !
 !===============================================================================
 !
-! append_block: subroutine allocates space for one block and appends it to
-!               the list
+! deallocate_datablock: subroutine deallocates space ocuppied by a given datablock
 !
 !===============================================================================
 !
-  subroutine append_block(pblock)
+  subroutine deallocate_datablock(pblock)
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+    if (associated(pblock)) then
+
+! if this is the first block in the list, update the list_data pointer
+!
+      if (pblock%meta%id .eq. list_data%meta%id) &
+        list_data => pblock%next
+
+! if this is the last block in the list, update the last_data pointer
+!
+      if (pblock%meta%id .eq. last_data%meta%id) &
+        last_data => pblock%prev
+
+! update the pointer of previous and next blocks
+!
+      if (associated(pblock%prev)) &
+        pblock%prev%next => pblock%next
+
+      if (associated(pblock%next)) &
+        pblock%next%prev => pblock%prev
+
+! deallocate variables
+!
+      deallocate(pblock%u)
+      deallocate(pblock%c)
+
+! nullify pointers
+!
+      nullify(pblock%next)
+      nullify(pblock%prev)
+      nullify(pblock%meta)
+
+! free and nullify the block
+!
+      deallocate(pblock)
+      nullify(pblock)
+
+! decrease the number of allocated blocks
+!
+      dblocks = dblocks - 1
+
+    end if
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine deallocate_datablock
+!
+!===============================================================================
+!
+! append_metablock: subroutine allocates space for one meta block and appends it
+!                   to the meta block list
+!
+!===============================================================================
+!
+  subroutine append_metablock(pblock)
 
     implicit none
 
 ! output arguments
 !
-    type(block), pointer, intent(out) :: pblock
+    type(block_meta), pointer, intent(out) :: pblock
 !
 !-------------------------------------------------------------------------------
 !
 ! allocate block
 !
-    call allocate_block(pblock)
+    call allocate_metablock(pblock)
 
 ! add to the list
 !
-    if (list_allocated()) then
-      pblock%prev => plast
-      nullify(pblock%next)
-      plast%next => pblock
-
-      plast => pblock
+    if (associated(list_meta)) then
+      pblock%prev => last_meta
+      last_meta%next => pblock
     else
-      plist => pblock
-      plast => pblock
-      nullify(pblock%prev)
-      nullify(pblock%next)
-    endif
+      list_meta => pblock
+    end if
 
+! set the pointer to the last block in the list
+!
+    last_meta => pblock
+!
 !-------------------------------------------------------------------------------
 !
-  end subroutine append_block
+  end subroutine append_metablock
+!
+!===============================================================================
+!
+! append_datablock: subroutine allocates space for one data block and appends it
+!                   to the data block list
+!
+!===============================================================================
+!
+  subroutine append_datablock(pblock)
+
+    implicit none
+
+! output arguments
+!
+    type(block_data), pointer, intent(out) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block
+!
+    call allocate_datablock(pblock)
+
+! add to the list
+!
+    if (associated(list_data)) then
+      pblock%prev => last_data
+      last_data%next => pblock
+    else
+      list_data => pblock
+    end if
+
+! set the pointer to the last block in the list
+!
+    last_data => pblock
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_datablock
+!
+!===============================================================================
+!
+! associate_blocks: subroutine associates a pair of meta and data blocks
+!
+!===============================================================================
+!
+  subroutine associate_blocks(pblock_meta, pblock_data)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock_meta
+    type(block_data), pointer, intent(inout) :: pblock_data
+!
+!-------------------------------------------------------------------------------
+!
+    pblock_meta%data => pblock_data
+    pblock_data%meta => pblock_meta
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine associate_blocks
+!
+!===============================================================================
+!
+! metablock_setleaf: subroutine sets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setleaf(pblock)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pblock%leaf = .true.
+
+! increase the number of leafs
+!
+    nleafs = nleafs + 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setleaf
+!
+!===============================================================================
+!
+! metablock_unsetleaf: subroutine unsets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_unsetleaf(pblock)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pblock%leaf = .false.
+
+! decrease the number of leafs
+!
+    nleafs = nleafs - 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_unsetleaf
+!
+!===============================================================================
+!
+! metablock_setconfig: subroutine sets the config flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setconfig(pblock, config)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+    integer(kind=4)          , intent(in)    :: config
+!
+!-------------------------------------------------------------------------------
+!
+! set the config flag
+!
+    pblock%config = config
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setconfig
+!
+!===============================================================================
+!
+! metablock_setlevel: subroutine sets the level of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setlevel(pblock, level)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+    integer(kind=4)          , intent(in)    :: level
+!
+!-------------------------------------------------------------------------------
+!
+! set the refinement level
+!
+    pblock%level = level
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setlevel
+!
+!===============================================================================
+!
+! metablock_setbounds: subroutine sets the bounds of data block
+!
+!===============================================================================
+!
+  subroutine metablock_setbounds(pblock, xmin, xmax, ymin, ymax, zmin, zmax)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pblock
+    real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
+!
+!-------------------------------------------------------------------------------
+!
+! set bounds of the block
+!
+    pblock%xmin = xmin
+    pblock%xmax = xmax
+    pblock%ymin = ymin
+    pblock%ymax = ymax
+    pblock%zmin = zmin
+    pblock%zmax = zmax
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_setbounds
 !
 !===============================================================================
 !
@@ -438,19 +744,31 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine refine_block(pblock)
+  subroutine refine_block(pblock, falloc_data)
 
-    use error, only : print_error
+    use error   , only : print_error
 
     implicit none
 
 ! input parameters
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
+    logical                  , intent(in)    :: falloc_data
 
 ! pointers
 !
-    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
+    type(block_meta), pointer :: pneigh, pchild, pfirst, plast
+    type(block_data), pointer :: pdata
+
+! local arrays
+!
+    integer, dimension(nchild)              :: config, order
+    integer, dimension(ndims,nsides,nfaces) :: set
+
+! local variables
+!
+    integer :: p, i, j, k
+    real    :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 !
 !-------------------------------------------------------------------------------
 !
@@ -458,382 +776,423 @@ module blocks
 !
     if (associated(pblock)) then
 
-! unset the refinement and leaf flags for the parent block
+! unset block leaf flag
+!
+      call metablock_unsetleaf(pblock)
+
+! reset refinement flag
 !
       pblock%refine = 0
-      pblock%leaf   = .false.
 
-! create 4 blocks
+! iterate over all child blocks
 !
-      call allocate_block(pbl)
-      call allocate_block(pbr)
-      call allocate_block(ptl)
-      call allocate_block(ptr)
+      do p = 1, nchild
 
-! set parent
+! create child meta and data blocks
 !
-      pbl%parent%id = pblock%id
-      pbr%parent%id = pblock%id
-      ptl%parent%id = pblock%id
-      ptr%parent%id = pblock%id
+        call allocate_metablock(pblock%child(p)%ptr)
 
-! set level
+! set it as a leaf
 !
-      pbl%level = pblock%level + 1
-      pbr%level = pbl%level
-      ptl%level = pbl%level
-      ptr%level = pbl%level
+        call metablock_setleaf(pblock%child(p)%ptr)
 
-! set leaf flags
+! assign pointer to the parent block
 !
-      pbl%leaf   = .true.
-      pbr%leaf   = .true.
-      ptl%leaf   = .true.
-      ptr%leaf   = .true.
+        pblock%child(p)%ptr%parent => pblock
 
-! set bounds
+! increase the refinement level
 !
-      pbl%xmin = pblock%xmin
-      pbl%xmax = 0.5 * (pblock%xmax + pblock%xmin)
-      pbl%ymin = pblock%ymin
-      pbl%ymax = 0.5 * (pblock%ymax + pblock%ymin)
+        pblock%child(p)%ptr%level = pblock%level + 1
 
-      pbr%xmin = pbl%xmax
-      pbr%xmax = pblock%xmax
-      pbr%ymin = pblock%ymin
-      pbr%ymax = pbl%ymax
-
-      ptl%xmin = pblock%xmin
-      ptl%xmax = pbl%xmax
-      ptl%ymin = pbl%ymax
-      ptl%ymax = pblock%ymax
-
-      ptr%xmin = ptl%xmax
-      ptr%xmax = pblock%xmax
-      ptr%ymin = ptl%ymin
-      ptr%ymax = pblock%ymax
-
-! set neighbors to the refined blocks
+! copy the parent cpu number to each child
 !
-      pbl%neigh(1,2,1)%id = pbr%id  ! BL right  -> BR
-      pbl%neigh(1,2,2)%id = pbr%id
-      pbl%neigh(2,2,1)%id = ptl%id  ! BL top    -> TL
-      pbl%neigh(2,2,2)%id = ptl%id
+        pblock%child(p)%ptr%cpu = pblock%cpu
 
-      pbr%neigh(1,1,1)%id = pbl%id  ! BR left   -> BL
-      pbr%neigh(1,1,2)%id = pbl%id
-      pbr%neigh(2,2,1)%id = ptr%id  ! BR top    -> TR
-      pbr%neigh(2,2,2)%id = ptr%id
+      end do
 
-      ptl%neigh(1,2,1)%id = ptr%id  ! TL right  -> TR
-      ptl%neigh(1,2,2)%id = ptr%id
-      ptl%neigh(2,1,1)%id = pbl%id  ! TL bottom -> BL
-      ptl%neigh(2,1,2)%id = pbl%id
-
-      ptr%neigh(1,1,1)%id = ptl%id  ! TR left   -> TL
-      ptr%neigh(1,1,2)%id = ptl%id
-      ptr%neigh(2,1,1)%id = pbr%id  ! TR bottom -> BR
-      ptr%neigh(2,1,2)%id = pbr%id
-
-! set pointer to the neighbors of the parent block
+! assign neighbors of the child blocks
 !
-      pneigh => get_pointer(pblock%neigh(1,1,1)%id) ! left lower neighbor
-      if (associated(pneigh)) then
-        pbl%neigh(1,1,1)%id = pneigh%id
-        pbl%neigh(1,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
-        endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = pbl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(1,1,2)%id) ! left upper neighbor
-      if (associated(pneigh)) then
-        ptl%neigh(1,1,1)%id = pneigh%id
-        ptl%neigh(1,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,2,1)%id = pbl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
-        endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%neigh(1,2,1)%id = ptl%id
-          pneigh%neigh(1,2,2)%id = ptl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(1,2,1)%id) ! right lower neighbor
-      if (associated(pneigh)) then
-        pbr%neigh(1,2,1)%id = pneigh%id
-        pbr%neigh(1,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = pbr%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(1,2,2)%id) ! right upper neighbor
-      if (associated(pneigh)) then
-        ptr%neigh(1,2,1)%id = pneigh%id
-        ptr%neigh(1,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(1,1,1)%id = pbr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%neigh(1,1,1)%id = ptr%id
-          pneigh%neigh(1,1,2)%id = ptr%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,1,1)%id)  ! bottom left neighbor
-      if (associated(pneigh)) then
-        pbl%neigh(2,1,1)%id = pneigh%id
-        pbl%neigh(2,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-        if (pneigh%level .eq. pbl%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,1,2)%id)  ! bottom right neighbor
-      if (associated(pneigh)) then
-        pbr%neigh(2,1,1)%id = pneigh%id
-        pbr%neigh(2,1,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,2,1)%id = pbl%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-        if (pneigh%level .eq. pbr%level) then
-          pneigh%neigh(2,2,1)%id = pbr%id
-          pneigh%neigh(2,2,2)%id = pbr%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,2,1)%id)  ! top left neighbor
-      if (associated(pneigh)) then
-        ptl%neigh(2,2,1)%id = pneigh%id
-        ptl%neigh(2,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. ptl%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptl%id
-        endif
-      endif
-
-      pneigh => get_pointer(pblock%neigh(2,2,2)%id)  ! top right neighbor
-      if (associated(pneigh)) then
-        ptr%neigh(2,2,1)%id = pneigh%id
-        ptr%neigh(2,2,2)%id = pneigh%id
-
-        if (pneigh%level .eq. pblock%level) then
-          pneigh%neigh(2,1,1)%id = ptl%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-        if (pneigh%level .eq. ptr%level) then
-          pneigh%neigh(2,1,1)%id = ptr%id
-          pneigh%neigh(2,1,2)%id = ptr%id
-        endif
-      endif
-
-! set children
+! interior of the block
 !
-      pblock%child(1)%id = pbl%id
-      pblock%child(2)%id = pbr%id
-      pblock%child(3)%id = ptl%id
-      pblock%child(4)%id = ptr%id
+      do p = 1, nfaces
 
-! depending on the configuration of the parent block
+! X direction (left side)
+!
+        pblock%child(2)%ptr%neigh(1,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(4)%ptr%neigh(1,1,p)%ptr => pblock%child(3)%ptr
+#if NDIMS == 3
+        pblock%child(6)%ptr%neigh(1,1,p)%ptr => pblock%child(5)%ptr
+        pblock%child(8)%ptr%neigh(1,1,p)%ptr => pblock%child(7)%ptr
+#endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(1,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(1,1,p)%ptr => pblock%child(2)%ptr
+            pblock%child(3)%ptr%neigh(1,1,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+            pblock%child(5)%ptr%neigh(1,1,p)%ptr => pblock%child(6)%ptr
+            pblock%child(7)%ptr%neigh(1,1,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+          end if
+        end if
+
+! X direction (right side)
+!
+        pblock%child(1)%ptr%neigh(1,2,p)%ptr => pblock%child(2)%ptr
+        pblock%child(3)%ptr%neigh(1,2,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(1,2,p)%ptr => pblock%child(6)%ptr
+        pblock%child(7)%ptr%neigh(1,2,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(1,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(2)%ptr%neigh(1,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(4)%ptr%neigh(1,2,p)%ptr => pblock%child(3)%ptr
+#if NDIMS == 3
+            pblock%child(6)%ptr%neigh(1,2,p)%ptr => pblock%child(5)%ptr
+            pblock%child(8)%ptr%neigh(1,2,p)%ptr => pblock%child(7)%ptr
+#endif /* NDIMS == 3 */
+          end if
+        end if
+
+! Y direction (left side)
+!
+        pblock%child(3)%ptr%neigh(2,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(4)%ptr%neigh(2,1,p)%ptr => pblock%child(2)%ptr
+#if NDIMS == 3
+        pblock%child(7)%ptr%neigh(2,1,p)%ptr => pblock%child(5)%ptr
+        pblock%child(8)%ptr%neigh(2,1,p)%ptr => pblock%child(6)%ptr
+#endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(2,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(2,1,p)%ptr => pblock%child(3)%ptr
+            pblock%child(2)%ptr%neigh(2,1,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+            pblock%child(5)%ptr%neigh(2,1,p)%ptr => pblock%child(7)%ptr
+            pblock%child(6)%ptr%neigh(2,1,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+          end if
+        end if
+
+! Y direction (right side)
+!
+        pblock%child(1)%ptr%neigh(2,2,p)%ptr => pblock%child(3)%ptr
+        pblock%child(2)%ptr%neigh(2,2,p)%ptr => pblock%child(4)%ptr
+#if NDIMS == 3
+        pblock%child(5)%ptr%neigh(2,2,p)%ptr => pblock%child(7)%ptr
+        pblock%child(6)%ptr%neigh(2,2,p)%ptr => pblock%child(8)%ptr
+#endif /* NDIMS == 3 */
+        pneigh => pblock%neigh(2,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(3)%ptr%neigh(2,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(4)%ptr%neigh(2,2,p)%ptr => pblock%child(2)%ptr
+#if NDIMS == 3
+            pblock%child(7)%ptr%neigh(2,2,p)%ptr => pblock%child(5)%ptr
+            pblock%child(8)%ptr%neigh(2,2,p)%ptr => pblock%child(6)%ptr
+#endif /* NDIMS == 3 */
+          end if
+        end if
+
+#if NDIMS == 3
+! Z direction (left side)
+!
+        pblock%child(5)%ptr%neigh(3,1,p)%ptr => pblock%child(1)%ptr
+        pblock%child(6)%ptr%neigh(3,1,p)%ptr => pblock%child(2)%ptr
+        pblock%child(7)%ptr%neigh(3,1,p)%ptr => pblock%child(3)%ptr
+        pblock%child(8)%ptr%neigh(3,1,p)%ptr => pblock%child(4)%ptr
+        pneigh => pblock%neigh(3,1,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(1)%ptr%neigh(3,1,p)%ptr => pblock%child(5)%ptr
+            pblock%child(2)%ptr%neigh(3,1,p)%ptr => pblock%child(6)%ptr
+            pblock%child(3)%ptr%neigh(3,1,p)%ptr => pblock%child(7)%ptr
+            pblock%child(4)%ptr%neigh(3,1,p)%ptr => pblock%child(8)%ptr
+          end if
+        end if
+
+! Z direction (right side)
+!
+        pblock%child(1)%ptr%neigh(3,2,p)%ptr => pblock%child(5)%ptr
+        pblock%child(2)%ptr%neigh(3,2,p)%ptr => pblock%child(6)%ptr
+        pblock%child(3)%ptr%neigh(3,2,p)%ptr => pblock%child(7)%ptr
+        pblock%child(4)%ptr%neigh(3,2,p)%ptr => pblock%child(8)%ptr
+        pneigh => pblock%neigh(3,2,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%id .eq. pblock%id) then
+            pblock%child(5)%ptr%neigh(3,2,p)%ptr => pblock%child(1)%ptr
+            pblock%child(6)%ptr%neigh(3,2,p)%ptr => pblock%child(2)%ptr
+            pblock%child(7)%ptr%neigh(3,2,p)%ptr => pblock%child(3)%ptr
+            pblock%child(8)%ptr%neigh(3,2,p)%ptr => pblock%child(4)%ptr
+          end if
+        end if
+#endif /* NDIMS == 3 */
+      end do
+
+! prepare set array
+!
+#if NDIMS == 2
+      set(1,1,:) = (/ 1, 3 /)
+      set(1,2,:) = (/ 2, 4 /)
+      set(2,1,:) = (/ 1, 2 /)
+      set(2,2,:) = (/ 3, 4 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      set(1,1,:) = (/ 1, 3, 5, 7 /)
+      set(1,2,:) = (/ 2, 4, 6, 8 /)
+      set(2,1,:) = (/ 1, 2, 5, 6 /)
+      set(2,2,:) = (/ 3, 4, 7, 8 /)
+      set(3,1,:) = (/ 1, 2, 3, 4 /)
+      set(3,2,:) = (/ 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+! set pointers to neighbors and update neighbors pointers
+!
+      do i = 1, ndims
+        do j = 1, nsides
+          do k = 1, nfaces
+            pneigh => pblock%neigh(i,j,k)%ptr
+
+            if (associated(pneigh)) then
+              if (pneigh%id .ne. pblock%id) then
+
+! point to the right neighbor
+!
+                do p = 1, nfaces
+                  pblock%child(set(i,j,k))%ptr%neigh(i,j,p)%ptr => pneigh
+                end do
+
+! neighbor level is the same as the refined block
+!
+                if (pneigh%level .eq. pblock%level) then
+                  pneigh%neigh(i,3-j,k)%ptr => pblock%child(set(i,j,k))%ptr
+                end if
+
+! neighbor level is the same as the child block
+!
+                if (pneigh%level .gt. pblock%level) then
+                  do p = 1, nfaces
+                    pneigh%neigh(i,3-j,p)%ptr => pblock%child(set(i,j,k))%ptr
+                  end do
+                end if
+
+              end if
+
+            end if
+
+          end do
+        end do
+      end do
+
+! set corresponding configuration of the new blocks
 !
       select case(pblock%config)
-      case('z', 'Z')
+      case(0) ! 'Z'
+
+#if NDIMS == 2
+        config(:) = (/ 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      case(1) ! 'N'
+
+#if NDIMS == 2
+        config(:) = (/ 2, 1, 1, 3 /)
+        order (:) = (/ 1, 3, 4, 2 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      case(2) ! 'D'
+
+#if NDIMS == 2
+        config(:) = (/ 1, 2, 2, 4 /)
+        order (:) = (/ 1, 2, 4, 3 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      case(3) ! 'C'
+
+#if NDIMS == 2
+        config(:) = (/ 4, 3, 3, 1 /)
+        order (:) = (/ 4, 3, 1, 2 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      case(4) ! 'U'
+
+#if NDIMS == 2
+        config(:) = (/ 3, 4, 4, 2 /)
+        order (:) = (/ 4, 2, 1, 3 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+      case(5)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(6)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(7)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+
+      case(8)
+
+        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+      end select
 
 ! set blocks configurations
 !
-        pbl%config = 'Z'
-        pbr%config = 'Z'
-        ptl%config = 'Z'
-        ptr%config = 'Z'
+      do p = 1, nchild
+        pblock%child(order(p))%ptr%config = config(p)
+      end do
 
-! connect blocks in a chain
+! connect blocks in chain
 !
-        pbl%next => pbr
-        pbr%next => ptl
-        ptl%next => ptr
-
-        pbr%prev => pbl
-        ptl%prev => pbr
-        ptr%prev => ptl
+      do p = 2, nchild
+        pblock%child(order(p  ))%ptr%prev => pblock%child(order(p-1))%ptr
+        pblock%child(order(p-1))%ptr%next => pblock%child(order(p  ))%ptr
+      end do
 
 ! insert this chain after the parent block
 !
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptr
-          ptr%next => pb
+      pneigh => pblock%next
+      pfirst => pblock%child(order(     1))%ptr
+      plast  => pblock%child(order(nchild))%ptr
+      if (associated(pneigh)) then
+        pneigh%prev => plast
+        plast%next  => pneigh
+      else
+        last_meta => plast
+      end if
+
+      pblock%next => pfirst
+      pfirst%prev => pblock
+
+! calculate the size of new blocks
+!
+      xln = 0.5 * (pblock%xmax - pblock%xmin)
+      yln = 0.5 * (pblock%ymax - pblock%ymin)
+#if NDIMS == 3
+      zln = 0.5 * (pblock%zmax - pblock%zmin)
+#else /* NDIMS == 3 */
+      zln =       (pblock%zmax - pblock%zmin)
+#endif /* NDIMS == 3 */
+
+! iterate over all children and allocate data blocks
+!
+      do p = 1, nchild
+
+! assign a pointer to the current child
+!
+        pchild => pblock%child(p)%ptr
+
+! calculate block bounds
+!
+        i   = mod((p - 1)    ,2)
+        j   = mod((p - 1) / 2,2)
+        k   = mod((p - 1) / 4,2)
+
+        xmn = pblock%xmin + xln * i
+        ymn = pblock%ymin + yln * j
+        zmn = pblock%zmin + zln * k
+
+        xmx = xmn + xln
+        ymx = ymn + yln
+        zmx = zmn + zln
+
+! set block bounds
+!
+        call metablock_setbounds(pchild, xmn, xmx, ymn, ymx, zmn, zmx)
+
+      end do
+
+! allocate data blocks if necessary
+!
+      if (falloc_data) then
+
+! iterate over all children and allocate data blocks
+!
+        do p = 1, nchild
+
+! assign a pointer to the current child
+!
+          pchild => pblock%child(p)%ptr
+
+! allocate data block
+!
+          call allocate_datablock(pdata)
+
+! associate with the meta block
+!
+          call associate_blocks(pchild, pdata)
+
+        end do
+
+! connect blocks in chain
+!
+        do p = 2, nchild
+          pblock%child(order(p  ))%ptr%data%prev => pblock%child(order(p-1))%ptr%data
+          pblock%child(order(p-1))%ptr%data%next => pblock%child(order(p  ))%ptr%data
+        end do
+
+! insert this chain after the parent block
+!
+        pdata => pblock%data%next
+
+        pfirst => pblock%child(order(     1))%ptr
+        plast  => pblock%child(order(nchild))%ptr
+
+        if (associated(pdata)) then
+          pdata%prev => plast%data
+          plast%data%next  => pdata
         else
-          plast => ptr
-          nullify(ptr%next)
-        endif
-        pblock%next => pbl
-        pbl%prev => pblock
+          last_data => plast%data
+        end if
 
-        pblock => ptr
+        pblock%data%next => pfirst%data
+        pfirst%data%prev => pblock%data
 
-      case('n', 'N')
+      end if
 
-! set blocks configurations
+! point the current block to the last created one
 !
-        pbl%config = 'D'
-        ptl%config = 'N'
-        ptr%config = 'N'
-        pbr%config = 'C'
-
-! connect blocks in a chain
-!
-        pbl%next => ptl
-        ptl%next => ptr
-        ptr%next => pbr
-
-        ptl%prev => pbl
-        ptr%prev => ptl
-        pbr%prev => ptr
-
-! insert this chain after the parent the block
-!
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => pbr
-          pbr%next => pb
-        endif
-        pbl%prev => pblock
-        pblock%next => pbl
-
-        pblock => pbr
-
-      case('d', 'D')
-
-! set blocks configurations
-!
-        pbl%config = 'N'
-        pbr%config = 'D'
-        ptr%config = 'D'
-        ptl%config = 'U'
-
-! connect blocks in a chain
-!
-        pbl%next => pbr
-        pbr%next => ptr
-        ptr%next => ptl
-
-        pbr%prev => pbl
-        ptr%prev => pbr
-        ptl%prev => ptr
-
-! insert this chain in the block list
-!
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptl
-          ptl%next => pb
-        endif
-        pbl%prev => pblock
-        pblock%next => pbl
-
-        pblock => ptl
-
-      case('c', 'C')
-
-! set blocks configurations
-!
-        ptr%config = 'U'
-        ptl%config = 'C'
-        pbl%config = 'C'
-        pbr%config = 'N'
-
-! connect blocks in a chain
-!
-        ptr%next => ptl
-        ptl%next => pbl
-        pbl%next => pbr
-
-        ptl%prev => ptr
-        pbl%prev => ptl
-        pbr%prev => pbl
-
-! insert this chain in the block list
-!
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => pbr
-          pbr%next => pb
-        endif
-        ptr%prev => pblock
-        pblock%next => ptr
-
-        pblock => pbr
-
-      case('u', 'U')
-
-! set blocks configurations
-!
-        ptr%config = 'C'
-        pbr%config = 'U'
-        pbl%config = 'U'
-        ptl%config = 'D'
-
-! connect blocks in a chain
-!
-        ptr%next => pbr
-        pbr%next => pbl
-        pbl%next => ptl
-
-        pbr%prev => ptr
-        pbl%prev => pbr
-        ptl%prev => pbl
-
-! insert this chain in the block list
-!
-        pb => pblock%next
-        if (associated(pb)) then
-          pb%prev => ptl
-          ptl%next => pb
-        endif
-        ptr%prev => pblock
-        pblock%next => ptr
-
-        pblock => ptl
-
-      end select
+      pblock => plast
 
     else
 
 ! terminate program if the pointer passed by argument is not associated
 !
       call print_error("blocks::refine_blocks","Input pointer is not associated! Terminating!")
-    endif
-
+    end if
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine refine_block
@@ -850,148 +1209,94 @@ module blocks
 
 ! input parameters
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pblock
 
 ! local variables
 !
-    integer :: p
+    integer :: i, j, k, l, p
 
 ! pointers
 !
-    type(block), pointer :: pb, pbl, pbr, ptl, ptr, pneigh
+    type(block_meta), pointer :: pchild, pneigh
 !
 !-------------------------------------------------------------------------------
 !
-! prepare pointers to children
+! update parent neighbor fields from the children
 !
-    pbl => get_pointer(pblock%child(1)%id)
-    pbr => get_pointer(pblock%child(2)%id)
-    ptl => get_pointer(pblock%child(3)%id)
-    ptr => get_pointer(pblock%child(4)%id)
+    pchild => pblock%child(1)%ptr
+    pblock%neigh(1,1,1)%ptr => pchild%neigh(1,1,1)%ptr
+    pblock%neigh(2,1,1)%ptr => pchild%neigh(2,1,1)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,1)%ptr => pchild%neigh(3,1,1)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(2)%ptr
+    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
+    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,2)%ptr => pchild%neigh(3,1,2)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(3)%ptr
+    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
+    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,3)%ptr => pchild%neigh(3,1,3)%ptr
+#endif /* NDIMS == 3 */
+    pchild => pblock%child(4)%ptr
+    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
+    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
+#if NDIMS == 3
+    pblock%neigh(3,1,4)%ptr => pchild%neigh(3,1,4)%ptr
+#endif /* NDIMS == 3 */
+#if NDIMS == 3
+    pchild => pblock%child(5)%ptr
+    pblock%neigh(1,1,3)%ptr => pchild%neigh(1,1,3)%ptr
+    pblock%neigh(2,1,3)%ptr => pchild%neigh(2,1,3)%ptr
+    pblock%neigh(3,2,1)%ptr => pchild%neigh(3,2,1)%ptr
+    pchild => pblock%child(6)%ptr
+    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
+    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
+    pblock%neigh(3,2,2)%ptr => pchild%neigh(3,2,2)%ptr
+    pchild => pblock%child(7)%ptr
+    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
+    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
+    pblock%neigh(3,2,3)%ptr => pchild%neigh(3,2,3)%ptr
+    pchild => pblock%child(8)%ptr
+    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
+    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
+    pblock%neigh(3,2,4)%ptr => pchild%neigh(3,2,4)%ptr
+#endif /* NDIMS == 3 */
 
-! prepare neighbors
+! update the neighbor fields of neighbors
 !
-    pblock%neigh(1,1,1)%id = pbl%neigh(1,1,1)%id
-    pblock%neigh(1,1,2)%id = ptl%neigh(1,1,2)%id
-    pblock%neigh(1,2,1)%id = pbr%neigh(1,2,1)%id
-    pblock%neigh(1,2,2)%id = ptr%neigh(1,2,2)%id
-    pblock%neigh(2,1,1)%id = pbl%neigh(2,1,1)%id
-    pblock%neigh(2,1,2)%id = pbr%neigh(2,1,2)%id
-    pblock%neigh(2,2,1)%id = ptl%neigh(2,2,1)%id
-    pblock%neigh(2,2,2)%id = ptr%neigh(2,2,2)%id
+    do i = 1, ndims
+      do j = 1, nsides
+        do k = 1, nfaces
+          pneigh => pblock%neigh(i,j,k)%ptr
+          if (associated(pneigh)) then
+            l = 3 - j
+            do p = 1, nfaces
+              pneigh%neigh(i,l,p)%ptr => pblock
+            end do
+          end if
+        end do
+      end do
+    end do
 
-    pneigh => get_pointer(pblock%neigh(1,1,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,2,1)%id = pblock%id
-      pneigh%neigh(1,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,1,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,2,1)%id = pblock%id
-      pneigh%neigh(1,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,2,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,1,1)%id = pblock%id
-      pneigh%neigh(1,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(1,2,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(1,1,1)%id = pblock%id
-      pneigh%neigh(1,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,1,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,2,1)%id = pblock%id
-      pneigh%neigh(2,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,1,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,2,1)%id = pblock%id
-      pneigh%neigh(2,2,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,2,1)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,1,1)%id = pblock%id
-      pneigh%neigh(2,1,2)%id = pblock%id
-    endif
-
-    pneigh => get_pointer(pblock%neigh(2,2,2)%id)
-    if (associated(pneigh)) then
-      pneigh%neigh(2,1,1)%id = pblock%id
-      pneigh%neigh(2,1,2)%id = pblock%id
-    endif
-
-! set the leaf flag for children
+! set the leaf flag of parent block
 !
-    pblock%leaf = .true.
-    pbl%leaf    = .false.
-    pbr%leaf    = .false.
-    ptl%leaf    = .false.
-    ptr%leaf    = .false.
+    call metablock_setleaf(pblock)
 
-! prepare next and prev pointers
+! reset the refinement flag of the parent block
 !
-    select case(pblock%config)
-      case('z', 'Z')
-        pb => ptr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('n', 'N')
-        pb => pbr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('d', 'D')
-        pb => ptl%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('c', 'C')
-        pb => pbr%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-      case('u', 'U')
-        pb => ptl%next
-        if (associated(pb)) then
-          pb%prev => pblock
-          pblock%next => pb
-        else
-          nullify(pblock%next)
-        endif
-    end select
-
     pblock%refine = 0
-    pbl%refine = 0
-    pbr%refine = 0
-    ptl%refine = 0
-    ptr%refine = 0
 
-    call deallocate_block(pbl)
-    call deallocate_block(pbr)
-    call deallocate_block(ptl)
-    call deallocate_block(ptr)
-
+! deallocate child blocks
+!
+    do p = 1, nchild
+      call metablock_unsetleaf(pblock%child(p)%ptr)
+      call deallocate_metablock(pblock%child(p)%ptr)
+    end do
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine derefine_block

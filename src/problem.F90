@@ -43,6 +43,8 @@ module problem
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
+    case("blast")
+      call domain_blast()
     case default
       call domain_default()
     end select
@@ -60,16 +62,16 @@ module problem
 !
   subroutine init_problem(pblock)
 
-    use blocks, only : block
+    use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local arguments
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -99,17 +101,17 @@ module problem
 !
   subroutine update_shapes(pblock, du)
 
-    use blocks, only : block
+    use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block), pointer    , intent(inout) :: pblock
-    real, dimension(:,:,:,:), intent(inout) :: du
+    type(block_data), pointer, intent(inout) :: pblock
+    real, dimension(:,:,:,:) , intent(inout) :: du
 
 ! local arguments
 !
-    type(block), pointer :: pb
+    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
@@ -137,105 +139,253 @@ module problem
 !
   subroutine domain_default
 
-    use blocks, only : block, append_block
-    use config, only : xlbndry, xubndry, ylbndry, yubndry                      &
-                     , xmin, xmax, ymin, ymax
+    use blocks, only : block_meta, block_data, append_metablock                &
+                     , append_datablock, associate_blocks, metablock_setleaf   &
+                     , metablock_setconfig, metablock_setlevel                 &
+                     , metablock_setbounds, nsides, nfaces
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
+                     , xmin, xmax, ymin, ymax, zmin, zmax
 
     implicit none
 
 ! local variables
 !
-    real :: xl, xc, xr, yl, yc, yr
+    integer :: i, j
 
 ! local pointers
 !
-    type(block), pointer :: pbl, pbr, ptl, ptr
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
 !
 !-------------------------------------------------------------------------------
 !
-! create root blocks
+! create root meta blocks
 !
-    call append_block(pbl)
-    call append_block(ptl)
-    call append_block(ptr)
-    call append_block(pbr)
+    call append_metablock(pblock_meta)
 
-! set configurations
+! mark block as a leaf
 !
-    pbl%config = 'D'
-    ptl%config = 'N'
-    ptr%config = 'N'
-    pbr%config = 'C'
+    call metablock_setleaf(pblock_meta)
 
-! set leaf flags
+! set block config flag
 !
-    pbl%leaf   = .true.
-    pbr%leaf   = .true.
-    ptl%leaf   = .true.
-    ptr%leaf   = .true.
+    call metablock_setconfig(pblock_meta, 1)
 
-! set neighbors
+! set block level
 !
-    if (xlbndry .eq. 'periodic') &
-      pbl%neigh(1,1,:)%id = pbr%id
-    pbl%neigh(1,2,:)%id = pbr%id
-    if (ylbndry .eq. 'periodic') &
-      pbl%neigh(2,1,:)%id = ptl%id
-    pbl%neigh(2,2,:)%id = ptl%id
+    call metablock_setlevel(pblock_meta, 1)
 
-    pbr%neigh(1,1,:)%id = pbl%id
-    if (xubndry .eq. 'periodic') &
-      pbr%neigh(1,2,:)%id = pbl%id
-    if (ylbndry .eq. 'periodic') &
-      pbr%neigh(2,1,:)%id = ptr%id
-    pbr%neigh(2,2,:)%id = ptr%id
-
-    if (xlbndry .eq. 'periodic') &
-      ptl%neigh(1,1,:)%id = ptr%id
-    ptl%neigh(1,2,:)%id = ptr%id
-    ptl%neigh(2,1,:)%id = pbl%id
-    if (yubndry .eq. 'periodic') &
-      ptl%neigh(2,2,:)%id = pbl%id
-
-    ptr%neigh(1,1,:)%id = ptl%id
-    if (xubndry .eq. 'periodic') &
-      ptr%neigh(1,2,:)%id = ptl%id
-    ptr%neigh(2,1,:)%id = pbr%id
-    if (yubndry .eq. 'periodic') &
-      ptr%neigh(2,2,:)%id = pbr%id
-
-! set the bounds of the blocks
+! if periodic boundary conditions set all neighbors to itself
 !
-    xl = xmin
-    xc = 0.5 * (xmax + xmin)
-    xr = xmax
-    yl = ymin
-    yc = 0.5 * (ymax + ymin)
-    yr = ymax
+    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        do i = 1, nsides
+          pblock_meta%neigh(1,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
+    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        do i = 1, nsides
+          pblock_meta%neigh(2,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
+#if NDIMS == 3
+    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        do i = 1, nsides
+          pblock_meta%neigh(3,i,j)%ptr => pblock_meta
+        end do
+      end do
+    endif
+#endif /* NDIMS == 3 */
 
-    pbl%xmin = xl
-    pbl%xmax = xc
-    pbl%ymin = yl
-    pbl%ymax = yc
+! set block bounds
+!
+    call metablock_setbounds(pblock_meta, xmin, xmax, ymin, ymax, zmin, zmax)
 
-    ptl%xmin = xl
-    ptl%xmax = xc
-    ptl%ymin = yc
-    ptl%ymax = yr
+! create root data block
+!
+    call append_datablock(pblock_data)
 
-    ptr%xmin = xc
-    ptr%xmax = xr
-    ptr%ymin = yc
-    ptr%ymax = yr
-
-    pbr%xmin = xc
-    pbr%xmax = xr
-    pbr%ymin = yl
-    pbr%ymax = yc
-
+! associate root blocks
+!
+    call associate_blocks(pblock_meta, pblock_data)
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine domain_default
+!
+!===============================================================================
+!
+! domain_default: subroutine initializes the default domain of 2x2 blocks in
+!                'N' configuration
+!
+!===============================================================================
+!
+  subroutine domain_blast
+
+    use blocks, only : block_meta, block_data, pointer_meta, append_metablock  &
+                     , append_datablock, associate_blocks, metablock_setleaf   &
+                     , metablock_setconfig, metablock_setlevel                 &
+                     , metablock_setbounds, nsides, nfaces
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
+
+    implicit none
+
+! local variables
+!
+    integer :: i, j
+    real    :: xm, yl, yu
+
+! local pointers
+!
+    type(block_meta), pointer :: pblock_meta
+    type(block_data), pointer :: pblock_data
+
+! local pointer array
+!
+    type(pointer_meta)        :: block_array(2,3)
+!
+!-------------------------------------------------------------------------------
+!
+!! TO DO:
+!!
+!! create a general way to initiate NxM blocks at level 1
+!!
+!!
+! create root meta blocks
+!
+    call append_metablock(block_array(1,1)%ptr)
+    call append_metablock(block_array(2,1)%ptr)
+    call append_metablock(block_array(2,2)%ptr)
+    call append_metablock(block_array(1,2)%ptr)
+    call append_metablock(block_array(1,3)%ptr)
+    call append_metablock(block_array(2,3)%ptr)
+
+! mark block as a leaf
+!
+    call metablock_setleaf(block_array(1,1)%ptr)
+    call metablock_setleaf(block_array(2,1)%ptr)
+    call metablock_setleaf(block_array(2,2)%ptr)
+    call metablock_setleaf(block_array(1,2)%ptr)
+    call metablock_setleaf(block_array(1,3)%ptr)
+    call metablock_setleaf(block_array(2,3)%ptr)
+
+! set block config flag
+!
+    call metablock_setconfig(block_array(1,1)%ptr, 1)
+    call metablock_setconfig(block_array(2,1)%ptr, 2)
+    call metablock_setconfig(block_array(2,2)%ptr, 2)
+    call metablock_setconfig(block_array(1,2)%ptr, 4)
+    call metablock_setconfig(block_array(1,3)%ptr, 1)
+    call metablock_setconfig(block_array(2,3)%ptr, 1)
+
+! set block level
+!
+    call metablock_setlevel(block_array(1,1)%ptr, 1)
+    call metablock_setlevel(block_array(2,1)%ptr, 1)
+    call metablock_setlevel(block_array(2,2)%ptr, 1)
+    call metablock_setlevel(block_array(1,2)%ptr, 1)
+    call metablock_setlevel(block_array(1,3)%ptr, 1)
+    call metablock_setlevel(block_array(2,3)%ptr, 1)
+
+! set boundary conditions
+!
+    block_array(1,1)%ptr%neigh(1,1,1)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,1,2)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,2,1)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(1,2,2)%ptr => block_array(2,1)%ptr
+    block_array(1,1)%ptr%neigh(2,1,1)%ptr => block_array(1,3)%ptr
+    block_array(1,1)%ptr%neigh(2,1,2)%ptr => block_array(1,3)%ptr
+    block_array(1,1)%ptr%neigh(2,2,1)%ptr => block_array(1,2)%ptr
+    block_array(1,1)%ptr%neigh(2,2,2)%ptr => block_array(1,2)%ptr
+
+    block_array(1,2)%ptr%neigh(1,1,1)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,1,2)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,2,1)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(1,2,2)%ptr => block_array(2,2)%ptr
+    block_array(1,2)%ptr%neigh(2,1,1)%ptr => block_array(1,1)%ptr
+    block_array(1,2)%ptr%neigh(2,1,2)%ptr => block_array(1,1)%ptr
+    block_array(1,2)%ptr%neigh(2,2,1)%ptr => block_array(1,3)%ptr
+    block_array(1,2)%ptr%neigh(2,2,2)%ptr => block_array(1,3)%ptr
+
+    block_array(1,3)%ptr%neigh(1,1,1)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,1,2)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,2,1)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(1,2,2)%ptr => block_array(2,3)%ptr
+    block_array(1,3)%ptr%neigh(2,1,1)%ptr => block_array(1,2)%ptr
+    block_array(1,3)%ptr%neigh(2,1,2)%ptr => block_array(1,2)%ptr
+    block_array(1,3)%ptr%neigh(2,2,1)%ptr => block_array(1,1)%ptr
+    block_array(1,3)%ptr%neigh(2,2,2)%ptr => block_array(1,1)%ptr
+
+    block_array(2,1)%ptr%neigh(1,1,1)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,1,2)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,2,1)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(1,2,2)%ptr => block_array(1,1)%ptr
+    block_array(2,1)%ptr%neigh(2,1,1)%ptr => block_array(2,3)%ptr
+    block_array(2,1)%ptr%neigh(2,1,2)%ptr => block_array(2,3)%ptr
+    block_array(2,1)%ptr%neigh(2,2,1)%ptr => block_array(2,2)%ptr
+    block_array(2,1)%ptr%neigh(2,2,2)%ptr => block_array(2,2)%ptr
+
+    block_array(2,2)%ptr%neigh(1,1,1)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,1,2)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,2,1)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(1,2,2)%ptr => block_array(1,2)%ptr
+    block_array(2,2)%ptr%neigh(2,1,1)%ptr => block_array(2,1)%ptr
+    block_array(2,2)%ptr%neigh(2,1,2)%ptr => block_array(2,1)%ptr
+    block_array(2,2)%ptr%neigh(2,2,1)%ptr => block_array(2,3)%ptr
+    block_array(2,2)%ptr%neigh(2,2,2)%ptr => block_array(2,3)%ptr
+
+    block_array(2,3)%ptr%neigh(1,1,1)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,1,2)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,2,1)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(1,2,2)%ptr => block_array(1,3)%ptr
+    block_array(2,3)%ptr%neigh(2,1,1)%ptr => block_array(2,2)%ptr
+    block_array(2,3)%ptr%neigh(2,1,2)%ptr => block_array(2,2)%ptr
+    block_array(2,3)%ptr%neigh(2,2,1)%ptr => block_array(2,1)%ptr
+    block_array(2,3)%ptr%neigh(2,2,2)%ptr => block_array(2,1)%ptr
+
+! calculate bounds
+!
+    xm = 0.5 * (xmin + xmax)
+    yl = (ymax - ymin) / 3.0 + ymin
+    yu = (ymax - ymin) / 3.0 + yl
+
+! set block bounds
+!
+    call metablock_setbounds(block_array(1,1)%ptr, xmin, xm  , ymin, yl  , zmin, zmax)
+    call metablock_setbounds(block_array(2,1)%ptr, xm  , xmax, ymin, yl  , zmin, zmax)
+    call metablock_setbounds(block_array(2,2)%ptr, xm  , xmax, yl  , yu  , zmin, zmax)
+    call metablock_setbounds(block_array(1,2)%ptr, xmin, xm  , yl  , yu  , zmin, zmax)
+    call metablock_setbounds(block_array(1,3)%ptr, xmin, xm  , yu  , ymax, zmin, zmax)
+    call metablock_setbounds(block_array(2,3)%ptr, xm  , xmax, yu  , ymax, zmin, zmax)
+
+! create root data block
+!
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,1)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,1)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,2)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,2)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(1,3)%ptr, pblock_data)
+    call append_datablock(pblock_data)
+    call associate_blocks(block_array(2,3)%ptr, pblock_data)
+
+! set block dimensions for the lowest level
+!
+    rdims(1) = 2
+    rdims(2) = 3
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine domain_blast
 !
 !===============================================================================
 !
@@ -245,29 +395,31 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
-    use config, only : in, jn, kn, im, jm, km, ng, dens, pres, gammam1i
+    use blocks, only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr
+    use config, only : in, jn, kn, im, jm, km, ng                              &
+                     , gamma, csnd2, rcut, dens, dnrat
+    use scheme, only : prim2cons
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: r, dx, dy, dz, en, enamb
+    real                          :: r, dx, dy, dz, pr
 
 ! local arrays
 !
-    real, dimension(:), allocatable :: x, y, z
+    real, dimension(:)  , allocatable :: x, y, z
+    real, dimension(:,:), allocatable :: q
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate parameters
 !
-    enamb = gammam1i * pres
-    en    = 100.0 * enamb
+    pr = dens * csnd2 / gamma
 
 ! allocate coordinates
 !
@@ -277,50 +429,62 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */
 
+! allocate primitive variables
+!
+    allocate(q(nv,im))
+
 ! set variables
 !
-    pblock%u(idn,:,:,:) = dens
-    pblock%u(imx,:,:,:) = 0.0d0
-    pblock%u(imy,:,:,:) = 0.0d0
-    pblock%u(imz,:,:,:) = 0.0d0
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
 
 ! set initial pressure
 !
     do k = 1, km
       do j = 1, jm
+
         do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          if (r .le. 0.1) then
-            pblock%u(ien,i,j,k) = en
+
+          if (r .lt. rcut) then
+            q(ipr,i) = pr * dnrat
           else
-            pblock%u(ien,i,j,k) = enamb
+            q(ipr,i) = pr
           endif
 
         end do
+
+! convert primitive variables to conserved
+!
+        call prim2cons(nv, im, q(1:nv,1:im), pblock%u(1:nv,1:im,j,k))
+
       end do
     end do
 
 ! deallocate coordinates
 !
+    deallocate(q)
     deallocate(x)
     deallocate(y)
     deallocate(z)
@@ -337,12 +501,12 @@ module problem
 !
   subroutine init_implosion(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -363,16 +527,16 @@ module problem
 
 ! calculate cell sizes
 !
-    dx  = (pblock%xmax - pblock%xmin) / in
-    dy  = (pblock%ymax - pblock%ymin) / jn
+    dx  = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy  = (pblock%meta%ymax - pblock%meta%ymin) / jn
     dxh = 0.5d0 * dx
     dyh = 0.5d0 * dy
     ds  = dx * dy
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%meta%ymin
 
 ! set variables
 !
@@ -433,14 +597,14 @@ module problem
 !
   subroutine init_binaries(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
                      , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini    &
                      , csnd2, gamma, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -481,20 +645,20 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 
@@ -580,15 +744,15 @@ module problem
 !
   subroutine shape_binaries(pblock, du)
 
-    use blocks, only : block, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz, ien
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
                      , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
                      , csnd2, gamma, gammam1i
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
-    real, dimension(:,:,:,:), intent(inout) :: du
+    type(block_data), pointer, intent(inout) :: pblock
+    real, dimension(:,:,:,:) , intent(inout) :: du
 
 ! local variables
 !
@@ -611,20 +775,20 @@ module problem
 
 ! calculate cell sizes
 !
-    dx = (pblock%xmax - pblock%xmin) / in
-    dy = (pblock%ymax - pblock%ymin) / jn
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%zmax - pblock%zmin) / kn
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 
@@ -684,13 +848,13 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block, idn, imx, imy, imz, ien, nv => nvars
-    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gammam1i            &
+    use blocks, only : block_data, idn, imx, imy, imz, ien, nv => nvars
+    use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
                      , crefmin, crefmax
 
 ! input arguments
 !
-    type(block), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! return variable
 !
@@ -726,9 +890,9 @@ module problem
 !
     dpmax = 0.0d0
 
-    do k = kb, ke
-      do j = jb-1, je+1
-        do i = ib-1, ie+1
+    do k = kbl, keu
+      do j = jbl, jeu
+        do i = ibl, ieu
           dnl = dn(i-1,j,k)
           dnr = dn(i+1,j,k)
           ddndx = abs(dnr-dnl)/(dnr+dnl)
