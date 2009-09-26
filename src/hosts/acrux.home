@@ -18,7 +18,7 @@ OMP      = N
 #   STATIC  = Y or N to enable or disable static linking
 #   PROFILE = Y or N to enable or disable profiling
 #
-DEBUG    = N
+DEBUG    = Y
 STATIC   = N
 PROFILE  = N
 

@@ -154,40 +154,44 @@ module problem
 
 ! local pointers
 !
-    type(block_meta), pointer :: pblock_meta
-    type(block_data), pointer :: pblock_data
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
 ! create root meta blocks
 !
-    call append_metablock(pblock_meta)
+    call append_metablock(pmeta)
 
 ! mark block as a leaf
 !
-    call metablock_setleaf(pblock_meta)
+    call metablock_setleaf(pmeta)
 
 ! set block config flag
 !
-    call metablock_setconfig(pblock_meta, 1)
+    call metablock_setconfig(pmeta, 1)
 
 ! set block level
 !
-    call metablock_setlevel(pblock_meta, 1)
+    call metablock_setlevel(pmeta, 1)
+
+! set block bounds
+!
+    call metablock_setbounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
 
 ! if periodic boundary conditions set all neighbors to itself
 !
     if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
       do j = 1, nfaces
         do i = 1, nsides
-          pblock_meta%neigh(1,i,j)%ptr => pblock_meta
+          pmeta%neigh(1,i,j)%ptr => pmeta
         end do
       end do
     endif
     if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
       do j = 1, nfaces
         do i = 1, nsides
-          pblock_meta%neigh(2,i,j)%ptr => pblock_meta
+          pmeta%neigh(2,i,j)%ptr => pmeta
         end do
       end do
     endif
@@ -195,23 +199,19 @@ module problem
     if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
       do j = 1, nfaces
         do i = 1, nsides
-          pblock_meta%neigh(3,i,j)%ptr => pblock_meta
+          pmeta%neigh(3,i,j)%ptr => pmeta
         end do
       end do
     endif
 #endif /* NDIMS == 3 */
 
-! set block bounds
-!
-    call metablock_setbounds(pblock_meta, xmin, xmax, ymin, ymax, zmin, zmax)
-
 ! create root data block
 !
-    call append_datablock(pblock_data)
+    call append_datablock(pdata)
 
 ! associate root blocks
 !
-    call associate_blocks(pblock_meta, pblock_data)
+    call associate_blocks(pmeta, pdata)
 !
 !-------------------------------------------------------------------------------
 !
@@ -242,8 +242,8 @@ module problem
 
 ! local pointers
 !
-    type(block_meta), pointer :: pblock_meta
-    type(block_data), pointer :: pblock_data
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 
 ! local pointer array
 !
@@ -365,18 +365,18 @@ module problem
 
 ! create root data block
 !
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(1,1)%ptr, pblock_data)
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(2,1)%ptr, pblock_data)
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(2,2)%ptr, pblock_data)
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(1,2)%ptr, pblock_data)
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(1,3)%ptr, pblock_data)
-    call append_datablock(pblock_data)
-    call associate_blocks(block_array(2,3)%ptr, pblock_data)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(1,1)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(2,1)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(2,2)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(1,2)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(1,3)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(2,3)%ptr, pdata)
 
 ! set block dimensions for the lowest level
 !

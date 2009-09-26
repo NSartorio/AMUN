@@ -316,8 +316,8 @@ module mesh
       p = p * rdims(1) * rdims(2) * rdims(3)
       k = k * rdims(1) * rdims(2) * rdims(3)
 
-      i = nint(alog10(1.0*nblocks)) + 1
-      j = nint(alog10(1.0*p)) + 1
+      i = nint(alog10(1.0*nblocks + 1)) + 1
+      j = nint(alog10(1.0*p + 1)) + 1
 
       write(fmt, "(a,i1,a,i1,a)") "(4x,a,1x,i", i, ",' / ',i", j, ",' = ',f8.4,' %')"
 
@@ -1016,15 +1016,15 @@ module mesh
 
 ! deallocating coordinate variables
 !
-    deallocate(ax)
-    deallocate(ay)
-    deallocate(az)
-    deallocate(adx)
-    deallocate(ady)
-    deallocate(adz)
-    deallocate(adxi)
-    deallocate(adyi)
-    deallocate(adzi)
+    if (allocated(ax))   deallocate(ax)
+    if (allocated(ay))   deallocate(ay)
+    if (allocated(az))   deallocate(az)
+    if (allocated(adx))  deallocate(adx)
+    if (allocated(ady))  deallocate(ady)
+    if (allocated(adz))  deallocate(adz)
+    if (allocated(adxi)) deallocate(adxi)
+    if (allocated(adyi)) deallocate(adyi)
+    if (allocated(adzi)) deallocate(adzi)
 
 !-------------------------------------------------------------------------------
 !

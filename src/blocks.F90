@@ -82,7 +82,8 @@ module blocks
     type(block_meta)  , pointer :: next             ! pointer to the next block
     type(block_meta)  , pointer :: parent           ! pointer to the parent block
     type(pointer_meta)          :: child(nchild)    ! pointers to children
-    type(pointer_meta)          :: neigh(ndims,2,2) ! pointers to neighbors
+    type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
+                                                    ! pointers to neighbors
 
     type(block_data)  , pointer :: data             ! pointer to the data block
 
@@ -153,10 +154,6 @@ module blocks
     use error, only : print_warning
 
     implicit none
-
-! local variables
-!
-    integer(kind=4) :: p
 !
 !-------------------------------------------------------------------------------
 !
@@ -201,17 +198,16 @@ module blocks
 
 ! pointers
 !
-    type(block_meta), pointer :: pblock_meta
-    type(block_data), pointer :: pblock_data
+    type(block_meta), pointer :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
 ! clear all meta blocks
 !
-    pblock_meta => list_meta
-    do while(associated(pblock_meta))
-      call deallocate_metablock(pblock_meta)
-      pblock_meta => list_meta
+    pmeta => list_meta
+    do while(associated(pmeta))
+      call deallocate_metablock(pmeta)
+      pmeta => list_meta
     end do
 !
 !-------------------------------------------------------------------------------
@@ -255,13 +251,13 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine allocate_metablock(pblock)
+  subroutine allocate_metablock(pmeta)
 
     implicit none
 
 ! output arguments
 !
-    type(block_meta), pointer, intent(out) :: pblock
+    type(block_meta), pointer, intent(out) :: pmeta
 
 ! local variables
 !
@@ -271,46 +267,46 @@ module blocks
 !
 ! allocate block structure
 !
-    allocate(pblock)
+    allocate(pmeta)
 
 ! nullify pointers
 !
-    nullify(pblock%prev)
-    nullify(pblock%next)
-    nullify(pblock%parent)
-    nullify(pblock%data)
+    nullify(pmeta%prev)
+    nullify(pmeta%next)
+    nullify(pmeta%parent)
+    nullify(pmeta%data)
     do i = 1, nchild
-      nullify(pblock%child(i)%ptr)
+      nullify(pmeta%child(i)%ptr)
     end do
     do k = 1, nfaces
       do j = 1, nsides
         do i = 1, ndims
-          nullify(pblock%neigh(i,j,k)%ptr)
+          nullify(pmeta%neigh(i,j,k)%ptr)
         end do
       end do
     end do
 
 ! set unique ID
 !
-    pblock%id = increase_id()
+    pmeta%id = increase_id()
 
 ! unset the CPU number of current block, level, the configuration, refine and
 ! leaf flags
 !
-    pblock%cpu    = -1
-    pblock%level  = -1
-    pblock%config = -1
-    pblock%refine =  0
-    pblock%leaf   = .false.
+    pmeta%cpu    = -1
+    pmeta%level  = -1
+    pmeta%config = -1
+    pmeta%refine =  0
+    pmeta%leaf   = .false.
 
 ! initialize bounds of the block
 !
-    pblock%xmin = 0.0
-    pblock%xmax = 1.0
-    pblock%ymin = 0.0
-    pblock%ymax = 1.0
-    pblock%zmin = 0.0
-    pblock%zmax = 1.0
+    pmeta%xmin = 0.0
+    pmeta%xmax = 1.0
+    pmeta%ymin = 0.0
+    pmeta%ymax = 1.0
+    pmeta%zmin = 0.0
+    pmeta%zmax = 1.0
 
 ! increase the number of allocated meta blocks
 !
@@ -327,7 +323,7 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine allocate_datablock(pblock)
+  subroutine allocate_datablock(pdata)
 
     use config, only : im, jm, km
 
@@ -335,24 +331,24 @@ module blocks
 
 ! output arguments
 !
-    type(block_data), pointer, intent(out) :: pblock
+    type(block_data), pointer, intent(out) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
 ! allocate block structure
 !
-    allocate(pblock)
+    allocate(pdata)
 
 ! nullify pointers
 !
-    nullify(pblock%prev)
-    nullify(pblock%next)
-    nullify(pblock%meta)
+    nullify(pdata%prev)
+    nullify(pdata%next)
+    nullify(pdata%meta)
 
 ! allocate space for variables
 !
-    allocate(pblock%u(nvars,im,jm,km))
-    allocate(pblock%c(im,jm,km))
+    allocate(pdata%u(nvars,im,jm,km))
+    allocate(pdata%c(im,jm,km))
 
 ! increase the number of allocated meta blocks
 !
@@ -368,13 +364,13 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine deallocate_metablock(pblock)
+  subroutine deallocate_metablock(pmeta)
 
     implicit none
 
 ! input arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
 
 ! local variables
 !
@@ -382,25 +378,30 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-    if (associated(pblock)) then
+    if (associated(pmeta)) then
 
-! if this is the first block in the list, update the plist pointer
+! if this is the first block in the list, update the list_meta pointer
 !
-      if (pblock%id .eq. list_meta%id) &
-        list_meta => pblock%next
+      if (pmeta%id .eq. list_meta%id) &
+        list_meta => pmeta%next
+
+! if this is the last block in the list, update the last_meta pointer
+!
+      if (pmeta%id .eq. last_meta%id) &
+        last_meta => pmeta%prev
 
 ! update the pointer of previous and next blocks
 !
-      if (associated(pblock%prev)) &
-        pblock%prev%next => pblock%next
+      if (associated(pmeta%prev)) &
+        pmeta%prev%next => pmeta%next
 
-      if (associated(pblock%next)) &
-        pblock%next%prev => pblock%prev
+      if (associated(pmeta%next)) &
+        pmeta%next%prev => pmeta%prev
 
 ! nullify children
 !
       do i = 1, nchild
-        nullify(pblock%child(i)%ptr)
+        nullify(pmeta%child(i)%ptr)
       end do
 
 ! nullify neighbors
@@ -408,27 +409,27 @@ module blocks
       do k = 1, nfaces
         do j = 1, nsides
           do i = 1, ndims
-            nullify(pblock%neigh(i,j,k)%ptr)
+            nullify(pmeta%neigh(i,j,k)%ptr)
           end do
         end do
       end do
 
 ! if corresponding data block is allocated, deallocate it too
 !
-      if (associated(pblock%data)) &
-        call deallocate_datablock(pblock%data)
+      if (associated(pmeta%data)) &
+        call deallocate_datablock(pmeta%data)
 
 ! nullify pointers
 !
-      nullify(pblock%next)
-      nullify(pblock%prev)
-      nullify(pblock%data)
-      nullify(pblock%parent)
+      nullify(pmeta%next)
+      nullify(pmeta%prev)
+      nullify(pmeta%data)
+      nullify(pmeta%parent)
 
 ! free and nullify the block
 !
-      deallocate(pblock)
-      nullify(pblock)
+      deallocate(pmeta)
+      nullify(pmeta)
 
 ! decrease the number of allocated blocks
 !
@@ -446,51 +447,51 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine deallocate_datablock(pblock)
+  subroutine deallocate_datablock(pdata)
 
     implicit none
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
-    if (associated(pblock)) then
+    if (associated(pdata)) then
 
 ! if this is the first block in the list, update the list_data pointer
 !
-      if (pblock%meta%id .eq. list_data%meta%id) &
-        list_data => pblock%next
+      if (pdata%meta%id .eq. list_data%meta%id) &
+        list_data => pdata%next
 
 ! if this is the last block in the list, update the last_data pointer
 !
-      if (pblock%meta%id .eq. last_data%meta%id) &
-        last_data => pblock%prev
+      if (pdata%meta%id .eq. last_data%meta%id) &
+        last_data => pdata%prev
 
 ! update the pointer of previous and next blocks
 !
-      if (associated(pblock%prev)) &
-        pblock%prev%next => pblock%next
+      if (associated(pdata%prev)) &
+        pdata%prev%next => pdata%next
 
-      if (associated(pblock%next)) &
-        pblock%next%prev => pblock%prev
+      if (associated(pdata%next)) &
+        pdata%next%prev => pdata%prev
 
 ! deallocate variables
 !
-      deallocate(pblock%u)
-      deallocate(pblock%c)
+      deallocate(pdata%u)
+      deallocate(pdata%c)
 
 ! nullify pointers
 !
-      nullify(pblock%next)
-      nullify(pblock%prev)
-      nullify(pblock%meta)
+      nullify(pdata%next)
+      nullify(pdata%prev)
+      nullify(pdata%meta)
 
 ! free and nullify the block
 !
-      deallocate(pblock)
-      nullify(pblock)
+      deallocate(pdata)
+      nullify(pdata)
 
 ! decrease the number of allocated blocks
 !
@@ -509,32 +510,32 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine append_metablock(pblock)
+  subroutine append_metablock(pmeta)
 
     implicit none
 
 ! output arguments
 !
-    type(block_meta), pointer, intent(out) :: pblock
+    type(block_meta), pointer, intent(out) :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
 ! allocate block
 !
-    call allocate_metablock(pblock)
+    call allocate_metablock(pmeta)
 
 ! add to the list
 !
-    if (associated(list_meta)) then
-      pblock%prev => last_meta
-      last_meta%next => pblock
+    if (associated(last_meta)) then
+      pmeta%prev => last_meta
+      last_meta%next => pmeta
     else
-      list_meta => pblock
+      list_meta => pmeta
     end if
 
 ! set the pointer to the last block in the list
 !
-    last_meta => pblock
+    last_meta => pmeta
 !
 !-------------------------------------------------------------------------------
 !
@@ -547,32 +548,32 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine append_datablock(pblock)
+  subroutine append_datablock(pdata)
 
     implicit none
 
 ! output arguments
 !
-    type(block_data), pointer, intent(out) :: pblock
+    type(block_data), pointer, intent(out) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
 ! allocate block
 !
-    call allocate_datablock(pblock)
+    call allocate_datablock(pdata)
 
 ! add to the list
 !
-    if (associated(list_data)) then
-      pblock%prev => last_data
-      last_data%next => pblock
+    if (associated(last_data)) then
+      pdata%prev => last_data
+      last_data%next => pdata
     else
-      list_data => pblock
+      list_data => pdata
     end if
 
 ! set the pointer to the last block in the list
 !
-    last_data => pblock
+    last_data => pdata
 !
 !-------------------------------------------------------------------------------
 !
@@ -584,19 +585,19 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine associate_blocks(pblock_meta, pblock_data)
+  subroutine associate_blocks(pmeta, pdata)
 
     implicit none
 
 ! output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock_meta
-    type(block_data), pointer, intent(inout) :: pblock_data
+    type(block_meta), pointer, intent(inout) :: pmeta
+    type(block_data), pointer, intent(inout) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
-    pblock_meta%data => pblock_data
-    pblock_data%meta => pblock_meta
+    pmeta%data => pdata
+    pdata%meta => pmeta
 !
 !-------------------------------------------------------------------------------
 !
@@ -608,19 +609,19 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine metablock_setleaf(pblock)
+  subroutine metablock_setleaf(pmeta)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
 ! set the leaf flag
 !
-    pblock%leaf = .true.
+    pmeta%leaf = .true.
 
 ! increase the number of leafs
 !
@@ -636,19 +637,19 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine metablock_unsetleaf(pblock)
+  subroutine metablock_unsetleaf(pmeta)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
 ! set the leaf flag
 !
-    pblock%leaf = .false.
+    pmeta%leaf = .false.
 
 ! decrease the number of leafs
 !
@@ -664,20 +665,20 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine metablock_setconfig(pblock, config)
+  subroutine metablock_setconfig(pmeta, config)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: config
 !
 !-------------------------------------------------------------------------------
 !
 ! set the config flag
 !
-    pblock%config = config
+    pmeta%config = config
 !
 !-------------------------------------------------------------------------------
 !
@@ -689,20 +690,20 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine metablock_setlevel(pblock, level)
+  subroutine metablock_setlevel(pmeta, level)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: level
 !
 !-------------------------------------------------------------------------------
 !
 ! set the refinement level
 !
-    pblock%level = level
+    pmeta%level = level
 !
 !-------------------------------------------------------------------------------
 !
@@ -714,25 +715,25 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine metablock_setbounds(pblock, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine metablock_setbounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
 
     implicit none
 
 ! input/output arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
     real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
 !
 !-------------------------------------------------------------------------------
 !
 ! set bounds of the block
 !
-    pblock%xmin = xmin
-    pblock%xmax = xmax
-    pblock%ymin = ymin
-    pblock%ymax = ymax
-    pblock%zmin = zmin
-    pblock%zmax = zmax
+    pmeta%xmin = xmin
+    pmeta%xmax = xmax
+    pmeta%ymin = ymin
+    pmeta%ymax = ymax
+    pmeta%zmin = zmin
+    pmeta%zmax = zmax
 !
 !-------------------------------------------------------------------------------
 !
