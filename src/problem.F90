@@ -189,14 +189,14 @@ module problem
           pmeta%neigh(1,i,j)%ptr => pmeta
         end do
       end do
-    endif
+    end if
     if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
       do j = 1, nfaces
         do i = 1, nsides
           pmeta%neigh(2,i,j)%ptr => pmeta
         end do
       end do
-    endif
+    end if
 #if NDIMS == 3
     if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
       do j = 1, nfaces
@@ -204,7 +204,7 @@ module problem
           pmeta%neigh(3,i,j)%ptr => pmeta
         end do
       end do
-    endif
+    end if
 #endif /* NDIMS == 3 */
 
 ! create root data block

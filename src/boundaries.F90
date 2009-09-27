@@ -202,8 +202,13 @@ module boundaries
 
 ! neighbor is not associated, it means that we have non periodic boundary here
 !
+#ifdef MPI
+                if (k .eq. 1 .and. pblock%cpu .eq. ncpu) &
+                  call bnd_spec(pblock%data, i, j, k)
+#else /* MPI */
                 if (k .eq. 1) &
                   call bnd_spec(pblock%data, i, j, k)
+#endif /* MPI */
 
               endif
             end do
