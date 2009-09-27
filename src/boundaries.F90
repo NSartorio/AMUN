@@ -228,13 +228,6 @@ module boundaries
 !!
 !! - send/receive only boundaries, not whole blocks
 !!
-!
-!     if (ncpu .eq. 0) then
-!       do p = 0, ncpus-1
-!         write (*,"(8(1i3))") block_counter(p,:)
-!       end do
-!      end if
-
 ! iterate over receiving and sending processors
 !
     do p = 0, ncpus - 1
@@ -367,7 +360,7 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_copy(pb, un, id, is, ip)
+  subroutine bnd_copy(pdata, un, id, is, ip)
 
     use blocks, only : block_data, nv => nvars
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
@@ -379,7 +372,7 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer           , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pdata
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: id, is, ip
 
@@ -396,44 +389,52 @@ module boundaries
 ! perform update according to the flag
 !
     select case(ii)
+
     case(110)
       do k = 1, km
         do j = 1, jm
-          pb%u(1:nv,1:ibl,j,k) = un(1:nv,iel:ie,j,k)
+          pdata%u(1:nv,1:ibl,j,k) = un(1:nv,iel:ie,j,k)
         end do
       end do
+
     case(120)
       do k = 1, km
         do j = 1, jm
-          pb%u(1:nv,ieu:im,j,k) = un(1:nv,ib:ibu,j,k)
+          pdata%u(1:nv,ieu:im,j,k) = un(1:nv,ib:ibu,j,k)
         end do
       end do
+
     case(210)
       do k = 1, km
         do i = 1, im
-          pb%u(1:nv,i,1:jbl,k) = un(1:nv,i,jel:je,k)
+          pdata%u(1:nv,i,1:jbl,k) = un(1:nv,i,jel:je,k)
         end do
       end do
+
     case(220)
       do k = 1, km
         do i = 1, im
-          pb%u(1:nv,i,jeu:jm,k) = un(1:nv,i,jb:jbu,k)
+          pdata%u(1:nv,i,jeu:jm,k) = un(1:nv,i,jb:jbu,k)
         end do
       end do
+
     case(310)
       do j = 1, jm
         do i = 1, im
-          pb%u(1:nv,i,j,1:kbl) = un(1:nv,i,j,kel:ke)
+          pdata%u(1:nv,i,j,1:kbl) = un(1:nv,i,j,kel:ke)
         end do
       end do
+
     case(320)
       do j = 1, jm
         do i = 1, im
-          pb%u(1:nv,i,j,keu:km) = un(1:nv,i,j,kb:kbu)
+          pdata%u(1:nv,i,j,keu:km) = un(1:nv,i,j,kb:kbu)
         end do
       end do
+
     case default
-      call print_warning("boundaries::bnd_copy_u", "Boundary flag unsupported!")
+      call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
+
     end select
 
 !-------------------------------------------------------------------------------
@@ -447,9 +448,9 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_rest(pb, un, id, is, ip)
+  subroutine bnd_rest(pdata, un, id, is, ip)
 
-    use blocks, only : block_data, nv => nvars
+    use blocks, only : block_data, nv => nvars, nchild
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
                          , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
@@ -459,13 +460,15 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer           , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pdata
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: id, is, ip
 
 ! local variables
 !
-    integer :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju, dm(3), fm(3)
+    integer :: ii, q, i, j, k
+    integer :: il, iu, jl, ju, kl, ku
+    integer :: i1, i2, j1, j2, k1, k2
 !
 !-------------------------------------------------------------------------------
 !
@@ -476,144 +479,737 @@ module boundaries
 ! perform update according to the flag
 !
     select case(ii)
+
+!! X-direction
+!!
     case(111)
 
+      il = 1
+      iu = ng
       jl = ng / 2 + 1
       ju = jm / 2
-      do k = 1, km
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
         do j = jl, ju
           j2 = 2 * j - ng
           j1 = j2 - 1
-          do i = 1, ng
+          do i = il, iu
             i2 = ie + 2 * (i - ng)
             i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
+#if NDIMS == 3
       end do
+#endif /* NDIMS == 3 */
 
     case(112)
 
+      il = 1
+      iu = ng
       jl = jm / 2 + 1
       ju = jm - ng / 2
-      do k = 1, km
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
         do j = jl, ju
           j2 = 2 * j - jm + ng
           j1 = j2 - 1
-          do i = 1, ng
+          do i = il, iu
             i2 = ie + 2 * (i - ng)
             i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
+#if NDIMS == 3
       end do
+#endif /* NDIMS == 3 */
 
-    case(121)
+#if NDIMS == 3
+    case(113)
 
+      il = 1
+      iu = ng
       jl = ng / 2 + 1
       ju = jm / 2
-      do k = 1, km
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
         do j = jl, ju
           j2 = 2 * j - ng
           j1 = j2 - 1
-          do i = ieu, im
-            i2 = ng + 2 * (i - ie)
+          do i = il, iu
+            i2 = ie + 2 * (i - ng)
             i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
       end do
 
-    case(122)
+    case(114)
 
+      il = 1
+      iu = ng
       jl = jm / 2 + 1
       ju = jm - ng / 2
-      do k = 1, km
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
         do j = jl, ju
           j2 = 2 * j - jm + ng
           j1 = j2 - 1
-          do i = ieu, im
+          do i = il, iu
+            i2 = ie + 2 * (i - ng)
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+#endif /* NDIMS == 3 */
+
+
+    case(121)
+
+      il = ieu
+      iu = im
+      jl = ng / 2 + 1
+      ju = jm / 2
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
             i2 = ng + 2 * (i - ie)
             i1 = i2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+#if NDIMS == 3
+      end do
+#endif /* NDIMS == 3 */
+
+    case(122)
+
+      il = ieu
+      iu = im
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+#if NDIMS == 3
+      end do
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(123)
+
+      il = ieu
+      iu = im
+      jl = ng / 2 + 1
+      ju = jm / 2
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
       end do
 
+    case(124)
+
+      il = ieu
+      iu = im
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      kl = km / 2 + 1
+      ku = km - ng / 2
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = ng + 2 * (i - ie)
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+#endif /* NDIMS == 3 */
+
+!! Y-direction
+!!
     case(211)
 
       il = ng / 2 + 1
       iu = im / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
-          do j = 1, ng
-            j2 = je + 2 * (j - ng)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+      jl = 1
+      ju = ng
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = je + 2 * (j - ng)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
+#if NDIMS == 3
       end do
+#endif /* NDIMS == 3 */
 
     case(212)
 
       il = im / 2 + 1
       iu = im - ng / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-          do j = 1, ng
-            j2 = je + 2 * (j - ng)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+      jl = 1
+      ju = ng
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = je + 2 * (j - ng)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+#if NDIMS == 3
+      end do
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(213)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = 1
+      ju = ng
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = je + 2 * (j - ng)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
       end do
+
+    case(214)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = 1
+      ju = ng
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = je + 2 * (j - ng)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+#endif /* NDIMS == 3 */
 
     case(221)
 
       il = ng / 2 + 1
       iu = im / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
-          do j = jeu, jm
-            j2 = ng + 2 * (j - je)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+      jl = jeu
+      ju = jm
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = ng + 2 * (j - je)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
+#if NDIMS == 3
       end do
+#endif /* NDIMS == 3 */
 
     case(222)
 
       il = im / 2 + 1
       iu = im - ng / 2
-      do k = 1, km
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-          do j = jeu, jm
-            j2 = ng + 2 * (j - je)
-            j1 = j2 - 1
-            pb%u(1:nv,i,j,k) = 0.25 * (un(1:nv,i1,j1,k) + un(1:nv,i1,j2,k) &
-                                     + un(1:nv,i2,j1,k) + un(1:nv,i2,j2,k))
+      jl = jeu
+      ju = jm
+#if NDIMS == 3
+      kl = ng / 2 + 1
+      ku = km / 2
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      k  = 1
+      k1 = 1
+      k2 = 1
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - ng
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = ng + 2 * (j - je)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+#if NDIMS == 3
+      end do
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(223)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = jeu
+      ju = jm
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = ng + 2 * (j - je)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
           end do
         end do
       end do
 
+    case(224)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = jeu
+      ju = jm
+      kl = km / 2 + 1
+      ku = km - ng / 2
+
+      do k = kl, ku
+        k2 = 2 * k - km + ng
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = ng + 2 * (j - je)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+
+!! Z-direction
+!!
+    case(311)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = ng / 2 + 1
+      ju = jm / 2
+      kl = 1
+      kl = ng
+
+      do k = kl, ku
+        k2 = ke + 2 * (k - ng)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(312)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = ng / 2 + 1
+      ju = jm / 2
+      kl = 1
+      kl = ng
+
+      do k = kl, ku
+        k2 = ke + 2 * (k - ng)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(313)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      kl = 1
+      kl = ng
+
+      do k = kl, ku
+        k2 = ke + 2 * (k - ng)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(314)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      kl = 1
+      kl = ng
+
+      do k = kl, ku
+        k2 = ke + 2 * (k - ng)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(321)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = ng / 2 + 1
+      ju = jm / 2
+      kl = keu
+      ku = km
+
+      do k = kl, ku
+        k2 = ng + 2 * (k - ke)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(322)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = ng / 2 + 1
+      ju = jm / 2
+      kl = keu
+      ku = km
+
+      do k = kl, ku
+        k2 = ng + 2 * (k - ke)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(323)
+
+      il = ng / 2 + 1
+      iu = im / 2
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      kl = keu
+      ku = km
+
+      do k = kl, ku
+        k2 = ng + 2 * (k - ke)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+
+    case(324)
+
+      il = im / 2 + 1
+      iu = im - ng / 2
+      jl = jm / 2 + 1
+      ju = jm - ng / 2
+      kl = keu
+      ku = km
+
+      do k = kl, ku
+        k2 = ng + 2 * (k - ke)
+        k1 = k2 - 1
+        do j = jl, ju
+          j2 = 2 * j - jm + ng
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - im + ng
+            i1 = i2 - 1
+
+            do q = 1, nv
+              pdata%u(q,i,j,k) = sum(un(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
+        end do
+      end do
+#endif /* NDIMS == 3 */
+
     case default
-      call print_warning("boundaries::bnd_rest_u", "Boundary flag unsupported!")
+      call print_warning("boundaries::bnd_rest", "Boundary flag unsupported!")
+
     end select
 
 !-------------------------------------------------------------------------------
