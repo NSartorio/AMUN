@@ -144,10 +144,10 @@ module boundaries
                         call bnd_copy(pblock%data, pneigh%data%u, i, j, k)
                     case(1)   ! prolongation
                       m = 1
-                      do while(pblock%id .eq. pneigh%neigh(i,3-j,m)%ptr%id .or. m .gt. nchild)
+                      do while(pblock%id .ne. pneigh%neigh(i,3-j,m)%ptr%id .and. m .lt. nfaces)
                         m = m + 1
                       end do
-                      if (m .le. nchild) then
+                      if (m .le. nfaces) then
                         if (k .eq. 1) &
                           call bnd_prol(pblock%data, pneigh%data%u, i, j, m)
                       else
@@ -281,10 +281,10 @@ module boundaries
                 pblock => pinfo%block
                 pneigh => pblock%neigh(i,j,k)%ptr
                 m = 1
-                do while(pblock%id .eq. pneigh%neigh(i,3-j,m)%ptr%id .or. m .gt. nchild)
+                do while(pblock%id .ne. pneigh%neigh(i,3-j,m)%ptr%id .and. m .lt. nfaces)
                   m = m + 1
                 end do
-                if (m .le. nchild) then
+                if (m .le. nfaces) then
                   if (k .eq. 1) &
                     call bnd_prol(pinfo%block%data,rbuf(l,:,:,:,:),i,j,m)
                   else
@@ -1223,7 +1223,7 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_prol(pb, un, id, is, ip)
+  subroutine bnd_prol(pdata, un, idir, iside, iface)
 
     use blocks, only : block_data, nv => nvars
     use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                  &
@@ -1236,268 +1236,312 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer           , intent(inout) :: pb
+    type(block_data), pointer           , intent(inout) :: pdata
     real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
-    integer                             , intent(in)    :: id, is, ip
+    integer                             , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
-    integer               :: ii, i, j, k, q, i0, i1, i2, j0, j1, j2, il, iu, jl, ju
-    integer, dimension(3) :: dm(3), fm(3)
+    integer :: ii, i, j, k, q
+    integer :: i1, i2, j1, j2, k1, k2
+    integer :: il, iu, jl, ju, kl, ku
+    integer :: is, it, js, jt, ks, kt
+
+! local arrays
+!
+    integer, dimension(3)              :: dm, cm, fm
+    real   , dimension(2*im,2*jm,2*km) :: ux
 
 ! parameters
 !
     integer :: del = 1
-
-! local arrays
-!
-    real, dimension(2*im,2*jm,km) :: ux
 !
 !-------------------------------------------------------------------------------
 !
 ! calcuate the flag determinig the side of boundary to update
 !
-    ii = 100 * id + 10 * is + ip
+    ii = 100 * idir + 10 * iside + iface
 
-! perform update according to the flag
+! prepare dimensions
+!
+    dm(:)  = (/ im, jm, km /)
+    dm(idir) = ng
+    cm(:)  = dm(:) / 2 + 2 * del
+    cm(idir) = ng / 2 + 2 * del
+    fm(:)  = 2 * cm(:)
+#if NDIMS == 2
+    dm(3)  = 1
+    cm(3)  = 1
+    fm(3)  = 1
+#endif /* NDIMS == 2 */
+
+! prepare lower indices of the source array
+!
+    i1 = (im - ng) / 2 - del + 1
+    j1 = (jm - ng) / 2 - del + 1
+#if NDIMS == 3
+    k1 = (km - ng) / 2 - del + 1
+#else /* NDIMS == 3 */
+    k1 = 1
+#endif /* NDIMS == 3 */
+
+    il = 2 * del + 1
+    jl = 2 * del + 1
+#if NDIMS == 3
+    kl = 2 * del + 1
+#else /* NDIMS == 3 */
+    kl = 1
+#endif /* NDIMS == 3 */
+
+    is = 1
+    js = 1
+    ks = 1
+
+! update lower indices accoring to the flag
 !
     select case(ii)
 
     case(111)
 
-      dm(1) = ng / 2 + 2 * del
-      dm(2) = jm / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = ie - ng / 2 - del + 1
-      i1 = i0 + dm(1) - 1
-      j0 = jm / 2 - ng / 2 - del + 1
-      j1 = j0 + dm(2) - 1
-
-      il = 2 * del + 1
-      iu = il + ng - 1
-      jl = 2 * del + 1
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      i1 =  ie - ng  / 2 - del + 1
+      j1 =  jb - ng  / 2 - del
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
     case(112)
 
-      dm(1) = ng / 2 + 2 * del
-      dm(2) = jm / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 =  ie - ng  / 2 - del + 1
+      j1 = (jm - ng) / 2 - del + 1
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = ie - ng / 2 - del + 1
-      i1 = i0 + dm(1) - 1
-      j0 = jb - ng / 2 - del
-      j1 = j0 + dm(2) - 1
+#if NDIMS == 3
+    case(113)
 
-      il = 2 * del + 1
-      iu = il + ng - 1
-      jl = 2 * del + 1
-      ju = jl + jm - 1
+      i1 =  ie - ng  / 2 - del + 1
+      j1 =  jb - ng  / 2 - del
+      k1 = (km - ng) / 2 - del + 1
 
-! expand cube
-!
-      do q = 1, nv
+    case(114)
 
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,1:ng,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      i1 =  ie - ng  / 2 - del + 1
+      j1 = (jm - ng) / 2 - del + 1
+      k1 = (km - ng) / 2 - del + 1
+#endif /* NDIMS == 3 */
 
     case(121)
 
-      dm(1) = ng / 2 + 2 * del
-      dm(2) = jm / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 =  ib - del
+      j1 =  jb - ng  / 2 - del
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = ib - del
-      i1 = i0 + dm(1) - 1
-      j0 = jm / 2 - ng / 2 - del + 1
-      j1 = j0 + dm(2) - 1
-
-      il = 2 * del + 1
-      iu = il + ng - 1
-      jl = 2 * del + 1
-      ju = jl + jm - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      is = ieu
 
     case(122)
 
-      dm(1) = ng / 2 + 2 * del
-      dm(2) = jm / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 =  ib - del
+      j1 = (jm - ng) / 2 - del + 1
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = ib - del
-      i1 = i0 + dm(1) - 1
-      j0 = jb - ng / 2 - del
-      j1 = j0 + dm(2) - 1
+      is = ieu
 
-      il = 2 * del + 1
-      iu = il + ng - 1
-      jl = 2 * del + 1
-      ju = jl + jm - 1
+#if NDIMS == 3
+    case(123)
 
-! expand cube
-!
-      do q = 1, nv
+      i1 =  ib - del
+      j1 =  jb - ng  / 2 - del
+      k1 = (km - ng) / 2 - del + 1
 
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+      is = ieu
 
-        pb%u(q,ieu:im,1:jm,1:km) = ux(il:iu,jl:ju,1:km)
+    case(124)
 
-      end do
+      i1 =  ib - del
+      j1 = (jm - ng) / 2 - del + 1
+      k1 = (km - ng) / 2 - del + 1
+
+      is = ieu
+#endif /* NDIMS == 3 */
 
     case(211)
 
-      dm(1) = im / 2 + 2 * del
-      dm(2) = ng / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
-
-      i0 = im / 2 - ng / 2 - del + 1
-      i1 = i0 + dm(1) - 1
-      j0 = je - ng / 2 - del + 1
-      j1 = j0 + dm(2) - 1
-
-      il = 2 * del + 1
-      iu = il + im - 1
-      jl = 2 * del + 1
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      i1 =  ib - ng  / 2 - del
+      j1 =  je - ng  / 2 - del + 1
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
     case(212)
 
-      dm(1) = im / 2 + 2 * del
-      dm(2) = ng / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  je - ng  / 2 - del + 1
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = ib - ng / 2 - del
-      i1 = i0 + dm(1) - 1
-      j0 = je - ng / 2 - del + 1
-      j1 = j0 + dm(2) - 1
+#if NDIMS == 3
+    case(213)
 
-      il = 2 * del + 1
-      iu = il + im - 1
-      jl = 2 * del + 1
-      ju = jl + ng - 1
+      i1 =  ib - ng  / 2 - del
+      j1 =  je - ng  / 2 - del + 1
+      k1 = (km - ng) / 2 - del + 1
 
-! expand cube
-!
-      do q = 1, nv
+    case(214)
 
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,1:im,1:ng,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  je - ng  / 2 - del + 1
+      k1 = (km - ng) / 2 - del + 1
+#endif /* NDIMS == 3 */
 
     case(221)
 
-      dm(1) = im / 2 + 2 * del
-      dm(2) = ng / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 =  ib - ng  / 2 - del
+      j1 =  jb - del
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = im / 2 - ng / 2 - del + 1
-      i1 = i0 + dm(1) - 1
-      j0 = jb - del
-      j1 = j0 + dm(2) - 1
-
-      il = 2 * del + 1
-      iu = il + im - 1
-      jl = 2 * del + 1
-      ju = jl + ng - 1
-
-! expand cube
-!
-      do q = 1, nv
-
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
-
-        pb%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
-
-      end do
+      js = jeu
 
     case(222)
 
-      dm(1) = im / 2 + 2 * del
-      dm(2) = ng / 2 + 2 * del
-      dm(3) = km
-      fm(1) = 2 * dm(1)
-      fm(2) = 2 * dm(2)
-      fm(3) = km
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  jb - del
+#if NDIMS == 3
+      k1 =  kb - ng  / 2 - del
+#else /* NDIMS == 3 */
+      k1 = 1
+#endif /* NDIMS == 3 */
 
-      i0 = ib - ng / 2 - del
-      i1 = i0 + dm(1) - 1
-      j0 = jb - del
-      j1 = j0 + dm(2) - 1
+      js = jeu
 
-      il = 2 * del + 1
-      iu = il + im - 1
-      jl = 2 * del + 1
-      ju = jl + ng - 1
+#if NDIMS == 3
+    case(223)
 
-! expand cube
-!
-      do q = 1, nv
+      i1 =  ib - ng  / 2 - del
+      j1 =  jb - del
+      k1 = (km - ng) / 2 - del + 1
 
-        call expand(dm,fm,0,un(q,i0:i1,j0:j1,1:km),ux,'t','t','t')
+      js = jeu
 
-        pb%u(q,1:im,jeu:jm,1:km) = ux(il:iu,jl:ju,1:km)
+    case(224)
 
-      end do
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  jb - del
+      k1 = (km - ng) / 2 - del + 1
+
+      js = jeu
+
+    case(311)
+
+      i1 =  ib - ng  / 2 - del
+      j1 =  jb - ng  / 2 - del
+      k1 =  ke - ng  / 2 - del + 1
+
+    case(312)
+
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  jb - ng  / 2 - del
+      k1 =  ke - ng  / 2 - del + 1
+
+    case(313)
+
+      i1 =  ib - ng  / 2 - del
+      j1 = (jm - ng) / 2 - del + 1
+      k1 =  ke - ng  / 2 - del + 1
+
+    case(314)
+
+      i1 = (im - ng) / 2 - del + 1
+      j1 = (jm - ng) / 2 - del + 1
+      k1 =  ke - ng  / 2 - del + 1
+
+    case(321)
+
+      i1 =  ib - ng  / 2 - del
+      j1 =  jb - ng  / 2 - del
+      k1 =  kb - del
+
+      ks = keu
+
+    case(322)
+
+      i1 = (im - ng) / 2 - del + 1
+      j1 =  jb - ng  / 2 - del
+      k1 =  kb - del
+
+      ks = keu
+
+    case(323)
+
+      i1 =  ib - ng  / 2 - del
+      j1 = (jm - ng) / 2 - del + 1
+      k1 =  kb - del
+
+      ks = keu
+
+    case(324)
+
+      i1 = (im - ng) / 2 - del + 1
+      j1 = (jm - ng) / 2 - del + 1
+      k1 =  kb - del
+
+      ks = keu
+
+#endif /* NDIMS == 3 */
 
     case default
-      call print_warning("boundaries::bnd_prol_u", "Boundary flag unsupported!")
+      call print_warning("boundaries::bnd_prol", "Boundary flag unsupported!")
+
     end select
+
+! update upper indices
+!
+    i2 = i1 + cm(1) - 1
+    j2 = j1 + cm(2) - 1
+    k2 = k1 + cm(3) - 1
+
+    iu = il + dm(1) - 1
+    ju = jl + dm(2) - 1
+    ku = kl + dm(3) - 1
+
+    it = is + dm(1) - 1
+    jt = js + dm(2) - 1
+    kt = ks + dm(3) - 1
+
+! iterate over all variables
+!
+    do q = 1, nv
+
+! expand the boundary
+!
+      call expand(cm, fm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 't', 't', 't')
+
+! copy expanded boundary in the proper place of the block
+!
+      pdata%u(q,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
+
+    end do
 
 !-------------------------------------------------------------------------------
 !
