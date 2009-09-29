@@ -872,8 +872,8 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, nv => nvars
-    use config       , only : in, jn, kn, im, jm, km, ng
+    use blocks       , only : block_meta, nvars, nchild
+    use config       , only : ng, im, jm, km, ib, jb, kb
 
     implicit none
 
@@ -883,114 +883,89 @@ module mesh
 
 ! local variables
 !
-    integer :: q, i, j, k, il, iu, jl, ju, i1, i2, j1, j2
+    integer :: i, j, k, q, p
+    integer :: il, iu, jl, ju, kl, ku, i1, i2, j1, j2, k1, k2
+    integer :: is, js, ks
+
+! local arrays
+!
+    integer, dimension(3)     :: dm, fm
+    integer, dimension(3,0:1) :: cm
 
 ! local pointers
 !
-    type(block_meta), pointer :: pbl, pbr, ptl, ptr, pb
+    type(block_meta), pointer :: pchild
 
 !-------------------------------------------------------------------------------
 !
-    pbl => pblock%child(1)%ptr
-    pbr => pblock%child(2)%ptr
-    ptl => pblock%child(3)%ptr
-    ptr => pblock%child(4)%ptr
-
-! BL
+! prepare dimensions
 !
-    il = ng / 2 + 1
-    iu = im / 2
-    jl = ng / 2 + 1
-    ju = jm / 2
-    do k = 1, km
-      do j = jl, ju
-        j2 = 2 * j - ng
-        j1 = j2 - 1
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
+    dm(:)   = (/ im, jm, km /)
+    fm(:)   = (dm(:) - ng) / 2
+    cm(:,0) = ng
+    cm(:,1) = dm(:) - ng
+#if NDIMS == 2
+    fm(3)   = 1
+    ks      = 1
+    kl      = 1
+    k1      = 1
+    k2      = 1
+    k       = 1
+#endif /* NDIMS == 2 */
 
-          pblock%data%u(1:nv,i,j,k) = 0.25 * (pbl%data%u(1:nv,i1,j1,k)         &
-                                            + pbl%data%u(1:nv,i1,j2,k)         &
-                                            + pbl%data%u(1:nv,i2,j1,k)         &
-                                            + pbl%data%u(1:nv,i2,j2,k))
+! iterate over all children
+!
+    do p = 1, nchild
+
+! assign pointer to the current child
+!
+      pchild => pblock%child(p)%ptr
+
+! calculate the position of child in the parent block
+!
+      is = mod((p - 1)    ,2)
+      js = mod((p - 1) / 2,2)
+#if NDIMS == 3
+      ks = mod((p - 1) / 4,2)
+#endif /* NDIMS == 3 */
+
+! calculate the bounds of the destination array indices
+!
+      il = ib - ng / 2 + is * fm(1)
+      jl = jb - ng / 2 + js * fm(2)
+#if NDIMS == 3
+      kl = kb - ng / 2 + ks * fm(3)
+#endif /* NDIMS == 3 */
+
+      iu = il + fm(1) - 1
+      ju = jl + fm(2) - 1
+      ku = kl + fm(3) - 1
+
+! perform the current block restriction
+!
+#if NDIMS == 3
+      do k = kl, ku
+        k2 = 2 * k - cm(3,ks)
+        k1 = k2 - 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          j2 = 2 * j - cm(2,js)
+          j1 = j2 - 1
+          do i = il, iu
+            i2 = 2 * i - cm(1,is)
+            i1 = i2 - 1
+
+            do q = 1, nvars
+              pblock%data%u(q,i,j,k) = sum(pchild%data%u(q,i1:i2,j1:j2,k1:k2)) / nchild
+            end do
+          end do
         end do
+#if NDIMS == 3
       end do
+#endif /* NDIMS == 3 */
+
     end do
-
-! BR
 !
-    il = im / 2 + 1
-    iu = im - ng / 2
-    jl = ng / 2 + 1
-    ju = jm / 2
-    do k = 1, km
-      do j = jl, ju
-        j2 = 2 * j - ng
-        j1 = j2 - 1
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-
-          pblock%data%u(1:nv,i,j,k) = 0.25 * (pbr%data%u(1:nv,i1,j1,k)         &
-                                            + pbr%data%u(1:nv,i1,j2,k)         &
-                                            + pbr%data%u(1:nv,i2,j1,k)         &
-                                            + pbr%data%u(1:nv,i2,j2,k))
-        end do
-      end do
-    end do
-
-! TL
-!
-    il = ng / 2 + 1
-    iu = im / 2
-    jl = jm / 2 + 1
-    ju = jm - ng / 2
-    do k = 1, km
-      do j = jl, ju
-        j2 = 2 * j - jm + ng
-        j1 = j2 - 1
-        do i = il, iu
-          i2 = 2 * i - ng
-          i1 = i2 - 1
-
-          pblock%data%u(1:nv,i,j,k) = 0.25 * (ptl%data%u(1:nv,i1,j1,k)         &
-                                            + ptl%data%u(1:nv,i1,j2,k)         &
-                                            + ptl%data%u(1:nv,i2,j1,k)         &
-                                            + ptl%data%u(1:nv,i2,j2,k))
-        end do
-      end do
-    end do
-
-! TR
-!
-    il = im / 2 + 1
-    iu = im - ng / 2
-    jl = jm / 2 + 1
-    ju = jm - ng / 2
-    do k = 1, km
-      do j = jl, ju
-        j2 = 2 * j - jm + ng
-        j1 = j2 - 1
-        do i = il, iu
-          i2 = 2 * i - im + ng
-          i1 = i2 - 1
-
-          pblock%data%u(1:nv,i,j,k) = 0.25 * (ptr%data%u(1:nv,i1,j1,k)         &
-                                            + ptr%data%u(1:nv,i1,j2,k)         &
-                                            + ptr%data%u(1:nv,i2,j1,k)         &
-                                            + ptr%data%u(1:nv,i2,j2,k))
-        end do
-      end do
-    end do
-
-! derefine block
-!
-    nullify(pbl)
-    nullify(pbr)
-    nullify(ptl)
-    nullify(ptr)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
