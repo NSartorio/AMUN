@@ -789,76 +789,96 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nv => nvars
-    use config       , only : in, jn, kn, im, jm, km, ng
+    use blocks       , only : block_meta, block_data, nvars, nchild
+    use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
 
     implicit none
 
 ! input arguments
 !
-    type(block_meta), pointer :: pblock, pchild
+    type(block_meta), pointer, intent(inout) :: pblock
 
 ! local variables
 !
-    integer :: q, dm(3), fm(3), il, iu, jl, ju, k
+    integer :: q, p
+    integer :: il, iu, jl, ju, kl, ku
+    integer :: is, js, ks
 
 ! local arrays
 !
-    real, dimension(nv,2*im,2*jm,2*km) :: u
+    integer, dimension(3) :: dm, fm
+
+! local allocatable arrays
+!
+    real, dimension(:,:,:,:), allocatable :: u
+
+! local pointers
+!
+    type(block_meta), pointer :: pchild
 
 !-------------------------------------------------------------------------------
 !
-    dm(1) = im
-    dm(2) = jm
-    dm(3) = km
+! prepare dimensions
+!
+    dm(:) = (/ im, jm, km /)
     fm(:) = 2 * (dm(:) - ng)
-    if (km .eq. 1) &
-      fm(3) = 1
+#if NDIMS == 2
+    fm(3) = 1
+    ks    = 1
+    kl    = 1
+    ku    = 1
+#endif /* NDIMS == 2 */
 
-! first expand variables
+! allocate array to the product of expansion
 !
-    do q = 1, nv
-      call expand(dm,fm,ng,pblock%data%u(q,:,:,:),u(q,:,:,:),'t','t','t')
-    end do
+    allocate(u(nvars,2*im,2*jm,2*km))
 
-! fill values of children
+! expand all variables and place them in the array u
 !
-    il = 1
-    iu = il + im - 1
-    jl = 1
-    ju = jl + jm - 1
-    pchild => pblock%child(1)%ptr
-    do k = 1, km
-      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+    do q = 1, nvars
+      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 
-    il = in + 1
-    iu = il + im - 1
-    jl = 1
-    ju = jl + jm - 1
-    pchild => pblock%child(2)%ptr
-    do k = 1, km
-      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
+! iterate over all children
+!
+    do p = 1, nchild
+
+! assign pointer to the current child
+!
+      pchild => pblock%child(p)%ptr
+
+! calculate the position of child in the parent block
+!
+      is = mod((p - 1)    ,2)
+      js = mod((p - 1) / 2,2)
+#if NDIMS == 3
+      ks = mod((p - 1) / 4,2)
+#endif /* NDIMS == 3 */
+
+! calculate indices of the current child subdomain
+!
+      il = 1 + is * in
+      jl = 1 + js * jn
+#if NDIMS == 3
+      kl = 1 + ks * kn
+#endif /* NDIMS == 3 */
+
+      iu = il + im - 1
+      ju = jl + jm - 1
+#if NDIMS == 3
+      ku = kl + km - 1
+#endif /* NDIMS == 3 */
+
+! copy data to the current child
+!
+      pchild%data%u(1:nvars,1:im,1:jm,1:km) = u(1:nvars,il:iu,jl:ju,kl:ku)
+
     end do
 
-    il = 1
-    iu = il + im - 1
-    jl = in + 1
-    ju = jl + jm - 1
-    pchild => pblock%child(3)%ptr
-    do k = 1, km
-      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
-    end do
-
-    il = in + 1
-    iu = il + im - 1
-    jl = in + 1
-    ju = jl + jm - 1
-    pchild => pblock%child(4)%ptr
-    do k = 1, km
-      pchild%data%u(:,:,:,k) = u(:,il:iu,jl:ju,k)
-    end do
+! deallocate local arrays
+!
+    if (allocated(u)) deallocate(u)
 
 !-------------------------------------------------------------------------------
 !
