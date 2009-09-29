@@ -864,11 +864,14 @@ module problem
 
 ! local variables
 !
-    integer                       :: i, j, k
-    real                          :: dpmax, vx, vy, vz, en, ek, ei
-    real                          :: dnl, dnr, prl, prr, ddndx, ddndy, ddn     &
-                                   , dprdx, dprdy, dpr
-    real, dimension(im,jm,km)     :: dn, pr
+    integer :: i, j, k
+    real    :: dpmax, vx, vy, vz, en, ek, ei
+    real    :: dnl, dnr, prl, prr, ddndx, ddndy, ddndz, ddn, dprdx, dprdy      &
+             , dprdz, dpr
+
+! local arrays
+!
+    real, dimension(im,jm,km) :: dn, pr
 !
 !-------------------------------------------------------------------------------
 !
@@ -901,8 +904,16 @@ module problem
           dnl = dn(i,j-1,k)
           dnr = dn(i,j+1,k)
           ddndy = abs(dnr-dnl)/(dnr+dnl)
+#if NDIMS == 3
+          dnl = dn(i,j,k-1)
+          dnr = dn(i,j,k+1)
+          ddndz = abs(dnr-dnl)/(dnr+dnl)
+
+          ddn = sqrt(ddndx**2 + ddndy**2 + ddndz**2)
+#else /* NDIMS == 3 */
 
           ddn = sqrt(ddndx**2 + ddndy**2)
+#endif /* NDIMS == 3 */
 
           prl = pr(i-1,j,k)
           prr = pr(i+1,j,k)
@@ -910,8 +921,16 @@ module problem
           prl = pr(i,j-1,k)
           prr = pr(i,j+1,k)
           dprdy = abs(prr-prl)/(prr+prl)
+#if NDIMS == 3
+          prl = pr(i,j,k-1)
+          prr = pr(i,j,k+1)
+          dprdz = abs(prr-prl)/(prr+prl)
+
+          dpr = sqrt(dprdx**2 + dprdy**2 + dprdz**2)
+#else /* NDIMS == 3 */
 
           dpr = sqrt(dprdx**2 + dprdy**2)
+#endif /* NDIMS == 3 */
 
           pblock%c(i,j,k) = max(ddn,dpr)
 
