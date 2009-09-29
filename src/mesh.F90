@@ -140,8 +140,15 @@ module mesh
         pdata_block => list_data
         do while (associated(pdata_block))
 
-          if (pdata_block%meta%level .eq. l) &
+          if (pdata_block%meta%level .eq. l) then
             pdata_block%meta%refine = max(0, check_ref(pdata_block))
+
+! if there is only one block, and it is set not to be refined, refine it anyway
+! because the resolution for the problem initiation may be too small
+!
+            if (nblocks .eq. 1 .and. l .eq. 1) &
+              pdata_block%meta%refine = 1
+          end if
 
 ! assign pointer to the next block
 !
