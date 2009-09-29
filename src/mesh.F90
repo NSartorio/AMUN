@@ -789,7 +789,7 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nvars, nchild
+    use blocks       , only : block_meta, nvars, nchild
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
 
