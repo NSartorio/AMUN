@@ -1216,71 +1216,68 @@ module blocks
 !
     integer :: i, j, k, l, p
 
-! pointers
+! local arrays
+!
+    integer, dimension(ndims, nsides, nfaces) :: arr
+
+! local pointers
 !
     type(block_meta), pointer :: pchild, pneigh
 !
 !-------------------------------------------------------------------------------
 !
-! update parent neighbor fields from the children
+! prepare reference array
 !
-    pchild => pblock%child(1)%ptr
-    pblock%neigh(1,1,1)%ptr => pchild%neigh(1,1,1)%ptr
-    pblock%neigh(2,1,1)%ptr => pchild%neigh(2,1,1)%ptr
 #if NDIMS == 3
-    pblock%neigh(3,1,1)%ptr => pchild%neigh(3,1,1)%ptr
-#endif /* NDIMS == 3 */
-    pchild => pblock%child(2)%ptr
-    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
-    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
-#if NDIMS == 3
-    pblock%neigh(3,1,2)%ptr => pchild%neigh(3,1,2)%ptr
-#endif /* NDIMS == 3 */
-    pchild => pblock%child(3)%ptr
-    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
-    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
-#if NDIMS == 3
-    pblock%neigh(3,1,3)%ptr => pchild%neigh(3,1,3)%ptr
-#endif /* NDIMS == 3 */
-    pchild => pblock%child(4)%ptr
-    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
-    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
-#if NDIMS == 3
-    pblock%neigh(3,1,4)%ptr => pchild%neigh(3,1,4)%ptr
-#endif /* NDIMS == 3 */
-#if NDIMS == 3
-    pchild => pblock%child(5)%ptr
-    pblock%neigh(1,1,3)%ptr => pchild%neigh(1,1,3)%ptr
-    pblock%neigh(2,1,3)%ptr => pchild%neigh(2,1,3)%ptr
-    pblock%neigh(3,2,1)%ptr => pchild%neigh(3,2,1)%ptr
-    pchild => pblock%child(6)%ptr
-    pblock%neigh(1,2,1)%ptr => pchild%neigh(1,2,1)%ptr
-    pblock%neigh(2,1,2)%ptr => pchild%neigh(2,1,2)%ptr
-    pblock%neigh(3,2,2)%ptr => pchild%neigh(3,2,2)%ptr
-    pchild => pblock%child(7)%ptr
-    pblock%neigh(1,1,2)%ptr => pchild%neigh(1,1,2)%ptr
-    pblock%neigh(2,2,1)%ptr => pchild%neigh(2,2,1)%ptr
-    pblock%neigh(3,2,3)%ptr => pchild%neigh(3,2,3)%ptr
-    pchild => pblock%child(8)%ptr
-    pblock%neigh(1,2,2)%ptr => pchild%neigh(1,2,2)%ptr
-    pblock%neigh(2,2,2)%ptr => pchild%neigh(2,2,2)%ptr
-    pblock%neigh(3,2,4)%ptr => pchild%neigh(3,2,4)%ptr
+    arr(1,1,:) = (/ 1, 3, 5, 7 /)
+    arr(1,2,:) = (/ 2, 4, 6, 8 /)
+    arr(2,1,:) = (/ 1, 2, 5, 6 /)
+    arr(2,2,:) = (/ 3, 4, 7, 8 /)
+    arr(3,1,:) = (/ 1, 2, 3, 4 /)
+    arr(3,2,:) = (/ 5, 6, 7, 8 /)
+#else /* NDIMS == 3 */
+    arr(1,1,:) = (/ 1, 3 /)
+    arr(1,2,:) = (/ 2, 4 /)
+    arr(2,1,:) = (/ 1, 2 /)
+    arr(2,2,:) = (/ 3, 4 /)
 #endif /* NDIMS == 3 */
 
-! update the neighbor fields of neighbors
+! iterate over all boundaries of the parent block
 !
     do i = 1, ndims
       do j = 1, nsides
         do k = 1, nfaces
-          pneigh => pblock%neigh(i,j,k)%ptr
+
+! calculate the right child number
+!
+          p = arr(i,j,k)
+
+! assign the pointer to the current neighbor
+!
+          pneigh => pblock%child(p)%ptr%neigh(i,j,k)%ptr
+
+! assign the right neighbor to the current neighbor pointer
+!
+          pblock%neigh(i,j,k)%ptr => pneigh
+
+! update the neighbor fields of neighbors
+!
           if (associated(pneigh)) then
             l = 3 - j
             do p = 1, nfaces
               pneigh%neigh(i,l,p)%ptr => pblock
             end do
           end if
+
         end do
       end do
+    end do
+
+! deallocate child blocks
+!
+    do p = 1, nchild
+      call metablock_unsetleaf(pblock%child(p)%ptr)
+      call deallocate_metablock(pblock%child(p)%ptr)
     end do
 
 ! set the leaf flag of parent block
@@ -1290,13 +1287,6 @@ module blocks
 ! reset the refinement flag of the parent block
 !
     pblock%refine = 0
-
-! deallocate child blocks
-!
-    do p = 1, nchild
-      call metablock_unsetleaf(pblock%child(p)%ptr)
-      call deallocate_metablock(pblock%child(p)%ptr)
-    end do
 !
 !-------------------------------------------------------------------------------
 !
