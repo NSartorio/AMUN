@@ -43,7 +43,7 @@ module io
                        , nleafs, dblocks, idn, ivx, ivy, ivz, ipr
     use config  , only : nghost, in, jn, kn, im, jm, km, maxlev                &
                        , ib, ie, jb, je, kb, ke                                &
-                       , xmin, xmax, ymin, ymax, zmin, zmax
+                       , xmin, xmax, ymin, ymax, zmin, zmax, rdims
     use error   , only : print_error
     use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f          &
                        , h5gcreate_f, h5gclose_f, h5acreate_f, h5aclose_f      &
@@ -72,19 +72,21 @@ module io
 ! local variables
 !
     character(len=64) :: fl
-    integer           :: err, j, k, l
+    integer           :: err
+    integer(kind=4)   :: i, j, k, l
 
 ! local arrays
 !
-    integer, dimension(3) :: dm
+    integer(kind=4), dimension(3) :: dm
 
 ! local allocatable arrays
 !
-    integer, dimension(:)      , allocatable :: indices
-    integer, dimension(:)      , allocatable :: levels
-    real   , dimension(:,:,:)  , allocatable :: bounds
-    real   , dimension(:,:,:,:), allocatable :: dens, velx, vely, velz, pres
-    real   , dimension(:,:,:,:), allocatable :: u
+    integer(kind=4), dimension(:)      , allocatable :: indices
+    integer(kind=4), dimension(:)      , allocatable :: levels
+    real(kind=8)   , dimension(:,:,:)  , allocatable :: bounds
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: dens, pres
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: velx, vely, velz
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: u
 
 ! local pointers
 !
@@ -240,19 +242,22 @@ module io
         call h5awrite_f(aid, H5T_NATIVE_INTEGER, dm(:), am, err)
         call h5aclose_f(aid, err)
 
+        call h5acreate_f(gid, 'rdims', H5T_NATIVE_INTEGER, sid, aid, err)
+        call h5awrite_f(aid, H5T_NATIVE_INTEGER, rdims(:), am, err)
+        call h5aclose_f(aid, err)
+
         call h5sclose_f(sid, err)
 
         am(1) = dblocks
-
         call h5screate_simple_f(1, am, sid, err)
-        call h5acreate_f(gid, 'indices', H5T_NATIVE_INTEGER, sid, aid, err)
-        call h5awrite_f(aid, H5T_NATIVE_INTEGER, indices(:), am, err)
-        call h5aclose_f(aid, err)
 
-        call h5screate_simple_f(1, am, sid, err)
-        call h5acreate_f(gid, 'levels', H5T_NATIVE_INTEGER, sid, aid, err)
-        call h5awrite_f(aid, H5T_NATIVE_INTEGER, levels(:), am, err)
-        call h5aclose_f(aid, err)
+        call h5dcreate_f(gid, 'indices', H5T_NATIVE_INTEGER, sid, did, err)
+        call h5dwrite_f(did, H5T_NATIVE_INTEGER, indices(:), am, err)
+        call h5dclose_f(did, err)
+
+        call h5dcreate_f(gid, 'levels', H5T_NATIVE_INTEGER, sid, did, err)
+        call h5dwrite_f(did, H5T_NATIVE_INTEGER, levels(:), am, err)
+        call h5dclose_f(did, err)
 
         call h5sclose_f(sid, err)
 
@@ -268,9 +273,9 @@ module io
           pm(3) = nsides
           call h5screate_simple_f(3, pm, sid, err)
 
-          call h5acreate_f(gid, 'bounds', H5T_NATIVE_DOUBLE, sid, aid, err)
-          call h5awrite_f(aid, H5T_NATIVE_DOUBLE, real(bounds(:,:,:),8), pm, err)
-          call h5aclose_f(aid, err)
+          call h5dcreate_f(gid, 'bounds', H5T_NATIVE_DOUBLE, sid, did, err)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, bounds(:,:,:), pm(:), err, sid)
+          call h5dclose_f(did, err)
 
           call h5sclose_f(sid, err)
         end if
