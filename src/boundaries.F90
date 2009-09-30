@@ -720,11 +720,12 @@ module boundaries
       ju = jm - ng / 2
       kl = km / 2 + 1
       ku = km - ng / 2
+
       do k = kl, ku
         k2 = 2 * k - km + ng
         k1 = k2 - 1
         do j = jl, ju
-          j2 = 2 * j - ng
+          j2 = 2 * j - jm + ng
           j1 = j2 - 1
           do i = il, iu
             i2 = ng + 2 * (i - ie)
@@ -1005,7 +1006,7 @@ module boundaries
       jl = ng / 2 + 1
       ju = jm / 2
       kl = 1
-      kl = ng
+      ku = ng
 
       do k = kl, ku
         k2 = ke + 2 * (k - ng)
@@ -1031,7 +1032,7 @@ module boundaries
       jl = ng / 2 + 1
       ju = jm / 2
       kl = 1
-      kl = ng
+      ku = ng
 
       do k = kl, ku
         k2 = ke + 2 * (k - ng)
@@ -1057,7 +1058,7 @@ module boundaries
       jl = jm / 2 + 1
       ju = jm - ng / 2
       kl = 1
-      kl = ng
+      ku = ng
 
       do k = kl, ku
         k2 = ke + 2 * (k - ng)
@@ -1083,7 +1084,7 @@ module boundaries
       jl = jm / 2 + 1
       ju = jm - ng / 2
       kl = 1
-      kl = ng
+      ku = ng
 
       do k = kl, ku
         k2 = ke + 2 * (k - ng)
