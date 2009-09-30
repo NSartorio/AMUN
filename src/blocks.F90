@@ -112,7 +112,6 @@ module blocks
     type(block_meta), pointer :: meta             ! pointer to the metadata block
 
     real, dimension(:,:,:,:), allocatable :: u    ! variable array
-    real, dimension(:,:,:)  , allocatable :: c    ! criterion array
   end type block_data
 
 ! define block_info structure for boundary exchange
@@ -348,7 +347,6 @@ module blocks
 ! allocate space for variables
 !
     allocate(pdata%u(nvars,im,jm,km))
-    allocate(pdata%c(im,jm,km))
 
 ! increase the number of allocated meta blocks
 !
@@ -480,7 +478,6 @@ module blocks
 ! deallocate variables
 !
       deallocate(pdata%u)
-      deallocate(pdata%c)
 
 ! nullify pointers
 !

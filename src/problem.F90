@@ -932,8 +932,6 @@ module problem
           dpr = sqrt(dprdx**2 + dprdy**2)
 #endif /* NDIMS == 3 */
 
-          pblock%c(i,j,k) = max(ddn,dpr)
-
           dpmax = max(dpmax, ddn, dpr)
 
         end do
