@@ -171,7 +171,7 @@ module problem
 
 ! set block config flag
 !
-    call metablock_setconfig(pmeta, 1)
+    call metablock_setconfig(pmeta, 12)
 
 ! set block level
 !
@@ -278,12 +278,12 @@ module problem
 
 ! set block config flag
 !
-    call metablock_setconfig(block_array(1,1)%ptr, 1)
-    call metablock_setconfig(block_array(2,1)%ptr, 2)
-    call metablock_setconfig(block_array(2,2)%ptr, 2)
-    call metablock_setconfig(block_array(1,2)%ptr, 4)
-    call metablock_setconfig(block_array(1,3)%ptr, 1)
-    call metablock_setconfig(block_array(2,3)%ptr, 1)
+    call metablock_setconfig(block_array(1,1)%ptr, 12)
+    call metablock_setconfig(block_array(2,1)%ptr, 13)
+    call metablock_setconfig(block_array(2,2)%ptr, 13)
+    call metablock_setconfig(block_array(1,2)%ptr, 43)
+    call metablock_setconfig(block_array(1,3)%ptr, 12)
+    call metablock_setconfig(block_array(2,3)%ptr, 12)
 
 ! set block level
 !
