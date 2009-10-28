@@ -397,10 +397,14 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks, only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr
-    use config, only : in, jn, kn, im, jm, km, ng                              &
+    use blocks       , only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr &
+                     , ibx, iby, ibz, icx, icy, icz
+    use config       , only : in, jn, kn, im, jm, km, ng                       &
                      , gamma, csnd2, rcut, dens, dnrat
-    use scheme, only : prim2cons
+#ifdef MHD
+    use interpolation, only : magtocen
+#endif /* MHD */
+    use scheme       , only : prim2cons
 
 ! input arguments
 !
@@ -459,12 +463,19 @@ module problem
     q(ivx,:) = 0.0d0
     q(ivy,:) = 0.0d0
     q(ivz,:) = 0.0d0
+#ifdef MHD
+    q(ibx,:) = 0.70710678118654752440
+    q(iby,:) = 0.70710678118654752440
+    q(ibz,:) = 0.0d0
+    q(icx,:) = 0.70710678118654752440
+    q(icy,:) = 0.70710678118654752440
+    q(icz,:) = 0.0d0
+#endif /* MHD */
 
 ! set initial pressure
 !
     do k = 1, km
       do j = 1, jm
-
         do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
@@ -483,6 +494,12 @@ module problem
 
       end do
     end do
+
+#ifdef MHD
+! calculate magnetic field at the cell centers
+!
+    call magtocen(im, jm, km, pblock%u(ibx:ibz,:,:,:), pblock%u(icx:icz,:,:,:))
+#endif /* MHD */
 
 ! deallocate coordinates
 !

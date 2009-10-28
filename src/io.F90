@@ -40,7 +40,8 @@ module io
   subroutine write_data(ftype, nfile, nproc)
 
     use blocks  , only : block_data, list_data, ndims, nsides, nvars, nblocks  &
-                       , nleafs, dblocks, idn, ivx, ivy, ivz, ipr
+                       , nleafs, dblocks                                       &
+                       , idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, icx, icy, icz
     use config  , only : nghost, in, jn, kn, im, jm, km, maxlev                &
                        , ib, ie, jb, je, kb, ke                                &
                        , xmin, xmax, ymin, ymax, zmin, zmax, rdims
@@ -86,6 +87,9 @@ module io
     real(kind=8)   , dimension(:,:,:)  , allocatable :: bounds
     real(kind=8)   , dimension(:,:,:,:), allocatable :: dens, pres
     real(kind=8)   , dimension(:,:,:,:), allocatable :: velx, vely, velz
+#ifdef MHD
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: magx, magy, magz
+#endif /* MHD */
     real(kind=8)   , dimension(:,:,:,:), allocatable :: u
 
 ! local pointers
@@ -130,6 +134,11 @@ module io
         allocate(velx   (dblocks,in,jn,kn))
         allocate(vely   (dblocks,in,jn,kn))
         allocate(velz   (dblocks,in,jn,kn))
+#ifdef MHD
+        allocate(magx   (dblocks,in,jn,kn))
+        allocate(magy   (dblocks,in,jn,kn))
+        allocate(magz   (dblocks,in,jn,kn))
+#endif /* MHD */
         allocate(pres   (dblocks,in,jn,kn))
         allocate(u      (nvars  ,im,jm,km))
 
@@ -160,6 +169,11 @@ module io
 #ifdef ADI
           pres(l,1:in,1:jn,1:kn) = u(ipr,ib:ie,jb:je,kb:ke)
 #endif /* ADI */
+#ifdef MHD
+          magx(l,1:in,1:jn,1:kn) = u(icx,ib:ie,jb:je,kb:ke)
+          magy(l,1:in,1:jn,1:kn) = u(icy,ib:ie,jb:je,kb:ke)
+          magz(l,1:in,1:jn,1:kn) = u(icz,ib:ie,jb:je,kb:ke)
+#endif /* MHD */
           l = l + 1
           pdata => pdata%next
         end do
@@ -330,6 +344,17 @@ module io
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, pres(:,:,:,:), qm(:), err, sid)
           call h5dclose_f(did, err)
 #endif /* ADI */
+#ifdef MHD
+          call h5dcreate_f(gid, 'magx', H5T_NATIVE_DOUBLE, sid, did, err, pid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magx(:,:,:,:), qm(:), err, sid)
+          call h5dclose_f(did, err)
+          call h5dcreate_f(gid, 'magy', H5T_NATIVE_DOUBLE, sid, did, err, pid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magy(:,:,:,:), qm(:), err, sid)
+          call h5dclose_f(did, err)
+          call h5dcreate_f(gid, 'magz', H5T_NATIVE_DOUBLE, sid, did, err, pid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magz(:,:,:,:), qm(:), err, sid)
+          call h5dclose_f(did, err)
+#endif /* MHD */
 
           call h5sclose_f(sid, err)
 
@@ -349,6 +374,11 @@ module io
         if (allocated(vely   )) deallocate(vely)
         if (allocated(velz   )) deallocate(velz)
         if (allocated(pres   )) deallocate(pres)
+#ifdef MHD
+        if (allocated(magx   )) deallocate(magx)
+        if (allocated(magy   )) deallocate(magy)
+        if (allocated(magz   )) deallocate(magz)
+#endif /* MHD */
 
 ! release properties
 !

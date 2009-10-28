@@ -362,7 +362,7 @@ module boundaries
 !
   subroutine bnd_copy(pdata, un, id, is, ip)
 
-    use blocks, only : block_data, nv => nvars
+    use blocks, only : block_data, nv => nvars, iqt
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
                      , km, kb, kbl, kbu, ke, kel, keu
@@ -378,7 +378,7 @@ module boundaries
 
 ! local variables
 !
-    integer :: ii, i, j, k
+    integer :: ii, i, j, k, q
 !
 !-------------------------------------------------------------------------------
 !
@@ -393,42 +393,54 @@ module boundaries
     case(110)
       do k = 1, km
         do j = 1, jm
-          pdata%u(1:nv,1:ibl,j,k) = un(1:nv,iel:ie,j,k)
+          do q = 1, iqt
+            pdata%u(q,1:ibl,j,k) = un(q,iel:ie,j,k)
+          end do
         end do
       end do
 
     case(120)
       do k = 1, km
         do j = 1, jm
-          pdata%u(1:nv,ieu:im,j,k) = un(1:nv,ib:ibu,j,k)
+          do q = 1, iqt
+            pdata%u(q,ieu:im,j,k) = un(q,ib:ibu,j,k)
+          end do
         end do
       end do
 
     case(210)
       do k = 1, km
         do i = 1, im
-          pdata%u(1:nv,i,1:jbl,k) = un(1:nv,i,jel:je,k)
+          do q = 1, iqt
+            pdata%u(q,i,1:jbl,k) = un(q,i,jel:je,k)
+          end do
         end do
       end do
 
     case(220)
       do k = 1, km
         do i = 1, im
-          pdata%u(1:nv,i,jeu:jm,k) = un(1:nv,i,jb:jbu,k)
+          do q = 1, iqt
+            pdata%u(q,i,jeu:jm,k) = un(q,i,jb:jbu,k)
+          end do
         end do
       end do
 
     case(310)
       do j = 1, jm
         do i = 1, im
-          pdata%u(1:nv,i,j,1:kbl) = un(1:nv,i,j,kel:ke)
+          do q = 1, iqt
+            pdata%u(q,i,j,1:kbl) = un(q,i,j,kel:ke)
+          end do
         end do
       end do
 
     case(320)
       do j = 1, jm
         do i = 1, im
-          pdata%u(1:nv,i,j,keu:km) = un(1:nv,i,j,kb:kbu)
+          do q = 1, iqt
+            pdata%u(q,i,j,keu:km) = un(q,i,j,kb:kbu)
+          end do
         end do
       end do
 

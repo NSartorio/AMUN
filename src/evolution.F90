@@ -123,9 +123,9 @@ module evolution
 
 ! check refinement and refine
 !
-    call start_timer(5)
-    call update_mesh
-    call stop_timer(5)
+!     call start_timer(5)
+!     call update_mesh
+!     call stop_timer(5)
 
 ! update boundaries
 !
@@ -146,19 +146,22 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks , only : block_data, nv => nvars
-    use config , only : im, jm, km
-    use mesh   , only : adxi, adyi, adzi
+    use blocks       , only : block_data, nv => nvars, iqt, ibx, ibz, icx, icz
+    use config       , only : im, jm, km
+#ifdef MHD
+    use interpolation, only : magtocen
+#endif /* MHD */
+    use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem, only : update_shapes
+    use problem      , only : update_shapes
 #endif /* SHAPE */
-    use scheme , only : update
+    use scheme       , only : update
 
     implicit none
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), intent(inout) :: pblock
 
 ! local variables
 !
@@ -168,29 +171,23 @@ module evolution
 ! local arrays
 !
     real, dimension(nv,im,jm,km) :: du
-
-! local pointers
-!
-    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
-    pb => pblock
-
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pb%meta%level)
-    dyi = adyi(pb%meta%level)
-    dzi = adzi(pb%meta%level)
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
 
 ! 1st step of integration
 !
-    call update(pb%u, du, dxi, dyi, dzi)
+    call update(pblock%u, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pb, du)
+    call update_shapes(pblock, du)
 #endif /* SHAPE */
 
 ! update solution
@@ -198,15 +195,19 @@ module evolution
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          do q = 1, nv
-            pb%u(q,i,j,k) = pb%u(q,i,j,k) + dt*du(q,i,j,k)
+          do q = 1, iqt
+            pblock%u(q,i,j,k) = pblock%u(q,i,j,k) + dt * du(q,i,j,k)
           end do
         end do
       end do
     end do
 
-    nullify(pb)
-
+#ifdef MHD
+! calculate magnetic field at the cell centers
+!
+    call magtocen(im, jm, km, pblock%u(ibx:ibz,:,:,:), pblock%u(icx:icz,:,:,:))
+#endif /* MHD */
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_euler
@@ -221,19 +222,22 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks , only : block_data, nv => nvars
-    use config , only : im, jm, km
-    use mesh   , only : adxi, adyi, adzi
+    use blocks       , only : block_data, nv => nvars, iqt, ibx, ibz, icx, icz
+    use config       , only : im, jm, km
+#ifdef MHD
+    use interpolation, only : magtocen
+#endif /* MHD */
+    use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem, only : update_shapes
+    use problem      , only : update_shapes
 #endif /* SHAPE */
-    use scheme , only : update
+    use scheme       , only : update
 
     implicit none
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), intent(inout) :: pblock
 
 ! local variables
 !
@@ -243,29 +247,23 @@ module evolution
 ! local arrays
 !
     real, dimension(nv,im,jm,km) :: u1, du
-
-! local pointers
-!
-    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
-    pb => pblock
-
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pb%meta%level)
-    dyi = adyi(pb%meta%level)
-    dzi = adzi(pb%meta%level)
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
 
 ! 1st step of integration
 !
-    call update(pb%u, du, dxi, dyi, dzi)
+    call update(pblock%u, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pb, du)
+    call update_shapes(pblock, du)
 #endif /* SHAPE */
 
 ! update solution
@@ -273,10 +271,18 @@ module evolution
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          u1(:,i,j,k) = pb%u(:,i,j,k) + dt*du(:,i,j,k)
+          do q = 1, iqt
+            u1(q,i,j,k) = pblock%u(q,i,j,k) + dt * du(q,i,j,k)
+          end do
         end do
       end do
     end do
+
+#ifdef MHD
+! calculate magnetic field at the cell centers
+!
+    call magtocen(im, jm, km, u1(ibx:ibz,:,:,:), u1(icx:icz,:,:,:))
+#endif /* MHD */
 
 ! 2nd step of integration
 !
@@ -285,7 +291,7 @@ module evolution
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pb, du)
+    call update_shapes(pblock, du)
 #endif /* SHAPE */
 
 ! update solution
@@ -293,13 +299,19 @@ module evolution
     do k = 1, km
       do j = 1, jm
         do i = 1, im
-          pb%u(:,i,j,k) = 0.5 * (pb%u(:,i,j,k) + u1(:,i,j,k) + dt*du(:,i,j,k))
+          do q = 1, iqt
+            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) + dt * du(q,i,j,k))
+          end do
         end do
       end do
     end do
 
-    nullify(pb)
-
+#ifdef MHD
+! calculate magnetic field at the cell centers
+!
+    call magtocen(im, jm, km, pblock%u(ibx:ibz,:,:,:), pblock%u(icx:icz,:,:,:))
+#endif /* MHD */
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2

@@ -257,6 +257,73 @@ module interpolation
 !-------------------------------------------------------------------------------
 !
   end subroutine interpolate
+!
+!===============================================================================
+!
+! magtocen: subroutine for interpolation of magnetic field from cell interface
+!           to cell center
+!             [Bx(i+1/2,j,k), By(i,j+1/2,k), Bz(i,j,k+1/2)] ->
+!             [Bx(i,j,k)    , By(i,j,k)    , Bz(i,j,k)]
+!
+!===============================================================================
+!
+  subroutine magtocen(im, jm, km, bi, bc)
+
+    implicit none
+
+! input and output variables
+!
+    integer                    , intent(in)    :: im, jm, km
+    real, dimension(3,im,jm,km), intent(in)    :: bi
+    real, dimension(3,im,jm,km), intent(inout) :: bc
+
+! local  variables
+!
+    integer :: i, j, k, n
+
+    real, dimension(:), allocatable, save :: al
+!
+!------------------------------------------------------------------------------
+!
+! allocate a vector for interpolation
+!
+    allocate(al(max(im,jm,km)))
+
+! perform interpolation
+!
+    do k = 1, km
+      do j = 1, jm
+        al(1:im) = bi(1,1:im,j,k)
+
+        bc(1,2:im,j,k) = 0.5 * (al(1:im-1) + al(2:im))
+        bc(1,1   ,j,k) =        al(1     )
+      enddo
+
+      do i = 1, im
+        al(1:jm) = bi(2,i,1:jm,k)
+
+        bc(2,i,2:jm,k) = 0.5 * (al(1:jm-1) + al(2:jm))
+        bc(2,i,1   ,k) =        al(1     )
+      enddo
+    enddo
+
+#if NDIMS == 3
+    do j = 1, jm
+      do i = 1, im
+        al(1:km) = bi(3,i,j,1:km)
+
+
+        bc(3,i,j,2:km) = 0.5 * (al(1:km-1) + ar(1:km-1))
+        bc(3,i,j,1   ) =        al(1     )
+      enddo
+    enddo
+#endif /* NDIMS == 3 */
+
+! deallocate temporary vector
+!
+    deallocate(al)
+
+  end subroutine magtocen
 
 !===============================================================================
 !

@@ -38,24 +38,26 @@ module blocks
                               , ivx = 2, ivy = 3, ivz = 4
 #ifdef HYDRO
 #ifdef ISO
-  integer(kind=4), parameter :: nvars  = 4
+  integer(kind=4), parameter :: nvars  = 4, ifl = 4, iqt = 4
 #endif /* ISO */
 #ifdef ADI
   integer(kind=4), parameter :: ien = 5, ipr = 5
-  integer(kind=4), parameter :: nvars  = 5
+  integer(kind=4), parameter :: nvars  = 5, ifl = 5, iqt = 5
 #endif /* ADI */
 #endif /* HYDRO */
 #ifdef MHD
 #ifdef ISO
   integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
-  integer(kind=4), parameter :: nvars  = 7
+  integer(kind=4), parameter :: icx = 8, icy = 9, icz = 10
+  integer(kind=4), parameter :: nvars  = 10, ifl = 4, iqt = 7
 #endif /* ISO */
 #ifdef ADI
-  integer(kind=4), parameter :: ien = 5, ibx = 6, iby = 7, ibz = 8
-  integer(kind=4), parameter :: nvars  = 8
+  integer(kind=4), parameter :: ien = 5, ipr = 5
+  integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
+  integer(kind=4), parameter :: icx = 9, icy = 10, icz = 11
+  integer(kind=4), parameter :: nvars  = 11, ifl = 5, iqt = 8
 #endif /* ADI */
 #endif /* MHD */
-  integer(kind=4), parameter :: maxid = 1000000
 
 !! BLOCK STRUCTURE POINTERS (have to be defined before structures)
 !!
