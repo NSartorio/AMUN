@@ -44,8 +44,8 @@ module problem
 !
     select case(trim(problem))
 #if NDIMS == 2
-!     case("blast")
-!       call domain_blast()
+    case("blast")
+      call domain_blast()
 #endif /* NDIMS == 2 */
     case default
       call domain_default()
