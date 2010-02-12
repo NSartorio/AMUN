@@ -303,14 +303,6 @@ module interpolation
     ie = n - ng / 2
 
     select case(flag)
-    case('m')
-      do i = ib, ie
-        j1 = 2 * i - ng
-        j0 = j1 - 1
-
-        v(j0) = u(i)
-        v(j1) = u(i)
-      end do
     case('l')
       do i = ib, ie
         du = 0.5 * (u(i+1) - u(i-1))
@@ -343,7 +335,7 @@ module interpolation
         v(j0) = u(i) - 0.25d0*dum
         v(j1) = u(i) + 0.25d0*dup
       end do
-    case default
+    case('t')
       do i = ib, ie
         dup = u(i+1) - u(i)
         dum = u(i) - u(i-1)
@@ -362,6 +354,14 @@ module interpolation
           v(j0) = u(i)
           v(j1) = u(i)
         endif
+      end do
+    case default
+      do i = ib, ie
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        v(j0) = u(i)
+        v(j1) = u(i)
       end do
     end select
 

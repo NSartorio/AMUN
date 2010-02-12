@@ -1203,7 +1203,6 @@ module boundaries
                      , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu      &
                      , kb, kbl, ke, keu
     use error , only : print_warning
-    use interpolation, only : expand
 
     implicit none
 
