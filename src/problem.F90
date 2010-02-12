@@ -44,8 +44,8 @@ module problem
 !
     select case(trim(problem))
 #if NDIMS == 2
-    case("blast")
-      call domain_blast()
+!     case("blast")
+!       call domain_blast()
 #endif /* NDIMS == 2 */
     case default
       call domain_default()
@@ -397,8 +397,10 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks       , only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr &
-                     , ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config       , only : in, jn, kn, im, jm, km, ng                       &
                      , gamma, csnd2, rcut, dens, dnrat
 #ifdef MHD
@@ -915,6 +917,7 @@ module problem
     do k = kbl, keu
       do j = jbl, jeu
         do i = ibl, ieu
+
           dnl = dn(i-1,j,k)
           dnr = dn(i+1,j,k)
           ddndx = abs(dnr-dnl)/(dnr+dnl)

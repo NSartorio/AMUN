@@ -40,7 +40,10 @@ module scheme
   subroutine update(u, du, dxi, dyi, dzi)
 
     use blocks, only : nv => nvars
-    use blocks, only : idn, imx, imy, imz, ien, ibx, iby, ibz, icx, icy, icz
+    use blocks, only : idn, imx, imy, imz, ien
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config, only : im, jm, km, ngrids
 
     implicit none
@@ -302,8 +305,10 @@ module scheme
 !
   subroutine hll(m, n, u, f)
 
-    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien      &
-                            , ibx, iby, ibz, icx, icy, icz, ifl, iqt
+    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, ifl, iqt
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use interpolation, only : reconstruct
 
     implicit none
@@ -634,7 +639,10 @@ module scheme
 !
   subroutine fluxspeed(m, n, q, u, f, c)
 
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, ibx, iby, ibz
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz
+#endif /* MHD */
     use config, only : gamma, csnd, csnd2
 
     implicit none
@@ -720,7 +728,10 @@ module scheme
 !
   subroutine cons2prim(m, n, u, q)
 
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, icx, icy, icz, ibx, iby, ibz
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config, only : gammam1
 
     implicit none
@@ -776,7 +787,10 @@ module scheme
 !
   subroutine prim2cons(m, n, q, u)
 
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, icx, icy, icz, ibx, iby, ibz
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config, only : gammam1i
 
     implicit none
@@ -830,7 +844,10 @@ module scheme
 !
   function maxspeed(u)
 
-    use blocks, only : nv => nvars, idn, ivx, ivz, ipr, icx, icz
+    use blocks, only : nv => nvars, idn, ivx, ivz, ipr
+#ifdef MHD
+    use blocks, only : icx, icz
+#endif /* MHD */
     use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
 
     implicit none

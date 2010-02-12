@@ -123,9 +123,9 @@ module evolution
 
 ! check refinement and refine
 !
-!     call start_timer(5)
-!     call update_mesh
-!     call stop_timer(5)
+    call start_timer(5)
+    call update_mesh
+    call stop_timer(5)
 
 ! update boundaries
 !
@@ -146,7 +146,10 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks       , only : block_data, nv => nvars, iqt, ibx, ibz, icx, icz
+    use blocks       , only : block_data, nv => nvars, iqt
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config       , only : im, jm, km
 #ifdef MHD
     use interpolation, only : magtocen
@@ -222,7 +225,10 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks       , only : block_data, nv => nvars, iqt, ibx, ibz, icx, icz
+    use blocks       , only : block_data, nv => nvars, iqt
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config       , only : im, jm, km
 #ifdef MHD
     use interpolation, only : magtocen

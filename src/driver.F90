@@ -46,11 +46,9 @@ program godunov
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef MPI
 ! initialize MPI
 !
   call init_mpi
-#endif /* MPI */
 
 ! print info message
 !
@@ -185,11 +183,9 @@ program godunov
     write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
   endif
 
-#ifdef MPI
 ! close access to the MPI
 !
   call clear_mpi
-#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !

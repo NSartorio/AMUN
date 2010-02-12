@@ -41,7 +41,10 @@ module io
 
     use blocks  , only : block_data, list_data, ndims, nsides, nvars, nblocks  &
                        , nleafs, dblocks                                       &
-                       , idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, icx, icy, icz
+                       , idn, ivx, ivy, ivz, ipr
+#ifdef MHD
+    use blocks  , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config  , only : nghost, in, jn, kn, im, jm, km, maxlev                &
                        , ib, ie, jb, je, kb, ke                                &
                        , xmin, xmax, ymin, ymax, zmin, zmax, rdims

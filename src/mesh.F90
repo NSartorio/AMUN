@@ -653,13 +653,17 @@ module mesh
               pparent => pmeta%parent
 
               if (associated(pparent)) then
+#ifdef MPI
                 if (pmeta%cpu .eq. ncpu) then
+#endif /* MPI */
                   if (.not. associated(pparent%data)) then
                     call append_datablock(pdata)
                     call associate_blocks(pparent, pdata)
                   end if
                   call restrict_block(pparent)
+#ifdef MPI
                 end if
+#endif /* MPI */
 
                 call derefine_block(pparent)
                 pmeta => pparent
@@ -683,13 +687,17 @@ module mesh
           if (pmeta%level .eq. l) then
             if (pmeta%refine .eq. 1) then
               pparent => pmeta
+#ifdef MPI
               if (pmeta%cpu .eq. ncpu) then
+#endif /* MPI */
                 call refine_block(pmeta, .true.)
                 call prolong_block(pparent)
                 call deallocate_datablock(pparent%data)
+#ifdef MPI
               else
                 call refine_block(pmeta, .false.)
               end if
+#endif /* MPI */
             end if
           end if
         end if
@@ -844,7 +852,7 @@ module mesh
 ! expand all variables and place them in the array u
 !
     do q = 1, nvars
-      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 'm', 'm', 'm')
     end do
 
 ! iterate over all children
@@ -899,8 +907,12 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, nvars, nchild
+    use blocks       , only : block_meta, nvars, nchild, ifl
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz
+#endif /* MHD */
     use config       , only : ng, im, jm, km, ib, jb, kb
+    use interpolation, only : shrink
 
     implicit none
 
@@ -916,8 +928,12 @@ module mesh
 
 ! local arrays
 !
-    integer, dimension(3)     :: dm, fm
+    integer, dimension(3)     :: dm, fm, pm
     integer, dimension(3,0:1) :: cm
+
+! local allocatable arrays
+!
+    real, dimension(:,:,:), allocatable :: u
 
 ! local pointers
 !
@@ -928,17 +944,24 @@ module mesh
 ! prepare dimensions
 !
     dm(:)   = (/ im, jm, km /)
+    pm(:)   = dm(:) / 2
     fm(:)   = (dm(:) - ng) / 2
     cm(:,0) = ng
     cm(:,1) = dm(:) - ng
 #if NDIMS == 2
+    pm(3)   = 1
     fm(3)   = 1
     ks      = 1
     kl      = 1
+    ku      = 1
     k1      = 1
     k2      = 1
     k       = 1
 #endif /* NDIMS == 2 */
+
+! allocate temporary array
+!
+    allocate(u(pm(1), pm(2), pm(3)))
 
 ! iterate over all children
 !
@@ -956,6 +979,18 @@ module mesh
       ks = mod((p - 1) / 4,2)
 #endif /* NDIMS == 3 */
 
+! calculate the bounds of the input array indices
+!
+      i1 =  1 + ng / 2 * is
+      j1 =  1 + ng / 2 * js
+#if NDIMS == 3
+      k1 =  1 + ng / 2 * ks
+#endif /* NDIMS == 3 */
+
+      i2 = i1 + fm(1) - 1
+      j2 = j1 + fm(2) - 1
+      k2 = k1 + fm(3) - 1
+
 ! calculate the bounds of the destination array indices
 !
       il = ib - ng / 2 + is * fm(1)
@@ -968,30 +1003,111 @@ module mesh
       ju = jl + fm(2) - 1
       ku = kl + fm(3) - 1
 
-! perform the current block restriction
+! iterate over all quantities
 !
-#if NDIMS == 3
-      do k = kl, ku
-        k2 = 2 * k - cm(3,ks)
-        k1 = k2 - 1
-#endif /* NDIMS == 3 */
-        do j = jl, ju
-          j2 = 2 * j - cm(2,js)
-          j1 = j2 - 1
-          do i = il, iu
-            i2 = 2 * i - cm(1,is)
-            i1 = i2 - 1
+      do q = 1, ifl
 
-            do q = 1, nvars
-              pblock%data%u(q,i,j,k) = sum(pchild%data%u(q,i1:i2,j1:j2,k1:k2)) / nchild
-            end do
-          end do
-        end do
-#if NDIMS == 3
+! shrink the current child
+!
+        call shrink(dm, pm, 0, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
+
+! fill the parent block
+!
+        pblock%data%u(q,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
       end do
+#ifdef MHD
+! shrink face centered Bx
+!
+      call shrink(dm, pm, 0, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'l', 'l')
+      pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
+! shrink face centered By
+!
+      call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'l', 'c', 'l')
+      pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
+#if NDIMS == 3
+! shrink face centered Bz
+!
+      call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'l', 'l', 'c')
+      pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 #endif /* NDIMS == 3 */
+#endif /* MHD */
 
     end do
+
+! deallocate temporary array
+!
+    deallocate(u)
+
+! ! prepare dimensions
+! !
+!     dm(:)   = (/ im, jm, km /)
+!     fm(:)   = (dm(:) - ng) / 2
+!     cm(:,0) = ng
+!     cm(:,1) = dm(:) - ng
+! #if NDIMS == 2
+!     fm(3)   = 1
+!     ks      = 1
+!     kl      = 1
+!     k1      = 1
+!     k2      = 1
+!     k       = 1
+! #endif /* NDIMS == 2 */
+!
+! ! iterate over all children
+! !
+!     do p = 1, nchild
+!
+! ! assign pointer to the current child
+! !
+!       pchild => pblock%child(p)%ptr
+!
+! ! calculate the position of child in the parent block
+! !
+!       is = mod((p - 1)    ,2)
+!       js = mod((p - 1) / 2,2)
+! #if NDIMS == 3
+!       ks = mod((p - 1) / 4,2)
+! #endif /* NDIMS == 3 */
+!
+! ! calculate the bounds of the destination array indices
+! !
+!       il = ib - ng / 2 + is * fm(1)
+!       jl = jb - ng / 2 + js * fm(2)
+! #if NDIMS == 3
+!       kl = kb - ng / 2 + ks * fm(3)
+! #endif /* NDIMS == 3 */
+!
+!       iu = il + fm(1) - 1
+!       ju = jl + fm(2) - 1
+!       ku = kl + fm(3) - 1
+!
+! ! perform the current block restriction
+! !
+! #if NDIMS == 3
+!       do k = kl, ku
+!         k2 = 2 * k - cm(3,ks)
+!         k1 = k2 - 1
+! #endif /* NDIMS == 3 */
+!         do j = jl, ju
+!           j2 = 2 * j - cm(2,js)
+!           j1 = j2 - 1
+!           do i = il, iu
+!             i2 = 2 * i - cm(1,is)
+!             i1 = i2 - 1
+!
+!             do q = 1, nvars
+!               pblock%data%u(q,i,j,k) = sum(pchild%data%u(q,i1:i2,j1:j2,k1:k2)) / nchild
+!             end do
+!           end do
+!         end do
+! #if NDIMS == 3
+!       end do
+! #endif /* NDIMS == 3 */
+!
+!     end do
 !
 !-------------------------------------------------------------------------------
 !

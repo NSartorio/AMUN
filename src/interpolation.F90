@@ -132,7 +132,7 @@ module interpolation
       do j = 1, dm(2)
         x(1:dm(1)) = u(1:dm(1),j,k)
 
-        call interpolate(dm(1),fm(1),ng,x(1:dm(1)),y(1:fm(1)),xflag)
+        call expand_1d(dm(1),fm(1),ng,x(1:dm(1)),y(1:fm(1)),xflag)
 
         w(1:fm(1),j,k) = y(1:fm(1))
       end do
@@ -144,7 +144,7 @@ module interpolation
       do i = 1, fm(1)
         x(1:dm(2)) = w(i,1:dm(2),k)
 
-        call interpolate(dm(2),fm(2),ng,x(1:dm(2)),y(1:fm(2)),yflag)
+        call expand_1d(dm(2),fm(2),ng,x(1:dm(2)),y(1:fm(2)),yflag)
 
         z(i,1:fm(2),k) = y(1:fm(2))
       end do
@@ -157,7 +157,7 @@ module interpolation
         do i = 1, fm(1)
           x(1:dm(3)) = z(i,j,1:dm(3))
 
-          call interpolate(dm(3),fm(3),ng,x(1:dm(3)),y(1:fm(3)),zflag)
+          call expand_1d(dm(3),fm(3),ng,x(1:dm(3)),y(1:fm(3)),zflag)
 
           v(i,j,1:fm(3)) = y(1:fm(3))
         end do
@@ -183,11 +183,103 @@ module interpolation
 !
 !===============================================================================
 !
-! interpolate: One dimensional second-order TVD interpolation.
+! shrink: shrinks multi-dimentional array using different interpolations
 !
 !===============================================================================
 !
-  subroutine interpolate(n, m, ng, u, v, flag)
+  subroutine shrink(dm, fm, ng, u, v, xflag, yflag, zflag)
+
+    implicit none
+
+! input parameters
+!
+    integer, dimension(3)         , intent(in)  :: dm, fm
+    integer                       , intent(in)  :: ng
+    real        , dimension(:,:,:), intent(in)  :: u
+    real        , dimension(:,:,:), intent(out) :: v
+    character                     , intent(in)  :: xflag, yflag, zflag
+
+! local variables
+!
+    integer :: i, j, k
+
+! allocatable variables
+!
+    real(kind=8), dimension(:)    , allocatable :: x, y
+    real(kind=8), dimension(:,:,:), allocatable :: w, z
+!
+!-------------------------------------------------------------------------------
+!
+    v(:,:,:) = 0.0
+
+    allocate(x(maxval(dm)))
+    allocate(y(maxval(fm)))
+    allocate(w(fm(1),dm(2),dm(3)))
+    allocate(z(fm(1),fm(2),dm(3)))
+
+! expand in X direction
+!
+    do k = 1, dm(3)
+      do j = 1, dm(2)
+        x(1:dm(1)) = u(1:dm(1),j,k)
+
+        call shrink_1d(dm(1),fm(1),ng,x(1:dm(1)),y(1:fm(1)),xflag)
+
+        w(1:fm(1),j,k) = y(1:fm(1))
+      end do
+    end do
+
+! expand in Y-direction
+!
+    do k = 1, dm(3)
+      do i = 1, fm(1)
+        x(1:dm(2)) = w(i,1:dm(2),k)
+
+        call shrink_1d(dm(2),fm(2),ng,x(1:dm(2)),y(1:fm(2)),yflag)
+
+        z(i,1:fm(2),k) = y(1:fm(2))
+      end do
+    end do
+
+! expand in Z-direction
+!
+    if (dm(3) .gt. 1) then
+      do j = 1, fm(2)
+        do i = 1, fm(1)
+          x(1:dm(3)) = z(i,j,1:dm(3))
+
+          call shrink_1d(dm(3),fm(3),ng,x(1:dm(3)),y(1:fm(3)),zflag)
+
+          v(i,j,1:fm(3)) = y(1:fm(3))
+        end do
+      end do
+    else
+      do k = 1, fm(3)
+        do j = 1, fm(2)
+          do i = 1, fm(1)
+            v(i,j,k) = z(i,j,k)
+          end do
+        end do
+      end do
+    endif
+
+    deallocate(w)
+    deallocate(z)
+    deallocate(x)
+    deallocate(y)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine shrink
+!
+!===============================================================================
+!
+! expand_1d: one dimensional expansion using different interpolations for
+!            different location of the new points
+!
+!===============================================================================
+!
+  subroutine expand_1d(n, m, ng, u, v, flag)
 
     implicit none
 
@@ -211,6 +303,14 @@ module interpolation
     ie = n - ng / 2
 
     select case(flag)
+    case('m')
+      do i = ib, ie
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        v(j0) = u(i)
+        v(j1) = u(i)
+      end do
     case('l')
       do i = ib, ie
         du = 0.5 * (u(i+1) - u(i-1))
@@ -231,6 +331,17 @@ module interpolation
 
         v(j0) = u(i) - 0.5 * du + 0.25 * ddu
         v(j1) = u(i)
+      end do
+    case('u')
+      do i = ib, ie
+        dup = u(i+1) - u(i)
+        dum = u(i) - u(i-1)
+
+        j1 = 2 * i - ng
+        j0 = j1 - 1
+
+        v(j0) = u(i) - 0.25d0*dum
+        v(j1) = u(i) + 0.25d0*dup
       end do
     case default
       do i = ib, ie
@@ -256,7 +367,63 @@ module interpolation
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine interpolate
+  end subroutine expand_1d
+!
+!===============================================================================
+!
+! shrink_1d: one dimensional shrinking using different interpolations for
+!            different location of the new points
+!
+!===============================================================================
+!
+  subroutine shrink_1d(n, m, ng, u, v, flag)
+
+    implicit none
+
+! input parameters
+!
+    integer                   , intent(in)  :: n, m, ng
+    real        , dimension(n), intent(in)  :: u
+    real        , dimension(m), intent(out) :: v
+    character                 , intent(in)  :: flag
+
+! local variables
+!
+    integer      :: i, ib, ie, j0, j1
+    real(kind=8) :: du, ddu, dum, dup, du0, ds
+!
+!-------------------------------------------------------------------------------
+!
+    v(:) = 0.0
+
+    ib = ng / 2 + 1
+    ie = m - ng / 2
+
+    select case(flag)
+    case('l', 'u')
+      do i = ib, ie
+        j1    = 2 * i - ng
+        j0    = j1 - 1
+
+        v(i)  = 0.5 * (u(j0) + u(j1))
+      end do
+    case('c')
+      do i = ib, ie
+        j1 = 2 * i - ng
+        v(i)  = u(j1)
+      end do
+    case default
+      do i = ib, ie
+        j1    = 2 * i - ng
+        j0    = j1 - 1
+
+        v(i)  = 0.5 * (u(j0) + u(j1))
+      end do
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine shrink_1d
 !
 !===============================================================================
 !
