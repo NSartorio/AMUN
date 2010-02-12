@@ -861,7 +861,7 @@ module boundaries
 
 ! local arrays
 !
-    integer, dimension(3)                  :: dm, cm, fm, pm
+    integer, dimension(3)                  :: dm, cm, pm
     real   , dimension(:,:,:), allocatable :: ux
 
 ! parameters
@@ -880,12 +880,10 @@ module boundaries
     dm(idir) = ng
     cm(:)    = dm(:) / 2 + 2 * del
     cm(idir) = ng / 2 + 2 * del
-    fm(:)    = 2 * cm(:)
     pm(:)    = 2 * dm(:)
 #if NDIMS == 2
     dm(3)    = 1
     cm(3)    = 1
-    fm(3)    = 1
     pm(3)    = 1
 #endif /* NDIMS == 2 */
 
@@ -1163,20 +1161,20 @@ module boundaries
 #ifdef MHD
 ! expand face centered Bx
 !
-    call expand(cm, fm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 'l', 'l')
+    call expand(cm, pm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 'l', 'l')
 
     pdata%u(ibx,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 
 ! expand face centered By
 !
-    call expand(cm, fm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'c', 'l')
+    call expand(cm, pm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'c', 'l')
 
     pdata%u(iby,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 
 #if NDIMS == 3
 ! expand face centered Bz
 !
-    call expand(cm, fm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'l', 'c')
+    call expand(cm, pm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'l', 'c')
 
     pdata%u(ibz,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
