@@ -400,13 +400,6 @@ module interpolation
     ie = m - ng / 2
 
     select case(flag)
-    case('l', 'u')
-      do i = ib, ie
-        j1    = 2 * i - ng
-        j0    = j1 - 1
-
-        v(i)  = 0.5 * (u(j0) + u(j1))
-      end do
     case('c')
       do i = ib, ie
         j1 = 2 * i - ng
