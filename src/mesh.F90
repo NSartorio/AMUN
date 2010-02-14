@@ -804,9 +804,15 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, nvars, nchild
+    use blocks       , only : block_meta, nvars, nchild, ifl, iqt
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
+#ifdef MHD
+    use interpolation, only : magtocen
+#endif /* MHD */
 
     implicit none
 
@@ -847,13 +853,32 @@ module mesh
 
 ! allocate array to the product of expansion
 !
-    allocate(u(nvars,2*im,2*jm,2*km))
+    allocate(u(nvars, fm(1), fm(2), fm(3)))
 
 ! expand all variables and place them in the array u
 !
     do q = 1, nvars
       call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 'm', 'm', 'm')
     end do
+#ifdef MHD
+! prolong face centered Bx
+!
+    call expand(dm, fm, ng, pblock%data%u(ibx,:,:,:), u(ibx,:,:,:), 'c', 'l', 'l')
+
+! prolong face centered By
+!
+    call expand(dm, fm, ng, pblock%data%u(iby,:,:,:), u(iby,:,:,:), 'l', 'c', 'l')
+
+#if NDIMS == 3
+! prolong face centered Bz
+!
+    call expand(dm, fm, ng, pblock%data%u(ibz,:,:,:), u(ibz,:,:,:), 'l', 'l', 'c')
+#endif /* NDIMS == 3 */
+
+! calculate magnetic field at the cell centers
+!
+    call magtocen(fm(1), fm(2), fm(3), u(ibx:ibz,:,:,:), u(icx:icz,:,:,:))
+#endif /* MHD */
 
 ! iterate over all children
 !
@@ -909,10 +934,13 @@ module mesh
 
     use blocks       , only : block_meta, nvars, nchild, ifl
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config       , only : ng, im, jm, km, ib, jb, kb
     use interpolation, only : shrink
+#ifdef MHD
+    use interpolation, only : magtocen
+#endif /* MHD */
 
     implicit none
 
@@ -1036,6 +1064,13 @@ module mesh
 #endif /* MHD */
 
     end do
+
+#ifdef MHD
+! calculate magnetic field at the cell centers
+!
+    call magtocen(im, jm, km, pblock%data%u(ibx:ibz,:,:,:)                     &
+                            , pblock%data%u(icx:icz,:,:,:))
+#endif /* MHD */
 
 ! deallocate temporary array
 !
