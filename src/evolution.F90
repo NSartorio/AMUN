@@ -148,7 +148,7 @@ module evolution
 
     use blocks       , only : block_data, nv => nvars, iqt
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : im, jm, km
 #ifdef MHD
@@ -204,12 +204,6 @@ module evolution
         end do
       end do
     end do
-
-#ifdef MHD
-! calculate magnetic field at the cell centers
-!
-    call magtocen(im, jm, km, pblock%u(ibx:ibz,:,:,:), pblock%u(icx:icz,:,:,:))
-#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
@@ -227,7 +221,7 @@ module evolution
 
     use blocks       , only : block_data, nv => nvars, iqt
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : im, jm, km
 #ifdef MHD
@@ -284,12 +278,6 @@ module evolution
       end do
     end do
 
-#ifdef MHD
-! calculate magnetic field at the cell centers
-!
-    call magtocen(im, jm, km, u1(ibx:ibz,:,:,:), u1(icx:icz,:,:,:))
-#endif /* MHD */
-
 ! 2nd step of integration
 !
     call update(u1, du, dxi, dyi, dzi)
@@ -311,12 +299,6 @@ module evolution
         end do
       end do
     end do
-
-#ifdef MHD
-! calculate magnetic field at the cell centers
-!
-    call magtocen(im, jm, km, pblock%u(ibx:ibz,:,:,:), pblock%u(icx:icz,:,:,:))
-#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !

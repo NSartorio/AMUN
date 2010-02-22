@@ -67,6 +67,12 @@ FFLAGS  += -D${EOS}
 #
 FFLAGS  += -D${FLUX}
 
+# electromotive force approximation method
+#
+ifeq ($(EQS),MHD)
+FFLAGS  += -D${FLUXEMF}
+endif
+
 #-------------------------------------------------------------------------------
 
 .SUFFIXES:

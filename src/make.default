@@ -30,11 +30,15 @@ EOS        = ADI
 
 # methods
 #
+#  SOLVER    - family of solvers: GODUNOV, GALERKIN
+#  ORDER     - order of the solution: 2, 3, or 4
 #  TIME      - time integration: EULER, RK2, RK3
 #  FLUX      - flux approximation: HLL
+#  FLUXEMF   - electromotive force approximation: FIELDCD
 #
 TIME       = RK2
 FLUX       = HLL
+FLUXEMF    = FIELDCD
 
 #
 #-------------------------------------------------------------------------------

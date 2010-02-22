@@ -48,14 +48,12 @@ module blocks
 #ifdef MHD
 #ifdef ISO
   integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
-  integer(kind=4), parameter :: icx = 8, icy = 9, icz = 10
-  integer(kind=4), parameter :: nvars  = 10, ifl = 4, iqt = 7
+  integer(kind=4), parameter :: nvars  = 7, ifl = 4, iqt = 7
 #endif /* ISO */
 #ifdef ADI
   integer(kind=4), parameter :: ien = 5, ipr = 5
   integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
-  integer(kind=4), parameter :: icx = 9, icy = 10, icz = 11
-  integer(kind=4), parameter :: nvars  = 11, ifl = 5, iqt = 8
+  integer(kind=4), parameter :: nvars  = 8, ifl = 5, iqt = 8
 #endif /* ADI */
 #endif /* MHD */
 

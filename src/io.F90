@@ -43,7 +43,7 @@ module io
                        , nleafs, dblocks                                       &
                        , idn, ivx, ivy, ivz, ipr
 #ifdef MHD
-    use blocks  , only : ibx, iby, ibz, icx, icy, icz
+    use blocks  , only : ibx, iby, ibz
 #endif /* MHD */
     use config  , only : nghost, in, jn, kn, im, jm, km, maxlev                &
                        , ib, ie, jb, je, kb, ke                                &
@@ -173,9 +173,9 @@ module io
           pres(l,1:in,1:jn,1:kn) = u(ipr,ib:ie,jb:je,kb:ke)
 #endif /* ADI */
 #ifdef MHD
-          magx(l,1:in,1:jn,1:kn) = u(icx,ib:ie,jb:je,kb:ke)
-          magy(l,1:in,1:jn,1:kn) = u(icy,ib:ie,jb:je,kb:ke)
-          magz(l,1:in,1:jn,1:kn) = u(icz,ib:ie,jb:je,kb:ke)
+          magx(l,1:in,1:jn,1:kn) = u(ibx,ib:ie,jb:je,kb:ke)
+          magy(l,1:in,1:jn,1:kn) = u(iby,ib:ie,jb:je,kb:ke)
+          magz(l,1:in,1:jn,1:kn) = u(ibz,ib:ie,jb:je,kb:ke)
 #endif /* MHD */
           l = l + 1
           pdata => pdata%next

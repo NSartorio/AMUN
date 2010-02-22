@@ -806,7 +806,7 @@ module mesh
 
     use blocks       , only : block_meta, nvars, nchild, ifl, iqt
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
@@ -860,25 +860,6 @@ module mesh
     do q = 1, nvars
       call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
-#ifdef MHD
-! prolong face centered Bx
-!
-    call expand(dm, fm, ng, pblock%data%u(ibx,:,:,:), u(ibx,:,:,:), 'c', 'l', 'l')
-
-! prolong face centered By
-!
-    call expand(dm, fm, ng, pblock%data%u(iby,:,:,:), u(iby,:,:,:), 'l', 'c', 'l')
-
-#if NDIMS == 3
-! prolong face centered Bz
-!
-    call expand(dm, fm, ng, pblock%data%u(ibz,:,:,:), u(ibz,:,:,:), 'l', 'l', 'c')
-#endif /* NDIMS == 3 */
-
-! calculate magnetic field at the cell centers
-!
-    call magtocen(fm(1), fm(2), fm(3), u(ibx:ibz,:,:,:), u(icx:icz,:,:,:))
-#endif /* MHD */
 
 ! iterate over all children
 !
@@ -934,7 +915,7 @@ module mesh
 
     use blocks       , only : block_meta, nvars, nchild, ifl
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : ng, im, jm, km, ib, jb, kb
     use interpolation, only : shrink
@@ -1065,84 +1046,9 @@ module mesh
 
     end do
 
-#ifdef MHD
-! calculate magnetic field at the cell centers
-!
-    call magtocen(im, jm, km, pblock%data%u(ibx:ibz,:,:,:)                     &
-                            , pblock%data%u(icx:icz,:,:,:))
-#endif /* MHD */
-
 ! deallocate temporary array
 !
     deallocate(u)
-
-! ! prepare dimensions
-! !
-!     dm(:)   = (/ im, jm, km /)
-!     fm(:)   = (dm(:) - ng) / 2
-!     cm(:,0) = ng
-!     cm(:,1) = dm(:) - ng
-! #if NDIMS == 2
-!     fm(3)   = 1
-!     ks      = 1
-!     kl      = 1
-!     k1      = 1
-!     k2      = 1
-!     k       = 1
-! #endif /* NDIMS == 2 */
-!
-! ! iterate over all children
-! !
-!     do p = 1, nchild
-!
-! ! assign pointer to the current child
-! !
-!       pchild => pblock%child(p)%ptr
-!
-! ! calculate the position of child in the parent block
-! !
-!       is = mod((p - 1)    ,2)
-!       js = mod((p - 1) / 2,2)
-! #if NDIMS == 3
-!       ks = mod((p - 1) / 4,2)
-! #endif /* NDIMS == 3 */
-!
-! ! calculate the bounds of the destination array indices
-! !
-!       il = ib - ng / 2 + is * fm(1)
-!       jl = jb - ng / 2 + js * fm(2)
-! #if NDIMS == 3
-!       kl = kb - ng / 2 + ks * fm(3)
-! #endif /* NDIMS == 3 */
-!
-!       iu = il + fm(1) - 1
-!       ju = jl + fm(2) - 1
-!       ku = kl + fm(3) - 1
-!
-! ! perform the current block restriction
-! !
-! #if NDIMS == 3
-!       do k = kl, ku
-!         k2 = 2 * k - cm(3,ks)
-!         k1 = k2 - 1
-! #endif /* NDIMS == 3 */
-!         do j = jl, ju
-!           j2 = 2 * j - cm(2,js)
-!           j1 = j2 - 1
-!           do i = il, iu
-!             i2 = 2 * i - cm(1,is)
-!             i1 = i2 - 1
-!
-!             do q = 1, nvars
-!               pblock%data%u(q,i,j,k) = sum(pchild%data%u(q,i1:i2,j1:j2,k1:k2)) / nchild
-!             end do
-!           end do
-!         end do
-! #if NDIMS == 3
-!       end do
-! #endif /* NDIMS == 3 */
-!
-!     end do
 !
 !-------------------------------------------------------------------------------
 !

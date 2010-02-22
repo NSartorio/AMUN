@@ -42,7 +42,7 @@ module scheme
     use blocks, only : nv => nvars
     use blocks, only : idn, imx, imy, imz, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use blocks, only : ibx, iby, ibz
 #endif /* MHD */
     use config, only : im, jm, km, ngrids
 
@@ -95,9 +95,6 @@ module scheme
           ul(ibx,i) = u(ibx,i,j,k)
           ul(iby,i) = u(iby,i,j,k)
           ul(ibz,i) = u(ibz,i,j,k)
-          ul(icx,i) = u(icx,i,j,k)
-          ul(icy,i) = u(icy,i,j,k)
-          ul(icz,i) = u(icz,i,j,k)
 #endif /* MHD */
         end do
 
@@ -171,9 +168,6 @@ module scheme
           ul(ibx,j) = u(iby,i,j,k)
           ul(iby,j) = u(ibz,i,j,k)
           ul(ibz,j) = u(ibx,i,j,k)
-          ul(icx,j) = u(icy,i,j,k)
-          ul(icy,j) = u(icz,i,j,k)
-          ul(icz,j) = u(icx,i,j,k)
 #endif /* MHD */
         end do
 
@@ -245,9 +239,6 @@ module scheme
           ul(ibx,k) = u(ibz,i,j,k)
           ul(iby,k) = u(ibx,i,j,k)
           ul(ibz,k) = u(iby,i,j,k)
-          ul(icx,k) = u(icz,i,j,k)
-          ul(icy,k) = u(icx,i,j,k)
-          ul(icz,k) = u(icy,i,j,k)
 #endif /* MHD */
         end do
 
@@ -307,7 +298,7 @@ module scheme
 
     use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, ifl, iqt
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+    use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use interpolation, only : reconstruct
 
@@ -329,56 +320,20 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef CONREC
-! reconstruct left and right states of conserved variables
-!
-    do p = 1, ifl
-      call reconstruct(n, u(p,:), ul(p,:), ur(p,:))
-    end do
-
-#ifdef MHD
-! reconstruct left and right states of magnetic field components
-!
-    ul(ibx,:) = u(ibx,:)
-    ur(ibx,:) = u(ibx,:)
-    call reconstruct(n, u(icy,:), ul(iby,:), ur(iby,:))
-    call reconstruct(n, u(icz,:), ul(ibz,:), ur(ibz,:))
-    ul(icx:icz,:) = ul(ibx:ibz,:)
-    ur(icx:icz,:) = ur(ibx:ibz,:)
-#endif /* MHD */
-
-! calculate primitive variables
-!
-    call cons2prim(m, n, ul, ql)
-    call cons2prim(m, n, ur, qr)
-#else /* CONREC */
-
 ! calculate primitive variables
 !
     call cons2prim(m, n, u, q)
 
 ! reconstruct left and right states of primitive variables
 !
-    do p = 1, ifl
+    do p = 1, iqt
       call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
     end do
-
-#ifdef MHD
-! reconstruct left and right states of magnetic field components
-!
-    ql(ibx,:) = q(ibx,:)
-    qr(ibx,:) = q(ibx,:)
-    call reconstruct(n, q(icy,:), ql(iby,:), qr(iby,:))
-    call reconstruct(n, q(icz,:), ql(ibz,:), qr(ibz,:))
-    ql(icx:icz,:) = ql(ibx:ibz,:)
-    qr(icx:icz,:) = qr(ibx:ibz,:)
-#endif /* MHD */
 
 ! calculate conservative variables at states
 !
     call prim2cons(m, n, ql, ul)
     call prim2cons(m, n, qr, ur)
-#endif /* CONREC */
 
 ! calculate fluxes and speeds
 !
@@ -730,7 +685,7 @@ module scheme
 
     use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use blocks, only : ibx, iby, ibz
 #endif /* MHD */
     use config, only : gammam1
 
@@ -760,7 +715,7 @@ module scheme
       ek       = 0.5 * sum(u(imx:imz,i) * q(ivx:ivz,i))
       ei       = u(ien,i) - ek
 #ifdef MHD
-      em       = 0.5 * sum(u(icx:icz,i) * u(icx:icz,i))
+      em       = 0.5 * sum(u(ibx:ibz,i) * u(ibx:ibz,i))
       ei       = ei - em
 #endif /* MHD */
       q(ipr,i) = gammam1 * ei
@@ -769,9 +724,6 @@ module scheme
       q(ibx,i) = u(ibx,i)
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
-      q(icx,i) = u(icx,i)
-      q(icy,i) = u(icy,i)
-      q(icz,i) = u(icz,i)
 #endif /* MHD */
     end do
 
@@ -789,7 +741,7 @@ module scheme
 
     use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use blocks, only : ibx, iby, ibz
 #endif /* MHD */
     use config, only : gammam1i
 
@@ -820,15 +772,12 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
 #ifdef ADI
-      em       = 0.5 * sum(q(icx:icz,i) * q(icx:icz,i))
+      em       = 0.5 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       u(ien,i) = u(ien,i) + em
 #endif /* ADI */
       u(ibx,i) = q(ibx,i)
       u(iby,i) = q(iby,i)
       u(ibz,i) = q(ibz,i)
-      u(icx,i) = q(icx,i)
-      u(icy,i) = q(icy,i)
-      u(icz,i) = q(icz,i)
 #endif /* MHD */
     end do
 
@@ -846,7 +795,7 @@ module scheme
 
     use blocks, only : nv => nvars, idn, ivx, ivz, ipr
 #ifdef MHD
-    use blocks, only : icx, icz
+    use blocks, only : ibx, iby, ibz
 #endif /* MHD */
     use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
 
@@ -887,7 +836,7 @@ module scheme
           vv = sum(q(ivx:ivz,i)**2)
           v  = sqrt(vv)
 #ifdef MHD
-          bb = sum(q(icx:icz,i)**2)
+          bb = sum(q(ibx:ibz,i)**2)
 #endif /* MHD */
 
 ! calculate the maximum characteristic speed
