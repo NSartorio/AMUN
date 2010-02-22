@@ -1151,7 +1151,7 @@ module boundaries
 
 ! expand the boundary
 !
-      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'm', 'm', 'm')
+      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'a', 'a', 'a')
 
 ! copy expanded boundary in the proper place of the block
 !

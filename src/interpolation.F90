@@ -292,8 +292,8 @@ module interpolation
 
 ! local variables
 !
-    integer      :: i, ib, ie, j0, j1
-    real(kind=8) :: du, ddu, dum, dup, du0, ds
+    integer  :: i, ib, ie, j0, j1
+    real     :: du, ddu, dum, dup, du0, ds
 !
 !-------------------------------------------------------------------------------
 !
@@ -337,23 +337,23 @@ module interpolation
       end do
     case('t')
       do i = ib, ie
-        dup = u(i+1) - u(i)
-        dum = u(i) - u(i-1)
-        du0 = dup + dum
-        ds  = dup * dum
 
         j1 = 2 * i - ng
         j0 = j1 - 1
 
-        if (ds .gt. 0.0) then
-          du = ds / du0
+        dup = u(i+1) - u(i)
+        dum = u(i-1) - u(i)
+        ds  = - dup * dum
 
-          v(j0) = u(i) - 0.25 * du
-          v(j1) = u(i) + 0.25 * du
+        if (ds .gt. 0.0) then
+          du    = 0.5 * ds / (dup - dum)
+
+          v(j0) = u(i) - du
+          v(j1) = u(i) + du
         else
           v(j0) = u(i)
           v(j1) = u(i)
-        endif
+        end if
       end do
     case default
       do i = ib, ie
@@ -484,7 +484,7 @@ module interpolation
     deallocate(al)
 
   end subroutine magtocen
-
+!
 !===============================================================================
 !
 end module

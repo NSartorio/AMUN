@@ -858,7 +858,7 @@ module mesh
 ! expand all variables and place them in the array u
 !
     do q = 1, nvars
-      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 'm', 'm', 'm')
+      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 #ifdef MHD
 ! prolong face centered Bx
