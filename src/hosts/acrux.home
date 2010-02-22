@@ -9,7 +9,7 @@
 #   MPI = Y or N to enable or disable MPI parallelization
 #   OMP = Y or N to enable or disable OpenMP parallelization
 #
-MPI      = N
+MPI      = Y
 OMP      = N
 
 # compilation options:

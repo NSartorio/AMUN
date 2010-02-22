@@ -1026,22 +1026,21 @@ module mesh
 
       end do
 #ifdef MHD
-! shrink face centered Bx
+#ifdef FIELDCD
+! iterate over magnetic field components
 !
-      call shrink(dm, pm, 0, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'l', 'l')
-      pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+      do q = ibx, ibz
 
-! shrink face centered By
+! shrink the current child
 !
-      call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'l', 'c', 'l')
-      pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+        call shrink(dm, pm, 0, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
 
-#if NDIMS == 3
-! shrink face centered Bz
+! fill the parent block
 !
-      call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'l', 'l', 'c')
-      pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
-#endif /* NDIMS == 3 */
+        pblock%data%u(q,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
+      end do
+#endif /* FIELDCD */
 #endif /* MHD */
 
     end do

@@ -795,26 +795,23 @@ module boundaries
       pdata%u(q,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 
     end do
+
 #ifdef MHD
-! shrink face centered Bx
+#ifdef FIELDCD
+! iterate over magnetic field components
 !
-    call shrink(fm, cm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 'l', 'l')
+    do q = ibx, ibz
 
-    pdata%u(ibx,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-
-! shrink face centered By
+! shrink the boundary
 !
-    call shrink(fm, cm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'c', 'l')
+      call shrink(fm, cm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'm', 'm', 'm')
 
-    pdata%u(iby,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-
-#if NDIMS == 3
-! shrink face centered Bz
+! copy shrinked boundary in the proper place of the block
 !
-    call shrink(fm, cm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'l', 'c')
+      pdata%u(q,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 
-    pdata%u(ibz,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
+    end do
+#endif /* FIELDCD */
 #endif /* MHD */
 
 ! deallocate temporary array
@@ -1159,25 +1156,21 @@ module boundaries
 
     end do
 #ifdef MHD
-! expand face centered Bx
+#ifdef FIELDCD
+! iterate over magnetic field components
 !
-    call expand(cm, pm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 'l', 'l')
+    do q = ibx, ibz
 
-    pdata%u(ibx,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-
-! expand face centered By
+! expand the boundary
 !
-    call expand(cm, pm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'c', 'l')
+      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'a', 'a', 'a')
 
-    pdata%u(iby,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-
-#if NDIMS == 3
-! expand face centered Bz
+! copy expanded boundary in the proper place of the block
 !
-    call expand(cm, pm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'l', 'l', 'c')
+      pdata%u(q,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
 
-    pdata%u(ibz,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
+    end do
+#endif /* FIELDCD */
 #endif /* MHD */
 
 ! deallocate temporary array

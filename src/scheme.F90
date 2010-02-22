@@ -120,20 +120,15 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          fl(ibx:ibz,i) = 0.25 * fl(ibx:ibz,i)
-
+#ifdef FIELDCD
           im1 = max(i - 1, 1)
+          ip1 = min(i + 1,im)
 
-          du(ibx,i,jm1,k  ) = du(ibx,i,jm1,k  ) + dyi *  fl(iby,i)
-          du(ibx,i,jp1,k  ) = du(ibx,i,jp1,k  ) - dyi *  fl(iby,i)
-          du(iby,i,j  ,k  ) = du(iby,i,j  ,k  ) - dxi * (fl(iby,i) - fl(iby,im1))
-          du(iby,i,jm1,k  ) = du(iby,i,jm1,k  ) - dxi * (fl(iby,i) - fl(iby,im1))
+          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dxi * (fl(iby,ip1) - fl(iby,im1))
 #if NDIMS == 3
-          du(ibx,i,j  ,km1) = du(ibx,i,j  ,km1) + dzi *  fl(ibz,i)
-          du(ibx,i,j  ,kp1) = du(ibx,i,j  ,kp1) - dzi *  fl(ibz,i)
-          du(ibz,i,j  ,k  ) = du(ibz,i,j  ,k  ) - dxi * (fl(ibz,i) - fl(ibz,im1))
-          du(ibz,i,j  ,km1) = du(ibz,i,j  ,km1) - dxi * (fl(ibz,i) - fl(ibz,im1))
+          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dxi * (fl(ibz,ip1) - fl(ibz,im1))
 #endif /* NDIMS == 3 */
+#endif /* FIELDCD */
 #endif /* MHD */
         end do
       end do
@@ -193,19 +188,15 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          fl(ibx:ibz,j) = 0.25 * fl(ibx:ibz,j)
-
+#ifdef FIELDCD
           jm1 = max(j - 1, 1)
+          jp1 = min(j + 1,jm)
+
 #if NDIMS == 3
-          du(iby,i  ,j,km1) = du(iby,i  ,j,km1) + dzi *  fl(iby,j)
-          du(iby,i  ,j,kp1) = du(iby,i  ,j,kp1) - dzi *  fl(iby,j)
-          du(ibz,i  ,j,k  ) = du(ibz,i  ,j,k  ) - dyi * (fl(iby,j) - fl(iby,jm1))
-          du(ibz,i  ,j,km1) = du(ibz,i  ,j,km1) - dyi * (fl(iby,j) - fl(iby,jm1))
+          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dyi * (fl(iby,jp1) - fl(iby,jm1))
 #endif /* NDIMS == 3 */
-          du(iby,im1,j,k  ) = du(iby,im1,j,k  ) + dxi *  fl(ibz,j)
-          du(iby,ip1,j,k  ) = du(iby,ip1,j,k  ) - dxi *  fl(ibz,j)
-          du(ibx,i  ,j,k  ) = du(ibx,i  ,j,k  ) - dyi * (fl(ibz,j) - fl(ibz,jm1))
-          du(ibx,im1,j,k  ) = du(ibx,im1,j,k  ) - dyi * (fl(ibz,j) - fl(ibz,jm1))
+          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dyi * (fl(ibz,jp1) - fl(ibz,jm1))
+#endif /* FIELDCD */
 #endif /* MHD */
         end do
       end do
@@ -264,19 +255,13 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          fl(ibx:ibz,k) = 0.25 * fl(ibx:ibz,k)
-
+#ifdef FIELDCD
           km1 = max(k - 1, 1)
+          kp1 = min(k + 1,km)
 
-          du(ibz,im1,j  ,k) = du(ibz,im1,j  ,k) + dxi *  fl(iby,k)
-          du(ibz,ip1,j  ,k) = du(ibz,ip1,j  ,k) - dxi *  fl(iby,k)
-          du(ibx,i  ,j  ,k) = du(ibx,i  ,j  ,k) - dzi * (fl(iby,k) - fl(iby,km1))
-          du(ibx,im1,j  ,k) = du(ibx,im1,j  ,k) - dzi * (fl(iby,k) - fl(iby,km1))
-
-          du(ibz,i  ,jm1,k) = du(ibz,i  ,jm1,k) + dyi *  fl(ibz,k)
-          du(ibz,i  ,jp1,k) = du(ibz,i  ,jp1,k) - dyi *  fl(ibz,k)
-          du(iby,i  ,j  ,k) = du(iby,i  ,j  ,k) - dzi * (fl(ibz,k) - fl(ibz,km1))
-          du(iby,i  ,jm1,k) = du(iby,i  ,jm1,k) - dzi * (fl(ibz,k) - fl(ibz,km1))
+          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dzi * (fl(iby,kp1) - fl(iby,km1))
+          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dzi * (fl(ibz,kp1) - fl(ibz,km1))
+#endif /* FIELDCD */
 #endif /* MHD */
         end do
       end do
@@ -352,14 +337,14 @@ module scheme
 ! calculate HLL flux
 !
       if (al .ge. 0.0) then
-        fx(1:iqt,i) = fl(1:iqt,i)
+        fx(1:ifl,i) = fl(1:ifl,i)
       else if (ar .le. 0.0) then
-        fx(1:iqt,i) = fr(1:iqt,i)
+        fx(1:ifl,i) = fr(1:ifl,i)
       else
         ap  = ar * al
         div = 1.0 / (ar - al)
 
-        fx(1:iqt,i) = div * (ar * fl(1:iqt,i) - al * fr(1:iqt,i) + ap * (ur(1:iqt,i) - ul(1:iqt,i)))
+        fx(1:ifl,i) = div * (ar * fl(1:ifl,i) - al * fr(1:ifl,i) + ap * (ur(1:ifl,i) - ul(1:ifl,i)))
       end if
 
     end do
@@ -368,7 +353,12 @@ module scheme
 !
     f(  1:ifl,2:n) = - fx(  1:ifl,2:n) + fx(   1:ifl,1:n-1)
 #ifdef MHD
+#ifdef FIELDCD
+    call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
+#endif /* FIELDCD */
+#ifdef FLUXCT
     f(ibx:ibz,1:n) =   fx(ibx:ibz,1:n)
+#endif /* FLUXCT */
 #endif /* MHD */
 
 !-------------------------------------------------------------------------------
@@ -644,9 +634,11 @@ module scheme
 #ifdef ADI
       f(ien,i) = f(ien,i) + q(ivx,i) * pm - q(ibx,i) * vb
 #endif /* ADI */
+#ifndef FIELDCD
       f(ibx,i) = 0.0
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
+#endif /* !FIELDCD */
 #endif /* MHD */
 
 ! compute speeds
@@ -674,6 +666,42 @@ module scheme
 !-------------------------------------------------------------------------------
 !
   end subroutine fluxspeed
+#ifdef MHD
+!
+!===============================================================================
+!
+! emf: subroutine computes magnetic fluxes (electromotive force)
+!
+!===============================================================================
+!
+  subroutine emf(n, v, b, f)
+
+    implicit none
+
+! input/output arguments
+!
+    integer             , intent(in)  :: n
+    real, dimension(3,n), intent(in)  :: v, b
+    real, dimension(3,n), intent(out) :: f
+
+! local variables
+!
+    integer :: i
+!
+!-------------------------------------------------------------------------------
+!
+! sweep over all points
+!
+    do i = 1, n
+      f(1,i) = 0.0
+      f(2,i) = v(1,i) * b(2,i) - b(1,i) * v(2,i)
+      f(3,i) = v(1,i) * b(3,i) - b(1,i) * v(3,i)
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine emf
+#endif /* MHD */
 !
 !===============================================================================
 !
