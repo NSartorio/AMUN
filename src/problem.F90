@@ -397,15 +397,13 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks       , only : block_data, nv => nvars, idn, ivx, ivy, ivz, ipr
+    use blocks, only : nvr, nqt
+    use blocks, only : block_data, idn, ivx, ivy, ivz, ipr
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config       , only : in, jn, kn, im, jm, km, ng                       &
                      , gamma, csnd2, rcut, dens, dnrat
-#ifdef MHD
-    use interpolation, only : magtocen
-#endif /* MHD */
     use scheme       , only : prim2cons
 
 ! input arguments
@@ -420,20 +418,16 @@ module problem
 
 ! local arrays
 !
-    real, dimension(:)  , allocatable :: x, y, z
-    real, dimension(:,:), allocatable :: q
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nvr,im) :: q, u
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate parameters
 !
     pr = dens * csnd2 / gamma
-
-! allocate coordinates
-!
-    allocate(x(im))
-    allocate(y(jm))
-    allocate(z(km))
 
 ! calculate cell sizes
 !
@@ -455,10 +449,6 @@ module problem
     z(1) = 0.0
 #endif /* NDIMS == 3 */
 
-! allocate primitive variables
-!
-    allocate(q(nv,im))
-
 ! set variables
 !
     q(idn,:) = dens
@@ -469,12 +459,20 @@ module problem
     q(ibx,:) = 0.70710678118654752440
     q(iby,:) = 0.70710678118654752440
     q(ibz,:) = 0.0d0
+#ifdef FLUXCT
+    q(icx,:) = 0.70710678118654752440
+    q(icy,:) = 0.70710678118654752440
+    q(icz,:) = 0.0d0
+#endif /* FLUXCT */
 #endif /* MHD */
 
 ! set initial pressure
 !
     do k = 1, km
       do j = 1, jm
+
+! fill out the pressure profile
+!
         do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
@@ -483,24 +481,21 @@ module problem
             q(ipr,i) = pr * dnrat
           else
             q(ipr,i) = pr
-          endif
+          end if
 
         end do
 
 ! convert primitive variables to conserved
 !
-        call prim2cons(nv, im, q(1:nv,1:im), pblock%u(1:nv,1:im,j,k))
+        call prim2cons(im, q, u)
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
       end do
     end do
-
-! deallocate coordinates
 !
-    deallocate(q)
-    deallocate(x)
-    deallocate(y)
-    deallocate(z)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine init_blast
@@ -860,7 +855,7 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien, nv => nvars
+    use blocks, only : block_data, idn, imx, imy, imz, ien, nvr
     use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
                      , crefmin, crefmax
 
@@ -953,12 +948,12 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .ge. crefmax) then
+!     if (dpmax .ge. crefmax) then
       check_ref =  1
-    endif
-    if (dpmax .le. crefmin) then
-      check_ref = -1
-    endif
+!     endif
+!     if (dpmax .le. crefmin) then
+!       check_ref = -1
+!     endif
 
     return
 

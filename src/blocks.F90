@@ -34,27 +34,44 @@ module blocks
   integer(kind=4), parameter :: nsides = 2
   integer(kind=4), parameter :: nfaces = 2**(ndims-1)
   integer(kind=4), parameter :: nchild = 2**ndims
-  integer(kind=4), parameter :: idn = 1, imx = 2, imy = 3, imz = 4 &
-                              , ivx = 2, ivy = 3, ivz = 4
+  integer(kind=4), parameter :: idn =  1, imx =  2, imy =  3, imz =  4 &
+                                        , ivx =  2, ivy =  3, ivz =  4
 #ifdef HYDRO
 #ifdef ISO
-  integer(kind=4), parameter :: nvars  = 4, ifl = 4, iqt = 4
+  integer(kind=4), parameter :: nvr =  4, nfl =  4, nqt =  4
 #endif /* ISO */
 #ifdef ADI
-  integer(kind=4), parameter :: ien = 5, ipr = 5
-  integer(kind=4), parameter :: nvars  = 5, ifl = 5, iqt = 5
+  integer(kind=4), parameter :: ien =  5, ipr =  5
+  integer(kind=4), parameter :: nvr =  5, nfl =  5, nqt =  5
 #endif /* ADI */
 #endif /* HYDRO */
 #ifdef MHD
+#ifdef FIELDCD
 #ifdef ISO
-  integer(kind=4), parameter :: ibx = 5, iby = 6, ibz = 7
-  integer(kind=4), parameter :: nvars  = 7, ifl = 4, iqt = 7
+  integer(kind=4), parameter :: ibx =  5, iby =  6, ibz =  7
+  integer(kind=4), parameter :: icx =  5, icy =  6, icz =  7
+  integer(kind=4), parameter :: nvr =  7, nfl =  4, nqt =  7
 #endif /* ISO */
 #ifdef ADI
-  integer(kind=4), parameter :: ien = 5, ipr = 5
-  integer(kind=4), parameter :: ibx = 6, iby = 7, ibz = 8
-  integer(kind=4), parameter :: nvars  = 8, ifl = 5, iqt = 8
+  integer(kind=4), parameter :: ien =  5, ipr =  5
+  integer(kind=4), parameter :: ibx =  6, iby =  7, ibz =  8
+  integer(kind=4), parameter :: icx =  6, icy =  7, icz =  8
+  integer(kind=4), parameter :: nvr =  8, nfl =  5, nqt =  8
 #endif /* ADI */
+#endif /* FIELDCD */
+#ifdef FLUXCT
+#ifdef ISO
+  integer(kind=4), parameter :: ibx =  5, iby =  6, ibz =  7
+  integer(kind=4), parameter :: icx =  8, icy =  9, icz = 10
+  integer(kind=4), parameter :: nvr = 10, nfl =  4, nqt =  7
+#endif /* ISO */
+#ifdef ADI
+  integer(kind=4), parameter :: ien =  5, ipr =  5
+  integer(kind=4), parameter :: ibx =  6, iby =  7, ibz =  8
+  integer(kind=4), parameter :: icx =  9, icy = 10, icz = 11
+  integer(kind=4), parameter :: nvr = 11, nfl =  5, nqt =  8
+#endif /* ADI */
+#endif /* FLUXCT */
 #endif /* MHD */
 
 !! BLOCK STRUCTURE POINTERS (have to be defined before structures)
@@ -346,7 +363,7 @@ module blocks
 
 ! allocate space for variables
 !
-    allocate(pdata%u(nvars,im,jm,km))
+    allocate(pdata%u(nqt,im,jm,km))
 
 ! increase the number of allocated meta blocks
 !

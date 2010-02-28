@@ -39,30 +39,52 @@ module scheme
 !
   subroutine update(u, du, dxi, dyi, dzi)
 
-    use blocks, only : nv => nvars
-    use blocks, only : idn, imx, imy, imz, ien
+    use blocks       , only : nvr, nqt
+    use blocks       , only : idn, imx, imy, imz, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config, only : im, jm, km, ngrids
+    use config       , only : im, jm, km
+#ifdef FLUXCT
+    use interpolation, only : magtocen
+#endif /* FLUXCT */
 
     implicit none
 
 ! input arguments
 !
-    real, dimension(nv,im,jm,km), intent(in)  :: u
-    real, dimension(nv,im,jm,km), intent(out) :: du
-    real                        , intent(in)  :: dxi, dyi, dzi
+    real, dimension(nqt,im,jm,km), intent(in)  :: u
+    real, dimension(nqt,im,jm,km), intent(out) :: du
+    real                         , intent(in)  :: dxi, dyi, dzi
 
 ! local variables
 !
     integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
 
-! local arrays
+! local temporary arrays
 !
-    real, dimension(nv,ngrids) :: ul, fl
+    real, dimension(nvr,im)       :: ux
+    real, dimension(nqt,im)       :: fx
+    real, dimension(nvr,jm)       :: uy
+    real, dimension(nqt,jm)       :: fy
+#if NDIMS == 3
+    real, dimension(nvr,km)       :: uz
+    real, dimension(nqt,km)       :: fz
+#endif /* NDIMS == 3 */
+    real, dimension(nvr,im,jm,km) :: w
 !
 !-------------------------------------------------------------------------------
+!
+! copy variables to a new array
+!
+    w(1:nqt,:,:,:) = u(1:nqt,:,:,:)
+#ifdef FLUXCT
+! interpolate cell centered components of the magnetic field
+!
+    call magtocen(w)
+#endif /* FLUXCT */
+
+! reset the increment array
 !
     du(:,:,:,:) = 0.0
 
@@ -84,51 +106,68 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do i = 1, im
-          ul(idn,i) = u(idn,i,j,k)
-          ul(imx,i) = u(imx,i,j,k)
-          ul(imy,i) = u(imy,i,j,k)
-          ul(imz,i) = u(imz,i,j,k)
+          ux(idn,i) = w(idn,i,j,k)
+          ux(imx,i) = w(imx,i,j,k)
+          ux(imy,i) = w(imy,i,j,k)
+          ux(imz,i) = w(imz,i,j,k)
 #ifdef ADI
-          ul(ien,i) = u(ien,i,j,k)
+          ux(ien,i) = w(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          ul(ibx,i) = u(ibx,i,j,k)
-          ul(iby,i) = u(iby,i,j,k)
-          ul(ibz,i) = u(ibz,i,j,k)
+          ux(ibx,i) = w(ibx,i,j,k)
+          ux(iby,i) = w(iby,i,j,k)
+          ux(ibz,i) = w(ibz,i,j,k)
+#ifdef FLUXCT
+          ux(icx,i) = w(icx,i,j,k)
+          ux(icy,i) = w(icy,i,j,k)
+          ux(icz,i) = w(icz,i,j,k)
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
 
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nv, im, ul, fl)
+        call hll (im, ux, fx)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(nv, im, ul, fl)
+        call hllc(im, ux, fx)
 #endif /* HLLC */
 
 ! update the arrays of increments
 !
         do i = 1, im
-          du(idn,i,j,k) = du(idn,i,j,k) + dxi * fl(idn,i)
-          du(imx,i,j,k) = du(imx,i,j,k) + dxi * fl(imx,i)
-          du(imy,i,j,k) = du(imy,i,j,k) + dxi * fl(imy,i)
-          du(imz,i,j,k) = du(imz,i,j,k) + dxi * fl(imz,i)
+          du(idn,i,j,k) = du(idn,i,j,k) + dxi * fx(idn,i)
+          du(imx,i,j,k) = du(imx,i,j,k) + dxi * fx(imx,i)
+          du(imy,i,j,k) = du(imy,i,j,k) + dxi * fx(imy,i)
+          du(imz,i,j,k) = du(imz,i,j,k) + dxi * fx(imz,i)
 #ifdef ADI
-          du(ien,i,j,k) = du(ien,i,j,k) + dxi * fl(ien,i)
+          du(ien,i,j,k) = du(ien,i,j,k) + dxi * fx(ien,i)
 #endif /* ADI */
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
           im1 = max(i - 1, 1)
+#ifdef FIELDCD
           ip1 = min(i + 1,im)
 
-          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dxi * (fl(iby,ip1) - fl(iby,im1))
+          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dxi * (fx(iby,ip1) - fx(iby,im1))
 #if NDIMS == 3
-          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dxi * (fl(ibz,ip1) - fl(ibz,im1))
+          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dxi * (fx(ibz,ip1) - fx(ibz,im1))
 #endif /* NDIMS == 3 */
 #endif /* FIELDCD */
+#ifdef FLUXCT
+          du(ibx,i  ,jm1,k  ) = du(ibx,i  ,jm1,k  ) + dyi *  fx(iby,i)
+          du(ibx,i  ,jp1,k  ) = du(ibx,i  ,jp1,k  ) - dyi *  fx(iby,i)
+          du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dxi * (fx(iby,i) - fx(iby,im1))
+          du(iby,i  ,jm1,k  ) = du(iby,i  ,jm1,k  ) - dxi * (fx(iby,i) - fx(iby,im1))
+#if NDIMS == 3
+          du(ibx,i  ,j  ,km1) = du(ibx,i  ,j  ,km1) + dzi *  fx(ibz,i)
+          du(ibx,i  ,j  ,kp1) = du(ibx,i  ,j  ,kp1) - dzi *  fx(ibz,i)
+          du(ibz,i  ,j  ,k  ) = du(ibz,i  ,j  ,k  ) - dxi * (fx(ibz,i) - fx(ibz,im1))
+          du(ibz,i  ,j  ,km1) = du(ibz,i  ,j  ,km1) - dxi * (fx(ibz,i) - fx(ibz,im1))
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
       end do
@@ -152,51 +191,68 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do j = 1, jm
-          ul(idn,j) = u(idn,i,j,k)
-          ul(imx,j) = u(imy,i,j,k)
-          ul(imy,j) = u(imz,i,j,k)
-          ul(imz,j) = u(imx,i,j,k)
+          uy(idn,j) = w(idn,i,j,k)
+          uy(imx,j) = w(imy,i,j,k)
+          uy(imy,j) = w(imz,i,j,k)
+          uy(imz,j) = w(imx,i,j,k)
 #ifdef ADI
-          ul(ien,j) = u(ien,i,j,k)
+          uy(ien,j) = w(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          ul(ibx,j) = u(iby,i,j,k)
-          ul(iby,j) = u(ibz,i,j,k)
-          ul(ibz,j) = u(ibx,i,j,k)
+          uy(ibx,j) = w(iby,i,j,k)
+          uy(iby,j) = w(ibz,i,j,k)
+          uy(ibz,j) = w(ibx,i,j,k)
+#ifdef FLUXCT
+          uy(icx,j) = w(icy,i,j,k)
+          uy(icy,j) = w(icz,i,j,k)
+          uy(icz,j) = w(icx,i,j,k)
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
 
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nv, jm, ul, fl)
+        call hll (jm, uy, fy)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(nv, jm, ul, fl)
+        call hllc(jm, uy, fy)
 #endif /* HLLC */
 
 ! update the arrays of increments
 !
         do j = 1, jm
-          du(idn,i,j,k) = du(idn,i,j,k) + dyi * fl(idn,j)
-          du(imx,i,j,k) = du(imx,i,j,k) + dyi * fl(imz,j)
-          du(imy,i,j,k) = du(imy,i,j,k) + dyi * fl(imx,j)
-          du(imz,i,j,k) = du(imz,i,j,k) + dyi * fl(imy,j)
+          du(idn,i,j,k) = du(idn,i,j,k) + dyi * fy(idn,j)
+          du(imx,i,j,k) = du(imx,i,j,k) + dyi * fy(imz,j)
+          du(imy,i,j,k) = du(imy,i,j,k) + dyi * fy(imx,j)
+          du(imz,i,j,k) = du(imz,i,j,k) + dyi * fy(imy,j)
 #ifdef ADI
-          du(ien,i,j,k) = du(ien,i,j,k) + dyi * fl(ien,j)
+          du(ien,i,j,k) = du(ien,i,j,k) + dyi * fy(ien,j)
 #endif /* ADI */
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
           jm1 = max(j - 1, 1)
+#ifdef FIELDCD
           jp1 = min(j + 1,jm)
 
 #if NDIMS == 3
-          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dyi * (fl(iby,jp1) - fl(iby,jm1))
+          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dyi * (fy(iby,jp1) - fy(iby,jm1))
 #endif /* NDIMS == 3 */
-          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dyi * (fl(ibz,jp1) - fl(ibz,jm1))
+          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dyi * (fy(ibz,jp1) - fy(ibz,jm1))
 #endif /* FIELDCD */
+#ifdef FLUXCT
+#if NDIMS == 3
+          du(iby,i  ,j  ,km1) = du(iby,i  ,j  ,km1) + dzi *  fy(iby,j)
+          du(iby,i  ,j  ,kp1) = du(iby,i  ,j  ,kp1) - dzi *  fy(iby,j)
+          du(ibz,i  ,j  ,k  ) = du(ibz,i  ,j  ,k  ) - dyi * (fy(iby,j) - fy(iby,jm1))
+          du(ibz,i  ,j  ,km1) = du(ibz,i  ,j  ,km1) - dyi * (fy(iby,j) - fy(iby,jm1))
+#endif /* NDIMS == 3 */
+          du(iby,im1,j  ,k  ) = du(iby,im1,j  ,k  ) + dxi *  fy(ibz,j)
+          du(iby,ip1,j  ,k  ) = du(iby,ip1,j  ,k  ) - dxi *  fy(ibz,j)
+          du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
+          du(ibx,im1,j  ,k  ) = du(ibx,im1,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
       end do
@@ -219,49 +275,65 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do k = 1, km
-          ul(idn,k) = u(idn,i,j,k)
-          ul(imx,k) = u(imz,i,j,k)
-          ul(imy,k) = u(imx,i,j,k)
-          ul(imz,k) = u(imy,i,j,k)
+          uz(idn,k) = w(idn,i,j,k)
+          uz(imx,k) = w(imz,i,j,k)
+          uz(imy,k) = w(imx,i,j,k)
+          uz(imz,k) = w(imy,i,j,k)
 #ifdef ADI
-          ul(ien,k) = u(ien,i,j,k)
+          uz(ien,k) = w(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          ul(ibx,k) = u(ibz,i,j,k)
-          ul(iby,k) = u(ibx,i,j,k)
-          ul(ibz,k) = u(iby,i,j,k)
+          uz(ibx,k) = w(ibz,i,j,k)
+          uz(iby,k) = w(ibx,i,j,k)
+          uz(ibz,k) = w(iby,i,j,k)
+#ifdef FLUXCT
+          uz(icx,k) = w(icz,i,j,k)
+          uz(icy,k) = w(icx,i,j,k)
+          uz(icz,k) = w(icy,i,j,k)
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
 
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll(nv, km, ul, fl)
+        call hll (km, uz, fz)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(nv, km, ul, fl)
+        call hllc(km, uz, fz)
 #endif /* HLLC */
 
 ! update the arrays of increments
 !
         do k = 1, km
-          du(idn,i,j,k) = du(idn,i,j,k) + dzi * fl(idn,k)
-          du(imx,i,j,k) = du(imx,i,j,k) + dzi * fl(imy,k)
-          du(imy,i,j,k) = du(imy,i,j,k) + dzi * fl(imz,k)
-          du(imz,i,j,k) = du(imz,i,j,k) + dzi * fl(imx,k)
+          du(idn,i,j,k) = du(idn,i,j,k) + dzi * fz(idn,k)
+          du(imx,i,j,k) = du(imx,i,j,k) + dzi * fz(imy,k)
+          du(imy,i,j,k) = du(imy,i,j,k) + dzi * fz(imz,k)
+          du(imz,i,j,k) = du(imz,i,j,k) + dzi * fz(imx,k)
 #ifdef ADI
-          du(ien,i,j,k) = du(ien,i,j,k) + dzi * fl(ien,k)
+          du(ien,i,j,k) = du(ien,i,j,k) + dzi * fz(ien,k)
 #endif /* ADI */
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
           km1 = max(k - 1, 1)
+#ifdef FIELDCD
           kp1 = min(k + 1,km)
 
-          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dzi * (fl(iby,kp1) - fl(iby,km1))
-          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dzi * (fl(ibz,kp1) - fl(ibz,km1))
+          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dzi * (fz(iby,kp1) - fz(iby,km1))
+          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dzi * (fz(ibz,kp1) - fz(ibz,km1))
 #endif /* FIELDCD */
+#ifdef FLUXCT
+          du(ibz,im1,j  ,k  ) = du(ibz,im1,j  ,k  ) + dxi *  fz(iby,k)
+          du(ibz,ip1,j  ,k  ) = du(ibz,ip1,j  ,k  ) - dxi *  fz(iby,k)
+          du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dzi * (fz(iby,k) - fz(iby,km1))
+          du(ibx,im1,j  ,k  ) = du(ibx,im1,j  ,k  ) - dzi * (fz(iby,k) - fz(iby,km1))
+
+          du(ibz,i  ,jm1,k  ) = du(ibz,i  ,jm1,k  ) + dyi *  fz(ibz,k)
+          du(ibz,i  ,jp1,k  ) = du(ibz,i  ,jp1,k  ) - dyi *  fz(ibz,k)
+          du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
+          du(iby,i  ,jm1,k  ) = du(iby,i  ,jm1,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
+#endif /* FLUXCT */
 #endif /* MHD */
         end do
       end do
@@ -279,11 +351,12 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hll(m, n, u, f)
+  subroutine hll(n, u, f)
 
-    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien, ifl, iqt
+    use blocks       , only : nvr, nfl, nqt
+    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks       , only : ibx, iby, ibz
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use interpolation, only : reconstruct
 
@@ -291,39 +364,52 @@ module scheme
 
 ! input/output arguments
 !
-    integer             , intent(in)  :: m, n
-    real, dimension(m,n), intent(in)  :: u
-    real, dimension(m,n), intent(out) :: f
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
-    integer              :: p, i
-    real, dimension(m,n) :: ul, ur, ql, qr, q
-    real, dimension(m,n) :: fl, fr, fx
-    real, dimension(n)   :: cl, cr
-    real                 :: al, ar, ap, div
+    integer                :: p, i
+    real, dimension(nvr,n) :: q, ql, qr, ul, ur
+    real, dimension(nqt,n) :: fl, fr, fn
+    real, dimension(n)     :: cl, cr
+    real                   :: al, ar, ap, div
 !
 !-------------------------------------------------------------------------------
 !
-! calculate primitive variables
+! calculate the primitive variables
 !
-    call cons2prim(m, n, u, q)
+    call cons2prim(n, u, q)
 
-! reconstruct left and right states of primitive variables
+! reconstruct the left and right states of the primitive variables
 !
-    do p = 1, iqt
+    do p = 1, nfl
       call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
     end do
 
+#ifdef MHD
+#ifdef FLUXCT
+! reconstruct the left and right states of the magnetic field components
+!
+    ql(ibx,:) = q(ibx,:)
+    qr(ibx,:) = q(ibx,:)
+    call reconstruct(n, q(icy,:), ql(iby,:), qr(iby,:))
+    call reconstruct(n, q(icz,:), ql(ibz,:), qr(ibz,:))
+    ql(icx:icz,:) = ql(ibx:ibz,:)
+    qr(icx:icz,:) = qr(ibx:ibz,:)
+#endif /* FLUXCT */
+#endif /* MHD */
+
 ! calculate conservative variables at states
 !
-    call prim2cons(m, n, ql, ul)
-    call prim2cons(m, n, qr, ur)
+    call prim2cons(n, ql, ul)
+    call prim2cons(n, qr, ur)
 
 ! calculate fluxes and speeds
 !
-    call fluxspeed(m, n, ql, ul, fl, cl)
-    call fluxspeed(m, n, qr, ur, fr, cr)
+    call fluxspeed(n, ql, ul, fl, cl)
+    call fluxspeed(n, qr, ur, fr, cr)
 
 ! iterate over all points
 !
@@ -337,27 +423,27 @@ module scheme
 ! calculate HLL flux
 !
       if (al .ge. 0.0) then
-        fx(1:ifl,i) = fl(1:ifl,i)
+        fn(:,i) = fl(:,i)
       else if (ar .le. 0.0) then
-        fx(1:ifl,i) = fr(1:ifl,i)
+        fn(:,i) = fr(:,i)
       else
         ap  = ar * al
         div = 1.0 / (ar - al)
 
-        fx(1:ifl,i) = div * (ar * fl(1:ifl,i) - al * fr(1:ifl,i) + ap * (ur(1:ifl,i) - ul(1:ifl,i)))
+        fn(1:nqt,i) = div * (ar * fl(1:nqt,i) - al * fr(1:nqt,i)               &
+                                             + ap * (ur(1:nqt,i) - ul(1:nqt,i)))
       end if
-
     end do
 
 ! calculate numerical flux
 !
-    f(  1:ifl,2:n) = - fx(  1:ifl,2:n) + fx(   1:ifl,1:n-1)
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
 #ifdef MHD
 #ifdef FIELDCD
     call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
 #endif /* FIELDCD */
 #ifdef FLUXCT
-    f(ibx:ibz,1:n) =   fx(ibx:ibz,1:n)
+    f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
 #endif /* FLUXCT */
 #endif /* MHD */
 
@@ -374,66 +460,53 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hllc(m, n, uc, f)
+  subroutine hllc(n, u, f)
 
+    use blocks       , only : nvr, nfl, nqt
     use interpolation, only : reconstruct
 
     implicit none
 
 ! input/output arguments
 !
-    integer             , intent(in)  :: m, n
-    real, dimension(m,n), intent(in)  :: uc
-    real, dimension(m,n), intent(out) :: f
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
-    integer              :: p, i
-    real, dimension(m,n) :: ql, qr, qc, ul, ur
-    real, dimension(m,n) :: fl, fr, fx
-    real, dimension(n)   :: cl, cr, cm
-    real                 :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm  &
-                          , smvl, smvr, div, pt
-    real, dimension(m)   :: q1l, q1r, u1l, u1r
+    integer                :: p, i
+    real, dimension(nvr,n) :: ql, qr, qc, ul, ur
+    real, dimension(nfl,n) :: fl, fr, fx
+    real, dimension(n)     :: cl, cr, cm
+    real                   :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm     &
+                            , smvl, smvr, div, pt
+    real, dimension(nvr)   :: q1l, q1r, u1l, u1r
 !
 !----------------------------------------------------------------------
 !
     f (:,:) = 0.0
     fx(:,:) = 0.0
 
-#ifdef CONREC
-! reconstruct left and right states of conserved variables
-!
-    do p = 1, m
-      call reconstruct(n,uc(p,:),ul(p,:),ur(p,:))
-    enddo
-
 ! calculate primitive variables
 !
-    call cons2prim(m,n,ul,ql)
-    call cons2prim(m,n,ur,qr)
-#else /* CONREC */
-
-! calculate primitive variables
-!
-    call cons2prim(m,n,uc,qc)
+    call cons2prim(nvr, n, uc, qc)
 
 ! reconstruct left and right states of primitive variables
 !
-    do p = 1, m
-      call reconstruct(n,qc(p,:),ql(p,:),qr(p,:))
+    do p = 1, nfl
+      call reconstruct(n, qc(p,:), ql(p,:), qr(p,:))
     enddo
 
 ! calculate conservative variables at states
 !
-    call prim2cons(m,n,ql,ul)
-    call prim2cons(m,n,qr,ur)
-#endif /* CONREC */
+    call prim2cons(nvr, n, ql, ul)
+    call prim2cons(nvr, n, qr, ur)
 
 ! calculate fluxes and speeds
 !
-    call fluxspeed(m,n,ql,ul,fl,cl)
-    call fluxspeed(m,n,qr,ur,fr,cr)
+    call fluxspeed(n, ql, ul, fl, cl)
+    call fluxspeed(n, qr, ur, fr, cr)
 
 ! calculate fluxes
 !
@@ -582,11 +655,12 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine fluxspeed(m, n, q, u, f, c)
+  subroutine fluxspeed(n, q, u, f, c)
 
+    use blocks, only : nvr, nqt
     use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config, only : gamma, csnd, csnd2
 
@@ -594,10 +668,10 @@ module scheme
 
 ! input/output arguments
 !
-    integer             , intent(in)  :: m, n
-    real, dimension(m,n), intent(in)  :: q, u
-    real, dimension(m,n), intent(out) :: f
-    real, dimension(n)  , intent(out) :: c
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: q, u
+    real, dimension(nqt,n), intent(out) :: f
+    real, dimension(n)    , intent(out) :: c
 
 ! local variables
 !
@@ -634,11 +708,11 @@ module scheme
 #ifdef ADI
       f(ien,i) = f(ien,i) + q(ivx,i) * pm - q(ibx,i) * vb
 #endif /* ADI */
-#ifndef FIELDCD
+#ifdef FLUXCT
       f(ibx,i) = 0.0
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
-#endif /* !FIELDCD */
+#endif /* FLUXCT */
 #endif /* MHD */
 
 ! compute speeds
@@ -709,11 +783,12 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine cons2prim(m, n, u, q)
+  subroutine cons2prim(n, u, q)
 
+    use blocks, only : nvr
     use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config, only : gammam1
 
@@ -721,9 +796,9 @@ module scheme
 
 ! input/output arguments
 !
-    integer             , intent(in)  :: m, n
-    real, dimension(m,n), intent(in)  :: u
-    real, dimension(m,n), intent(out) :: q
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nvr,n), intent(out) :: q
 
 ! local variables
 !
@@ -743,7 +818,7 @@ module scheme
       ek       = 0.5 * sum(u(imx:imz,i) * q(ivx:ivz,i))
       ei       = u(ien,i) - ek
 #ifdef MHD
-      em       = 0.5 * sum(u(ibx:ibz,i) * u(ibx:ibz,i))
+      em       = 0.5 * sum(u(icx:icz,i) * u(icx:icz,i))
       ei       = ei - em
 #endif /* MHD */
       q(ipr,i) = gammam1 * ei
@@ -752,6 +827,11 @@ module scheme
       q(ibx,i) = u(ibx,i)
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
+#ifdef FLUXCT
+      q(icx,i) = u(icx,i)
+      q(icy,i) = u(icy,i)
+      q(icz,i) = u(icz,i)
+#endif /* FLUXCT */
 #endif /* MHD */
     end do
 
@@ -765,11 +845,12 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine prim2cons(m, n, q, u)
+  subroutine prim2cons(n, q, u)
 
+    use blocks, only : nvr
     use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config, only : gammam1i
 
@@ -777,9 +858,9 @@ module scheme
 
 ! input/output arguments
 !
-    integer             , intent(in)  :: m, n
-    real, dimension(m,n), intent(in)  :: q
-    real, dimension(m,n), intent(out) :: u
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: q
+    real, dimension(nvr,n), intent(out) :: u
 
 ! local variables
 !
@@ -800,12 +881,17 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
 #ifdef ADI
-      em       = 0.5 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
+      em       = 0.5 * sum(q(icx:icz,i) * q(icx:icz,i))
       u(ien,i) = u(ien,i) + em
 #endif /* ADI */
       u(ibx,i) = q(ibx,i)
       u(iby,i) = q(iby,i)
       u(ibz,i) = q(ibz,i)
+#ifdef FLUXCT
+      u(icx,i) = q(icx,i)
+      u(icy,i) = q(icy,i)
+      u(icz,i) = q(icz,i)
+#endif /* FLUXCT */
 #endif /* MHD */
     end do
 
@@ -821,17 +907,21 @@ module scheme
 !
   function maxspeed(u)
 
-    use blocks, only : nv => nvars, idn, ivx, ivz, ipr
+    use blocks       , only : nvr, nqt
+    use blocks       , only : idn, ivx, ivz, ipr
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config, only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
+    use config       , only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
+#if defined MHD && defined FLUXCT
+    use interpolation, only : magtocen
+#endif /* MHD && FLUXCT */
 
     implicit none
 
 ! input arguments
 !
-    real, dimension(nv,im,jm,km), intent(in)  :: u
+    real, dimension(nqt,im,jm,km), intent(in)  :: u
 
 ! local variables
 !
@@ -844,18 +934,28 @@ module scheme
 
 ! local arrays
 !
-    real, dimension(nv,im) :: q
+    real, dimension(nvr,im,jm,km) :: w
+    real, dimension(nvr,im)       :: q
 !
 !----------------------------------------------------------------------
 !
     maxspeed = 0.0
+
+! copy variables to a new array
+!
+    w(1:nqt,1:im,1:jm,1:km) = u(1:nqt,1:im,1:jm,1:km)
+#ifdef FLUXCT
+! interpolate cell centered components of the magnetic field
+!
+    call magtocen(w)
+#endif /* FLUXCT */
 
 ! iterate over all points and calculate maximum speed
 !
     do k = kb, ke
       do j = jb, je
 
-        call cons2prim(nv, im, u(:,:,j,k), q(:,:))
+        call cons2prim(im, w(1:nvr,1:im,j,k), q(1:nvr,1:im))
 
         do i = ib, ie
 
@@ -864,7 +964,7 @@ module scheme
           vv = sum(q(ivx:ivz,i)**2)
           v  = sqrt(vv)
 #ifdef MHD
-          bb = sum(q(ibx:ibz,i)**2)
+          bb = sum(q(icx:icz,i)**2)
 #endif /* MHD */
 
 ! calculate the maximum characteristic speed
@@ -891,7 +991,7 @@ module scheme
         end do
       end do
     end do
-
+!
 !-------------------------------------------------------------------------------
 !
   end function maxspeed

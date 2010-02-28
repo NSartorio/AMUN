@@ -34,7 +34,7 @@ EOS        = ADI
 #  ORDER     - order of the solution: 2, 3, or 4
 #  TIME      - time integration: EULER, RK2, RK3
 #  FLUX      - flux approximation: HLL
-#  FLUXEMF   - electromotive force approximation: FIELDCD
+#  FLUXEMF   - electromotive force approximation: FIELDCD, FLUXCT
 #
 TIME       = RK2
 FLUX       = HLL

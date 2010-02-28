@@ -34,6 +34,16 @@ endif
 
 #-------------------------------------------------------------------------------
 #
+# check flag conditions
+#
+ifeq ($(EQS),MHD)
+ifeq ($(FLUX),HLLC)
+FLUX = HLL
+endif
+endif
+
+#-------------------------------------------------------------------------------
+#
 # pass additional flags to the compiler
 #
 # number of dimensions
@@ -118,7 +128,7 @@ driver.o        : driver.F90 config.o evolution.o io.o mesh.o mpitools.o       \
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o interpolation.o \
                   mesh.o mpitools.o problem.o scheme.o timer.o
-interpolation.o : interpolation.F90
+interpolation.o : interpolation.F90 blocks.o config.o
 io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o

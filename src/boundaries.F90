@@ -43,7 +43,7 @@ module boundaries
   subroutine boundary
 
     use config  , only : im, jm, km
-    use blocks  , only : nv => nvars, ndims, nsides, nfaces, nchild            &
+    use blocks  , only : nvr, nqt, ndims, nsides, nfaces, nchild               &
                        , block_meta, block_info, pointer_info, list_meta
     use error   , only : print_error
     use mpitools, only : ncpus, ncpu, msendf, mrecvf
@@ -247,7 +247,7 @@ module boundaries
 
 ! allocate space for variables
 !
-            allocate(rbuf(l,nv,im,jm,km))
+            allocate(rbuf(l,nqt,im,jm,km))
 
 ! if p == ncpu we are receiving data
 !
@@ -362,9 +362,9 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_copy(pdata, un, idir, is, ip)
+  subroutine bnd_copy(pdata, u, idir, is, ip)
 
-    use blocks, only : block_data, nv => nvars, iqt
+    use blocks, only : block_data, nvr, nqt
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
                      , km, kb, kbl, kbu, ke, kel, keu
@@ -374,13 +374,13 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer           , intent(inout) :: pdata
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
-    integer                             , intent(in)    :: idir, is, ip
+    type(block_data), pointer            , intent(inout) :: pdata
+    real        , dimension(nqt,im,jm,km), intent(in)    :: u
+    integer                              , intent(in)    :: idir, is, ip
 
 ! local variables
 !
-    integer :: ii, i, j, k, q
+    integer :: ii
 !
 !-------------------------------------------------------------------------------
 !
@@ -393,63 +393,23 @@ module boundaries
     select case(ii)
 
     case(110)
-      do k = 1, km
-        do j = 1, jm
-          do q = 1, iqt
-            pdata%u(q,1:ibl,j,k) = un(q,iel:ie,j,k)
-          end do
-        end do
-      end do
-      pdata%u(1:iqt,1:ibl,1:jm,1:km) = un(1:iqt,iel:ie,1:jm,1:km)
+      pdata%u(1:nqt,  1:ibl,1:jm,1:km) = u(1:nqt,iel:ie ,1:jm,1:km)
 
     case(120)
-      do k = 1, km
-        do j = 1, jm
-          do q = 1, iqt
-            pdata%u(q,ieu:im,j,k) = un(q,ib:ibu,j,k)
-          end do
-        end do
-      end do
-      pdata%u(1:iqt,ieu:im,1:jm,1:km) = un(1:iqt,ib:ibu,1:jm,1:km)
+      pdata%u(1:nqt,ieu:im ,1:jm,1:km) = u(1:nqt, ib:ibu,1:jm,1:km)
 
     case(210)
-      do k = 1, km
-        do i = 1, im
-          do q = 1, iqt
-            pdata%u(q,i,1:jbl,k) = un(q,i,jel:je,k)
-          end do
-        end do
-      end do
-      pdata%u(1:iqt,1:im,1:jbl,1:km) = un(1:iqt,1:im,jel:je,1:km)
+      pdata%u(1:nqt,1:im,  1:jbl,1:km) = u(1:nqt,1:im,jel:je ,1:km)
 
     case(220)
-      do k = 1, km
-        do i = 1, im
-          do q = 1, iqt
-            pdata%u(q,i,jeu:jm,k) = un(q,i,jb:jbu,k)
-          end do
-        end do
-      end do
-      pdata%u(1:iqt,1:im,jeu:jm,1:km) = un(1:iqt,1:im,jb:jbu,1:km)
+      pdata%u(1:nqt,1:im,jeu:jm ,1:km) = u(1:nqt,1:im, jb:jbu,1:km)
 
 #if NDIMS == 3
     case(310)
-      do j = 1, jm
-        do i = 1, im
-          do q = 1, iqt
-            pdata%u(q,i,j,1:kbl) = un(q,i,j,kel:ke)
-          end do
-        end do
-      end do
+      pdata%u(1:nqt,1:im,1:jm,  1:kbl) = u(1:nqt,1:im,1:jm,kel:ke )
 
     case(320)
-      do j = 1, jm
-        do i = 1, im
-          do q = 1, iqt
-            pdata%u(q,i,j,keu:km) = un(q,i,j,kb:kbu)
-          end do
-        end do
-      end do
+      pdata%u(1:nqt,1:im,1:jm,keu:km ) = u(1:nqt,1:im,1:jm, kb:kbu)
 #endif /* NDIMS == 3 */
     case default
       call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
@@ -469,7 +429,7 @@ module boundaries
 !
   subroutine bnd_rest(pdata, un, idir, iside, iface)
 
-    use blocks, only : block_data, nv => nvars, nchild, ifl, iqt
+    use blocks, only : block_data, nvr, nchild, nfl, nqt
 #ifdef MHD
     use blocks, only : ibx, iby, ibz
 #endif /* MHD */
@@ -483,9 +443,9 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer           , intent(inout) :: pdata
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
-    integer                             , intent(in)    :: idir, iside, iface
+    type(block_data), pointer            , intent(inout) :: pdata
+    real(kind=8), dimension(nqt,im,jm,km), intent(in)    :: un
+    integer                              , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
@@ -784,7 +744,7 @@ module boundaries
 
 ! iterate over all variables
 !
-    do q = 1, ifl
+    do q = 1, nfl
 
 ! shrink the boundary
 !
@@ -831,7 +791,7 @@ module boundaries
 !
   subroutine bnd_prol(pdata, un, idir, iside, iface)
 
-    use blocks, only : block_data, nv => nvars, ifl
+    use blocks, only : block_data, nvr, nfl, nqt
 #ifdef MHD
     use blocks, only : ibx, iby, ibz
 #endif /* MHD */
@@ -846,7 +806,7 @@ module boundaries
 ! arguments
 !
     type(block_data), pointer           , intent(inout) :: pdata
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: un
+    real(kind=8), dimension(nqt,im,jm,km), intent(in)    :: un
     integer                             , intent(in)    :: idir, iside, iface
 
 ! local variables
@@ -1144,7 +1104,7 @@ module boundaries
 
 ! iterate over all variables
 !
-    do q = 1, ifl
+    do q = 1, nfl
 
 ! expand the boundary
 !
@@ -1189,7 +1149,7 @@ module boundaries
 !
   subroutine bnd_spec(pb, id, il, ip)
 
-    use blocks, only : block_data, nv => nvars, imx, imy, imz
+    use blocks, only : block_data, nvr, imx, imy, imz
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu      &
                      , kb, kbl, ke, keu

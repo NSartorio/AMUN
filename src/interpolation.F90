@@ -417,6 +417,7 @@ module interpolation
 !-------------------------------------------------------------------------------
 !
   end subroutine shrink_1d
+#ifdef FLUXCT
 !
 !===============================================================================
 !
@@ -427,63 +428,65 @@ module interpolation
 !
 !===============================================================================
 !
-  subroutine magtocen(im, jm, km, bi, bc)
+  subroutine magtocen(u)
+
+    use blocks, only : nvr
+    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use config, only : im, jm, km
 
     implicit none
 
 ! input and output variables
 !
-    integer                    , intent(in)    :: im, jm, km
-    real, dimension(3,im,jm,km), intent(in)    :: bi
-    real, dimension(3,im,jm,km), intent(inout) :: bc
+    real, dimension(nvr,im,jm,km), intent(inout) :: u
 
 ! local  variables
 !
     integer :: i, j, k, n
 
-    real, dimension(:), allocatable, save :: al
+! local arrays
+!
+    real, dimension(im) :: ax
+    real, dimension(jm) :: ay
+#if NDIMS == 3
+    real, dimension(km) :: az
+#endif /* NDIMS == 3 */
 !
 !------------------------------------------------------------------------------
 !
-! allocate a vector for interpolation
-!
-    allocate(al(max(im,jm,km)))
-
 ! perform interpolation
 !
     do k = 1, km
       do j = 1, jm
-        al(1:im) = bi(1,1:im,j,k)
+        ax(1:im) = u(ibx,1:im,j,k)
 
-        bc(1,2:im,j,k) = 0.5 * (al(1:im-1) + al(2:im))
-        bc(1,1   ,j,k) =        al(1     )
+        u(icx,2:im,j,k) = 0.5 * (ax(1:im-1) + ax(2:im))
+        u(icx,1   ,j,k) =        ax(1     )
       enddo
 
       do i = 1, im
-        al(1:jm) = bi(2,i,1:jm,k)
+        ay(1:jm) = u(iby,i,1:jm,k)
 
-        bc(2,i,2:jm,k) = 0.5 * (al(1:jm-1) + al(2:jm))
-        bc(2,i,1   ,k) =        al(1     )
+        u(icy,i,2:jm,k) = 0.5 * (ay(1:jm-1) + ay(2:jm))
+        u(icy,i,1   ,k) =        ay(1     )
       enddo
     enddo
 
 #if NDIMS == 3
     do j = 1, jm
       do i = 1, im
-        al(1:km) = bi(3,i,j,1:km)
+        az(1:km) = u(ibz,i,j,1:km)
 
-
-        bc(3,i,j,2:km) = 0.5 * (al(1:km-1) + ar(1:km-1))
-        bc(3,i,j,1   ) =        al(1     )
+        u(icz,i,j,2:km) = 0.5 * (az(1:km-1) + az(2:km))
+        u(icz,i,j,1   ) =        az(1     )
       enddo
     enddo
+#else /* NDIMS == 3 */
+    u(icz,:,:,:) = u(ibz,:,:,:)
 #endif /* NDIMS == 3 */
-
-! deallocate temporary vector
 !
-    deallocate(al)
-
   end subroutine magtocen
+#endif /* FLUXCT */
 !
 !===============================================================================
 !

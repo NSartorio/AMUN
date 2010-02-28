@@ -39,11 +39,11 @@ module io
 !
   subroutine write_data(ftype, nfile, nproc)
 
-    use blocks  , only : block_data, list_data, ndims, nsides, nvars, nblocks  &
+    use blocks  , only : block_data, list_data, ndims, nsides, nvr, nblocks    &
                        , nleafs, dblocks                                       &
-                       , idn, ivx, ivy, ivz, ipr
+                       , idn, ivx, ivy, ivz, ipr, ien, nqt
 #ifdef MHD
-    use blocks  , only : ibx, iby, ibz
+    use blocks  , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
     use config  , only : nghost, in, jn, kn, im, jm, km, maxlev                &
                        , ib, ie, jb, je, kb, ke                                &
@@ -57,6 +57,9 @@ module io
                        , h5pclose_f, hid_t, hsize_t, H5F_ACC_TRUNC_F           &
                        , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER              &
                        , H5T_NATIVE_DOUBLE, H5P_DATASET_CREATE_F
+#if defined MHD && defined FLUXCT
+    use interpolation, only : magtocen
+#endif /* MHD & FLUXCT */
     use mesh    , only : ax, ay, az, adx, ady, adz
     use mpitools, only : ncpus, ncpu
     use scheme  , only : cons2prim
@@ -88,12 +91,12 @@ module io
     integer(kind=4), dimension(:)      , allocatable :: indices
     integer(kind=4), dimension(:)      , allocatable :: levels
     real(kind=8)   , dimension(:,:,:)  , allocatable :: bounds
-    real(kind=8)   , dimension(:,:,:,:), allocatable :: dens, pres
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: dens, pres, ener
     real(kind=8)   , dimension(:,:,:,:), allocatable :: velx, vely, velz
 #ifdef MHD
     real(kind=8)   , dimension(:,:,:,:), allocatable :: magx, magy, magz
 #endif /* MHD */
-    real(kind=8)   , dimension(:,:,:,:), allocatable :: u
+    real           , dimension(:,:,:,:), allocatable :: u, q
 
 ! local pointers
 !
@@ -143,7 +146,9 @@ module io
         allocate(magz   (dblocks,in,jn,kn))
 #endif /* MHD */
         allocate(pres   (dblocks,in,jn,kn))
-        allocate(u      (nvars  ,im,jm,km))
+        allocate(ener   (dblocks,in,jn,kn))
+        allocate(u      (nvr    ,im,jm,km))
+        allocate(q      (nvr    ,im,jm,km))
 
 ! iterate over all data blocks and fill the stored arrays
 !
@@ -160,22 +165,29 @@ module io
           bounds (l,3,1) = pdata%meta%zmin
           bounds (l,3,2) = pdata%meta%zmax
 #endif /* NDIMS == 3 */
+          u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
+#if defined MHD && defined FLUXCT
+! interpolate cell centered components of the magnetic field
+!
+          call magtocen(u)
+#endif /* MHD & FLUXCT */
           do k = 1, km
             do j = 1, jm
-              call cons2prim(nvars,im,pdata%u(:,:,j,k),u(:,:,j,k))
+              call cons2prim(im, u(:,:,j,k), q(:,:,j,k))
             end do
           end do
-          dens(l,1:in,1:jn,1:kn) = u(idn,ib:ie,jb:je,kb:ke)
-          velx(l,1:in,1:jn,1:kn) = u(ivx,ib:ie,jb:je,kb:ke)
-          vely(l,1:in,1:jn,1:kn) = u(ivy,ib:ie,jb:je,kb:ke)
-          velz(l,1:in,1:jn,1:kn) = u(ivz,ib:ie,jb:je,kb:ke)
+          dens(l,1:in,1:jn,1:kn) = q(idn,ib:ie,jb:je,kb:ke)
+          velx(l,1:in,1:jn,1:kn) = q(ivx,ib:ie,jb:je,kb:ke)
+          vely(l,1:in,1:jn,1:kn) = q(ivy,ib:ie,jb:je,kb:ke)
+          velz(l,1:in,1:jn,1:kn) = q(ivz,ib:ie,jb:je,kb:ke)
 #ifdef ADI
-          pres(l,1:in,1:jn,1:kn) = u(ipr,ib:ie,jb:je,kb:ke)
+          pres(l,1:in,1:jn,1:kn) = q(ipr,ib:ie,jb:je,kb:ke)
+          ener(l,1:in,1:jn,1:kn) = u(ien,ib:ie,jb:je,kb:ke)
 #endif /* ADI */
 #ifdef MHD
-          magx(l,1:in,1:jn,1:kn) = u(ibx,ib:ie,jb:je,kb:ke)
-          magy(l,1:in,1:jn,1:kn) = u(iby,ib:ie,jb:je,kb:ke)
-          magz(l,1:in,1:jn,1:kn) = u(ibz,ib:ie,jb:je,kb:ke)
+          magx(l,1:in,1:jn,1:kn) = q(icx,ib:ie,jb:je,kb:ke)
+          magy(l,1:in,1:jn,1:kn) = q(icy,ib:ie,jb:je,kb:ke)
+          magz(l,1:in,1:jn,1:kn) = q(icz,ib:ie,jb:je,kb:ke)
 #endif /* MHD */
           l = l + 1
           pdata => pdata%next
@@ -184,6 +196,7 @@ module io
 ! deallocate unused arrays
 !
         if (allocated(u)) deallocate(u)
+        if (allocated(q)) deallocate(q)
 
 ! prepare properties / compression
 !
@@ -345,6 +358,9 @@ module io
 #ifdef ADI
           call h5dcreate_f(gid, 'pres', H5T_NATIVE_DOUBLE, sid, did, err, pid)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, pres(:,:,:,:), qm(:), err, sid)
+          call h5dclose_f(did, err)
+          call h5dcreate_f(gid, 'ener', H5T_NATIVE_DOUBLE, sid, did, err, pid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, ener(:,:,:,:), qm(:), err, sid)
           call h5dclose_f(did, err)
 #endif /* ADI */
 #ifdef MHD

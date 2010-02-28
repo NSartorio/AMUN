@@ -42,14 +42,15 @@ module evolution
 !
   subroutine evolve
 
-    use blocks    , only : block_data, list_data
-    use boundaries, only : boundary
-    use mesh      , only : dx_min, update_mesh
+    use blocks      , only : block_data, list_data
+    use boundaries  , only : boundary
+    use mesh        , only : update_mesh
+    use mesh        , only : dx_min
 #ifdef MPI
-    use mpitools  , only : mallreduceminr
+    use mpitools    , only : mallreduceminr
 #endif /* MPI */
-    use scheme    , only : maxspeed
-    use timer     , only : start_timer, stop_timer
+    use scheme      , only : maxspeed
+    use timer       , only : start_timer, stop_timer
 
     implicit none
 
@@ -132,7 +133,7 @@ module evolution
     call start_timer(4)
     call boundary
     call stop_timer(4)
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve
@@ -146,14 +147,8 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks       , only : block_data, nv => nvars, iqt
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz
-#endif /* MHD */
+    use blocks       , only : block_data, nqt
     use config       , only : im, jm, km
-#ifdef MHD
-    use interpolation, only : magtocen
-#endif /* MHD */
     use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem      , only : update_shapes
@@ -168,12 +163,11 @@ module evolution
 
 ! local variables
 !
-    integer :: q, i, j, k
     real    :: dxi, dyi, dzi
 
 ! local arrays
 !
-    real, dimension(nv,im,jm,km) :: du
+    real, dimension(nqt,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -195,15 +189,7 @@ module evolution
 
 ! update solution
 !
-    do k = 1, km
-      do j = 1, jm
-        do i = 1, im
-          do q = 1, iqt
-            pblock%u(q,i,j,k) = pblock%u(q,i,j,k) + dt * du(q,i,j,k)
-          end do
-        end do
-      end do
-    end do
+    pblock%u(:,:,:,:) = pblock%u(:,:,:,:) + dt * du(:,:,:,:)
 !
 !-------------------------------------------------------------------------------
 !
@@ -219,14 +205,8 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks       , only : block_data, nv => nvars, iqt
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz
-#endif /* MHD */
+    use blocks       , only : block_data, nqt
     use config       , only : im, jm, km
-#ifdef MHD
-    use interpolation, only : magtocen
-#endif /* MHD */
     use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem      , only : update_shapes
@@ -241,12 +221,11 @@ module evolution
 
 ! local variables
 !
-    integer :: q, i, j, k
     real    :: dxi, dyi, dzi
 
 ! local arrays
 !
-    real, dimension(nv,im,jm,km) :: u1, du
+    real, dimension(nqt,im,jm,km) :: u1, du
 !
 !-------------------------------------------------------------------------------
 !
@@ -268,15 +247,7 @@ module evolution
 
 ! update solution
 !
-    do k = 1, km
-      do j = 1, jm
-        do i = 1, im
-          do q = 1, iqt
-            u1(q,i,j,k) = pblock%u(q,i,j,k) + dt * du(q,i,j,k)
-          end do
-        end do
-      end do
-    end do
+    u1(:,:,:,:) = pblock%u(:,:,:,:) + dt * du(:,:,:,:)
 
 ! 2nd step of integration
 !
@@ -290,21 +261,13 @@ module evolution
 
 ! update solution
 !
-    do k = 1, km
-      do j = 1, jm
-        do i = 1, im
-          do q = 1, iqt
-            pblock%u(q,i,j,k) = 0.5 * (pblock%u(q,i,j,k) + u1(q,i,j,k) + dt * du(q,i,j,k))
-          end do
-        end do
-      end do
-    end do
+    pblock%u(:,:,:,:) = 0.5 * (pblock%u(:,:,:,:) + u1(:,:,:,:) + dt * du(:,:,:,:))
 !
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
 #endif /* RK2 */
-
+!
 !===============================================================================
 !
 end module

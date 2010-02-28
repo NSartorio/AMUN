@@ -384,7 +384,7 @@ module mesh
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , nleafs, dblocks, nchild, ndims, nsides, nfaces        &
                        , refine_block, derefine_block, append_datablock        &
-                       , associate_blocks, deallocate_datablock, nv => nvars
+                       , associate_blocks, deallocate_datablock, nqt
     use error   , only : print_info
 #ifdef MPI
     use mpitools, only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
@@ -409,7 +409,7 @@ module mesh
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nv,im,jm,km) :: rbuf
+    real(kind=8)   , dimension(nqt,im,jm,km) :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -804,15 +804,12 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, nvars, nchild, ifl, iqt
+    use blocks       , only : block_meta, nchild, nfl, nqt
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
-#ifdef MHD
-    use interpolation, only : magtocen
-#endif /* MHD */
 
     implicit none
 
@@ -853,11 +850,11 @@ module mesh
 
 ! allocate array to the product of expansion
 !
-    allocate(u(nvars, fm(1), fm(2), fm(3)))
+    allocate(u(nqt, fm(1), fm(2), fm(3)))
 
 ! expand all variables and place them in the array u
 !
-    do q = 1, nvars
+    do q = 1, nqt
       call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 
@@ -893,7 +890,7 @@ module mesh
 
 ! copy data to the current child
 !
-      pchild%data%u(1:nvars,1:im,1:jm,1:km) = u(1:nvars,il:iu,jl:ju,kl:ku)
+      pchild%data%u(1:nqt,1:im,1:jm,1:km) = u(1:nqt,il:iu,jl:ju,kl:ku)
 
     end do
 
@@ -913,15 +910,12 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, nvars, nchild, ifl
+    use blocks       , only : block_meta, nchild, nfl
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
     use config       , only : ng, im, jm, km, ib, jb, kb
     use interpolation, only : shrink
-#ifdef MHD
-    use interpolation, only : magtocen
-#endif /* MHD */
 
     implicit none
 
@@ -1014,7 +1008,7 @@ module mesh
 
 ! iterate over all quantities
 !
-      do q = 1, ifl
+      do q = 1, nfl
 
 ! shrink the current child
 !
@@ -1041,6 +1035,24 @@ module mesh
 
       end do
 #endif /* FIELDCD */
+#ifdef FLUXCT
+! restrict the X component of magnetic field
+!
+      call shrink(dm, pm, 0, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'm', 'm')
+      pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
+! restrict the Y component of magnetic field
+!
+      call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
+      pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+
+#if NDIMS == 3
+! restrict the Z component of magnetic field
+!
+      call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
+      pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
 #endif /* MHD */
 
     end do
