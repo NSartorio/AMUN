@@ -854,10 +854,32 @@ module mesh
 
 ! expand all variables and place them in the array u
 !
-    do q = 1, nqt
+    do q = 1, nfl
       call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 
+#ifdef MHD
+#ifdef FIELDCD
+! expand the cell centered magnetic field components
+!
+    do q = ibx, ibz
+      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+    end do
+#endif /* FIELDCD */
+#ifdef FLUXCT
+! expand X-component of magnetic field
+!
+    call expand(dm, fm, ng, pblock%data%u(ibx,:,:,:), u(ibx,:,:,:), 'c', 't', 't')
+
+! expand Y-component of magnetic field
+!
+    call expand(dm, fm, ng, pblock%data%u(iby,:,:,:), u(iby,:,:,:), 't', 'c', 't')
+
+! expand Z-component of magnetic field
+!
+    call expand(dm, fm, ng, pblock%data%u(ibz,:,:,:), u(ibz,:,:,:), 't', 't', 'c')
+#endif /* FLUXCT */
+#endif /* MHD */
 ! iterate over all children
 !
     do p = 1, nchild
@@ -1046,12 +1068,10 @@ module mesh
       call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
       pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 
-#if NDIMS == 3
 ! restrict the Z component of magnetic field
 !
       call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
       pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
-#endif /* NDIMS == 3 */
 #endif /* FLUXCT */
 #endif /* MHD */
 

@@ -295,7 +295,11 @@ module config
     kgrids = ngrids
 #endif /* */
 
-    ng  = nghost
+#ifdef MHD
+    ng  = min(nghost, 4)
+#else /* MHD */
+    ng  = min(nghost, 6)
+#endif /* MHD */
 
     in  = ncells
     im  = in + 2 * ng

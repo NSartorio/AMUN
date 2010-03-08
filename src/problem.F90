@@ -948,12 +948,12 @@ module problem
 !
     check_ref = 0
 
-!     if (dpmax .ge. crefmax) then
+    if (dpmax .ge. crefmax) then
       check_ref =  1
-!     endif
-!     if (dpmax .le. crefmin) then
-!       check_ref = -1
-!     endif
+    end if
+    if (dpmax .le. crefmin) then
+      check_ref = -1
+    end if
 
     return
 

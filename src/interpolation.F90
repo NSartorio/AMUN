@@ -293,7 +293,7 @@ module interpolation
 ! local variables
 !
     integer  :: i, ib, ie, j0, j1
-    real     :: du, ddu, dum, dup, du0, ds
+    real     :: du, dum, dup, du0, ds
 !
 !-------------------------------------------------------------------------------
 !
@@ -303,37 +303,15 @@ module interpolation
     ie = n - ng / 2
 
     select case(flag)
-    case('l')
-      do i = ib, ie
-        du = 0.5 * (u(i+1) - u(i-1))
-
-        j1 = 2 * i - ng
-        j0 = j1 - 1
-
-        v(j0) = u(i) - 0.25 * du
-        v(j1) = u(i) + 0.25 * du
-      end do
     case('c')
       do i = ib, ie
         du  = u(i) - u(i-1)
-        ddu = - 0.25 * (u(i+1) - u(i-1) - u(i) + u(i-2))
 
         j1 = 2 * i - ng
         j0 = j1 - 1
 
-        v(j0) = u(i) - 0.5 * du + 0.25 * ddu
+        v(j0) = u(i) - 0.5 * du
         v(j1) = u(i)
-      end do
-    case('u')
-      do i = ib, ie
-        dup = u(i+1) - u(i)
-        dum = u(i) - u(i-1)
-
-        j1 = 2 * i - ng
-        j0 = j1 - 1
-
-        v(j0) = u(i) - 0.25d0*dum
-        v(j1) = u(i) + 0.25d0*dup
       end do
     case('t')
       do i = ib, ie

@@ -362,12 +362,15 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_copy(pdata, u, idir, is, ip)
+  subroutine bnd_copy(pdata, u, idir, iside, iface)
 
-    use blocks, only : block_data, nvr, nqt
+    use blocks, only : block_data, nvr, nfl, nqt
+#ifdef MHD
+    use blocks, only : ibx, iby, ibz
+#endif /* MHD */
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
-                     , km, kb, kbl, kbu, ke, kel, keu
+                     , km, kb, kbl, kbu, ke, kel, keu, ng
     use error , only : print_warning
 
     implicit none
@@ -376,46 +379,109 @@ module boundaries
 !
     type(block_data), pointer            , intent(inout) :: pdata
     real        , dimension(nqt,im,jm,km), intent(in)    :: u
-    integer                              , intent(in)    :: idir, is, ip
+    integer                              , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
     integer :: ii
+    integer :: il, iu, jl, ju, kl, ku
+    integer :: is, it, js, jt, ks, kt
 !
 !-------------------------------------------------------------------------------
 !
 ! calcuate the flag determinig the side of boundary to update
 !
-    ii = 100 * idir + 10 * is
+    ii = 100 * idir + 10 * iside
 
-! perform update according to the flag
+! prepare common indices
+!
+    il = 1
+    iu = im
+    jl = 1
+    ju = jm
+    kl = 1
+    ku = km
+
+    is = 1
+    it = im
+    js = 1
+    jt = jm
+    ks = 1
+    kt = km
+
+! prepare indices
 !
     select case(ii)
 
     case(110)
-      pdata%u(1:nqt,  1:ibl,1:jm,1:km) = u(1:nqt,iel:ie ,1:jm,1:km)
+      il = iel
+      iu = ie
+      it = ibl
 
     case(120)
-      pdata%u(1:nqt,ieu:im ,1:jm,1:km) = u(1:nqt, ib:ibu,1:jm,1:km)
+      il = ib
+      iu = ibu
+      is = ieu
 
     case(210)
-      pdata%u(1:nqt,1:im,  1:jbl,1:km) = u(1:nqt,1:im,jel:je ,1:km)
+      jl = jel
+      ju = je
+      jt = jbl
 
     case(220)
-      pdata%u(1:nqt,1:im,jeu:jm ,1:km) = u(1:nqt,1:im, jb:jbu,1:km)
+      jl = jb
+      ju = jbu
+      js = jeu
 
-#if NDIMS == 3
     case(310)
-      pdata%u(1:nqt,1:im,1:jm,  1:kbl) = u(1:nqt,1:im,1:jm,kel:ke )
+      kl = kel
+      ku = ke
+      kt = kbl
 
     case(320)
-      pdata%u(1:nqt,1:im,1:jm,keu:km ) = u(1:nqt,1:im,1:jm, kb:kbu)
-#endif /* NDIMS == 3 */
-    case default
-      call print_warning("boundaries::bnd_copy", "Boundary flag unsupported!")
+      kl = kb
+      ku = kbu
+      ks = keu
 
     end select
 
+! perform update of the fluid variables
+!
+    pdata%u(1:nfl,is:it,js:jt,ks:kt) = u(1:nfl,il:iu,jl:ju,kl:ku)
+
+#ifdef MHD
+#ifdef FIELDCD
+! perform update of the cell-centered magnetic field components
+!
+    pdata%u(ibx:ibz,is:it,js:jt,ks:kt) = u(ibx:ibz,il:iu,jl:ju,kl:ku)
+#endif /* FIELDCD */
+#ifdef FLUXCT
+! perform update of the staggered magnetic field components
+!
+    if (it .eq. ng) then
+      pdata%u(ibx,is:it-1,js:jt,ks:kt) = u(ibx,il:iu-1,jl:ju,kl:ku)
+    else
+      pdata%u(ibx,is:it  ,js:jt,ks:kt) = u(ibx,il:iu  ,jl:ju,kl:ku)
+    end if
+
+    if (jt .eq. ng) then
+      pdata%u(iby,is:it,js:jt-1,ks:kt) = u(iby,il:iu,jl:ju-1,kl:ku)
+    else
+      pdata%u(iby,is:it,js:jt  ,ks:kt) = u(iby,il:iu,jl:ju  ,kl:ku)
+    end if
+
+#if NDIMS == 3
+    if (kt .eq. ng) then
+      pdata%u(ibz,is:it,js:jt,ks:kt-1) = u(ibz,il:iu,jl:ju,kl:ku-1)
+    else
+      pdata%u(ibz,is:it,js:jt,ks:kt  ) = u(ibz,il:iu,jl:ju,kl:ku  )
+    end if
+#else /* NDIMS == 3 */
+    pdata%u(ibz,is:it,js:jt,ks:kt) = u(ibz,il:iu,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
+#endif /* MHD */
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine bnd_copy
@@ -461,7 +527,7 @@ module boundaries
 
 ! parameters
 !
-    integer :: del = 1
+    integer :: del = 2
 !
 !-------------------------------------------------------------------------------
 !
@@ -772,6 +838,47 @@ module boundaries
 
     end do
 #endif /* FIELDCD */
+#ifdef FLUXCT
+! X-component of magnetic field
+!
+    call shrink(fm, cm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 'm', 'm')
+
+! copy shrinked boundary in the proper place of the block
+!
+    if (it .eq. ng) then
+      pdata%u(ibx,is:it-1,js:jt,ks:kt) = ux(il:iu-1,jl:ju,kl:ku)
+    else
+      pdata%u(ibx,is:it  ,js:jt,ks:kt) = ux(il:iu  ,jl:ju,kl:ku)
+    end if
+
+! Y-component of magnetic field
+!
+    call shrink(fm, cm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'm', 'c', 'm')
+
+! copy shrinked boundary in the proper place of the block
+!
+    if (jt .eq. ng) then
+      pdata%u(iby,is:it,js:jt-1,ks:kt) = ux(il:iu,jl:ju-1,kl:ku)
+    else
+      pdata%u(iby,is:it,js:jt  ,ks:kt) = ux(il:iu,jl:ju  ,kl:ku)
+    end if
+
+! Z-component of magnetic field
+!
+    call shrink(fm, cm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'm', 'm', 'c')
+
+! copy shrinked boundary in the proper place of the block
+!
+#if NDIMS == 3
+    if (kt .eq. ng) then
+      pdata%u(ibz,is:it,js:jt,ks:kt-1) = ux(il:iu,jl:ju,kl:ku-1)
+    else
+      pdata%u(ibz,is:it,js:jt,ks:kt  ) = ux(il:iu,jl:ju,kl:ku  )
+    end if
+#else /* NDIMS == 3 */
+    pdata%u(ibz,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
 #endif /* MHD */
 
 ! deallocate temporary array
@@ -823,7 +930,7 @@ module boundaries
 
 ! parameters
 !
-    integer :: del = 1
+    integer :: del = 2
 !
 !-------------------------------------------------------------------------------
 !
@@ -1131,6 +1238,47 @@ module boundaries
 
     end do
 #endif /* FIELDCD */
+#ifdef FLUXCT
+! X-component of magnetic field
+!
+    call expand(cm, pm, 0, un(ibx,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'c', 't', 't')
+
+! copy expanded boundary in the proper place of the block
+!
+    if (it .eq. ng) then
+      pdata%u(ibx,is:it-1,js:jt,ks:kt) = ux(il:iu-1,jl:ju,kl:ku)
+    else
+      pdata%u(ibx,is:it  ,js:jt,ks:kt) = ux(il:iu  ,jl:ju,kl:ku)
+    end if
+
+! Y-component of magnetic field
+!
+    call expand(cm, pm, 0, un(iby,i1:i2,j1:j2,k1:k2), ux(:,:,:), 't', 'c', 't')
+
+! copy expanded boundary in the proper place of the block
+!
+    if (jt .eq. ng) then
+      pdata%u(iby,is:it,js:jt-1,ks:kt) = ux(il:iu,jl:ju-1,kl:ku)
+    else
+      pdata%u(iby,is:it,js:jt  ,ks:kt) = ux(il:iu,jl:ju  ,kl:ku)
+    end if
+
+! Z-component of magnetic field
+!
+    call expand(cm, pm, 0, un(ibz,i1:i2,j1:j2,k1:k2), ux(:,:,:), 't', 't', 'c')
+
+! copy expanded boundary in the proper place of the block
+!
+#if NDIMS == 3
+    if (kt .eq. ng) then
+      pdata%u(ibz,is:it,js:jt,ks:kt-1) = ux(il:iu,jl:ju,kl:ku-1)
+    else
+      pdata%u(ibz,is:it,js:jt,ks:kt  ) = ux(il:iu,jl:ju,kl:ku  )
+    end if
+#else /* NDIMS == 3 */
+    pdata%u(ibz,is:it,js:jt,ks:kt) = ux(il:iu,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
 #endif /* MHD */
 
 ! deallocate temporary array
