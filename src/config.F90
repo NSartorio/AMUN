@@ -296,9 +296,9 @@ module config
 #endif /* */
 
 #ifdef MHD
-    ng  = min(nghost, 4)
+    ng  = max(nghost, 4)
 #else /* MHD */
-    ng  = min(nghost, 6)
+    ng  = max(nghost, 6)
 #endif /* MHD */
 
     in  = ncells
