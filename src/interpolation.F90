@@ -114,8 +114,8 @@ module interpolation
 
 ! allocatable variables
 !
-    real(kind=8), dimension(:)    , allocatable :: x, y
-    real(kind=8), dimension(:,:,:), allocatable :: w, z
+    real, dimension(:)    , allocatable :: x, y
+    real, dimension(:,:,:), allocatable :: w, z
 !
 !-------------------------------------------------------------------------------
 !
@@ -205,8 +205,8 @@ module interpolation
 
 ! allocatable variables
 !
-    real(kind=8), dimension(:)    , allocatable :: x, y
-    real(kind=8), dimension(:,:,:), allocatable :: w, z
+    real, dimension(:)    , allocatable :: x, y
+    real, dimension(:,:,:), allocatable :: w, z
 !
 !-------------------------------------------------------------------------------
 !
@@ -292,7 +292,7 @@ module interpolation
 
 ! local variables
 !
-    integer  :: i, ib, ie, j0, j1
+    integer  :: i, ib, ie, il, ir
     real     :: du, dum, dup, du0, ds
 !
 !-------------------------------------------------------------------------------
@@ -307,17 +307,17 @@ module interpolation
       do i = ib, ie
         du  = u(i) - u(i-1)
 
-        j1 = 2 * i - ng
-        j0 = j1 - 1
+        ir = 2 * i - ng
+        il = ir - 1
 
-        v(j0) = u(i) - 0.5 * du
-        v(j1) = u(i)
+        v(il) = u(i) - 0.5 * du
+        v(ir) = u(i)
       end do
     case('t')
       do i = ib, ie
 
-        j1 = 2 * i - ng
-        j0 = j1 - 1
+        ir = 2 * i - ng
+        il = ir - 1
 
         dup = u(i+1) - u(i)
         dum = u(i-1) - u(i)
@@ -326,20 +326,20 @@ module interpolation
         if (ds .gt. 0.0) then
           du    = 0.5 * ds / (dup - dum)
 
-          v(j0) = u(i) - du
-          v(j1) = u(i) + du
+          v(il) = u(i) - du
+          v(ir) = u(i) + du
         else
-          v(j0) = u(i)
-          v(j1) = u(i)
+          v(il) = u(i)
+          v(ir) = u(i)
         end if
       end do
     case default
       do i = ib, ie
-        j1 = 2 * i - ng
-        j0 = j1 - 1
+        ir = 2 * i - ng
+        il = ir - 1
 
-        v(j0) = u(i)
-        v(j1) = u(i)
+        v(il) = u(i)
+        v(ir) = u(i)
       end do
     end select
 
@@ -367,8 +367,7 @@ module interpolation
 
 ! local variables
 !
-    integer      :: i, ib, ie, j0, j1
-    real(kind=8) :: du, ddu, dum, dup, du0, ds
+    integer      :: i, ib, ie, il, ir
 !
 !-------------------------------------------------------------------------------
 !
@@ -380,15 +379,15 @@ module interpolation
     select case(flag)
     case('c')
       do i = ib, ie
-        j1 = 2 * i - ng
-        v(i)  = u(j1)
+        ir   = 2 * i - ng
+        v(i) = u(ir)
       end do
     case default
       do i = ib, ie
-        j1    = 2 * i - ng
-        j0    = j1 - 1
+        ir   = 2 * i - ng
+        il   = ir - 1
 
-        v(i)  = 0.5 * (u(j0) + u(j1))
+        v(i) = 0.5 * (u(il) + u(ir))
       end do
     end select
 

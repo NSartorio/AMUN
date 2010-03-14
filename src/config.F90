@@ -283,6 +283,14 @@ module config
 20  continue
     close(1)
 
+! limit the minimum number of domain and ghost cells
+#ifdef MHD
+    nghost = max(nghost, 4)
+#else /* MHD */
+    nghost = max(nghost, 6)
+#endif /* MHD */
+    ncells = max(ncells, 2 * nghost)
+
 ! compute additional parameters
 !
     ngrids = ncells + 2 * nghost
@@ -295,11 +303,7 @@ module config
     kgrids = ngrids
 #endif /* */
 
-#ifdef MHD
-    ng  = max(nghost, 4)
-#else /* MHD */
-    ng  = max(nghost, 6)
-#endif /* MHD */
+    ng  = nghost
 
     in  = ncells
     im  = in + 2 * ng

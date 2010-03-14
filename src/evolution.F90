@@ -88,6 +88,18 @@ module evolution
     call boundary
     call stop_timer(4)
 
+! check refinement and refine
+!
+    call start_timer(5)
+    call update_mesh
+    call stop_timer(5)
+
+! update boundaries
+!
+    call start_timer(4)
+    call boundary
+    call stop_timer(4)
+
 ! reset maximum speed
 !
     cmax = 1.0e-8
@@ -121,18 +133,6 @@ module evolution
 !
     call mallreduceminr(dtn)
 #endif /* MPI */
-
-! check refinement and refine
-!
-    call start_timer(5)
-    call update_mesh
-    call stop_timer(5)
-
-! update boundaries
-!
-    call start_timer(4)
-    call boundary
-    call stop_timer(4)
 !
 !-------------------------------------------------------------------------------
 !

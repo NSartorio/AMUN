@@ -542,7 +542,7 @@ module boundaries
     cm(:)    = dm(:) / 2
     cm(idir) = ng + 2 * del
     fm(:)    = 2 * cm(:)
-    pm(:)    = dm(:) / 2 - ng / 2
+    pm(:)    = (dm(:) - ng) / 2
     pm(idir) = ng
 #if NDIMS == 2
     dm(3)  = 1
@@ -1215,7 +1215,7 @@ module boundaries
 
 ! expand the boundary
 !
-      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'a', 'a', 'a')
+      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 't', 't', 't')
 
 ! copy expanded boundary in the proper place of the block
 !
@@ -1230,7 +1230,7 @@ module boundaries
 
 ! expand the boundary
 !
-      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 'a', 'a', 'a')
+      call expand(cm, pm, 0, un(q,i1:i2,j1:j2,k1:k2), ux(:,:,:), 't', 't', 't')
 
 ! copy expanded boundary in the proper place of the block
 !
