@@ -81,6 +81,7 @@ module io
     character(len=64) :: fl
     integer           :: err
     integer(kind=4)   :: i, j, k, l
+    integer           :: it, jt, kt
 
 ! local arrays
 !
@@ -95,6 +96,9 @@ module io
     real(kind=8)   , dimension(:,:,:,:), allocatable :: velx, vely, velz
 #ifdef MHD
     real(kind=8)   , dimension(:,:,:,:), allocatable :: magx, magy, magz
+#ifdef FLUXCT
+    real(kind=8)   , dimension(:,:,:,:), allocatable :: divb
+#endif /* FLUXCT */
 #endif /* MHD */
     real           , dimension(:,:,:,:), allocatable :: u, q
 
@@ -144,6 +148,9 @@ module io
         allocate(magx   (dblocks,in,jn,kn))
         allocate(magy   (dblocks,in,jn,kn))
         allocate(magz   (dblocks,in,jn,kn))
+#ifdef FLUXCT
+        allocate(divb   (dblocks,in,jn,kn))
+#endif /* FLUXCT */
 #endif /* MHD */
         allocate(pres   (dblocks,in,jn,kn))
         allocate(ener   (dblocks,in,jn,kn))
@@ -188,6 +195,35 @@ module io
           magx(l,1:in,1:jn,1:kn) = q(icx,ib:ie,jb:je,kb:ke)
           magy(l,1:in,1:jn,1:kn) = q(icy,ib:ie,jb:je,kb:ke)
           magz(l,1:in,1:jn,1:kn) = q(icz,ib:ie,jb:je,kb:ke)
+#ifdef FLUXCT
+#if NDIMS == 3
+          do k = kb, ke
+            kt = k - kb + 1
+            do j = jb, je
+                jt = j - jb + 1
+              do i = ib, ie
+                it = i - ib + 1
+
+                divb(l,it,jt,kt) = q(ibx,i,j,k) - q(ibx,i-1,j,k)               &
+                                 + q(iby,i,j,k) - q(iby,i,j-1,k)               &
+                                 + q(ibz,i,j,k) - q(ibz,i,j,k-1)
+              end do
+            end do
+          end do
+#else /* NDIMS == 3 */
+          k  = 1
+          kt = 1
+          do j = jb, je
+              jt = j - jb + 1
+            do i = ib, ie
+              it = i - ib + 1
+
+              divb(l,it,jt,kt) = q(ibx,i,j,k) - q(ibx,i-1,j,k)                 &
+                               + q(iby,i,j,k) - q(iby,i,j-1,k)
+            end do
+          end do
+#endif /* NDIMS == 3 */
+#endif /* FLUXCT */
 #endif /* MHD */
           l = l + 1
           pdata => pdata%next
@@ -373,6 +409,11 @@ module io
           call h5dcreate_f(gid, 'magz', H5T_NATIVE_DOUBLE, sid, did, err, pid)
           call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magz(:,:,:,:), qm(:), err, sid)
           call h5dclose_f(did, err)
+#ifdef FLUXCT
+          call h5dcreate_f(gid, 'divb', H5T_NATIVE_DOUBLE, sid, did, err, pid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, divb(:,:,:,:), qm(:), err, sid)
+          call h5dclose_f(did, err)
+#endif /* FLUXCT */
 #endif /* MHD */
 
           call h5sclose_f(sid, err)
@@ -397,6 +438,9 @@ module io
         if (allocated(magx   )) deallocate(magx)
         if (allocated(magy   )) deallocate(magy)
         if (allocated(magz   )) deallocate(magz)
+#ifdef FLUXCT
+        if (allocated(divb   )) deallocate(divb)
+#endif /* FLUXCT */
 #endif /* MHD */
 
 ! release properties
