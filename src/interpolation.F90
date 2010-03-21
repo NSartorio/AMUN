@@ -521,7 +521,7 @@ module interpolation
 
 ! local variables
 !
-    integer :: i, j, k
+    integer :: i, j, k, im1, jm1, km1
 
 ! temporary arrays
 !
@@ -570,8 +570,13 @@ module interpolation
 !
     do k = 1, dm(3)
       do j = 2, dm(2)
+        jm1 = j - 1
         do i = 2, fm(1), 2
-          tx(1,i-1,j,k) = tx(1,i-1,j,k) + 0.125 * ((tx(2,i,j,k) - tx(2,i-1,j,k)) - (tx(2,i,j-1,k) - tx(2,i-1,j-1,k)))
+          im1 = i - 1
+
+          tx(1,im1,j,k) = tx(1,im1,j,k)                                        &
+                        + 0.25 * ((tx(2,i,j  ,k) - tx(2,im1,j  ,k))            &
+                                - (tx(2,i,jm1,k) - tx(2,im1,jm1,k)))
         end do
       end do
     end do
@@ -598,8 +603,13 @@ module interpolation
 !
     do k = 1, dm(3)
       do j = 2, fm(2), 2
+        jm1 = j - 1
         do i = 2, fm(1)
-          wy(i,j-1,k) = wy(i,j-1,k) + 0.25 * ((wx(i,j,k) - wx(i,j-1,k)) - (wx(i-1,j,k) - wx(i-1,j-1,k)))
+          im1 = i - 1
+
+          wy(i,jm1,k) = wy(i,jm1,k)                                            &
+                      + 0.5 * ((wx(i  ,j,k) - wx(i  ,jm1,k))                   &
+                             - (wx(im1,j,k) - wx(im1,jm1,k)))
         end do
       end do
     end do
@@ -653,9 +663,17 @@ module interpolation
 ! calculate Bx from expanded By and Bz using the divergence condition
 !
     do k = 2, dm(3)
+      km1 = k - 1
       do j = 2, dm(2)
+        jm1 = j - 1
         do i = 2, fm(1), 2
-          tx(1,i-1,j,k) = tx(1,i-1,j,k) + 0.125 * ((tx(2,i,j,k) - tx(2,i-1,j,k)) - (tx(2,i,j-1,k) - tx(2,i-1,j-1,k)) + (tx(3,i,j,k) - tx(3,i-1,j,k)) - (tx(3,i,j,k-1) - tx(3,i-1,j,k-1)))
+          im1 = i - 1
+
+          tx(1,im1,j,k) = tx(1,im1,j,k)                                        &
+                        + 0.25 * ((tx(2,i,j  ,k) - tx(2,im1,j  ,k))            &
+                                - (tx(2,i,jm1,k) - tx(2,im1,jm1,k))            &
+                                + (tx(3,i,j,k  ) - tx(3,im1,j,k  ))            &
+                                - (tx(3,i,j,km1) - tx(3,im1,j,km1)))
         end do
       end do
     end do
@@ -681,13 +699,17 @@ module interpolation
 ! calculate Bx from expanded By and Bz using the divergence condition
 !
     do k = 2, dm(3)
+      km1 = k - 1
       do j = 2, fm(2), 2
+        jm1 = j - 1
         do i = 2, dm(1)
-          ty(2,i,j-1,k) = ty(2,i,j-1,k)                                        &
-                       + 0.25  * ((ty(1,i  ,j,k) - ty(1,i  ,j-1,k))            &
-                                - (ty(1,i-1,j,k) - ty(1,i-1,j-1,k)))           &
-                       + 0.125 * ((ty(3,i,j,k  ) - ty(3,i,j-1,k  ))            &
-                                - (ty(3,i,j,k-1) - ty(3,i,j-1,k-1)))
+          im1 = i - 1
+
+          ty(2,i,jm1,k) = ty(2,i,jm1,k)                                        &
+                        + 0.5  * ((ty(1,i  ,j,k) - ty(1,i  ,jm1,k))            &
+                                - (ty(1,im1,j,k) - ty(1,im1,jm1,k)))           &
+                        + 0.25 * ((ty(3,i,j,k  ) - ty(3,i,jm1,k  ))            &
+                                - (ty(3,i,j,km1) - ty(3,i,jm1,km1)))
         end do
       end do
     end do
@@ -713,13 +735,17 @@ module interpolation
 ! calculate Bx from expanded By and Bz using the divergence condition
 !
     do k = 2, fm(3), 2
+      km1 = k - 1
       do j = 2, fm(2)
+        jm1 = j - 1
         do i = 2, fm(1)
-          wz(i,j,k-1) = wz(i,j,k-1)                                            &
-                      + 0.25 * ((wx(i  ,j,k) - wx(i  ,j,k-1))                  &
-                              - (wx(i-1,j,k) - wx(i-1,j,k-1))                  &
-                              + (wy(i  ,j,k) - wy(i  ,j,k-1))                  &
-                              - (wy(i,j-1,k) - wy(i,j-1,k-1)))
+          im1 = i - 1
+
+          wz(i,j,km1) = wz(i,j,km1)                                            &
+                      + 0.5 * ((wx(i  ,j,k) - wx(i  ,j,km1))                   &
+                             - (wx(im1,j,k) - wx(im1,j,km1))                   &
+                             + (wy(i  ,j,k) - wy(i  ,j,km1))                   &
+                             - (wy(i,jm1,k) - wy(i,jm1,km1)))
         end do
       end do
     end do
