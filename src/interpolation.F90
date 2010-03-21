@@ -420,6 +420,7 @@ module interpolation
 ! local  variables
 !
     integer :: i, j, k, n
+    real    :: dur, dul, du, ds
 
 ! local arrays
 !
@@ -461,8 +462,284 @@ module interpolation
 #else /* NDIMS == 3 */
     u(icz,:,:,:) = u(ibz,:,:,:)
 #endif /* NDIMS == 3 */
+
+! correct components to get the divergence free interpolation
+!
+    do k = 1, km
+      do j = 2, jm - 1
+        do i = 2, im - 1
+          dur = u(iby,i+1,j,k) - u(iby,i  ,j,k)
+          dul = u(iby,i  ,j,k) - u(iby,i-1,j,k)
+
+          ds  = dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur + dul)
+          else
+            du = 0.0
+          end if
+
+          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.125 * du
+          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.125 * du
+
+          dur = u(ibx,i,j+1,k) - u(ibx,i,j  ,k)
+          dul = u(ibx,i,j  ,k) - u(ibx,i,j-1,k)
+
+          ds  = dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur + dul)
+          else
+            du = 0.0
+          end if
+
+          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.125 * du
+          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.125 * du
+        end do
+      end do
+    end do
 !
   end subroutine magtocen
+!
+!===============================================================================
+!
+! expand_mag: subroutine for prolongation of the magnetic field with preserving
+!             the divergence free condition (Li & Li, 2004, JCoPh, 199, 1)
+!
+!===============================================================================
+!
+  subroutine expand_mag(dm, fm, ng, ux, uy, uz, wx, wy, wz)
+
+    implicit none
+
+! input and output variables
+!
+    integer, dimension(3)                , intent(in)    :: dm, fm
+    integer                              , intent(in)    :: ng
+    real   , dimension(dm(1),dm(2),dm(3)), intent(in)    :: ux, uy, uz
+    real   , dimension(fm(1),fm(2),fm(3)), intent(inout) :: wx, wy, wz
+
+! local variables
+!
+    integer :: i, j, k
+
+! temporary arrays
+!
+    real, dimension(:)      , allocatable :: sx, sy, sz, rx, ry, rz
+    real, dimension(:,:,:,:), allocatable :: tx, ty
+!
+!------------------------------------------------------------------------------
+!
+    wx(:,:,:) = 0.0
+    wy(:,:,:) = 0.0
+    wz(:,:,:) = 0.0
+
+#if NDIMS == 2
+! allocate dimensional vectors for expansion
+!
+    allocate(sx(maxval(dm(:))))
+    allocate(sy(maxval(dm(:))))
+    allocate(sz(maxval(dm(:))))
+    allocate(rx(maxval(fm(:))))
+    allocate(ry(maxval(fm(:))))
+    allocate(rz(maxval(fm(:))))
+
+! prepare temporary arrays for expansion along the X direction
+!
+    allocate(tx(3,fm(1),dm(2),dm(3)))
+
+! expand By and Bz along the X direction using TVD reconstruction
+!
+    do k = 1, dm(3)
+      do j = 1, dm(2)
+        sx(1:dm(1)) = ux(1:dm(1),j,k)
+        sy(1:dm(1)) = uy(1:dm(1),j,k)
+        sz(1:dm(1)) = uz(1:dm(1),j,k)
+
+        call expand_1d(dm(1), fm(1), ng, sx(1:dm(1)), rx(1:fm(1)), 'c')
+        call expand_1d(dm(1), fm(1), ng, sy(1:dm(1)), ry(1:fm(1)), 't')
+        call expand_1d(dm(1), fm(1), ng, sz(1:dm(1)), rz(1:fm(1)), 't')
+
+        tx(1,1:fm(1),j,k) = rx(1:fm(1))
+        tx(2,1:fm(1),j,k) = ry(1:fm(1))
+        tx(3,1:fm(1),j,k) = rz(1:fm(1))
+      end do
+    end do
+
+! calculate Bx from expanded By and Bz using the divergence condition
+!
+    do k = 1, dm(3)
+      do j = 2, dm(2)
+        do i = 2, fm(1), 2
+          tx(1,i-1,j,k) = tx(1,i-1,j,k) + 0.125 * ((tx(2,i,j,k) - tx(2,i-1,j,k)) - (tx(2,i,j-1,k) - tx(2,i-1,j-1,k)))
+        end do
+      end do
+    end do
+
+! expand Bx and Bz along the Y direction using TVD reconstruction
+!
+    do k = 1, dm(3)
+      do i = 1, fm(1)
+        sx(1:dm(2)) = tx(1,i,1:dm(2),k)
+        sy(1:dm(2)) = tx(2,i,1:dm(2),k)
+        sz(1:dm(2)) = tx(3,i,1:dm(2),k)
+
+        call expand_1d(dm(2), fm(2), ng, sx(1:dm(2)), rx(1:fm(2)), 't')
+        call expand_1d(dm(2), fm(2), ng, sy(1:dm(2)), ry(1:fm(2)), 'c')
+        call expand_1d(dm(2), fm(2), ng, sz(1:dm(2)), rz(1:fm(2)), 't')
+
+        wx(i,1:fm(2),k) = rx(1:fm(2))
+        wy(i,1:fm(2),k) = ry(1:fm(2))
+        wz(i,1:fm(2),k) = rz(1:fm(2))
+      end do
+    end do
+
+! calculate By from expanded Bx and Bz using the divergence condition
+!
+    do k = 1, dm(3)
+      do j = 2, fm(2), 2
+        do i = 2, fm(1)
+          wy(i,j-1,k) = wy(i,j-1,k) + 0.25 * ((wx(i,j,k) - wx(i,j-1,k)) - (wx(i-1,j,k) - wx(i-1,j-1,k)))
+        end do
+      end do
+    end do
+
+! deallocate direction one dimensional vector
+!
+    deallocate(sx)
+    deallocate(sy)
+    deallocate(sz)
+    deallocate(rx)
+    deallocate(ry)
+    deallocate(rz)
+
+! deallocate temporary arrays
+!
+    deallocate(tx)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! allocate dimensional vectors for expansion
+!
+    allocate(sx(maxval(dm(:))))
+    allocate(sy(maxval(dm(:))))
+    allocate(sz(maxval(dm(:))))
+    allocate(rx(maxval(fm(:))))
+    allocate(ry(maxval(fm(:))))
+    allocate(rz(maxval(fm(:))))
+
+! prepare temporary arrays for expansion along the X direction
+!
+    allocate(tx(3,fm(1),dm(2),dm(3)))
+    allocate(ty(3,fm(1),fm(2),dm(3)))
+
+! expand By and Bz along the X direction using TVD reconstruction
+!
+    do k = 1, dm(3)
+      do j = 1, dm(2)
+        sx(1:dm(1)) = ux(1:dm(1),j,k)
+        sy(1:dm(1)) = uy(1:dm(1),j,k)
+        sz(1:dm(1)) = uz(1:dm(1),j,k)
+
+        call expand_1d(dm(1), fm(1), ng, sx(1:dm(1)), rx(1:fm(1)), 'c')
+        call expand_1d(dm(1), fm(1), ng, sy(1:dm(1)), ry(1:fm(1)), 't')
+        call expand_1d(dm(1), fm(1), ng, sz(1:dm(1)), rz(1:fm(1)), 't')
+
+        tx(1,1:fm(1),j,k) = rx(1:fm(1))
+        tx(2,1:fm(1),j,k) = ry(1:fm(1))
+        tx(3,1:fm(1),j,k) = rz(1:fm(1))
+      end do
+    end do
+
+! calculate Bx from expanded By and Bz using the divergence condition
+!
+    do k = 2, dm(3)
+      do j = 2, dm(2)
+        do i = 2, fm(1), 2
+          tx(1,i-1,j,k) = tx(1,i-1,j,k) + 0.125 * ((tx(2,i,j,k) - tx(2,i-1,j,k)) - (tx(2,i,j-1,k) - tx(2,i-1,j-1,k)) + (tx(3,i,j,k) - tx(3,i-1,j,k)) - (tx(3,i,j,k-1) - tx(3,i-1,j,k-1)))
+        end do
+      end do
+    end do
+
+! expand Bx and Bz along the Y direction using TVD reconstruction
+!
+    do k = 1, dm(3)
+      do i = 1, fm(1)
+        sx(1:dm(2)) = tx(1,i,1:dm(2),k)
+        sy(1:dm(2)) = tx(2,i,1:dm(2),k)
+        sz(1:dm(2)) = tx(3,i,1:dm(2),k)
+
+        call expand_1d(dm(2), fm(2), ng, sx(1:dm(2)), rx(1:fm(2)), 't')
+        call expand_1d(dm(2), fm(2), ng, sy(1:dm(2)), ry(1:fm(2)), 'c')
+        call expand_1d(dm(2), fm(2), ng, sz(1:dm(2)), rz(1:fm(2)), 't')
+
+        ty(1,i,1:fm(2),k) = rx(1:fm(2))
+        ty(2,i,1:fm(2),k) = ry(1:fm(2))
+        ty(3,i,1:fm(2),k) = rz(1:fm(2))
+      end do
+    end do
+
+! calculate Bx from expanded By and Bz using the divergence condition
+!
+    do k = 2, dm(3)
+      do j = 2, fm(2), 2
+        do i = 2, dm(1)
+          ty(2,i,j-1,k) = ty(2,i,j-1,k)                                        &
+                       + 0.25  * ((ty(1,i  ,j,k) - ty(1,i  ,j-1,k))            &
+                                - (ty(1,i-1,j,k) - ty(1,i-1,j-1,k)))           &
+                       + 0.125 * ((ty(3,i,j,k  ) - ty(3,i,j-1,k  ))            &
+                                - (ty(3,i,j,k-1) - ty(3,i,j-1,k-1)))
+        end do
+      end do
+    end do
+
+! expand Bx and Bz along the Y direction using TVD reconstruction
+!
+    do j = 1, fm(2)
+      do i = 1, fm(1)
+        sx(1:dm(3)) = tx(1,i,j,1:dm(3))
+        sy(1:dm(3)) = tx(2,i,j,1:dm(3))
+        sz(1:dm(3)) = tx(3,i,j,1:dm(3))
+
+        call expand_1d(dm(3), fm(3), ng, sx(1:dm(3)), rx(1:fm(3)), 't')
+        call expand_1d(dm(3), fm(3), ng, sy(1:dm(3)), ry(1:fm(3)), 't')
+        call expand_1d(dm(3), fm(3), ng, sz(1:dm(3)), rz(1:fm(3)), 'c')
+
+        wx(i,j,1:fm(2)) = rx(1:fm(3))
+        wy(i,j,1:fm(2)) = ry(1:fm(3))
+        wz(i,j,1:fm(2)) = rz(1:fm(3))
+      end do
+    end do
+
+! calculate Bx from expanded By and Bz using the divergence condition
+!
+    do k = 2, fm(3), 2
+      do j = 2, fm(2)
+        do i = 2, fm(1)
+          wz(i,j,k-1) = wz(i,j,k-1)                                            &
+                      + 0.25 * ((wx(i  ,j,k) - wx(i  ,j,k-1))                  &
+                              - (wx(i-1,j,k) - wx(i-1,j,k-1))                  &
+                              + (wy(i  ,j,k) - wy(i  ,j,k-1))                  &
+                              - (wy(i,j-1,k) - wy(i,j-1,k-1)))
+        end do
+      end do
+    end do
+
+! deallocate direction one dimensional vector
+!
+    deallocate(sx)
+    deallocate(sy)
+    deallocate(sz)
+    deallocate(rx)
+    deallocate(ry)
+    deallocate(rz)
+
+! deallocate temporary arrays
+!
+    deallocate(tx)
+    deallocate(ty)
+#endif /* NDIMS == 3 */
+!
+  end subroutine expand_mag
 #endif /* FLUXCT */
 !
 !===============================================================================

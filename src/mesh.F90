@@ -810,6 +810,9 @@ module mesh
 #endif /* MHD */
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
+#if defined MHD && defined FLUXCT
+    use interpolation, only : expand_mag
+#endif /* MHD & FLUXCT */
 
     implicit none
 
@@ -867,17 +870,10 @@ module mesh
     end do
 #endif /* FIELDCD */
 #ifdef FLUXCT
-! expand X-component of magnetic field
+! expand the staggered magnetic field components preserving divergence-free
+! condition
 !
-    call expand(dm, fm, ng, pblock%data%u(ibx,:,:,:), u(ibx,:,:,:), 'c', 't', 't')
-
-! expand Y-component of magnetic field
-!
-    call expand(dm, fm, ng, pblock%data%u(iby,:,:,:), u(iby,:,:,:), 't', 'c', 't')
-
-! expand Z-component of magnetic field
-!
-    call expand(dm, fm, ng, pblock%data%u(ibz,:,:,:), u(ibz,:,:,:), 't', 't', 'c')
+    call expand_mag(dm, fm, ng, pblock%data%u(ibx,:,:,:), pblock%data%u(iby,:,:,:), pblock%data%u(ibz,:,:,:), u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
 #endif /* FLUXCT */
 #endif /* MHD */
 ! iterate over all children
@@ -1061,16 +1057,19 @@ module mesh
 ! restrict the X component of magnetic field
 !
       call shrink(dm, pm, 0, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'm', 'm')
+
       pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 
 ! restrict the Y component of magnetic field
 !
       call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
+
       pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 
 ! restrict the Z component of magnetic field
 !
       call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
+
       pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 #endif /* FLUXCT */
 #endif /* MHD */
