@@ -950,7 +950,6 @@ module mesh
 ! local arrays
 !
     integer, dimension(3)     :: dm, fm, pm
-    integer, dimension(3,0:1) :: cm
 
 ! local allocatable arrays
 !
@@ -967,12 +966,10 @@ module mesh
     dm(:)   = (/ im, jm, km /)
     pm(:)   = dm(:) / 2
     fm(:)   = (dm(:) - ng) / 2
-    cm(:,0) = ng
-    cm(:,1) = dm(:) - ng
 #if NDIMS == 2
     pm(3)   = 1
     fm(3)   = 1
-    ks      = 1
+    ks      = 0
     kl      = 1
     ku      = 1
     k1      = 1
@@ -995,9 +992,11 @@ module mesh
 ! calculate the position of child in the parent block
 !
       is = mod((p - 1)    ,2)
-      js = mod((p - 1) / 2,2)
 #if NDIMS == 3
+      js = mod((p - 1) / 2,2)
       ks = mod((p - 1) / 4,2)
+#else /* NDIMS == 3 */
+      js =     (p - 1) / 2
 #endif /* NDIMS == 3 */
 
 ! calculate the bounds of the input array indices
@@ -1010,19 +1009,23 @@ module mesh
 
       i2 = i1 + fm(1) - 1
       j2 = j1 + fm(2) - 1
+#if NDIMS == 3
       k2 = k1 + fm(3) - 1
+#endif /* NDIMS == 3 */
 
 ! calculate the bounds of the destination array indices
 !
-      il = ib - ng / 2 + is * fm(1)
-      jl = jb - ng / 2 + js * fm(2)
+      il = 1 + ng / 2 + is * fm(1)
+      jl = 1 + ng / 2 + js * fm(2)
 #if NDIMS == 3
-      kl = kb - ng / 2 + ks * fm(3)
+      kl = 1 + ng / 2 + ks * fm(3)
 #endif /* NDIMS == 3 */
 
       iu = il + fm(1) - 1
       ju = jl + fm(2) - 1
+#if NDIMS == 3
       ku = kl + fm(3) - 1
+#endif /* NDIMS == 3 */
 
 ! iterate over all quantities
 !
@@ -1030,7 +1033,7 @@ module mesh
 
 ! shrink the current child
 !
-        call shrink(dm, pm, 0, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
+        call shrink(dm, pm, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
 
 ! fill the parent block
 !
@@ -1045,7 +1048,7 @@ module mesh
 
 ! shrink the current child
 !
-        call shrink(dm, pm, 0, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
+        call shrink(dm, pm, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
 
 ! fill the parent block
 !
@@ -1056,19 +1059,19 @@ module mesh
 #ifdef FLUXCT
 ! restrict the X component of magnetic field
 !
-      call shrink(dm, pm, 0, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'm', 'm')
+      call shrink(dm, pm, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'm', 'm')
 
       pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 
 ! restrict the Y component of magnetic field
 !
-      call shrink(dm, pm, 0, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
+      call shrink(dm, pm, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
 
       pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 
 ! restrict the Z component of magnetic field
 !
-      call shrink(dm, pm, 0, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
+      call shrink(dm, pm, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
 
       pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
 #endif /* FLUXCT */

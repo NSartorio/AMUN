@@ -157,6 +157,7 @@ module boundaries
                           do while(pblock%id .ne. pneigh%neigh(idir,nside,nface)%ptr%id)
                             nface = nface + 1
                           end do
+
                           call bnd_prol(pblock%data, pneigh%data%u, idir, iside, nface)
                         end if
                       case default
@@ -745,7 +746,7 @@ module boundaries
 
 ! shrink the boundary
 !
-      call shrink(fm, cm, 0, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
+      call shrink(fm, cm, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
 
 ! copy shrinked boundary in the proper place of the block
 !
@@ -761,7 +762,7 @@ module boundaries
 
 ! shrink the boundary
 !
-      call shrink(fm, cm, 0, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
+      call shrink(fm, cm, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
 
 ! copy shrinked boundary in the proper place of the block
 !
@@ -772,7 +773,7 @@ module boundaries
 #ifdef FLUXCT
 ! X-component of magnetic field
 !
-    call shrink(fm, cm, 0, ub(ibx,i1:i2,j1:j2,k1:k2), u(:,:,:), 'c', 'm', 'm')
+    call shrink(fm, cm, ub(ibx,i1:i2,j1:j2,k1:k2), u(:,:,:), 'c', 'm', 'm')
 
 ! copy shrinked boundary in the proper place of the block
 !
@@ -784,7 +785,7 @@ module boundaries
 
 ! Y-component of magnetic field
 !
-    call shrink(fm, cm, 0, ub(iby,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'c', 'm')
+    call shrink(fm, cm, ub(iby,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'c', 'm')
 
 ! copy shrinked boundary in the proper place of the block
 !
@@ -796,7 +797,7 @@ module boundaries
 
 ! Z-component of magnetic field
 !
-    call shrink(fm, cm, 0, ub(ibz,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'c')
+    call shrink(fm, cm, ub(ibz,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'c')
 
 ! copy shrinked boundary in the proper place of the block
 !

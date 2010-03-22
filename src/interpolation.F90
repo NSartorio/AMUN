@@ -187,14 +187,13 @@ module interpolation
 !
 !===============================================================================
 !
-  subroutine shrink(dm, fm, ng, u, v, xflag, yflag, zflag)
+  subroutine shrink(dm, fm, u, v, xflag, yflag, zflag)
 
     implicit none
 
 ! input parameters
 !
     integer, dimension(3)         , intent(in)  :: dm, fm
-    integer                       , intent(in)  :: ng
     real        , dimension(:,:,:), intent(in)  :: u
     real        , dimension(:,:,:), intent(out) :: v
     character                     , intent(in)  :: xflag, yflag, zflag
@@ -223,7 +222,7 @@ module interpolation
       do j = 1, dm(2)
         x(1:dm(1)) = u(1:dm(1),j,k)
 
-        call shrink_1d(dm(1),fm(1),ng,x(1:dm(1)),y(1:fm(1)),xflag)
+        call shrink_1d(dm(1), fm(1), x(1:dm(1)), y(1:fm(1)), xflag)
 
         w(1:fm(1),j,k) = y(1:fm(1))
       end do
@@ -235,7 +234,7 @@ module interpolation
       do i = 1, fm(1)
         x(1:dm(2)) = w(i,1:dm(2),k)
 
-        call shrink_1d(dm(2),fm(2),ng,x(1:dm(2)),y(1:fm(2)),yflag)
+        call shrink_1d(dm(2), fm(2), x(1:dm(2)), y(1:fm(2)), yflag)
 
         z(i,1:fm(2),k) = y(1:fm(2))
       end do
@@ -248,7 +247,7 @@ module interpolation
         do i = 1, fm(1)
           x(1:dm(3)) = z(i,j,1:dm(3))
 
-          call shrink_1d(dm(3),fm(3),ng,x(1:dm(3)),y(1:fm(3)),zflag)
+          call shrink_1d(dm(3), fm(3), x(1:dm(3)), y(1:fm(3)), zflag)
 
           v(i,j,1:fm(3)) = y(1:fm(3))
         end do
@@ -354,13 +353,13 @@ module interpolation
 !
 !===============================================================================
 !
-  subroutine shrink_1d(n, m, ng, u, v, flag)
+  subroutine shrink_1d(n, m, u, v, flag)
 
     implicit none
 
 ! input parameters
 !
-    integer                   , intent(in)  :: n, m, ng
+    integer                   , intent(in)  :: n, m
     real        , dimension(n), intent(in)  :: u
     real        , dimension(m), intent(out) :: v
     character                 , intent(in)  :: flag
@@ -373,24 +372,24 @@ module interpolation
 !
     v(:) = 0.0
 
-    ib = ng / 2 + 1
-    ie = m - ng / 2
+    ib = 1
+    ie = m
 
     select case(flag)
     case('c')
       do i = ib, ie
-        ir   = 2 * i - ng
+        ir   = 2 * i
         v(i) = u(ir)
       end do
     case default
       do i = ib, ie
-        ir   = 2 * i - ng
+        ir   = 2 * i
         il   = ir - 1
 
         v(i) = 0.5 * (u(il) + u(ir))
       end do
     end select
-
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine shrink_1d
@@ -468,33 +467,33 @@ module interpolation
     do k = 1, km
       do j = 2, jm - 1
         do i = 2, im - 1
-          dur = u(iby,i+1,j,k) - u(iby,i  ,j,k)
-          dul = u(iby,i  ,j,k) - u(iby,i-1,j,k)
+          dur = u(iby,i+1,j,k) - u(iby,i,j,k)
+          dul = u(iby,i-1,j,k) - u(iby,i,j,k)
 
-          ds  = dur * dul
+          ds  = - dur * dul
 
           if (ds .gt. 0.0) then
-            du = ds / (dur + dul)
+            du = ds / (dur - dul)
           else
             du = 0.0
           end if
 
-          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.125 * du
-          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.125 * du
+          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
+          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.25 * du
 
-          dur = u(ibx,i,j+1,k) - u(ibx,i,j  ,k)
-          dul = u(ibx,i,j  ,k) - u(ibx,i,j-1,k)
+          dur = u(ibx,i,j+1,k) - u(ibx,i,j,k)
+          dul = u(ibx,i,j-1,k) - u(ibx,i,j,k)
 
-          ds  = dur * dul
+          ds  = - dur * dul
 
           if (ds .gt. 0.0) then
-            du = ds / (dur + dul)
+            du = ds / (dur - dul)
           else
             du = 0.0
           end if
 
-          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.125 * du
-          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.125 * du
+          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
+          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.25 * du
         end do
       end do
     end do
