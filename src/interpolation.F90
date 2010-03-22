@@ -464,9 +464,13 @@ module interpolation
 
 ! correct components to get the divergence free interpolation
 !
-    do k = 1, km
+#if NDIMS == 3
+    do k = 2, km - 1
       do j = 2, jm - 1
         do i = 2, im - 1
+
+! Bx correction from By
+!
           dur = u(iby,i+1,j,k) - u(iby,i,j,k)
           dul = u(iby,i-1,j,k) - u(iby,i,j,k)
 
@@ -481,6 +485,112 @@ module interpolation
           u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
           u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.25 * du
 
+! Bx correction from Bz
+!
+          dur = u(ibz,i+1,j,k) - u(ibz,i,j,k)
+          dul = u(ibz,i-1,j,k) - u(ibz,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icx,i,j,k  ) = u(icx,i,j,k  ) + 0.25 * du
+          u(icx,i,j,k+1) = u(icx,i,j,k+1) - 0.25 * du
+
+! By correction from Bx
+!
+          dur = u(ibx,i,j+1,k) - u(ibx,i,j,k)
+          dul = u(ibx,i,j-1,k) - u(ibx,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
+          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.25 * du
+
+! By correction from Bz
+!
+          dur = u(ibz,i,j+1,k) - u(ibz,i,j,k)
+          dul = u(ibz,i,j-1,k) - u(ibz,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icy,i,j,k  ) = u(icy,i,j,k  ) + 0.25 * du
+          u(icy,i,j,k+1) = u(icy,i,j,k+1) - 0.25 * du
+
+! Bz correction from Bx
+!
+          dur = u(ibx,i,j,k+1) - u(ibx,i,j,k)
+          dul = u(ibx,i,j,k-1) - u(ibx,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icz,i  ,j,k) = u(icz,i  ,j,k) + 0.25 * du
+          u(icz,i+1,j,k) = u(icz,i+1,j,k) - 0.25 * du
+
+! Bz correction from By
+!
+          dur = u(iby,i,j,k+1) - u(iby,i,j,k)
+          dul = u(iby,i,j,k-1) - u(iby,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icz,i,j  ,k) = u(icz,i,j  ,k) + 0.25 * du
+          u(icz,i,j+1,k) = u(icz,i,j+1,k) - 0.25 * du
+
+        end do
+      end do
+    end do
+#else /* NDIMS == 3 */
+    do k = 1, km
+      do j = 2, jm - 1
+        do i = 2, im - 1
+
+! Bx correction from By
+!
+          dur = u(iby,i+1,j,k) - u(iby,i,j,k)
+          dul = u(iby,i-1,j,k) - u(iby,i,j,k)
+
+          ds  = - dur * dul
+
+          if (ds .gt. 0.0) then
+            du = ds / (dur - dul)
+          else
+            du = 0.0
+          end if
+
+          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
+          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.25 * du
+
+! By correction from Bx
+!
           dur = u(ibx,i,j+1,k) - u(ibx,i,j,k)
           dul = u(ibx,i,j-1,k) - u(ibx,i,j,k)
 
@@ -497,6 +607,7 @@ module interpolation
         end do
       end do
     end do
+#endif /* NDIMS == 3 */
 !
   end subroutine magtocen
 !
