@@ -57,13 +57,13 @@ module interpolation
 !
 ! second order interpolation
 !
-    dvl(1) = 0.0
-    dvr(n) = 0.0
-
     do i = 1, n-1
       dvr(i  ) = vx(i+1) - vx(i)
       dvl(i+1) = dvr(i)
     enddo
+
+    dvl(1) = dvr(1)
+    dvr(n) = dvl(n)
 
     do i = 1, n
       ds (i) = dvr(i) * dvl(i)
@@ -418,7 +418,7 @@ module interpolation
 
 ! local  variables
 !
-    integer :: i, j, k, n
+    integer :: i, j, k, im1, ip1, jm1, jp1, km1, kp1
     real    :: dur, dul, du, ds
 
 ! local arrays
@@ -466,13 +466,19 @@ module interpolation
 !
 #if NDIMS == 3
     do k = 2, km - 1
+      km1 = k - 1
+      kp1 = k + 1
       do j = 2, jm - 1
+        jm1 = j - 1
+        jp1 = j + 1
         do i = 2, im - 1
+          im1 = i - 1
+          ip1 = i + 1
 
 ! Bx correction from By
 !
-          dur = u(iby,i+1,j,k) - u(iby,i,j,k)
-          dul = u(iby,i-1,j,k) - u(iby,i,j,k)
+          dur = u(iby,ip1,j,k) - u(iby,i,j,k)
+          dul = u(iby,im1,j,k) - u(iby,i,j,k)
 
           ds  = - dur * dul
 
@@ -483,12 +489,12 @@ module interpolation
           end if
 
           u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
-          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.25 * du
+          u(icx,i,jp1,k) = u(icx,i,jp1,k) - 0.25 * du
 
 ! Bx correction from Bz
 !
-          dur = u(ibz,i+1,j,k) - u(ibz,i,j,k)
-          dul = u(ibz,i-1,j,k) - u(ibz,i,j,k)
+          dur = u(ibz,ip1,j,k) - u(ibz,i,j,k)
+          dul = u(ibz,im1,j,k) - u(ibz,i,j,k)
 
           ds  = - dur * dul
 
@@ -499,12 +505,12 @@ module interpolation
           end if
 
           u(icx,i,j,k  ) = u(icx,i,j,k  ) + 0.25 * du
-          u(icx,i,j,k+1) = u(icx,i,j,k+1) - 0.25 * du
+          u(icx,i,j,kp1) = u(icx,i,j,kp1) - 0.25 * du
 
 ! By correction from Bx
 !
-          dur = u(ibx,i,j+1,k) - u(ibx,i,j,k)
-          dul = u(ibx,i,j-1,k) - u(ibx,i,j,k)
+          dur = u(ibx,i,jp1,k) - u(ibx,i,j,k)
+          dul = u(ibx,i,jm1,k) - u(ibx,i,j,k)
 
           ds  = - dur * dul
 
@@ -515,12 +521,12 @@ module interpolation
           end if
 
           u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
-          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.25 * du
+          u(icy,ip1,j,k) = u(icy,ip1,j,k) - 0.25 * du
 
 ! By correction from Bz
 !
-          dur = u(ibz,i,j+1,k) - u(ibz,i,j,k)
-          dul = u(ibz,i,j-1,k) - u(ibz,i,j,k)
+          dur = u(ibz,i,jp1,k) - u(ibz,i,j,k)
+          dul = u(ibz,i,jm1,k) - u(ibz,i,j,k)
 
           ds  = - dur * dul
 
@@ -531,12 +537,12 @@ module interpolation
           end if
 
           u(icy,i,j,k  ) = u(icy,i,j,k  ) + 0.25 * du
-          u(icy,i,j,k+1) = u(icy,i,j,k+1) - 0.25 * du
+          u(icy,i,j,kp1) = u(icy,i,j,kp1) - 0.25 * du
 
 ! Bz correction from Bx
 !
-          dur = u(ibx,i,j,k+1) - u(ibx,i,j,k)
-          dul = u(ibx,i,j,k-1) - u(ibx,i,j,k)
+          dur = u(ibx,i,j,kp1) - u(ibx,i,j,k)
+          dul = u(ibx,i,j,km1) - u(ibx,i,j,k)
 
           ds  = - dur * dul
 
@@ -547,12 +553,12 @@ module interpolation
           end if
 
           u(icz,i  ,j,k) = u(icz,i  ,j,k) + 0.25 * du
-          u(icz,i+1,j,k) = u(icz,i+1,j,k) - 0.25 * du
+          u(icz,ip1,j,k) = u(icz,ip1,j,k) - 0.25 * du
 
 ! Bz correction from By
 !
-          dur = u(iby,i,j,k+1) - u(iby,i,j,k)
-          dul = u(iby,i,j,k-1) - u(iby,i,j,k)
+          dur = u(iby,i,j,kp1) - u(iby,i,j,k)
+          dul = u(iby,i,j,km1) - u(iby,i,j,k)
 
           ds  = - dur * dul
 
@@ -563,7 +569,7 @@ module interpolation
           end if
 
           u(icz,i,j  ,k) = u(icz,i,j  ,k) + 0.25 * du
-          u(icz,i,j+1,k) = u(icz,i,j+1,k) - 0.25 * du
+          u(icz,i,jp1,k) = u(icz,i,jp1,k) - 0.25 * du
 
         end do
       end do
@@ -571,39 +577,39 @@ module interpolation
 #else /* NDIMS == 3 */
     do k = 1, km
       do j = 2, jm - 1
+        jm1 = j - 1
+        jp1 = j + 1
         do i = 2, im - 1
+          im1 = i - 1
+          ip1 = i + 1
 
 ! Bx correction from By
 !
-          dur = u(iby,i+1,j,k) - u(iby,i,j,k)
-          dul = u(iby,i-1,j,k) - u(iby,i,j,k)
+          dur = u(iby,ip1,j,k) - u(iby,i,j,k)
+          dul = u(iby,im1,j,k) - u(iby,i,j,k)
 
           ds  = - dur * dul
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
-          u(icx,i,j+1,k) = u(icx,i,j+1,k) - 0.25 * du
+            u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
+            u(icx,i,jp1,k) = u(icx,i,jp1,k) - 0.25 * du
+          end if
 
 ! By correction from Bx
 !
-          dur = u(ibx,i,j+1,k) - u(ibx,i,j,k)
-          dul = u(ibx,i,j-1,k) - u(ibx,i,j,k)
+          dur = u(ibx,i,jp1,k) - u(ibx,i,j,k)
+          dul = u(ibx,i,jm1,k) - u(ibx,i,j,k)
 
           ds  = - dur * dul
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
-          u(icy,i+1,j,k) = u(icy,i+1,j,k) - 0.25 * du
+            u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
+            u(icy,ip1,j,k) = u(icy,ip1,j,k) - 0.25 * du
+          end if
         end do
       end do
     end do

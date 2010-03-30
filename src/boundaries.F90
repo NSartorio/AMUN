@@ -591,7 +591,7 @@ module boundaries
 !
       if (if .eq. 0) then
         is = 1
-        it = is + ng - 1
+        it = ng
       else
         is = ie + 1
         it = im
@@ -661,7 +661,7 @@ module boundaries
       end if
       if (jf .eq. 0) then
         js = 1
-        jt = js + ng - 1
+        jt = ng
       else
         js = je + 1
         jt = jm
@@ -727,7 +727,7 @@ module boundaries
       end if
       if (kf .eq. 0) then
         ks = 1
-        kt = ks + ng - 1
+        kt = ng
       else
         ks = ke + 1
         kt = km
