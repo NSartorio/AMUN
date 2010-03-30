@@ -484,12 +484,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
-          u(icx,i,jp1,k) = u(icx,i,jp1,k) - 0.25 * du
+            u(icx,i,j  ,k) = u(icx,i,j  ,k) + 0.25 * du
+            u(icx,i,jp1,k) = u(icx,i,jp1,k) - 0.25 * du
+          end if
 
 ! Bx correction from Bz
 !
@@ -500,12 +498,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icx,i,j,k  ) = u(icx,i,j,k  ) + 0.25 * du
-          u(icx,i,j,kp1) = u(icx,i,j,kp1) - 0.25 * du
+            u(icx,i,j,k  ) = u(icx,i,j,k  ) + 0.25 * du
+            u(icx,i,j,kp1) = u(icx,i,j,kp1) - 0.25 * du
+          end if
 
 ! By correction from Bx
 !
@@ -516,12 +512,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
-          u(icy,ip1,j,k) = u(icy,ip1,j,k) - 0.25 * du
+            u(icy,i  ,j,k) = u(icy,i  ,j,k) + 0.25 * du
+            u(icy,ip1,j,k) = u(icy,ip1,j,k) - 0.25 * du
+          end if
 
 ! By correction from Bz
 !
@@ -532,12 +526,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icy,i,j,k  ) = u(icy,i,j,k  ) + 0.25 * du
-          u(icy,i,j,kp1) = u(icy,i,j,kp1) - 0.25 * du
+            u(icy,i,j,k  ) = u(icy,i,j,k  ) + 0.25 * du
+            u(icy,i,j,kp1) = u(icy,i,j,kp1) - 0.25 * du
+          end if
 
 ! Bz correction from Bx
 !
@@ -548,12 +540,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icz,i  ,j,k) = u(icz,i  ,j,k) + 0.25 * du
-          u(icz,ip1,j,k) = u(icz,ip1,j,k) - 0.25 * du
+            u(icz,i  ,j,k) = u(icz,i  ,j,k) + 0.25 * du
+            u(icz,ip1,j,k) = u(icz,ip1,j,k) - 0.25 * du
+          end if
 
 ! Bz correction from By
 !
@@ -564,12 +554,10 @@ module interpolation
 
           if (ds .gt. 0.0) then
             du = ds / (dur - dul)
-          else
-            du = 0.0
-          end if
 
-          u(icz,i,j  ,k) = u(icz,i,j  ,k) + 0.25 * du
-          u(icz,i,jp1,k) = u(icz,i,jp1,k) - 0.25 * du
+            u(icz,i,j  ,k) = u(icz,i,j  ,k) + 0.25 * du
+            u(icz,i,jp1,k) = u(icz,i,jp1,k) - 0.25 * du
+          end if
 
         end do
       end do
