@@ -607,6 +607,69 @@ module interpolation
 !
 !===============================================================================
 !
+! divergence: function calculates divergence of the input staggered field
+!             [Bx(i+1/2,j,k), By(i,j+1/2,k), Bz(i,j,k+1/2)] -> div B
+!
+!===============================================================================
+!
+  subroutine divergence(b, db, dx, dy, dz)
+
+    use blocks, only : nvr
+    use config, only : im, jm, km
+
+    implicit none
+
+! input and output variables
+!
+    real, dimension(3,im,jm,km), intent(in)  :: b
+    real, dimension(  im,jm,km), intent(out) :: db
+    real, optional             , intent(in)  :: dx, dy, dz
+
+! local  variables
+!
+    integer :: i, j, k
+    real    :: dxi, dyi, dzi
+!
+!------------------------------------------------------------------------------
+!
+! check optional arguments
+!
+    dxi = 1.0
+    dyi = 1.0
+    dzi = 1.0
+
+    if (present(dx)) dxi = 1.0 / dx
+    if (present(dy)) dyi = 1.0 / dy
+    if (present(dz)) dzi = 1.0 / dz
+
+! reset output array
+!
+    db(:,:,:) = 0.0
+
+! iterate over all points
+!
+#if NDIMS == 3
+    do k = 2, km
+      do j = 2, jm
+        do i = 2, im
+          db(i,j,k) = dxi * (b(1,i,j,k) - b(1,i-1,j,k))                        &
+                    + dyi * (b(2,i,j,k) - b(2,i,j-1,k))                        &
+                    + dzi * (b(3,i,j,k) - b(3,i,j,k-1))
+#else /* NDIMS == 3 */
+    do k = 1, km
+      do j = 2, jm
+        do i = 2, im
+          db(i,j,k) = dxi * (b(1,i,j,k) - b(1,i-1,j,k))                        &
+                    + dyi * (b(2,i,j,k) - b(2,i,j-1,k))
+#endif /* NDIMS == 3 */
+        end do
+      end do
+    end do
+!
+  end subroutine divergence
+!
+!===============================================================================
+!
 ! expand_mag: subroutine for prolongation of the magnetic field with preserving
 !             the divergence free condition (Li & Li, 2004, JCoPh, 199, 1)
 !

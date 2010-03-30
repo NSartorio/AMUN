@@ -58,7 +58,7 @@ module io
                        , H5T_NATIVE_CHARACTER, H5T_NATIVE_INTEGER              &
                        , H5T_NATIVE_DOUBLE, H5P_DATASET_CREATE_F
 #if defined MHD && defined FLUXCT
-    use interpolation, only : magtocen
+    use interpolation, only : magtocen, divergence
 #endif /* MHD & FLUXCT */
     use mesh    , only : ax, ay, az, adx, ady, adz
     use mpitools, only : ncpus, ncpu
@@ -97,6 +97,7 @@ module io
 #ifdef MHD
     real(kind=8)   , dimension(:,:,:,:), allocatable :: magx, magy, magz
 #ifdef FLUXCT
+    real           , dimension(  :,:,:), allocatable :: db
     real(kind=8)   , dimension(:,:,:,:), allocatable :: divb
 #endif /* FLUXCT */
 #endif /* MHD */
@@ -150,6 +151,7 @@ module io
         allocate(magz   (dblocks,in,jn,kn))
 #ifdef FLUXCT
         allocate(divb   (dblocks,in,jn,kn))
+        allocate(db     (        im,jm,km))
 #endif /* FLUXCT */
 #endif /* MHD */
         allocate(pres   (dblocks,in,jn,kn))
@@ -196,33 +198,8 @@ module io
           magy(l,1:in,1:jn,1:kn) = q(icy,ib:ie,jb:je,kb:ke)
           magz(l,1:in,1:jn,1:kn) = q(icz,ib:ie,jb:je,kb:ke)
 #ifdef FLUXCT
-#if NDIMS == 3
-          do k = kb, ke
-            kt = k - kb + 1
-            do j = jb, je
-                jt = j - jb + 1
-              do i = ib, ie
-                it = i - ib + 1
-
-                divb(l,it,jt,kt) = q(ibx,i,j,k) - q(ibx,i-1,j,k)               &
-                                 + q(iby,i,j,k) - q(iby,i,j-1,k)               &
-                                 + q(ibz,i,j,k) - q(ibz,i,j,k-1)
-              end do
-            end do
-          end do
-#else /* NDIMS == 3 */
-          k  = 1
-          kt = 1
-          do j = jb, je
-              jt = j - jb + 1
-            do i = ib, ie
-              it = i - ib + 1
-
-              divb(l,it,jt,kt) = q(ibx,i,j,k) - q(ibx,i-1,j,k)                 &
-                               + q(iby,i,j,k) - q(iby,i,j-1,k)
-            end do
-          end do
-#endif /* NDIMS == 3 */
+          call divergence(u(ibx:ibz,:,:,:), db)
+          divb(l,1:in,1:jn,1:kn) = db(   ib:ie,jb:je,kb:ke)
 #endif /* FLUXCT */
 #endif /* MHD */
           l = l + 1
@@ -440,6 +417,7 @@ module io
         if (allocated(magz   )) deallocate(magz)
 #ifdef FLUXCT
         if (allocated(divb   )) deallocate(divb)
+        if (allocated(db     )) deallocate(db)
 #endif /* FLUXCT */
 #endif /* MHD */
 
