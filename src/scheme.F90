@@ -40,7 +40,10 @@ module scheme
   subroutine update(u, du, dxi, dyi, dzi)
 
     use blocks       , only : nvr, nqt
-    use blocks       , only : idn, imx, imy, imz, ien
+    use blocks       , only : idn, imx, imy, imz
+#ifdef ADI
+    use blocks       , only : ien
+#endif /* ADI */
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -354,7 +357,7 @@ module scheme
   subroutine hll(n, u, f)
 
     use blocks       , only : nvr, nfl, nqt
-    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+    use blocks       , only : ivx, ivz
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -658,7 +661,10 @@ module scheme
   subroutine fluxspeed(n, q, u, f, c)
 
     use blocks, only : nvr, nqt
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+#ifdef ADI
+    use blocks, only : ipr, ien
+#endif /* ADI */
 #ifdef MHD
     use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -786,7 +792,10 @@ module scheme
   subroutine cons2prim(n, u, q)
 
     use blocks, only : nvr
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+#ifdef ADI
+    use blocks, only : ipr, ien
+#endif /* ADI */
 #ifdef MHD
     use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -848,7 +857,10 @@ module scheme
   subroutine prim2cons(n, q, u)
 
     use blocks, only : nvr
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+#ifdef ADI
+    use blocks, only : ipr, ien
+#endif /* ADI */
 #ifdef MHD
     use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -908,11 +920,20 @@ module scheme
   function maxspeed(u)
 
     use blocks       , only : nvr, nqt
-    use blocks       , only : idn, ivx, ivz, ipr
+    use blocks       , only : idn, ivx, ivz
+#ifdef ADI
+    use blocks       , only : ipr
+#endif /* ADI */
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config       , only : im, jm, km, ib, ie, jb, je, kb, ke, gamma
+    use config       , only : im, jm, km, ib, ie, jb, je, kb, ke
+#ifdef ADI
+    use config       , only : gamma
+#endif /* ADI */
+#ifdef ISO
+    use config       , only : csnd2
+#endif /* ISO */
 #if defined MHD && defined FLUXCT
     use interpolation, only : magtocen
 #endif /* MHD && FLUXCT */

@@ -41,7 +41,10 @@ module io
 
     use blocks  , only : block_data, list_data, ndims, nsides, nvr, nblocks    &
                        , nleafs, dblocks                                       &
-                       , idn, ivx, ivy, ivz, ipr, ien, nqt
+                       , nqt, idn, ivx, ivy, ivz
+#ifdef ADI
+    use blocks  , only : ipr, ien
+#endif /* ADI */
 #ifdef MHD
     use blocks  , only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */

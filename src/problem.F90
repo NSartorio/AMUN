@@ -398,7 +398,10 @@ module problem
   subroutine init_blast(pblock)
 
     use blocks, only : nvr, nqt
-    use blocks, only : block_data, idn, ivx, ivy, ivz, ipr
+    use blocks, only : block_data, idn, ivx, ivy, ivz
+#ifdef ADI
+    use blocks, only : ipr
+#endif /* ADI */
 #ifdef MHD
     use blocks, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
@@ -427,7 +430,9 @@ module problem
 !
 ! calculate parameters
 !
+#ifdef ADI
     pr = dens * csnd2 / gamma
+#endif /* ADI */
 
 ! calculate cell sizes
 !
@@ -477,11 +482,20 @@ module problem
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 
+#ifdef ISO
+          if (r .lt. rcut) then
+            q(idn,i) = dens * dnrat
+          else
+            q(idn,i) = dens
+          end if
+#endif /* ISO */
+#ifdef ADI
           if (r .lt. rcut) then
             q(ipr,i) = pr * dnrat
           else
             q(ipr,i) = pr
           end if
+#endif /* ADI */
 
         end do
 
@@ -508,7 +522,10 @@ module problem
 !
   subroutine init_implosion(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz
+#ifdef ADI
+    use blocks, only : ien
+#endif /* ADI */
     use config, only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
 
 ! input arguments
@@ -604,7 +621,10 @@ module problem
 !
   subroutine init_binaries(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien
+    use blocks, only : block_data, idn, imx, imy, imz
+#ifdef ADI
+    use blocks, only : ien
+#endif /* ADI */
     use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
                      , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini    &
                      , csnd2, gamma, gammam1i
@@ -855,7 +875,10 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien, nvr
+    use blocks, only : block_data, idn, imx, imy, imz, nvr
+#ifdef ADI
+    use blocks, only : ien
+#endif /* ADI */
     use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
                      , crefmin, crefmax
 
@@ -884,6 +907,7 @@ module problem
       do j = 1, jm
         do i = 1, im
           dn(i,j,k) = pblock%u(idn,i,j,k)
+#ifdef ADI
           vx = pblock%u(imx,i,j,k) / dn(i,j,k)
           vy = pblock%u(imy,i,j,k) / dn(i,j,k)
           vz = pblock%u(imz,i,j,k) / dn(i,j,k)
@@ -892,6 +916,7 @@ module problem
           ek = 0.5 * dn(i,j,k) * (vx*vx + vy*vy + vz*vz)
           ei = en - ek
           pr(i,j,k) = gammam1i * ei
+#endif /* ADI */
         end do
       end do
     end do
@@ -921,6 +946,9 @@ module problem
           ddn = sqrt(ddndx**2 + ddndy**2)
 #endif /* NDIMS == 3 */
 
+          dpmax = max(dpmax, ddn)
+
+#ifdef ADI
           prl = pr(i-1,j,k)
           prr = pr(i+1,j,k)
           dprdx = abs(prr-prl)/(prr+prl)
@@ -938,7 +966,8 @@ module problem
           dpr = sqrt(dprdx**2 + dprdy**2)
 #endif /* NDIMS == 3 */
 
-          dpmax = max(dpmax, ddn, dpr)
+          dpmax = max(dpmax, dpr)
+#endif /* ADI */
 
         end do
       end do
