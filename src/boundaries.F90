@@ -368,35 +368,31 @@ module boundaries
 !
   subroutine bnd_copy(pdata, u, idir, iside, iface)
 
-    use blocks, only : block_data, nvr, nfl, nqt
+    use blocks, only : block_data, nfl, nqt
 #ifdef MHD
     use blocks, only : ibx, iby, ibz
 #endif /* MHD */
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
-                     , km, kb, kbl, kbu, ke, kel, keu, ng
-    use error , only : print_warning
+                     , km, kb, kbl, kbu, ke, kel, keu
+    use error , only : print_error
 
     implicit none
 
 ! arguments
 !
-    type(block_data), pointer            , intent(inout) :: pdata
-    real        , dimension(nqt,im,jm,km), intent(in)    :: u
-    integer                              , intent(in)    :: idir, iside, iface
+    type(block_data), pointer       , intent(inout) :: pdata
+
+    real   , dimension(nqt,im,jm,km), intent(in)    :: u
+    integer                         , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
-    integer :: ii
     integer :: il, iu, jl, ju, kl, ku
     integer :: is, it, js, jt, ks, kt
 !
 !-------------------------------------------------------------------------------
 !
-! calcuate the flag determinig the side of boundary to update
-!
-    ii = 100 * idir + 10 * iside
-
 ! prepare common indices
 !
     il = 1
@@ -413,39 +409,62 @@ module boundaries
     ks = 1
     kt = km
 
-! prepare indices
+! prepare source and destination boundary indices
 !
-    select case(ii)
+    select case(idir)
 
-    case(110)
-      il = iel
-      iu = ie
-      it = ibl
+    case(1)
 
-    case(120)
-      il = ib
-      iu = ibu
-      is = ieu
+      if (iside .eq. 1) then
+        il = iel
+        iu = ie
 
-    case(210)
-      jl = jel
-      ju = je
-      jt = jbl
+        is = 1
+        it = ibl
+      else
+        il = ib
+        iu = ibu
 
-    case(220)
-      jl = jb
-      ju = jbu
-      js = jeu
+        is = ieu
+        it = im
+      end if
 
-    case(310)
-      kl = kel
-      ku = ke
-      kt = kbl
+    case(2)
 
-    case(320)
-      kl = kb
-      ku = kbu
-      ks = keu
+      if (iside .eq. 1) then
+        jl = jel
+        ju = je
+
+        js = 1
+        jt = jbl
+      else
+        jl = jb
+        ju = jbu
+
+        js = jeu
+        jt = jm
+      end if
+
+#if NDIMS == 3
+    case(3)
+
+      if (iside .eq. 1) then
+        kl = kel
+        ku = ke
+
+        ks = 1
+        kt = kbl
+      else
+        kl = kb
+        ku = kbu
+
+        ks = keu
+        kt = km
+      end if
+#endif /* NDIMS == 3 */
+
+    case default
+      call print_error("boundaries::bnd_copy", "Direction unsupported!")
 
     end select
 
@@ -462,20 +481,20 @@ module boundaries
 #ifdef FLUXCT
 ! perform update of the staggered magnetic field components
 !
-    if (it .eq. ng) then
+    if (it .eq. ibl) then
       pdata%u(ibx,is:it-1,js:jt,ks:kt) = u(ibx,il:iu-1,jl:ju,kl:ku)
     else
       pdata%u(ibx,is:it  ,js:jt,ks:kt) = u(ibx,il:iu  ,jl:ju,kl:ku)
     end if
 
-    if (jt .eq. ng) then
+    if (jt .eq. jbl) then
       pdata%u(iby,is:it,js:jt-1,ks:kt) = u(iby,il:iu,jl:ju-1,kl:ku)
     else
       pdata%u(iby,is:it,js:jt  ,ks:kt) = u(iby,il:iu,jl:ju  ,kl:ku)
     end if
 
 #if NDIMS == 3
-    if (kt .eq. ng) then
+    if (kt .eq. kbl) then
       pdata%u(ibz,is:it,js:jt,ks:kt-1) = u(ibz,il:iu,jl:ju,kl:ku-1)
     else
       pdata%u(ibz,is:it,js:jt,ks:kt  ) = u(ibz,il:iu,jl:ju,kl:ku  )
