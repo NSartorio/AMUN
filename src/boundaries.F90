@@ -859,7 +859,7 @@ module boundaries
     use error , only : print_warning
     use interpolation, only : expand
 #if defined MHD && defined FLUXCT
-    use interpolation, only : expand_mag
+    use interpolation, only : expand_mag_bnd
 #endif /* MHD & FLUXCT */
 
     implicit none
@@ -872,21 +872,22 @@ module boundaries
 
 ! local variables
 !
-    integer :: q, i, j, k
+    integer :: q, i, j, k, nh
     integer :: i1, i2, j1, j2, k1, k2
     integer :: il, iu, jl, ju, kl, ku
     integer :: is, it, js, jt, ks, kt
-    integer :: if, jf, kf
+    integer :: if, jf, kf, id, jd, kd
+    integer :: ih, jh, kh
 
 ! local arrays
 !
     integer, dimension(3)                    :: dm, cm, pm
-    real   , dimension(:,:,:)  , allocatable :: u
-    real   , dimension(:,:,:,:), allocatable :: b
+    real   , dimension(:,:,:)  , allocatable :: u, bx, by, bz
+    real   , dimension(:,:)    , allocatable :: bn
 
 ! parameters
 !
-    integer :: del = 1
+    integer :: dl = 2
 !
 !-------------------------------------------------------------------------------
 !
@@ -895,9 +896,9 @@ module boundaries
     dm(:)    = (/ im, jm, km /)
     dm(idir) = ng
     cm(:)    = dm(:) / 2 + ng
-    cm(idir) = 3 * ng / 2 + 2 * del
+    cm(idir) = 3 * ng / 2 + 2 * dl
     pm(:)    = dm(:)
-    pm(idir) = ng + 4 * del
+    pm(idir) = ng + 4 * dl
 #if NDIMS == 2
     dm(3)    = 1
     cm(3)    = 1
@@ -917,11 +918,11 @@ module boundaries
 ! indices of the input array
 !
       if (if .eq. 0) then
-        i1 = ie - ng + 1 - del
-        i2 = ie + ng / 2 + del
+        i1 = ie - ng + 1 - dl
+        i2 = ie + ng / 2 + dl
       else
-        i1 = ib - ng / 2 - del
-        i2 = ib + ng - 1 + del
+        i1 = ib - ng / 2 - dl
+        i2 = ib + ng - 1 + dl
       end if
       if (jf .eq. 0) then
         j1 =  1
@@ -945,8 +946,8 @@ module boundaries
 
 ! indices for the output array
 !
-      il =  1 + 2 * del
-      iu = ng + 2 * del
+      il =  1 + 2 * dl
+      iu = ng + 2 * dl
       jl =  1
       ju = jm
       kl =  1
@@ -982,11 +983,11 @@ module boundaries
         i2 = im
       end if
       if (jf .eq. 0) then
-        j1 = je - ng + 1 - del
-        j2 = je + ng / 2 + del
+        j1 = je - ng + 1 - dl
+        j2 = je + ng / 2 + dl
       else
-        j1 = jb - ng / 2 - del
-        j2 = jb + ng - 1 + del
+        j1 = jb - ng / 2 - dl
+        j2 = jb + ng - 1 + dl
       end if
 #if NDIMS == 3
       if (kf .eq. 0) then
@@ -1005,8 +1006,8 @@ module boundaries
 !
       il =  1
       iu = im
-      jl =  1 + 2 * del
-      ju = ng + 2 * del
+      jl =  1 + 2 * dl
+      ju = ng + 2 * dl
       kl =  1
       ku = km
 
@@ -1048,11 +1049,11 @@ module boundaries
         j2 = jm
       end if
       if (kf .eq. 0) then
-        k1 = ke - ng + 1 - del
-        k2 = ke + ng / 2 + del
+        k1 = ke - ng + 1 - dl
+        k2 = ke + ng / 2 + dl
       else
-        k1 = kb - ng / 2 - del
-        k2 = kb + ng - 1 + del
+        k1 = kb - ng / 2 - dl
+        k2 = kb + ng - 1 + dl
       end if
 
 ! indices for the output array
@@ -1061,8 +1062,8 @@ module boundaries
       iu = im
       jl =  1
       ju = jm
-      kl =  1 + 2 * del
-      ku = ng + 2 * del
+      kl =  1 + 2 * dl
+      ku = ng + 2 * dl
 
 ! indices of the destination array
 !
@@ -1115,45 +1116,240 @@ module boundaries
     end do
 #endif /* FIELDCD */
 #ifdef FLUXCT
+! prepare useful variables
+!
+    nh = max(1, ng / 2)
+    ih = max(1, in / 2)
+    jh = max(1, jn / 2)
+    kh = max(1, kn / 2)
+
+! prepare dimensions of the input arrays
+!
+    dm(:)    = (/ im, jm, km /)
+    dm(idir) = ng
+    pm(:)    = (/ ih, jh, kh /) + ng
+    pm(idir) = nh
+    cm(:)    = pm(:) + 2 * dl
+
 ! allocate space for the prolongated magnetic field components
 !
-    allocate(b(3,pm(1),pm(2),pm(3)))
+    allocate(bx(dm(1)+1,dm(2)  ,dm(3)  ))
+    allocate(by(dm(1)  ,dm(2)+1,dm(3)  ))
+    allocate(bz(dm(1)  ,dm(2)  ,dm(3)+1))
+
+! depending on the direction perform the right prolongation
+!
+    select case(idir)
+
+!! boundary update along the X direction
+!!
+    case(1)
+
+! prepare the index along the longitudinal direction from which the boundary
+! should be copied
+!
+      id = ibl + if * in
+
+! prepare the indices in ourder to determine the input array
+!
+      if (if .eq. 0) then
+        is = ie - nh
+        it = ie
+      else
+        is = ib      - 1
+        it = ib + nh - 1
+      end if
+      il = is - dl + 1
+      iu = it + dl
+
+      jl = jb - nh - dl + jf * jh
+      js = jl - 1
+      ju = jl + cm(2) - 1
+
+#if NDIMS == 2
+      kl = 1
+      ks = 1
+      ku = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      kl = kb - nh - dl + kf * kh
+      ks = kl - 1
+      ku = kl + cm(3) - 1
+#endif /* NDIMS == 3 */
+
+! allocate the temporary boundary array
+!
+      allocate(bn(jm,km))
+
+! copy the boundary from the higher refinement level neighbor
+!
+      bn(1:jm,1:km) = pdata%u(ibx,id,1:jm,1:km)
 
 ! prolongate magnetic field preserving the divergence-free condition
 !
-    call expand_mag(cm, pm, ng, ub(ibx,i1:i2,j1:j2,k1:k2), ub(iby,i1:i2,j1:j2,k1:k2), ub(ibz,i1:i2,j1:j2,k1:k2), b(1,:,:,:), b(2,:,:,:), b(3,:,:,:))
+      call expand_mag_bnd(idir, if, dl, pm, bn(:,:)                            &
+                 , ub(ibx,is:it,jl:ju,kl:ku), ub(iby,il:iu,js:ju,kl:ku)        &
+                 , ub(ibz,il:iu,jl:ju,ks:ku), bx(:,:,:), by(:,:,:), bz(:,:,:))
 
-! update the X component of magnetic field
+! deallocate the boundary array
 !
-    if (it .eq. ng) then
-      pdata%u(ibx,is:it-1,js:jt,ks:kt) = b(1,il:iu-1,jl:ju,kl:ku)
-    else
-      pdata%u(ibx,is:it  ,js:jt,ks:kt) = b(1,il:iu  ,jl:ju,kl:ku)
-    end if
+      deallocate(bn)
 
-! update the Y component of magnetic field
+! update the magnetic field components
 !
-    if (jt .eq. ng) then
-      pdata%u(iby,is:it,js:jt-1,ks:kt) = b(2,il:iu,jl:ju-1,kl:ku)
-    else
-      pdata%u(iby,is:it,js:jt  ,ks:kt) = b(2,il:iu,jl:ju  ,kl:ku)
-    end if
-
-! update the Z component of magnetic field
-!
+      if (if .eq. 0) then
+        pdata%u(ibx,  1:ibl-1,1:jm,1:km) = bx(2:ng  ,1:jm  ,1:km  )
+        pdata%u(iby,  1:ibl  ,1:jm,1:km) = by(1:ng  ,2:jm+1,1:km  )
 #if NDIMS == 3
-    if (kt .eq. ng) then
-      pdata%u(ibz,is:it,js:jt,ks:kt-1) = b(3,il:iu,jl:ju,kl:ku-1)
-    else
-      pdata%u(ibz,is:it,js:jt,ks:kt  ) = b(3,il:iu,jl:ju,kl:ku  )
-    end if
-#else /* NDIMS == 3 */
-    pdata%u(ibz,is:it,js:jt,ks:kt) = b(3,il:iu,jl:ju,kl:ku)
+        pdata%u(ibz,  1:ibl  ,1:jm,1:km) = bz(1:ng  ,1:jm  ,2:km+1)
 #endif /* NDIMS == 3 */
+      else
+        pdata%u(ibx,ieu:im   ,1:jm,1:km) = bx(2:ng+1,1:jm  ,1:km  )
+        pdata%u(iby,ieu:im   ,1:jm,1:km) = by(1:ng  ,2:jm+1,1:km  )
+#if NDIMS == 3
+        pdata%u(ibz,ieu:im   ,1:jm,1:km) = bz(1:ng  ,1:jm  ,2:km+1)
+#endif /* NDIMS == 3 */
+      end if
+
+!! boundary update along the Y direction
+!!
+    case(2)
+
+! prepare the index along the longitudinal direction from which the boundary
+! should be copied
+!
+      jd = jbl + jf * jn
+
+! prepare the indices in ourder to determine the input array
+!
+      il = ib - nh - dl + if * ih
+      is = il - 1
+      iu = il + cm(1) - 1
+
+      if (jf .eq. 0) then
+        js = je - nh
+        jt = je
+      else
+        js = jb      - 1
+        jt = jb + nh - 1
+      end if
+      jl = js - dl + 1
+      ju = jt + dl
+
+#if NDIMS == 2
+      kl = 1
+      ks = 1
+      ku = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      kl = kb - nh - dl + kf * kh
+      ks = kl - 1
+      ku = kl + cm(3) - 1
+#endif /* NDIMS == 3 */
+
+! allocate the temporary boundary array
+!
+      allocate(bn(im,km))
+
+! copy the boundary from the higher refinement level neighbor
+!
+      bn(1:im,1:km) = pdata%u(iby,1:im,jd,1:km)
+
+! prolongate magnetic field preserving the divergence-free condition
+!
+      call expand_mag_bnd(idir, jf, dl, pm, bn(:,:)                            &
+                 , ub(ibx,is:iu,jl:ju,kl:ku), ub(iby,il:iu,js:jt,kl:ku)        &
+                 , ub(ibz,il:iu,jl:ju,ks:ku), bx(:,:,:), by(:,:,:), bz(:,:,:))
+
+! deallocate the boundary array
+!
+      deallocate(bn)
+
+! update the magnetic field components
+!
+      if (jf .eq. 0) then
+        pdata%u(ibx,1:im,  1:jbl  ,1:km) = bx(2:im+1,1:ng  ,1:km  )
+        pdata%u(iby,1:im,  1:jbl-1,1:km) = by(1:im  ,2:ng  ,1:km  )
+#if NDIMS == 3
+        pdata%u(ibz,1:im,  1:jbl  ,1:km) = bz(1:im  ,1:ng  ,2:km+1)
+#endif /* NDIMS == 3 */
+      else
+        pdata%u(ibx,1:im,jeu:jm   ,1:km) = bx(2:im+1,1:ng  ,1:km  )
+        pdata%u(iby,1:im,jeu:jm   ,1:km) = by(1:im  ,2:ng+1,1:km  )
+#if NDIMS == 3
+        pdata%u(ibz,1:im,jeu:jm   ,1:km) = bz(1:im  ,1:ng  ,2:km+1)
+#endif /* NDIMS == 3 */
+      end if
+
+#if NDIMS == 3
+!! boundary update along the Y direction
+!!
+    case(3)
+
+! prepare the index along the longitudinal direction from which the boundary
+! should be copied
+!
+      kd = kbl + kf * kn
+
+! prepare the indices in ourder to determine the input array
+!
+      il = ib - nh - dl + if * ih
+      is = il - 1
+      iu = il + cm(1) - 1
+
+      jl = jb - nh - dl + jf * jh
+      js = jl - 1
+      ju = jl + cm(2) - 1
+
+      if (kf .eq. 0) then
+        ks = ke - nh
+        kt = ke
+      else
+        ks = kb      - 1
+        kt = kb + nh - 1
+      end if
+      kl = ks - dl + 1
+      ku = kt + dl
+
+! allocate the temporary boundary array
+!
+      allocate(bn(im,jm))
+
+! copy the boundary from the higher refinement level neighbor
+!
+      bn(1:im,1:jm) = pdata%u(ibz,1:im,1:jm,kd)
+
+! prolongate magnetic field preserving the divergence-free condition
+!
+      call expand_mag_bnd(idir, kf, dl, pm, bn(:,:)                            &
+                 , ub(ibx,is:iu,jl:ju,kl:ku), ub(iby,il:iu,js:ju,kl:ku)        &
+                 , ub(ibz,il:iu,jl:ju,ks:kt), bx(:,:,:), by(:,:,:), bz(:,:,:))
+
+! deallocate the boundary array
+!
+      deallocate(bn)
+
+! update the magnetic field components
+!
+      if (kf .eq. 0) then
+        pdata%u(ibx,1:im,1:jm,  1:kbl  ) = bx(2:im+1,1:jm  ,1:ng  )
+        pdata%u(iby,1:im,1:jm,  1:kbl  ) = by(1:im  ,2:jm+1,1:ng  )
+        pdata%u(ibz,1:im,1:jm,  1:kbl-1) = bz(1:im  ,1:jm  ,2:ng  )
+      else
+        pdata%u(ibx,1:im,1:jm,keu:km   ) = bx(2:im+1,1:jm  ,1:ng  )
+        pdata%u(iby,1:im,1:jm,keu:km   ) = by(1:im  ,2:jm+1,1:ng  )
+        pdata%u(ibz,1:im,1:jm,keu:km   ) = bz(1:im  ,1:jm  ,2:ng+1)
+      end if
+#endif /* NDIMS == 3 */
+
+    case default
+    end select
 
 ! deallocate space for the prolongated magnetic field components
 !
-    deallocate(b)
+    deallocate(bx)
+    deallocate(by)
+    deallocate(bz)
 #endif /* FLUXCT */
 #endif /* MHD */
 

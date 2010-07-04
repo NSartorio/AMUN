@@ -348,6 +348,56 @@ module interpolation
 !
 !===============================================================================
 !
+! expand_1d_tvd: one dimensional expansion using the TVD interpolation
+!
+!===============================================================================
+!
+  subroutine expand_1d_tvd(nu, nv, ng, u, v)
+
+    implicit none
+
+! input parameters
+!
+    integer                    , intent(in)    :: nu, nv, ng
+    real        , dimension(nu), intent(in)    :: u
+    real        , dimension(nv), intent(inout) :: v
+
+! local variables
+!
+    integer  :: i, ib, ie, il, ir
+    real     :: dum, dup, ds, du
+!
+!-------------------------------------------------------------------------------
+!
+    ib =  1 + ng
+    ie = nu - ng
+
+    do i = ib, ie
+
+      ir = 2 * (i - ng)
+      il = ir - 1
+
+      dup = u(i+1) - u(i)
+      dum = u(i-1) - u(i)
+      ds  = - dup * dum
+
+      if (ds .gt. 0.0) then
+        du    = 0.5 * ds / (dup - dum)
+        v(il) = u(i) - du
+        v(ir) = u(i) + du
+      else
+        v(il) = u(i)
+        v(ir) = u(i)
+      end if
+
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine expand_1d_tvd
+!
+!===============================================================================
+!
 ! shrink_1d: one dimensional shrinking using different interpolations for
 !            different location of the new points
 !
@@ -933,6 +983,297 @@ module interpolation
 #endif /* NDIMS == 3 */
 !
   end subroutine expand_mag
+!
+!===============================================================================
+!
+! expand_mag_bnd: subroutine for prolongation of the magnetic field with
+!                 preserving the divergence free condition and applied
+!                 boundaries (Li & Li, 2004, JCoPh, 199, 1)
+!
+! arguments:
+!
+!   id        - the direction of the expansion
+!   if        - the side of the boundary values
+!   dl        - number of safety zones
+!   dm(3)     - the dimensions of the expanded region without boundaries
+!   bn(:,:)   - the finer values of the boundary
+!   ux(:,:,:) - X component of the coarse field
+!   uy(:,:,:) - Y component of the coarse field
+!   uz(:,:,:) - Z component of the coarse field
+!   wx(:,:,:) - X component of the fine field
+!   wy(:,:,:) - Y component of the fine field
+!   wz(:,:,:) - Z component of the fine field
+!
+!===============================================================================
+!
+  subroutine expand_mag_bnd(id, if, dl, dm, bn, ux, uy, uz, wx, wy, wz)
+
+    implicit none
+
+! input and output variables
+!
+    integer                  , intent(in)    :: id, if, dl
+    integer, dimension(3)    , intent(in)    :: dm
+    real   , dimension(:,:)  , intent(in)    :: bn
+    real   , dimension(:,:,:), intent(in)    :: ux, uy, uz
+    real   , dimension(:,:,:), intent(inout) :: wx, wy, wz
+
+! local variables
+!
+    integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
+    integer :: ib, ie, jb, je, kb, ke
+    integer :: il, jl, kl
+
+! local arrays
+!
+    integer, dimension(3) :: cm, fm
+
+! temporary arrays
+!
+    real, dimension(:,:,:), allocatable :: tx, ty
+!
+!------------------------------------------------------------------------------
+!
+! notes:
+!
+!  - the dimensions of parallel and perpendicular components are different;
+!    the parallel components is [ dm(1) + 1, dm(2) + 2 * ng, dm(3) + 2 * ng];
+!    the perpendicular is [ dm(1) + 2 * ng, dm(2) + 2 * ng + 1, dm(3) + 2 * ng]
+!    or [ dm(1) + 2 * ng, dm(2) + 2 * ng, dm(3) + 2 * ng + 1]
+!
+!  - the boundary is an array of the dimensions
+!    [ 4 * dm(2) + 2 * ng, 4 * dm(3) + 2 * ng ]
+!
+!  - the parallel output vector is of the dimensions
+!    [ 2 * dm(1) + 1, 2 * dm(2) + 2 * ng, 2 * dm(2) + 2 * ng ];
+!
+!  - the perpendicular output vector is of the dimensions
+!    [ 2 * dm(1), 2 * dm(2) + 2 * ng + 1, 2 * dm(2) + 2 * ng ] or
+!    [ 2 * dm(1), 2 * dm(2) + 2 * ng, 2 * dm(2) + 2 * ng + 1 ];
+!
+!  - depending on the direction and side of the boundary vector choose the right
+!    interpolation;
+!
+!  - perpendicular components to the direction of boundary should be larger by
+!    at least 2 ghost zones in order to handle properly TVD interpolation;
+!
+!  - boundary array should be two dimensional and have perpendicular dimensions
+!    of the fine output array, e.g. if idir = 1, bn(fm(2),fm(3));
+
+! prepare dimensions
+!
+    cm(:) = dm(:) + 2 * dl
+#if NDIMS == 2
+    cm(3) = 1
+#endif /* NDIMS == 2 */
+
+    fm(:) = 2 * dm(:)
+#if NDIMS == 2
+    fm(3) = 1
+#endif /* NDIMS == 2 */
+
+    select case(id)
+
+!! boundary perpendicular to the X direction
+!!
+    case(1)
+
+! allocate temporary arrays
+!
+      allocate(tx(fm(1)+1,cm(2)  ,cm(3)))
+      allocate(ty(fm(1)  ,cm(2)+1,cm(3)))
+
+! prepare indices
+!
+      il = 1 + (1 - if) * fm(1)
+
+      jb = 1     + dl
+      je = cm(2) - dl
+
+! steps:
+!
+! 1. check if the input arrays have the right dimensions
+!
+
+! 2. interpolate components perpendicular to the direction of boundary using the
+!    TVD interpolation; place the calculated values in the output array;
+!
+      do k = 1, cm(3)
+        do j = 1, cm(2) + 1
+          call expand_1d_tvd(cm(1), fm(1), dl, uy(1:cm(1),j,k), ty(1:fm(1),j,k))
+        end do
+      end do
+
+! 3. fill the already known values of the parallel component
+!
+      tx(1:fm(1)+1:2,1:cm(2),1:cm(3)) = ux(1:dm(1)+1,1:cm(2),1:cm(3))
+
+! 4. average the fine boundary in order to get the coarse values and substitute
+!    these values in the coarse parallel component;
+!
+      tx(il,jb:je,1:cm(3)) = 0.50 * (bn(1:fm(2):2,1:cm(3))                     &
+                                   + bn(2:fm(2):2,1:cm(3)))
+
+! 5. calculate the even values of the parallel component using the divergence
+!    free condition;
+!
+      do k = 1, cm(3)
+        do j = 1, cm(2)
+          jp1 = j + 1
+          do i = 2, fm(1) + 1, 2
+            im1 = i - 1
+            ip1 = i + 1
+
+            tx(i,j,k) = 0.50 * (tx(im1,j  ,k) + tx(ip1,j  ,k))                 &
+                      + 0.25 * (ty(i  ,jp1,k) - ty(im1,jp1,k))                 &
+                      - 0.25 * (ty(i  ,j  ,k) - ty(im1,j  ,k))
+          end do
+        end do
+      end do
+
+! 6. interpolate components perpendicular to the direction of boundary using the
+!    TVD interpolation; place the calculated values in the output array;
+!
+      do k = 1, cm(3)
+        do i = 1, fm(1) + 1
+          call expand_1d_tvd(cm(2), fm(2), dl, tx(i,1:cm(2),k), wx(i,1:fm(2),k))
+        end do
+      end do
+
+! 7. substitute the original values of the fine boundary in the parallel
+!    component;
+!
+      wx(il,1:fm(2),1:fm(3)) = bn(1:fm(2),1:fm(3))
+
+! 8. substitute the odd values of the perpendicular component from the previous
+!    array;
+!
+      wy(1:fm(1),1:fm(2)+1:2,1:fm(3)) = ty(1:fm(1),jb:je+1,1:fm(3))
+
+! 9. calculate the even values of the perpendicular component using the
+!    divergence free condition;
+!
+      do k = 1, fm(3)
+        do i = 1, fm(1)
+          ip1 = i + 1
+          do j = 2, fm(2), 2
+            jm1 = j - 1
+            jp1 = j + 1
+
+            wy(i,j,k) = 0.50 * (wy(i  ,jm1,k) + wy(i  ,jp1,k))                 &
+                      + 0.50 * (wx(ip1,j  ,k) - wx(ip1,jm1,k))                 &
+                      - 0.50 * (wx(i  ,j  ,k) - wx(i  ,jm1,k))
+          end do
+        end do
+      end do
+
+! deallocate temporary arrays
+!
+      deallocate(tx)
+      deallocate(ty)
+
+!! boundary perpendicular to the Y direction
+!!
+    case(2)
+
+! allocate temporary arrays
+!
+      allocate(tx(cm(1)+1,fm(2)  ,cm(3)))
+      allocate(ty(cm(1)  ,fm(2)+1,cm(3)))
+
+! prepare indices
+!
+      jl = 1 + (1 - if) * fm(2)
+
+      ib = 1     + dl
+      ie = cm(1) - dl
+
+! steps:
+!
+! 1. check if the input arrays have the right dimensions
+!
+
+! 2. interpolate components perpendicular to the direction of boundary using the
+!    TVD interpolation; place the calculated values in the output array;
+!
+      do k = 1, cm(3)
+        do i = 1, cm(1) + 1
+          call expand_1d_tvd(cm(2), fm(2), dl, ux(i,1:cm(2),k), tx(i,1:fm(2),k))
+        end do
+      end do
+
+! 3. fill the already known values of the parallel component
+!
+      ty(1:cm(1),1:fm(2)+1:2,1:cm(3)) = uy(1:cm(1),1:dm(2)+1,1:cm(3))
+
+! 4. average the fine boundary in order to get the coarse values and substitute
+!    these values in the coarse parallel component;
+!
+      ty(ib:ie,jl,1:cm(3)) = 0.50 * (bn(1:fm(1):2,1:cm(3))                     &
+                                   + bn(2:fm(1):2,1:cm(3)))
+
+! 5. calculate the even values of the parallel component using the divergence
+!    free condition;
+!
+      do k = 1, cm(3)
+        do i = 1, cm(1)
+          ip1 = i + 1
+          do j = 2, fm(2) + 1, 2
+            jm1 = j - 1
+            jp1 = j + 1
+
+            ty(i,j,k) = 0.50 * (ty(i  ,jm1,k) + ty(i  ,jp1,k))                 &
+                      + 0.25 * (tx(ip1,j  ,k) - tx(ip1,jm1,k))                 &
+                      - 0.25 * (tx(i  ,j  ,k) - tx(i  ,jm1,k))
+          end do
+        end do
+      end do
+
+! 6. interpolate components perpendicular to the direction of boundary using the
+!    TVD interpolation; place the calculated values in the output array;
+!
+      do k = 1, cm(3)
+        do j = 1, fm(2) + 1
+          call expand_1d_tvd(cm(1), fm(1), dl, ty(1:cm(1),j,k), wy(1:fm(1),j,k))
+        end do
+      end do
+
+! 7. substitute the original values of the fine boundary in the parallel
+!    component;
+!
+      wy(1:fm(1),jl,1:fm(3)) = bn(1:fm(1),1:fm(3))
+
+! 8. substitute the odd values of the perpendicular component from the previous
+!    array;
+!
+      wx(1:fm(1)+1:2,1:fm(2),1:fm(3)) = tx(ib:ie+1,1:fm(2),1:fm(3))
+
+! 9. calculate the even values of the perpendicular component using the
+!    divergence free condition;
+!
+      do k = 1, fm(3)
+        do j = 1, fm(2)
+          jp1 = j + 1
+          do i = 2, fm(1), 2
+            im1 = i - 1
+            ip1 = i + 1
+
+            wx(i,j,k) = 0.50 * (wx(im1,j  ,k) + wx(ip1,j  ,k))                 &
+                      + 0.50 * (wy(i  ,jp1,k) - wy(im1,jp1,k))                 &
+                      - 0.50 * (wy(i  ,j  ,k) - wy(im1,j  ,k))
+          end do
+        end do
+      end do
+
+! deallocate temporary arrays
+!
+      deallocate(tx)
+      deallocate(ty)
+
+    case default
+    end select
+!
+  end subroutine expand_mag_bnd
 #endif /* FLUXCT */
 !
 !===============================================================================
