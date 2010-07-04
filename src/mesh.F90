@@ -928,11 +928,11 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, nchild, nfl
+    use blocks       , only : block_meta, nchild, nfl, nqt
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
-    use config       , only : ng, im, jm, km, ib, jb, kb
+    use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : shrink
 
     implicit none
@@ -944,16 +944,17 @@ module mesh
 ! local variables
 !
     integer :: i, j, k, q, p
-    integer :: il, iu, jl, ju, kl, ku, i1, i2, j1, j2, k1, k2
     integer :: is, js, ks
+    integer :: ib, jb, kb, ie, je, ke
+    integer :: il, iu, jl, ju, kl, ku
 
 ! local arrays
 !
-    integer, dimension(3)     :: dm, fm, pm
+    integer, dimension(3)     :: dm, pm, fm
 
 ! local allocatable arrays
 !
-    real, dimension(:,:,:), allocatable :: u
+    real, dimension(:,:,:,:), allocatable :: u, w
 
 ! local pointers
 !
@@ -964,22 +965,23 @@ module mesh
 ! prepare dimensions
 !
     dm(:)   = (/ im, jm, km /)
-    pm(:)   = dm(:) / 2
-    fm(:)   = (dm(:) - ng) / 2
+    pm(:)   = dm(:) - ng
+    fm(:)   = 2 * pm(:)
 #if NDIMS == 2
     pm(3)   = 1
     fm(3)   = 1
+    kb      = 1
+    ke      = 1
     ks      = 0
     kl      = 1
     ku      = 1
-    k1      = 1
-    k2      = 1
     k       = 1
 #endif /* NDIMS == 2 */
 
-! allocate temporary array
+! allocate temporary arrays
 !
-    allocate(u(pm(1), pm(2), pm(3)))
+    allocate(u(nqt, fm(1), fm(2), fm(3)))
+    allocate(w(nqt, pm(1), pm(2), pm(3)))
 
 ! iterate over all children
 !
@@ -1001,87 +1003,88 @@ module mesh
 
 ! calculate the bounds of the input array indices
 !
-      i1 =  1 + ng / 2 * is
-      j1 =  1 + ng / 2 * js
-#if NDIMS == 3
-      k1 =  1 + ng / 2 * ks
-#endif /* NDIMS == 3 */
+      ib =  1 + ng * is
+      jb =  1 + ng * js
+#if NDIMS == 2
+      kb =  1 + ng * ks
+#endif /* NDIMS == 2 */
 
-      i2 = i1 + fm(1) - 1
-      j2 = j1 + fm(2) - 1
-#if NDIMS == 3
-      k2 = k1 + fm(3) - 1
-#endif /* NDIMS == 3 */
+      ie = ib + pm(1) - 1
+      je = jb + pm(2) - 1
+#if NDIMS == 2
+      ke = kb + pm(3) - 1
+#endif /* NDIMS == 2 */
 
 ! calculate the bounds of the destination array indices
 !
-      il = 1 + ng / 2 + is * fm(1)
-      jl = 1 + ng / 2 + js * fm(2)
-#if NDIMS == 3
-      kl = 1 + ng / 2 + ks * fm(3)
-#endif /* NDIMS == 3 */
+      il =  1 + pm(1) * is
+      jl =  1 + pm(2) * js
+#if NDIMS == 2
+      kl =  1 + pm(3) * ks
+#endif /* NDIMS == 2 */
 
-      iu = il + fm(1) - 1
-      ju = jl + fm(2) - 1
-#if NDIMS == 3
-      ku = kl + fm(3) - 1
-#endif /* NDIMS == 3 */
+      iu = il + pm(1) - 1
+      ju = jl + pm(2) - 1
+#if NDIMS == 2
+      ku = kl + pm(3) - 1
+#endif /* NDIMS == 2 */
 
-! iterate over all quantities
+! copy variables from the current child to the proper location of the array u
 !
-      do q = 1, nfl
+      u(1:nqt,il:iu,jl:ju,kl:ku) = pchild%data%u(1:nqt,ib:ie,jb:je,kb:je)
 
-! shrink the current child
+    end do
+
+! iterate over all quantities and shrink them and substitute to the new block
 !
-        call shrink(dm, pm, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
+    do q = 1, nfl
+      call shrink(fm, pm, u(q,:,:,:), w(q,:,:,:), 'm', 'm', 'm')
+    end do
 
-! fill the parent block
-!
-        pblock%data%u(q,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
-
-      end do
 #ifdef MHD
 #ifdef FIELDCD
 ! iterate over magnetic field components
 !
-      do q = ibx, ibz
-
-! shrink the current child
-!
-        call shrink(dm, pm, pchild%data%u(q,:,:,:), u(:,:,:), 'm', 'm', 'm')
-
-! fill the parent block
-!
-        pblock%data%u(q,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
-
-      end do
+    do q = ibx, ibz
+      call shrink(fm, pm, u(q,:,:,:), w(q,:,:,:), 'm', 'm', 'm')
+    end do
 #endif /* FIELDCD */
 #ifdef FLUXCT
 ! restrict the X component of magnetic field
 !
-      call shrink(dm, pm, pchild%data%u(ibx,:,:,:), u(:,:,:), 'c', 'm', 'm')
-
-      pblock%data%u(ibx,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+    call shrink(fm, pm, u(ibx,:,:,:), w(ibx,:,:,:), 'c', 'm', 'm')
 
 ! restrict the Y component of magnetic field
 !
-      call shrink(dm, pm, pchild%data%u(iby,:,:,:), u(:,:,:), 'm', 'c', 'm')
-
-      pblock%data%u(iby,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+    call shrink(fm, pm, u(iby,:,:,:), w(iby,:,:,:), 'm', 'c', 'm')
 
 ! restrict the Z component of magnetic field
 !
-      call shrink(dm, pm, pchild%data%u(ibz,:,:,:), u(:,:,:), 'm', 'm', 'c')
-
-      pblock%data%u(ibz,il:iu,jl:ju,kl:ku) = u(i1:i2,j1:j2,k1:k2)
+    call shrink(fm, pm, u(ibz,:,:,:), w(ibz,:,:,:), 'm', 'm', 'c')
 #endif /* FLUXCT */
 #endif /* MHD */
 
-    end do
+! calculate substitution indices
+!
+    ib = ng / 2 + 1
+    jb = ng / 2 + 1
+    kb = ng / 2 + 1
+    ie = ib + in + ng - 1
+    je = jb + jn + ng - 1
+    ke = kb + kn + ng - 1
+#if NDIMS == 2
+    kb = 1
+    ke = 1
+#endif /* NDIMS == 2 */
 
-! deallocate temporary array
+! substitute shrinked variables to the new data block
+!
+    pblock%data%u(1:nqt,ib:ie,jb:je,kb:ke) = w(1:nqt,:,:,:)
+
+! deallocate temporary arrays
 !
     deallocate(u)
+    deallocate(w)
 !
 !-------------------------------------------------------------------------------
 !
