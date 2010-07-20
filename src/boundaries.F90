@@ -852,7 +852,7 @@ module boundaries
                          , jn, jm, jb, jbl, jbu, je, jel, jeu                  &
                          , kn, km, kb, kbl, kbu, ke, kel, keu
     use error , only : print_warning
-    use interpolation, only : expand
+    use interpolation, only : expand_tvd
 #if defined MHD && defined FLUXCT
     use interpolation, only : expand_mag_bnd
 #endif /* MHD & FLUXCT */
@@ -867,18 +867,20 @@ module boundaries
 
 ! local variables
 !
-    integer :: q, i, j, k, nh
-    integer :: i1, i2, j1, j2, k1, k2
+    integer :: q, i, j, k
+    integer :: ih, jh, kh, nh
+    integer :: if, jf, kf, id, jd, kd
     integer :: il, iu, jl, ju, kl, ku
     integer :: is, it, js, jt, ks, kt
-    integer :: if, jf, kf, id, jd, kd
-    integer :: ih, jh, kh
 
 ! local arrays
 !
     integer, dimension(3)                    :: dm, cm, pm
-    real   , dimension(:,:,:)  , allocatable :: u, bx, by, bz
+    real   , dimension(:,:,:)  , allocatable :: u
+#if defined MHD && defined FLUXCT
+    real   , dimension(:,:,:)  , allocatable :: bx, by, bz
     real   , dimension(:,:)    , allocatable :: bn
+#endif /* MHD & FLUXCT */
 
 ! parameters
 !
@@ -886,231 +888,6 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! prepare dimensions
-!
-    dm(:)    = (/ im, jm, km /)
-    dm(idir) = ng
-    cm(:)    = dm(:) / 2 + ng
-    cm(idir) = 3 * ng / 2 + 2 * dl
-    pm(:)    = dm(:)
-    pm(idir) = ng + 4 * dl
-#if NDIMS == 2
-    dm(3)    = 1
-    cm(3)    = 1
-    pm(3)    = 1
-#endif /* NDIMS == 2 */
-
-! prepare indices
-!
-    select case(idir)
-
-    case(1)
-
-      if =     iside - 1
-      jf = mod(iface - 1, 2)
-      kf =    (iface - 1) / 2
-
-! indices of the input array
-!
-      if (if .eq. 0) then
-        i1 = ie - ng + 1 - dl
-        i2 = ie + ng / 2 + dl
-      else
-        i1 = ib - ng / 2 - dl
-        i2 = ib + ng - 1 + dl
-      end if
-      if (jf .eq. 0) then
-        j1 =  1
-        j2 = jm / 2 + ng
-      else
-        j1 = jm / 2 - ng + 1
-        j2 = jm
-      end if
-#if NDIMS == 3
-      if (kf .eq. 0) then
-        k1 =  1
-        k2 = km / 2 + ng
-      else
-        k1 = km / 2 - ng + 1
-        k2 = km
-      end if
-#else /* NDIMS == 3 */
-      k1 = 1
-      k2 = 1
-#endif /* NDIMS == 3 */
-
-! indices for the output array
-!
-      il =  1 + 2 * dl
-      iu = ng + 2 * dl
-      jl =  1
-      ju = jm
-      kl =  1
-      ku = km
-
-! indices of the destination array
-!
-      if (if .eq. 0) then
-        is =  1
-        it = ng
-      else
-        is = ie + 1
-        it = im
-      end if
-      js = 1
-      jt = jm
-      ks = 1
-      kt = km
-
-    case(2)
-
-      if = mod(iface - 1, 2)
-      jf =     iside - 1
-      kf =    (iface - 1) / 2
-
-! indices of the input array
-!
-      if (if .eq. 0) then
-        i1 =  1
-        i2 = im / 2 + ng
-      else
-        i1 = im / 2 - ng + 1
-        i2 = im
-      end if
-      if (jf .eq. 0) then
-        j1 = je - ng + 1 - dl
-        j2 = je + ng / 2 + dl
-      else
-        j1 = jb - ng / 2 - dl
-        j2 = jb + ng - 1 + dl
-      end if
-#if NDIMS == 3
-      if (kf .eq. 0) then
-        k1 =  1
-        k2 = km / 2 + ng
-      else
-        k1 = km / 2 - ng + 1
-        k2 = km
-      end if
-#else /* NDIMS == 3 */
-      k1 = 1
-      k2 = 1
-#endif /* NDIMS == 3 */
-
-! indices for the output array
-!
-      il =  1
-      iu = im
-      jl =  1 + 2 * dl
-      ju = ng + 2 * dl
-      kl =  1
-      ku = km
-
-! indices of the destination array
-!
-      is =  1
-      it = im
-      if (jf .eq. 0) then
-        js =  1
-        jt = ng
-      else
-        js = je + 1
-        jt = jm
-      end if
-      ks =  1
-      kt = km
-
-#if NDIMS == 3
-    case(3)
-
-      if = mod(iface - 1, 2)
-      jf =    (iface - 1) / 2
-      kf =     iside - 1
-
-! indices of the input array
-!
-      if (if .eq. 0) then
-        i1 =  1
-        i2 = im / 2 + ng
-      else
-        i1 = im / 2 - ng + 1
-        i2 = im
-      end if
-      if (jf .eq. 0) then
-        j1 =  1
-        j2 = jm / 2 + ng
-      else
-        j1 = jm / 2 - ng + 1
-        j2 = jm
-      end if
-      if (kf .eq. 0) then
-        k1 = ke - ng + 1 - dl
-        k2 = ke + ng / 2 + dl
-      else
-        k1 = kb - ng / 2 - dl
-        k2 = kb + ng - 1 + dl
-      end if
-
-! indices for the output array
-!
-      il =  1
-      iu = im
-      jl =  1
-      ju = jm
-      kl =  1 + 2 * dl
-      ku = ng + 2 * dl
-
-! indices of the destination array
-!
-      is =  1
-      it = im
-      js =  1
-      jt = jm
-      if (kf .eq. 0) then
-        ks =  1
-        kt = ng
-      else
-        ks = ke + 1
-        kt = km
-      end if
-#endif /* NDIMS == 3 */
-
-    end select
-
-! allocate temporary array
-!
-    allocate(u(pm(1),pm(2),pm(3)))
-
-! iterate over all variables
-!
-    do q = 1, nfl
-
-! expand the boundary
-!
-      call expand(cm, pm, ng, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 't', 't', 't')
-
-! copy expanded boundary in the proper place of the block
-!
-      pdata%u(q,is:it,js:jt,ks:kt) = u(il:iu,jl:ju,kl:ku)
-
-    end do
-#ifdef MHD
-#ifdef FIELDCD
-! iterate over magnetic field components
-!
-    do q = ibx, ibz
-
-! expand the boundary
-!
-      call expand(cm, pm, ng, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 't', 't', 't')
-
-! copy expanded boundary in the proper place of the block
-!
-      pdata%u(q,is:it,js:jt,ks:kt) = u(il:iu,jl:ju,kl:ku)
-
-    end do
-#endif /* FIELDCD */
-#ifdef FLUXCT
 ! prepare useful variables
 !
     nh = max(1, ng / 2)
@@ -1125,7 +902,160 @@ module boundaries
     pm(:)    = (/ ih, jh, kh /) + ng
     pm(idir) = nh
     cm(:)    = pm(:) + 2 * dl
+#if NDIMS == 2
+    dm(3)    = 1
+    pm(3)    = 1
+    cm(3)    = 1
 
+    kl = 1
+    ku = 1
+#endif /* NDIMS == 2 */
+
+! prepare indices of for the destination array
+!
+      is = 1
+      it = im
+      js = 1
+      jt = jm
+      ks = 1
+      kt = km
+
+! prepare indices
+!
+    select case(idir)
+
+    case(1)
+
+      if =     iside - 1
+      jf = mod(iface - 1, 2)
+      kf =    (iface - 1) / 2
+
+! indices of the input array
+!
+      if (if .eq. 0) then
+        il = ie - nh - dl + 1
+        iu = ie      + dl
+      else
+        il = ib      - dl
+        iu = ib + nh + dl - 1
+      end if
+      jl = jb - nh - dl + jh * jf
+      ju = jl + cm(2) - 1
+#if NDIMS == 3
+      kl = kb - nh - dl + kh * kf
+      ku = kl + cm(3) - 1
+#endif /* NDIMS == 3 */
+
+! indices of the destination array
+!
+      if (if .eq. 0) then
+        is = 1
+        it = ibl
+      else
+        is = ieu
+        it = im
+      end if
+
+    case(2)
+
+      if = mod(iface - 1, 2)
+      jf =     iside - 1
+      kf =    (iface - 1) / 2
+
+! indices of the input array
+!
+      il = ib - nh - dl + ih * if
+      iu = il + cm(1) - 1
+      if (jf .eq. 0) then
+        jl = je - nh - dl + 1
+        ju = je      + dl
+      else
+        jl = jb      - dl
+        ju = jb + nh + dl - 1
+      end if
+#if NDIMS == 3
+      kl = kb - nh - dl + kh * kf
+      ku = kl + cm(3) - 1
+#endif /* NDIMS == 3 */
+
+! indices of the destination array
+!
+      if (jf .eq. 0) then
+        js = 1
+        jt = jbl
+      else
+        js = jeu
+        jt = jm
+      end if
+
+#if NDIMS == 3
+    case(3)
+
+      if = mod(iface - 1, 2)
+      jf =    (iface - 1) / 2
+      kf =     iside - 1
+
+! indices of the input array
+!
+      il = ib - nh - dl + ih * if
+      iu = il + cm(1) - 1
+      jl = jb - nh - dl + jh * jf
+      ju = jl + cm(2) - 1
+      if (kf .eq. 0) then
+        kl = ke - nh - dl + 1
+        ku = ke      + dl
+      else
+        kl = kb      - dl
+        ku = kb + nh + dl - 1
+      end if
+
+! indices of the destination array
+!
+      if (kf .eq. 0) then
+        ks = 1
+        kt = kbl
+      else
+        ks = keu
+        kt = km
+      end if
+#endif /* NDIMS == 3 */
+
+    end select
+
+! allocate temporary array
+!
+    allocate(u(dm(1),dm(2),dm(3)))
+
+! iterate over all variables
+!
+    do q = 1, nfl
+
+! expand the boundary
+!
+      call expand_tvd(cm, dm, dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
+
+! copy expanded boundary in the proper place of the block
+!
+      pdata%u(q,is:it,js:jt,ks:kt) = u(:,:,:)
+
+    end do
+#ifdef MHD
+#ifdef FIELDCD
+! iterate over magnetic field components
+!
+    do q = ibx, ibz
+
+! expand the boundary
+!
+      call expand_tvd(cm, dm, dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
+
+! copy expanded boundary in the proper place of the block
+!
+      pdata%u(q,is:it,js:jt,ks:kt) = u(:,:,:)
+
+    end do
+#endif /* FIELDCD */
+#ifdef FLUXCT
 ! allocate space for the prolongated magnetic field components
 !
     allocate(bx(dm(1)+1,dm(2)  ,dm(3)  ))

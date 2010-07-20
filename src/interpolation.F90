@@ -183,6 +183,93 @@ module interpolation
 !
 !===============================================================================
 !
+! expand_tvd: expands a multi-dimentional array similar to EXPAND but using
+!             only the second-order TVD interpolation
+!
+!===============================================================================
+!
+  subroutine expand_tvd(cm, dm, ng, u, v)
+
+    implicit none
+
+! input parameters
+!
+    integer, dimension(3)                     , intent(in)  :: cm, dm
+    integer                                   , intent(in)  :: ng
+    real        , dimension(cm(1),cm(2),cm(3)), intent(in)  :: u
+    real        , dimension(dm(1),dm(2),dm(3)), intent(out) :: v
+
+! local variables
+!
+    integer :: i, j, k
+
+! allocatable variables
+!
+    real, dimension(:)    , allocatable :: x, y
+    real, dimension(:,:,:), allocatable :: w, z
+!
+!-------------------------------------------------------------------------------
+!
+! allocate temporary arrays
+!
+    allocate(x(maxval(cm)))
+    allocate(y(maxval(dm)))
+    allocate(w(dm(1),cm(2),cm(3)))
+    allocate(z(dm(1),dm(2),cm(3)))
+
+! expand in X direction
+!
+    do k = 1, cm(3)
+      do j = 1, cm(2)
+        x(1:cm(1)) = u(1:cm(1),j,k)
+
+        call expand_1d_tvd(cm(1), dm(1), ng, x(1:cm(1)), y(1:dm(1)))
+
+        w(1:dm(1),j,k) = y(1:dm(1))
+      end do
+    end do
+
+! expand in Y-direction
+!
+    do k = 1, cm(3)
+      do i = 1, dm(1)
+        x(1:cm(2)) = w(i,1:cm(2),k)
+
+        call expand_1d_tvd(cm(2), dm(2), ng, x(1:cm(2)), y(1:dm(2)))
+
+        z(i,1:dm(2),k) = y(1:dm(2))
+      end do
+    end do
+
+! expand in Z-direction
+!
+    if (cm(3) .gt. 1) then
+      do j = 1, dm(2)
+        do i = 1, dm(1)
+          x(1:cm(3)) = z(i,j,1:cm(3))
+
+          call expand_1d_tvd(cm(3), dm(3), ng, x(1:cm(3)), y(1:dm(3)))
+
+          v(i,j,1:dm(3)) = y(1:dm(3))
+        end do
+      end do
+    else
+      v(:,:,:) = z(:,:,:)
+    endif
+
+! deallocate temporary arrays
+!
+    deallocate(w)
+    deallocate(z)
+    deallocate(x)
+    deallocate(y)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine expand_tvd
+!
+!===============================================================================
+!
 ! shrink: shrinks multi-dimentional array using different interpolations
 !
 !===============================================================================
