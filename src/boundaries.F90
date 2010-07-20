@@ -361,7 +361,7 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_copy(pdata, u, idir, iside, iface)
+  subroutine bnd_copy(pdata, u, idir, iside)
 
     use blocks, only : block_data, nfl, nqt
 #ifdef MHD
@@ -379,7 +379,7 @@ module boundaries
     type(block_data), pointer       , intent(inout) :: pdata
 
     real   , dimension(nqt,im,jm,km), intent(in)    :: u
-    integer                         , intent(in)    :: idir, iside, iface
+    integer                         , intent(in)    :: idir, iside
 
 ! local variables
 !
