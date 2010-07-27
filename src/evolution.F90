@@ -147,7 +147,7 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks       , only : block_data, nqt
+    use blocks       , only : block_data, nqt, nfl
     use config       , only : im, jm, km
     use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
@@ -167,7 +167,8 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nqt,im,jm,km) :: du
+    real, dimension(NDIMS,nfl,im,jm,km) :: f
+    real, dimension(      nqt,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -179,7 +180,7 @@ module evolution
 
 ! 1st step of integration
 !
-    call update(pblock%u, du, dxi, dyi, dzi)
+    call update(pblock%u, f, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -205,7 +206,7 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks       , only : block_data, nqt
+    use blocks       , only : block_data, nqt, nfl
     use config       , only : im, jm, km
     use mesh         , only : adxi, adyi, adzi
 #ifdef SHAPE
@@ -225,7 +226,8 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nqt,im,jm,km) :: u1, du
+    real, dimension(      nqt,im,jm,km) :: u1, du
+    real, dimension(NDIMS,nfl,im,jm,km) :: f
 !
 !-------------------------------------------------------------------------------
 !
@@ -237,7 +239,7 @@ module evolution
 
 ! 1st step of integration
 !
-    call update(pblock%u, du, dxi, dyi, dzi)
+    call update(pblock%u, f, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -251,7 +253,7 @@ module evolution
 
 ! 2nd step of integration
 !
-    call update(u1, du, dxi, dyi, dzi)
+    call update(u1, f, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape

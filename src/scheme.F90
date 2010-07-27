@@ -37,9 +37,9 @@ module scheme
 !
 !==============================================================================
 !
-  subroutine update(u, du, dxi, dyi, dzi)
+  subroutine update(u, f, du, dxi, dyi, dzi)
 
-    use blocks       , only : nvr, nqt
+    use blocks       , only : nvr, nqt, nfl
     use blocks       , only : idn, imx, imy, imz
 #ifdef ADI
     use blocks       , only : ien
@@ -56,9 +56,10 @@ module scheme
 
 ! input arguments
 !
-    real, dimension(nqt,im,jm,km), intent(in)  :: u
-    real, dimension(nqt,im,jm,km), intent(out) :: du
-    real                         , intent(in)  :: dxi, dyi, dzi
+    real, dimension(nqt,im,jm,km)      , intent(in)  :: u
+    real, dimension(NDIMS,nfl,im,jm,km), intent(out) :: f
+    real, dimension(nqt,im,jm,km)      , intent(out) :: du
+    real                               , intent(in)  :: dxi, dyi, dzi
 
 ! local variables
 !
@@ -136,6 +137,21 @@ module scheme
 #ifdef HLLC
         call hllc(im, ux, fx)
 #endif /* HLLC */
+
+! update fluxes along the X direction
+!
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+#ifdef ADI
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
+#endif /* ADI */
+#ifdef MHD
+        f(1,ibx,1:im,j,k) = fx(ibx,1:im)
+        f(1,iby,1:im,j,k) = fx(iby,1:im)
+        f(1,ibz,1:im,j,k) = fx(ibz,1:im)
+#endif /* MHD */
 
 ! update the arrays of increments
 !
@@ -222,6 +238,21 @@ module scheme
         call hllc(jm, uy, fy)
 #endif /* HLLC */
 
+! update fluxes along the Y direction
+!
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+#ifdef ADI
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
+#endif /* ADI */
+#ifdef MHD
+        f(2,ibx,i,1:jm,k) = fy(ibz,1:jm)
+        f(2,iby,i,1:jm,k) = fy(ibx,1:jm)
+        f(2,ibz,i,1:jm,k) = fy(iby,1:jm)
+#endif /* MHD */
+
 ! update the arrays of increments
 !
         do j = 1, jm
@@ -305,6 +336,21 @@ module scheme
 #ifdef HLLC
         call hllc(km, uz, fz)
 #endif /* HLLC */
+
+! update fluxes along the Z direction
+!
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+#ifdef ADI
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
+#endif /* ADI */
+#ifdef MHD
+        f(3,ibx,i,j,1:km) = fz(iby,1:km)
+        f(3,iby,i,j,1:km) = fz(ibz,1:km)
+        f(3,ibz,i,j,1:km) = fz(ibx,1:km)
+#endif /* MHD */
 
 ! update the arrays of increments
 !
