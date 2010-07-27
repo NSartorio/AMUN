@@ -35,6 +35,119 @@ module evolution
 !
 !===============================================================================
 !
+! advance: subroutine sweeps over all data blocks and updates their numerical
+!          fluxes; then updates the flux boundaries; next, advances in time the
+!          conserved variables, refines the mesh, updates the
+!          boundaries of conserved variables, and finally calculates the new
+!          time step
+!
+!===============================================================================
+!
+  subroutine advance
+
+    use blocks      , only : block_data, list_data
+    use boundaries  , only : boundary!, boundary_flux
+    use mesh        , only : update_mesh, dx_min
+#ifdef MPI
+    use mpitools    , only : mallreduceminr
+#endif /* MPI */
+    use scheme      , only : maxspeed!, advance_variables
+    use timer       , only : start_timer, stop_timer
+
+    implicit none
+
+! local variables
+!
+    type(block_data), pointer :: pblock
+    real                      :: cmax, cm
+!
+!-------------------------------------------------------------------------------
+!
+! 1. iterate over all data blocks and calculate the numerical fluxes
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! - update the numerical fluxes of the current block
+!
+      call update_flux(pblock)
+
+! - assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! ! 2. update the flux boundaries
+! !
+!     call start_timer(4)
+!     call boundary_flux
+!     call stop_timer(4)
+!
+! ! 3. iterate over all data blocks and advance in time the conserved variables
+! !
+!     pblock => list_data
+!     do while (associated(pblock))
+!
+! ! - advance in time the conserved variables of the current block
+! !
+!       call advance_variables(pblock)
+!
+! ! - assign pointer to the next block
+! !
+!       pblock => pblock%next
+!
+!     end do
+!
+! ! 4. update the mesh (refine and derefine blocks)
+! !
+!     call start_timer(5)
+!     call update_mesh
+!     call stop_timer(5)
+!
+! ! 5. update the boundaries of the conserved variables
+! !
+!     call start_timer(4)
+!     call boundary
+!     call stop_timer(4)
+!
+! ! 6. iterate over all blocks in order to find the maximum speed
+! !
+!     cmax = 1.0e-8
+!
+!     pblock => list_data
+!     do while (associated(pblock))
+!
+! ! - calculate the maximum speed for the current block
+! !
+!       cm = maxspeed(pblock%u)
+!
+! ! - take the maximum of the global and local maximum speeds
+! !
+!       cmax = max(cmax, cm)
+!
+! ! - assign pointer to the next block
+! !
+!       pblock => pblock%next
+!
+!     end do
+!
+! ! - calculate the new time step
+! !
+!     dtn = dx_min / max(cmax, 1.e-8)
+!
+! #ifdef MPI
+! ! - reduce the new time step over all processes
+! !
+!     call mallreduceminr(dtn)
+! #endif /* MPI */
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine advance
+!
+!===============================================================================
+!
 ! evolve: subroutine sweeps over all leaf blocks and performs one step time
 !         evolution for each according to the selected integration scheme
 !
@@ -137,6 +250,35 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve
+!
+!===============================================================================
+!
+! update_flux: subroutine updates the fluxes for the current block using the
+!              conserved variables
+!
+!===============================================================================
+!
+  subroutine update_flux(pblock)
+
+    use blocks       , only : block_data, nqt
+    use config       , only : im, jm, km
+    use scheme       , only : numerical_flux
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the numerical flux for the block
+!
+    call numerical_flux(pblock%u, pblock%f, pblock%e)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_flux
 #ifdef EULER
 !
 !===============================================================================

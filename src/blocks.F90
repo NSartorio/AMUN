@@ -130,6 +130,7 @@ module blocks
 
     real, dimension(:,:,:,:)  , allocatable :: u  ! the array of the conserved variables
     real, dimension(:,:,:,:,:), allocatable :: f  ! the array of the numerical fluxes
+    real, dimension(:,:,:,:)  , allocatable :: e  ! the array of the electomagnetic force
   end type block_data
 
 ! define block_info structure for boundary exchange
@@ -370,6 +371,10 @@ module blocks
 !
     allocate(pdata%f(NDIMS,nfl,im,jm,km))
 
+! allocate space for the electromotive force
+!
+    allocate(pdata%e(        3,im,jm,km))
+
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
@@ -504,6 +509,7 @@ module blocks
 ! deallocate fluxes
 !
       deallocate(pdata%f)
+      deallocate(pdata%e)
 
 ! nullify pointers
 !

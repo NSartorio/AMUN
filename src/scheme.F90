@@ -32,6 +32,270 @@ module scheme
 !
 !==============================================================================
 !
+! numerical_flux: subroutine updates the numerical flux of the current data
+!                 block
+!
+! notes: - the fluid fluxes must be located at cell interface centers
+!             [ fx(i+1/2,j,k), fy(i,j+1/2,k), fz(i,j,k+1/2) ]
+!        - the magnetic fluxes must be located at the cell edge centers
+!             [ ex(i,j+1/2,j+1/2), ey(i+1/2,j,j+1/2), ez(i+1/2,j+1/2,k) ]
+!
+!==============================================================================
+!
+  subroutine numerical_flux(u, f, e)
+
+    use blocks       , only : block_data
+    use blocks       , only : nvr, nqt
+    use blocks       , only : idn, imx, imy, imz
+#ifdef ADI
+    use blocks       , only : ien
+#endif /* ADI */
+#ifdef MHD
+    use blocks       , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
+    use config       , only : im, jm, km
+#ifdef FLUXCT
+    use interpolation, only : magtocen
+#endif /* FLUXCT */
+
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(      nqt,im,jm,km), intent(in)  :: u
+    real, dimension(NDIMS,nqt,im,jm,km), intent(out) :: f
+    real, dimension(        3,im,jm,km), intent(out) :: e
+
+! local variables
+!
+    integer :: i, j, k
+#ifdef MHD
+    integer :: im1, jm1, km1
+#endif /* MHD */
+
+! local temporary arrays
+!
+    real, dimension(nvr,im)       :: ux
+    real, dimension(nqt,im)       :: fx
+    real, dimension(nvr,jm)       :: uy
+    real, dimension(nqt,jm)       :: fy
+#if NDIMS == 3
+    real, dimension(nvr,km)       :: uz
+    real, dimension(nqt,km)       :: fz
+#endif /* NDIMS == 3 */
+    real, dimension(nvr,im,jm,km) :: w
+!
+!-------------------------------------------------------------------------------
+!
+! 0. prepare the numerical flux calculation
+!
+! - reset the flux array to zero
+!
+    f(:,:,:,:,:) = 0.0
+    e(:,:,:,:)   = 0.0
+
+! - copy the conserved variables to the local array
+!
+    w(1:nqt,1:im,1:jm,1:km) = u(1:nqt,1:im,1:jm,1:km)
+#ifdef FLUXCT
+! - interpolate the cell centered components of the magnetic field
+!
+    call magtocen(w)
+#endif /* FLUXCT */
+
+! 1. update along the X direction
+!
+    do k = 1, km
+#if NDIMS == 3 && defined MHD
+      km1 = max(k - 1, 1)
+#endif /* NDIMS == 3 & MHD */
+      do j = 1, jm
+#ifdef MHD
+        jm1 = max(j - 1, 1)
+#endif /* MHD */
+
+! - copy the directional vectors of variables for the one dimensional solver
+!
+        ux(idn,1:im) = w(idn,1:im,j,k)
+        ux(imx,1:im) = w(imx,1:im,j,k)
+        ux(imy,1:im) = w(imy,1:im,j,k)
+        ux(imz,1:im) = w(imz,1:im,j,k)
+#ifdef ADI
+        ux(ien,1:im) = w(ien,1:im,j,k)
+#endif /* ADI */
+#ifdef MHD
+        ux(ibx,1:im) = w(ibx,1:im,j,k)
+        ux(iby,1:im) = w(iby,1:im,j,k)
+        ux(ibz,1:im) = w(ibz,1:im,j,k)
+#ifdef FLUXCT
+        ux(icx,1:im) = w(icx,1:im,j,k)
+        ux(icy,1:im) = w(icy,1:im,j,k)
+        ux(icz,1:im) = w(icz,1:im,j,k)
+#endif /* FLUXCT */
+#endif /* MHD */
+
+! - execute the Riemann solver (returns fluxes for the update)
+!
+#ifdef HLL
+        call hll (im, ux, fx, .true.)
+#endif /* HLL */
+#ifdef HLLC
+        call hllc(im, ux, fx, .true.)
+#endif /* HLLC */
+
+! - update the fluxes along the current direction
+!
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+#ifdef ADI
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
+#endif /* ADI */
+#ifdef MHD
+        e(ibx,1:im,j  ,k  ) = e(ibx,1:im,j  ,k  ) +        fx(ibx,1:im)
+#if NDIMS == 3
+        e(iby,1:im,j  ,k  ) = e(iby,1:im,j  ,k  ) - 0.25 * fx(ibz,1:im)
+        e(iby,1:im,j  ,km1) = e(iby,1:im,j  ,km1) - 0.25 * fx(ibz,1:im)
+#else /* NDIMS == 3 */
+        e(iby,1:im,j  ,k  ) = e(iby,1:im,j  ,k  ) -        fx(ibz,1:im)
+#endif /* NDIMS == 3 */
+        e(ibz,1:im,j  ,k  ) = e(ibz,1:im,j  ,k  ) + 0.25 * fx(iby,1:im)
+        e(ibz,1:im,jm1,k  ) = e(ibz,1:im,jm1,k  ) + 0.25 * fx(iby,1:im)
+#endif /* MHD */
+      end do
+    end do
+
+! 2. update along the Y direction
+!
+    do k = 1, km
+#if NDIMS == 3 && defined MHD
+      km1 = max(k - 1, 1)
+#endif /* NDIMS == 3 & MHD */
+      do i = 1, im
+#ifdef MHD
+        im1 = max(i - 1, 1)
+#endif /* MHD */
+
+! - copy the directional vectors of variables for the one dimensional solver
+!
+        uy(idn,1:jm) = w(idn,i,1:jm,k)
+        uy(imx,1:jm) = w(imy,i,1:jm,k)
+        uy(imy,1:jm) = w(imz,i,1:jm,k)
+        uy(imz,1:jm) = w(imx,i,1:jm,k)
+#ifdef ADI
+        uy(ien,1:jm) = w(ien,i,1:jm,k)
+#endif /* ADI */
+#ifdef MHD
+        uy(ibx,1:jm) = w(iby,i,1:jm,k)
+        uy(iby,1:jm) = w(ibz,i,1:jm,k)
+        uy(ibz,1:jm) = w(ibx,i,1:jm,k)
+#ifdef FLUXCT
+        uy(icx,1:jm) = w(icy,i,1:jm,k)
+        uy(icy,1:jm) = w(icz,i,1:jm,k)
+        uy(icz,1:jm) = w(icx,i,1:jm,k)
+#endif /* FLUXCT */
+#endif /* MHD */
+
+! - execute the Riemann solver (returns fluxes for the update)
+!
+#ifdef HLL
+        call hll (jm, uy, fy, .true.)
+#endif /* HLL */
+#ifdef HLLC
+        call hllc(jm, uy, fy, .true.)
+#endif /* HLLC */
+
+! - update the fluxes along the current direction
+!
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+#ifdef ADI
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
+#endif /* ADI */
+#ifdef MHD
+#if NDIMS == 3
+        e(ibx,i  ,1:jm,k  ) = e(ibx,i  ,1:jm,k  ) + 0.25 * fy(ibz,1:jm)
+        e(ibx,i  ,1:jm,km1) = e(ibx,i  ,1:jm,km1) + 0.25 * fy(ibz,1:jm)
+#else /* NDIMS == 3 */
+        e(ibx,i  ,1:jm,k  ) = e(ibx,i  ,1:jm,k  ) +        fy(ibz,1:jm)
+#endif /* NDIMS == 3 */
+        e(iby,i  ,1:jm,k  ) = e(iby,i  ,1:jm,k  ) +        fy(iby,1:jm)
+        e(ibz,i  ,1:jm,k  ) = e(ibz,i  ,1:jm,k  ) - 0.25 * fy(ibx,1:jm)
+        e(ibz,im1,1:jm,k  ) = e(ibz,im1,1:jm,k  ) - 0.25 * fy(ibx,1:jm)
+#endif /* MHD */
+      end do
+    end do
+
+#if NDIMS == 3
+! 3. update along the Z direction
+!
+    do j = 1, jm
+#ifdef MHD
+      jm1 = max(j - 1, 1)
+#endif /* MHD */
+      do i = 1, im
+#ifdef MHD
+        im1 = max(i - 1, 1)
+#endif /* MHD */
+
+! - copy the directional vectors of variables for the one dimensional solver
+!
+        uz(idn,1:km) = w(idn,i,j,1:km)
+        uz(imx,1:km) = w(imz,i,j,1:km)
+        uz(imy,1:km) = w(imx,i,j,1:km)
+        uz(imz,1:km) = w(imy,i,j,1:km)
+#ifdef ADI
+        uz(ien,1:km) = w(ien,i,j,1:km)
+#endif /* ADI */
+#ifdef MHD
+        uz(ibx,1:km) = w(ibz,i,j,1:km)
+        uz(iby,1:km) = w(ibx,i,j,1:km)
+        uz(ibz,1:km) = w(iby,i,j,1:km)
+#ifdef FLUXCT
+        uz(icx,1:km) = w(icz,i,j,1:km)
+        uz(icy,1:km) = w(icx,i,j,1:km)
+        uz(icz,1:km) = w(icy,i,j,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
+
+! - execute the Riemann solver (returns fluxes for the update)
+!
+#ifdef HLL
+        call hll (km, uz, fz, .true.)
+#endif /* HLL */
+#ifdef HLLC
+        call hllc(km, uz, fz, .true.)
+#endif /* HLLC */
+
+! - update the fluxes along the current direction
+!
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+#ifdef ADI
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
+#endif /* ADI */
+#ifdef MHD
+        e(ibx,i  ,j  ,1:km) = e(ibx,i  ,j  ,1:km) - 0.25 * fz(iby,1:km)
+        e(ibx,i  ,jm1,1:km) = e(ibx,i  ,jm1,1:km) - 0.25 * fz(iby,1:km)
+        e(iby,i  ,j  ,1:km) = e(iby,i  ,j  ,1:km) + 0.25 * fz(ibx,1:km)
+        e(iby,im1,j  ,1:km) = e(iby,im1,j  ,1:km) + 0.25 * fz(ibx,1:km)
+        e(ibz,i  ,j  ,1:km) = e(ibz,i  ,j  ,1:km) +        fz(ibz,1:km)
+#endif /* MHD */
+      end do
+    end do
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine numerical_flux
+!
+!==============================================================================
+!
 ! update: subroutine sweeps over all directions and integrates the directional
 !         derivatives of the flux in order to get the increment of solution
 !
@@ -57,7 +321,7 @@ module scheme
 ! input arguments
 !
     real, dimension(nqt,im,jm,km)      , intent(in)  :: u
-    real, dimension(NDIMS,nfl,im,jm,km), intent(out) :: f
+    real, dimension(NDIMS,nqt,im,jm,km), intent(out) :: f
     real, dimension(nqt,im,jm,km)      , intent(out) :: du
     real                               , intent(in)  :: dxi, dyi, dzi
 
@@ -132,10 +396,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (im, ux, fx)
+        call hll (im, ux, fx, .false.)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(im, ux, fx)
+        call hllc(im, ux, fx, .false.)
 #endif /* HLLC */
 
 ! update fluxes along the X direction
@@ -232,10 +496,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (jm, uy, fy)
+        call hll (jm, uy, fy, .false.)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(jm, uy, fy)
+        call hllc(jm, uy, fy, .false.)
 #endif /* HLLC */
 
 ! update fluxes along the Y direction
@@ -331,10 +595,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (km, uz, fz)
+        call hll (km, uz, fz, .false.)
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(km, uz, fz)
+        call hllc(km, uz, fz, .false.)
 #endif /* HLLC */
 
 ! update fluxes along the Z direction
@@ -400,7 +664,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hll(n, u, f)
+  subroutine hll(n, u, f, d)
 
     use blocks       , only : nvr, nfl, nqt
     use blocks       , only : ivx, ivz
@@ -416,6 +680,7 @@ module scheme
     integer               , intent(in)  :: n
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
+    logical               , intent(in)  :: d
 
 ! local variables
 !
@@ -486,15 +751,19 @@ module scheme
 
 ! calculate numerical flux
 !
-    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
+    if (d) then
+      f(1:nqt,1:n) = fn(1:nqt,1:n)
+    else
+      f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
 #ifdef MHD
 #ifdef FIELDCD
-    call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
+      call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
 #endif /* FIELDCD */
 #ifdef FLUXCT
-    f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
+      f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
 #endif /* FLUXCT */
 #endif /* MHD */
+    end if
 
 !-------------------------------------------------------------------------------
 !
@@ -509,7 +778,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hllc(n, u, f)
+  subroutine hllc(n, u, f, d)
 
     use blocks       , only : nvr, nfl, nqt
     use interpolation, only : reconstruct
@@ -521,6 +790,7 @@ module scheme
     integer               , intent(in)  :: n
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
+    logical               , intent(in)  :: d
 
 ! local variables
 !
@@ -691,7 +961,11 @@ module scheme
 
 ! calculate numerical flux
 !
-    f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
+    if (d) then
+      f(:,:) = fx(:,:)
+    else
+      f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
+    end if
 
 !-------------------------------------------------------------------------------
 !
