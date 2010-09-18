@@ -34,14 +34,14 @@ module config
 
 ! block dimensions, number of ghost zones
 !
-  integer(kind=4), save :: ncells =  8, nghost =  4, ngrids = 16    &
+  integer(kind=4), save :: ncells =  8, nghost =  4, ngrids = 16  &
                          , igrids = 16, jgrids = 16, kgrids = 16
 
 ! derived dimensional variables
 !
-  integer(kind=4), save :: in, im, ib, ie, ibl, ibu, iel, ieu, ng   &
-                         , jn, jm, jb, je, jbl, jbu, jel, jeu       &
-                         , kn, km, kb, ke, kbl, kbu, kel, keu
+  integer(kind=4), save :: in, im, ib, ie, ibl, ibu, iel, ieu, ih, ng  &
+                         , jn, jm, jb, je, jbl, jbu, jel, jeu, jh, nd  &
+                         , kn, km, kb, ke, kbl, kbu, kel, keu, kh, nh
 
 ! the dimensions of the lowest level
 !
@@ -304,9 +304,12 @@ module config
 #endif /* */
 
     ng  = nghost
+    nd  = ng * 2
+    nh  = ng / 2
 
     in  = ncells
-    im  = in + 2 * ng
+    im  = in + nd
+    ih  = im / 2
     ib  = ng + 1
     ie  = ng + in
     ibl = ib - 1
@@ -315,7 +318,8 @@ module config
     ieu = ie + 1
 
     jn  = ncells
-    jm  = jn + 2 * ng
+    jm  = jn + nd
+    jh  = jm / 2
     jb  = ng + 1
     je  = ng + jn
     jbl = jb - 1
@@ -326,6 +330,7 @@ module config
 #if NDIMS == 2
     kn  = 1
     km  = 1
+    kh  = 1
     kb  = 1
     ke  = 1
     kbl = 1
@@ -335,7 +340,8 @@ module config
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
     kn  = ncells
-    km  = kn + 2 * ng
+    km  = kn + nd
+    kh  = km / 2
     kb  = ng + 1
     ke  = ng + kn
     kbl = kb - 1
