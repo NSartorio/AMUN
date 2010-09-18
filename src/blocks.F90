@@ -238,7 +238,7 @@ module blocks
 !
 !===============================================================================
 !
-  function increase_id
+  function increase_id()
 
     implicit none
 

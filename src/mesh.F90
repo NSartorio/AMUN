@@ -873,7 +873,10 @@ module mesh
 ! expand the staggered magnetic field components preserving divergence-free
 ! condition
 !
-    call expand_mag(dm, fm, ng, pblock%data%u(ibx,:,:,:), pblock%data%u(iby,:,:,:), pblock%data%u(ibz,:,:,:), u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
+    call expand_mag(dm, fm, ng, pblock%data%u(ibx,:,:,:) &
+                              , pblock%data%u(iby,:,:,:) &
+                              , pblock%data%u(ibz,:,:,:) &
+                                     , u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
 #endif /* FLUXCT */
 #endif /* MHD */
 ! iterate over all children

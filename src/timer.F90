@@ -140,7 +140,7 @@ module timer
 !
 !===============================================================================
 !
-  function get_timer_total
+  function get_timer_total()
 
     implicit none
 

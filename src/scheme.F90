@@ -153,15 +153,15 @@ module scheme
         f(1,ien,1:im,j,k) = fx(ien,1:im)
 #endif /* ADI */
 #ifdef MHD
-        e(ibx,1:im,j  ,k  ) = e(ibx,1:im,j  ,k  ) +        fx(ibx,1:im)
+#if NDIMS == 2
+        e(2,1:im,j  ,k  ) = e(2,1:im,j  ,k  ) +        fx(ibz,1:im)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-        e(iby,1:im,j  ,k  ) = e(iby,1:im,j  ,k  ) - 0.25 * fx(ibz,1:im)
-        e(iby,1:im,j  ,km1) = e(iby,1:im,j  ,km1) - 0.25 * fx(ibz,1:im)
-#else /* NDIMS == 3 */
-        e(iby,1:im,j  ,k  ) = e(iby,1:im,j  ,k  ) -        fx(ibz,1:im)
+        e(2,1:im,j  ,k  ) = e(2,1:im,j  ,k  ) + 0.25 * fx(ibz,1:im)
+        e(2,1:im,j  ,km1) = e(2,1:im,j  ,km1) + 0.25 * fx(ibz,1:im)
 #endif /* NDIMS == 3 */
-        e(ibz,1:im,j  ,k  ) = e(ibz,1:im,j  ,k  ) + 0.25 * fx(iby,1:im)
-        e(ibz,1:im,jm1,k  ) = e(ibz,1:im,jm1,k  ) + 0.25 * fx(iby,1:im)
+        e(3,1:im,j  ,k  ) = e(3,1:im,j  ,k  ) - 0.25 * fx(iby,1:im)
+        e(3,1:im,jm1,k  ) = e(3,1:im,jm1,k  ) - 0.25 * fx(iby,1:im)
 #endif /* MHD */
       end do
     end do
@@ -216,15 +216,15 @@ module scheme
         f(2,ien,i,1:jm,k) = fy(ien,1:jm)
 #endif /* ADI */
 #ifdef MHD
+#if NDIMS == 2
+        e(1,i  ,1:jm,k  ) = e(1,i  ,1:jm,k  ) -        fy(iby,1:jm)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-        e(ibx,i  ,1:jm,k  ) = e(ibx,i  ,1:jm,k  ) + 0.25 * fy(ibz,1:jm)
-        e(ibx,i  ,1:jm,km1) = e(ibx,i  ,1:jm,km1) + 0.25 * fy(ibz,1:jm)
-#else /* NDIMS == 3 */
-        e(ibx,i  ,1:jm,k  ) = e(ibx,i  ,1:jm,k  ) +        fy(ibz,1:jm)
+        e(1,i  ,1:jm,k  ) = e(1,i  ,1:jm,k  ) - 0.25 * fy(iby,1:jm)
+        e(1,i  ,1:jm,km1) = e(1,i  ,1:jm,km1) - 0.25 * fy(iby,1:jm)
 #endif /* NDIMS == 3 */
-        e(iby,i  ,1:jm,k  ) = e(iby,i  ,1:jm,k  ) +        fy(iby,1:jm)
-        e(ibz,i  ,1:jm,k  ) = e(ibz,i  ,1:jm,k  ) - 0.25 * fy(ibx,1:jm)
-        e(ibz,im1,1:jm,k  ) = e(ibz,im1,1:jm,k  ) - 0.25 * fy(ibx,1:jm)
+        e(3,i  ,1:jm,k  ) = e(3,i  ,1:jm,k  ) + 0.25 * fy(ibz,1:jm)
+        e(3,im1,1:jm,k  ) = e(3,im1,1:jm,k  ) + 0.25 * fy(ibz,1:jm)
 #endif /* MHD */
       end do
     end do
@@ -280,11 +280,10 @@ module scheme
         f(3,ien,i,j,1:km) = fz(ien,1:km)
 #endif /* ADI */
 #ifdef MHD
-        e(ibx,i  ,j  ,1:km) = e(ibx,i  ,j  ,1:km) - 0.25 * fz(iby,1:km)
-        e(ibx,i  ,jm1,1:km) = e(ibx,i  ,jm1,1:km) - 0.25 * fz(iby,1:km)
-        e(iby,i  ,j  ,1:km) = e(iby,i  ,j  ,1:km) + 0.25 * fz(ibx,1:km)
-        e(iby,im1,j  ,1:km) = e(iby,im1,j  ,1:km) + 0.25 * fz(ibx,1:km)
-        e(ibz,i  ,j  ,1:km) = e(ibz,i  ,j  ,1:km) +        fz(ibz,1:km)
+        e(1,i  ,j  ,1:km) = e(1,i  ,j  ,1:km) + 0.25 * fz(ibz,1:km)
+        e(1,i  ,jm1,1:km) = e(1,i  ,jm1,1:km) + 0.25 * fz(ibz,1:km)
+        e(2,i  ,j  ,1:km) = e(2,i  ,j  ,1:km) - 0.25 * fz(iby,1:km)
+        e(2,im1,j  ,1:km) = e(2,im1,j  ,1:km) - 0.25 * fz(iby,1:km)
 #endif /* MHD */
       end do
     end do
