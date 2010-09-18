@@ -365,7 +365,7 @@ module blocks
 
 ! allocate space for the conserved variables
 !
-    allocate(pdata%u(nqt,im,jm,km))
+    allocate(pdata%u(      nqt,im,jm,km))
 
 ! allocate space for the numerical fluxes
 !
