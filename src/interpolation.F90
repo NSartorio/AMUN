@@ -465,11 +465,11 @@ module interpolation
       il = ir - 1
 
       dup = u(i+1) - u(i)
-      dum = u(i-1) - u(i)
-      ds  = - dup * dum
+      dum = u(i) - u(i-1)
+      ds  = dup * dum
 
       if (ds .gt. 0.0) then
-        du    = 0.5 * ds / (dup - dum)
+        du    = 0.5 * ds / (dup + dum)
         v(il) = u(i) - du
         v(ir) = u(i) + du
       else
@@ -503,23 +503,20 @@ module interpolation
 
 ! local variables
 !
-    integer      :: i, ib, ie, il, ir
+    integer      :: i, il, ir
 !
 !-------------------------------------------------------------------------------
 !
     v(:) = 0.0
 
-    ib = 1
-    ie = m
-
     select case(flag)
     case('c')
-      do i = ib, ie
+      do i = 1, m
         ir   = 2 * i
         v(i) = u(ir)
       end do
     case default
-      do i = ib, ie
+      do i = 1, m
         ir   = 2 * i
         il   = ir - 1
 
@@ -1159,6 +1156,10 @@ module interpolation
     fm(3) = 1
 #endif /* NDIMS == 2 */
 
+    wx(:,:,:) = 0.0
+    wy(:,:,:) = 0.0
+    wz(:,:,:) = 0.0
+
     select case(id)
 
 !! boundary perpendicular to the X direction
@@ -1169,6 +1170,9 @@ module interpolation
 !
       allocate(tx(fm(1)+1,cm(2)  ,cm(3)))
       allocate(ty(fm(1)  ,cm(2)+1,cm(3)))
+
+      tx(:,:,:) = 0.0
+      ty(:,:,:) = 0.0
 
 ! prepare indices
 !
@@ -1241,11 +1245,11 @@ module interpolation
 !    divergence free condition;
 !
       do k = 1, fm(3)
-        do i = 1, fm(1)
-          ip1 = i + 1
-          do j = 2, fm(2), 2
-            jm1 = j - 1
-            jp1 = j + 1
+        do j = 2, fm(2), 2
+          jm1 = j - 1
+          jp1 = j + 1
+          do i = 1, fm(1)
+            ip1 = i + 1
 
             wy(i,j,k) = 0.50 * (wy(i  ,jm1,k) + wy(i  ,jp1,k))                 &
                       + 0.50 * (wx(ip1,j  ,k) - wx(ip1,jm1,k))                 &
@@ -1267,6 +1271,9 @@ module interpolation
 !
       allocate(tx(cm(1)+1,fm(2)  ,cm(3)))
       allocate(ty(cm(1)  ,fm(2)+1,cm(3)))
+
+      tx(:,:,:) = 0.0
+      ty(:,:,:) = 0.0
 
 ! prepare indices
 !
@@ -1303,11 +1310,11 @@ module interpolation
 !    free condition;
 !
       do k = 1, cm(3)
-        do i = 1, cm(1)
-          ip1 = i + 1
-          do j = 2, fm(2) + 1, 2
-            jm1 = j - 1
-            jp1 = j + 1
+        do j = 2, fm(2) + 1, 2
+          jm1 = j - 1
+          jp1 = j + 1
+          do i = 1, cm(1)
+            ip1 = i + 1
 
             ty(i,j,k) = 0.50 * (ty(i  ,jm1,k) + ty(i  ,jp1,k))                 &
                       + 0.25 * (tx(ip1,j  ,k) - tx(ip1,jm1,k))                 &
@@ -1351,6 +1358,7 @@ module interpolation
           end do
         end do
       end do
+
 
 ! deallocate temporary arrays
 !
