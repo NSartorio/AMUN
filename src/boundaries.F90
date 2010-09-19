@@ -438,6 +438,314 @@ module boundaries
 !
 !===============================================================================
 !
+! restrict_flux: subroutine restricts the flux from the neighbor which is at
+!                higher level and updates the boundary flux of the current block
+!
+!===============================================================================
+!
+  subroutine restrict_flux(f, e, pdata, idir, iside, iface)
+
+    use config, only : ng, nd, nh, im, jm, km, ih, jh, kh, ib, jb, kb  &
+                     , ie, je, ke, ibl, jbl, kbl, ieu, jeu, keu
+    use blocks, only : block_data, nfl
+
+    implicit none
+
+! arguments
+!
+    type(block_data), pointer             , intent(inout) :: pdata
+    real   , dimension(NDIMS,nfl,im,jm,km), intent(in)    :: f
+    real   , dimension(        3,im,jm,km), intent(in)    :: e
+    integer                               , intent(in)    :: idir, iside, iface
+
+! local variables
+!
+    integer :: if, jf, kf
+    integer :: il, jl, kl, ip, jp, kp, iu, ju, ku
+    integer :: is, js, ks, it, jt, kt
+!
+!-------------------------------------------------------------------------------
+!
+#if NDIMS == 2
+    kl = 1
+    ku = 1
+    ks = 1
+#endif /* NDIMS == 2 */
+
+    select case(idir)
+
+    case(1)
+
+! calculate the indices determining the position of the neighbor
+!
+      if =     iside - 1
+      jf = mod(iface - 1, 2)
+#if NDIMS == 3
+      kf =    (iface - 1) / 2
+#endif /* NDIMS == 3 */
+
+! indices of the input and destination arrays
+!
+      if (if .eq. 0) then
+        il = ieu - nd
+        iu = ie
+        is = 1
+        it = ibl
+      else
+        il = ib
+        iu = ibl + nd
+        is = ieu
+        it = im
+      end if
+      ip = il + 1
+      if (jf .eq. 0) then
+        jl = 1
+        ju = je
+        js = jb - nh
+        jt = jh
+      else
+        jl = jb
+        ju = jm
+        js = jh + 1
+        jt = je + nh
+      end if
+      jp = jl + 1
+#if NDIMS == 3
+      if (kf .eq. 0) then
+        kl = 1
+        ku = ke
+        ks = kb - nh
+        kt = kh
+      else
+        kl = kb
+        ku = km
+        ks = kh + 1
+        kt = ke + nh
+      end if
+      kp = kl + 1
+#endif /* NDIMS == 3 */
+
+! update the boundaries of the fluid fluxes
+!
+#if NDIMS == 2
+!       if (it .eq. im) then
+!         pdata%f(1,1:nfl,is-1:it,js:jt,1) = 0.5 * (f(1,1:nfl,ip-2:iu:2,jl:ju:2,1)   &
+!                                                 + f(1,1:nfl,ip-2:iu:2,jp:ju:2,1))
+!       else
+!         pdata%f(1,1:nfl,is  :it,js:jt,1) = 0.5 * (f(1,1:nfl,ip  :iu:2,jl:ju:2,1)   &
+!                                                 + f(1,1:nfl,ip  :iu:2,jp:ju:2,1))
+!       end if
+!       pdata%f(2,1:nfl,is:it,js:jt,1) = 0.5 * (f(2,1:nfl,il:iu:2,jp:ju:2,1)     &
+!                                             + f(2,1:nfl,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+!       pdata%f(1,1:nfl,is:it,js:jt,ks:kt) =                                     &
+!                                 0.25 * (f(1,1:nfl,ip:iu:2,jl:ju:2,kl:ku:2)     &
+!                                       + f(1,1:nfl,ip:iu:2,jp:ju:2,kl:ku:2)     &
+!                                       + f(1,1:nfl,ip:iu:2,jl:ju:2,kp:ku:2)     &
+!                                       + f(1,1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+#ifdef MHD
+
+! update the boundaries of the electromotive force
+!
+#if NDIMS == 2
+!       pdata%e(1,is:it,js:jt,1) = 0.5 * (e(1,il:iu:2,jp:ju:2,1)                 &
+!                                       + e(1,ip:iu:2,jp:ju:2,1))
+!       if (it .eq. im) then
+!         pdata%e(2,is-1:it,js:jt,1) = 0.5 * (e(2,ip-2:iu:2,jl:ju:2,1)           &
+!                                           + e(2,ip-2:iu:2,jp:ju:2,1))
+!         pdata%e(3,is-1:it,js:jt,1) =        e(3,ip-2:iu:2,jp:ju:2,1)
+!       else
+!         pdata%e(2,is  :it,js:jt,1) = 0.5 * (e(2,ip  :iu:2,jl:ju:2,1)           &
+!                                           + e(2,ip  :iu:2,jp:ju:2,1))
+!         pdata%e(3,is  :it,js:jt,1) =        e(3,ip  :iu:2,jp:ju:2,1)
+!       end if
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+!       pdata%e(1,is:it,js:jt,ks:kt) = 0.5 * (e(1,il:iu:2,jp:ju:2,kp:ku:2)       &
+!                                           + e(1,ip:iu:2,jp:ju:2,kp:ku:2))
+!       pdata%e(2,is:it,js:jt,ks:kt) = 0.5 * (e(2,ip:iu:2,jl:ju:2,kp:ku:2)       &
+!                                           + e(2,ip:iu:2,jp:ju:2,kp:ku:2))
+!       pdata%e(3,is:it,js:jt,ks:kt) = 0.5 * (e(3,ip:iu:2,jp:ju:2,kl:ku:2)       &
+!                                           + e(3,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+#endif /* MHD */
+
+    case(2)
+
+! calculate the indices determining the position of the neighbor
+!
+      if = mod(iface - 1, 2)
+      jf =     iside - 1
+#if NDIMS == 3
+      kf =    (iface - 1) / 2
+#endif /* NDIMS == 3 */
+
+! indices of the input and destination arrays
+!
+      if (if .eq. 0) then
+        il = 1
+        iu = ie
+        is = ib - nh
+        it = ih
+      else
+        il = ib
+        iu = im
+        is = ih + 1
+        it = ie + nh
+      end if
+      ip = il + 1
+      if (jf .eq. 0) then
+        jl = jeu - nd
+        ju = je
+        js = 1
+        jt = jbl
+      else
+        jl = jb
+        ju = jbl + nd
+        js = jeu
+        jt = jm
+      end if
+      jp = jl + 1
+#if NDIMS == 3
+      if (kf .eq. 0) then
+        kl = 1
+        ku = ke
+        ks = kb - nh
+        kt = kh
+      else
+        kl = kb
+        ku = km
+        ks = kh + 1
+        kt = ke + nh
+      end if
+      kp = kl + 1
+#endif /* NDIMS == 3 */
+
+! update the boundaries of the fluid fluxes
+!
+#if NDIMS == 2
+!       pdata%f(1,1:nfl,is:it,js:jt,1) = 0.5 * (f(1,1:nfl,ip:iu:2,jl:ju:2,1)     &
+!                                             + f(1,1:nfl,ip:iu:2,jp:ju:2,1))
+!       if (jt .eq. jm) then
+!         pdata%f(2,1:nfl,is:it,js-1:jt,1) = 0.5 * (f(2,1:nfl,il:iu:2,jp-2:ju:2,1)     &
+!                                                 + f(2,1:nfl,ip:iu:2,jp-2:ju:2,1))
+!       else
+!         pdata%f(2,1:nfl,is:it,js  :jt,1) = 0.5 * (f(2,1:nfl,il:iu:2,jp  :ju:2,1)     &
+!                                                 + f(2,1:nfl,ip:iu:2,jp  :ju:2,1))
+!       end if
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+!       pdata%f(2,1:nfl,is:it,js:jt,ks:kt) =                                     &
+!                                 0.25 * (f(2,1:nfl,il:iu:2,jp:ju:2,kl:ku:2)     &
+!                                       + f(2,1:nfl,ip:iu:2,jp:ju:2,kl:ku:2)     &
+!                                       + f(2,1:nfl,il:iu:2,jp:ju:2,kp:ku:2)     &
+!                                       + f(2,1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+#ifdef MHD
+
+! update the boundaries of the electromotive force
+!
+#if NDIMS == 2
+!       if (jt .eq. jm) then
+!         pdata%e(1,is:it,js-1:jt,1) = 0.5 * (e(1,il:iu:2,jp-2:ju:2,1)           &
+!                                           + e(1,ip:iu:2,jp-2:ju:2,1))
+!         pdata%e(2,is:it,js  :jt,1) = 0.5 * (e(2,ip:iu:2,jl  :ju:2,1)           &
+!                                           + e(2,ip:iu:2,jp  :ju:2,1))
+!         pdata%e(3,is:it,js-1:jt,1) =        e(3,ip:iu:2,jp-2:ju:2,1)
+!       else
+!         pdata%e(1,is:it,js  :jt,1) = 0.5 * (e(1,il:iu:2,jp  :ju:2,1)           &
+!                                           + e(1,ip:iu:2,jp  :ju:2,1))
+!         pdata%e(3,is:it,js  :jt,1) =        e(3,ip:iu:2,jp  :ju:2,1)
+!       end if
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+!       pdata%e(1,is:it,js:jt,ks:kt) = 0.5 * (e(1,il:iu:2,jp:ju:2,kp:ku:2)       &
+!                                           + e(1,ip:iu:2,jp:ju:2,kp:ku:2))
+!       pdata%e(2,is:it,js:jt,ks:kt) = 0.5 * (e(2,ip:iu:2,jl:ju:2,kp:ku:2)       &
+!                                           + e(2,ip:iu:2,jp:ju:2,kp:ku:2))
+!       pdata%e(3,is:it,js:jt,ks:kt) = 0.5 * (e(3,ip:iu:2,jp:ju:2,kl:ku:2)       &
+!                                           + e(3,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+#endif /* MHD */
+
+#if NDIMS == 3
+    case(3)
+
+! calculate the indices determining the position of the neighbor
+!
+      if = mod(iface - 1, 2)
+      jf =    (iface - 1) / 2
+      kf =     iside - 1
+
+! indices of the input and destination arrays
+!
+      if (if .eq. 0) then
+        il = 1
+        iu = ie
+        is = ib - nh
+        it = ih
+      else
+        il = ib
+        iu = im
+        is = ih + 1
+        it = ie + nh
+      end if
+      ip = il + 1
+      if (jf .eq. 0) then
+        jl = 1
+        ju = je
+        js = jb - nh
+        jt = jh
+      else
+        jl = jb
+        ju = jm
+        js = jh + 1
+        jt = je + nh
+      end if
+      jp = jl + 1
+      if (kf .eq. 0) then
+        kl = keu - nd
+        ku = ke
+        ks = 1
+        kt = kbl
+      else
+        kl = kb - 2
+        ku = kbl + nd
+        ks = ke
+        kt = km
+      end if
+      kp = kl + 1
+
+! update the boundaries of the fluid fluxes
+!
+      pdata%f(3,1:nfl,is:it,js:jt,ks:kt) =                                     &
+                                0.25 * (f(3,1:nfl,il:iu:2,jl:ju:2,kp:ku:2)     &
+                                      + f(3,1:nfl,ip:iu:2,jl:ju:2,kp:ku:2)     &
+                                      + f(3,1:nfl,il:iu:2,jp:ju:2,kp:ku:2)     &
+                                      + f(3,1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+#ifdef MHD
+
+! update the boundaries of the electromotive force
+!
+      pdata%e(1,is:it,js:jt,ks:kt) = 0.5 * (e(1,il:iu:2,jp:ju:2,kp:ku:2)       &
+                                          + e(1,ip:iu:2,jp:ju:2,kp:ku:2))
+      pdata%e(2,is:it,js:jt,ks:kt) = 0.5 * (e(2,ip:iu:2,jl:ju:2,kp:ku:2)       &
+                                          + e(2,ip:iu:2,jp:ju:2,kp:ku:2))
+      pdata%e(3,is:it,js:jt,ks:kt) = 0.5 * (e(3,ip:iu:2,jp:ju:2,kl:ku:2)       &
+                                          + e(3,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* MHD */
+#endif /* NDIMS == 3 */
+
+    end select
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine restrict_flux
+!
+!===============================================================================
+!
 ! bnd_copy: subroutine copies the interior of neighbor to update the
 !           boundaries of current block
 !
