@@ -937,12 +937,12 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, nchild, nfl, nqt
+    use blocks       , only : block_meta, block_data, nchild, nfl
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
-    use config       , only : ng, in, jn, kn, im, jm, km
-    use interpolation, only : shrink
+    use config       , only : ng, in, ih, im, ib, ie, nh, jn, jh, jm, jb, je   &
+                                , kn, kh, km, kb, ke
 
     implicit none
 
@@ -952,45 +952,21 @@ module mesh
 
 ! local variables
 !
-    integer :: i, j, k, q, p
-    integer :: is, js, ks
-    integer :: ib, jb, kb, ie, je, ke
-    integer :: il, iu, jl, ju, kl, ku
-
-! local arrays
-!
-    integer, dimension(3)     :: dm, pm, fm
-
-! local allocatable arrays
-!
-    real, dimension(:,:,:,:), allocatable :: u, w
+    integer :: p
+    integer :: if, jf, kf
+    integer :: il, jl, kl, iu, ju, ku
+    integer :: ip, jp, kp
+    integer :: is, js, ks, it, jt, kt
 
 ! local pointers
 !
-    type(block_meta), pointer :: pchild
+    type(block_data), pointer :: pparent, pchild
 
 !-------------------------------------------------------------------------------
 !
-! prepare dimensions
+! assign pointers
 !
-    dm(:)   = (/ im, jm, km /)
-    pm(:)   = dm(:) - ng
-    fm(:)   = 2 * pm(:)
-#if NDIMS == 2
-    pm(3)   = 1
-    fm(3)   = 1
-    kb      = 1
-    ke      = 1
-    ks      = 0
-    kl      = 1
-    ku      = 1
-    k       = 1
-#endif /* NDIMS == 2 */
-
-! allocate temporary arrays
-!
-    allocate(u(nqt, fm(1), fm(2), fm(3)))
-    allocate(w(nqt, pm(1), pm(2), pm(3)))
+    pparent => pblock%data
 
 ! iterate over all children
 !
@@ -998,102 +974,129 @@ module mesh
 
 ! assign pointer to the current child
 !
-      pchild => pblock%child(p)%ptr
+      pchild  => pblock%child(p)%ptr%data
 
-! calculate the position of child in the parent block
+! calculate the position of the current child in the parent block
 !
-      is = mod((p - 1)    ,2)
+      if = mod((p - 1)    ,2)
+      jf = mod((p - 1) / 2,2)
 #if NDIMS == 3
-      js = mod((p - 1) / 2,2)
-      ks = mod((p - 1) / 4,2)
-#else /* NDIMS == 3 */
-      js =     (p - 1) / 2
+      kf = mod((p - 1) / 4,2)
 #endif /* NDIMS == 3 */
 
-! calculate the bounds of the input array indices
+! calculate the bound indices of the source nad destination arrays
 !
-      ib =  1 + ng * is
-      jb =  1 + ng * js
-#if NDIMS == 2
-      kb =  1 + ng * ks
-#endif /* NDIMS == 2 */
+      if (if .eq. 0) then
+        il = 1
+        iu = ie
+        is = ib - nh
+        it = ih
+      else
+        il = ib
+        iu = im
+        is = ih + 1
+        it = ie + nh
+      end if
+      ip = il + 1
+      if (jf .eq. 0) then
+        jl = 1
+        ju = je
+        js = jb - nh
+        jt = jh
+      else
+        jl = jb
+        ju = jm
+        js = jh + 1
+        jt = je + nh
+      end if
+      jp = jl + 1
+#if NDIMS == 3
+      if (kf .eq. 0) then
+        kl = 1
+        ku = ke
+        ks = kb - nh
+        kt = kh
+      else
+        kl = kb
+        ku = km
+        ks = kh + 1
+        kt = ke + nh
+      end if
+      kp = kl + 1
+#endif /* NDIMS == 3 */
 
-      ie = ib + pm(1) - 1
-      je = jb + pm(2) - 1
-#if NDIMS == 2
-      ke = kb + pm(3) - 1
-#endif /* NDIMS == 2 */
-
-! calculate the bounds of the destination array indices
+! copy the variables from the current child to the proper location of
+! the parent block
 !
-      il =  1 + pm(1) * is
-      jl =  1 + pm(2) * js
 #if NDIMS == 2
-      kl =  1 + pm(3) * ks
-#endif /* NDIMS == 2 */
-
-      iu = il + pm(1) - 1
-      ju = jl + pm(2) - 1
-#if NDIMS == 2
-      ku = kl + pm(3) - 1
-#endif /* NDIMS == 2 */
-
-! copy variables from the current child to the proper location of the array u
-!
-      u(1:nqt,il:iu,jl:ju,kl:ku) = pchild%data%u(1:nqt,ib:ie,jb:je,kb:je)
-
-    end do
-
-! iterate over all quantities and shrink them and substitute to the new block
-!
-    do q = 1, nfl
-      call shrink(fm, pm, u(q,:,:,:), w(q,:,:,:), 'm', 'm', 'm')
-    end do
+      pparent%u(1:nfl,is:it,js:jt,1) =                                         &
+                                   0.25 * (pchild%u(1:nfl,il:iu:2,jl:ju:2,1)   &
+                                         + pchild%u(1:nfl,ip:iu:2,jl:ju:2,1)   &
+                                         + pchild%u(1:nfl,il:iu:2,jp:ju:2,1)   &
+                                         + pchild%u(1:nfl,ip:iu:2,jp:ju:2,1))
 
 #ifdef MHD
 #ifdef FIELDCD
-! iterate over magnetic field components
-!
-    do q = ibx, ibz
-      call shrink(fm, pm, u(q,:,:,:), w(q,:,:,:), 'm', 'm', 'm')
-    end do
+      pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
+                                 0.25 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,1))
 #endif /* FIELDCD */
 #ifdef FLUXCT
-! restrict the X component of magnetic field
-!
-    call shrink(fm, pm, u(ibx,:,:,:), w(ibx,:,:,:), 'c', 'm', 'm')
-
-! restrict the Y component of magnetic field
-!
-    call shrink(fm, pm, u(iby,:,:,:), w(iby,:,:,:), 'm', 'c', 'm')
-
-! restrict the Z component of magnetic field
-!
-    call shrink(fm, pm, u(ibz,:,:,:), w(ibz,:,:,:), 'm', 'm', 'c')
+      pparent%u(ibx,is:it,js:jt,1) = 0.50 * (pchild%u(ibx,ip:iu:2,jl:ju:2,1)   &
+                                           + pchild%u(ibx,ip:iu:2,jp:ju:2,1))
+      pparent%u(iby,is:it,js:jt,1) = 0.50 * (pchild%u(iby,il:iu:2,jp:ju:2,1)   &
+                                           + pchild%u(iby,ip:iu:2,jp:ju:2,1))
+      pparent%u(ibz,is:it,js:jt,1) = 0.25 * (pchild%u(ibz,il:iu:2,jl:ju:2,1)   &
+                                           + pchild%u(ibz,ip:iu:2,jl:ju:2,1)   &
+                                           + pchild%u(ibz,il:iu:2,jp:ju:2,1)   &
+                                           + pchild%u(ibz,ip:iu:2,jp:ju:2,1))
 #endif /* FLUXCT */
 #endif /* MHD */
-
-! calculate substitution indices
-!
-    ib = ng / 2 + 1
-    jb = ng / 2 + 1
-    kb = ng / 2 + 1
-    ie = ib + in + ng - 1
-    je = jb + jn + ng - 1
-    ke = kb + kn + ng - 1
-#if NDIMS == 2
-    kb = 1
-    ke = 1
 #endif /* NDIMS == 2 */
-
-! substitute shrinked variables to the new data block
-!
-    pblock%data%u(1:nqt,ib:ie,jb:je,kb:ke) = w(1:nqt,:,:,:)
-
-! deallocate temporary arrays
-!
-    deallocate(u)
-    deallocate(w)
+#if NDIMS == 3
+      pparent%u(1:nfl,is:it,js:jt,ks:kt) =                                     &
+                             0.125 * (pchild%u(1:nfl,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nfl,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nfl,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nfl,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nfl,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+#ifdef MHD
+#ifdef FIELDCD
+      pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
+                           0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* FIELDCD */
+#ifdef FLUXCT
+      pparent%u(ibx,is:it,js:jt,ks:kt) =                                       &
+                                0.25 * (pchild%u(ibx,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                      + pchild%u(ibx,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                      + pchild%u(ibx,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                      + pchild%u(ibx,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(iby,is:it,js:jt,ks:kt) =                                       &
+                                0.25 * (pchild%u(iby,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                      + pchild%u(iby,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                      + pchild%u(iby,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                      + pchild%u(iby,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(ibz,is:it,js:jt,ks:kt) =                                       &
+                                0.25 * (pchild%u(ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                      + pchild%u(ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                      + pchild%u(ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                      + pchild%u(ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* FLUXCT */
+#endif /* MHD */
+#endif /* NDIMS == 3 */
+    end do
 !
 !-------------------------------------------------------------------------------
 !
