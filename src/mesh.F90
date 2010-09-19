@@ -807,7 +807,7 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, nchild, nfl, nqt
+    use blocks       , only : block_meta, block_data, nchild, nfl, nqt
 #ifdef MHD
     use blocks       , only : ibx, iby, ibz
 #endif /* MHD */
@@ -840,9 +840,14 @@ module mesh
 ! local pointers
 !
     type(block_meta), pointer :: pchild
+    type(block_data), pointer :: pdata
 
 !-------------------------------------------------------------------------------
 !
+! assign the pdata pointer
+!
+    pdata => pblock%data
+
 ! prepare dimensions
 !
     dm(:) = (/ im, jm, km /)
@@ -861,7 +866,7 @@ module mesh
 ! expand all variables and place them in the array u
 !
     do q = 1, nfl
-      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 
 #ifdef MHD
@@ -869,17 +874,15 @@ module mesh
 ! expand the cell centered magnetic field components
 !
     do q = ibx, ibz
-      call expand(dm, fm, ng, pblock%data%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
     end do
 #endif /* FIELDCD */
 #ifdef FLUXCT
 ! expand the staggered magnetic field components preserving divergence-free
 ! condition
 !
-    call expand_mag(dm, fm, ng, pblock%data%u(ibx,:,:,:) &
-                              , pblock%data%u(iby,:,:,:) &
-                              , pblock%data%u(ibz,:,:,:) &
-                                     , u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
+    call expand_mag(dm, fm, ng, pdata%u(ibx,:,:,:), pdata%u(iby,:,:,:), pdata%u(ibz,:,:,:)  &
+                              , u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
 #endif /* FLUXCT */
 #endif /* MHD */
 ! iterate over all children
