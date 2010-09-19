@@ -430,6 +430,9 @@ module mesh
 
         if (pmeta%level .eq. maxlev) &
           pmeta%refine = min(0, pmeta%refine)
+
+        if (pmeta%level .eq. 1) &
+          pmeta%refine = max(0, pmeta%refine)
       end if
 
       pdata => pdata%next
