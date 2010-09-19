@@ -48,7 +48,7 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine boundary_flux
+  subroutine boundary_fluxes
 
     use blocks, only : block_meta, list_meta
     use blocks, only : nsides, nfaces
@@ -113,7 +113,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine boundary_flux
+  end subroutine boundary_fluxes
 !
 !===============================================================================
 !
@@ -122,7 +122,7 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine boundary
+  subroutine boundary_variables
 
     use config  , only : im, jm, km, maxlev
     use blocks  , only : nvr, nqt, ndims, nsides, nfaces, nchild               &
@@ -434,7 +434,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine boundary
+  end subroutine boundary_variables
 !
 !===============================================================================
 !

@@ -46,7 +46,7 @@ module evolution
   subroutine advance
 
     use blocks      , only : block_data, list_data
-    use boundaries  , only : boundary!, boundary_flux
+    use boundaries  , only : boundary_variables, boundary_fluxes
     use mesh        , only : update_mesh, dx_min
 #ifdef MPI
     use mpitools    , only : mallreduceminr
@@ -81,7 +81,7 @@ module evolution
 ! ! 2. update the flux boundaries
 ! !
 !     call start_timer(4)
-!     call boundary_flux
+!     call boundary_fluxes
 !     call stop_timer(4)
 !
 ! ! 3. iterate over all data blocks and advance in time the conserved variables
@@ -108,7 +108,7 @@ module evolution
 ! ! 5. update the boundaries of the conserved variables
 ! !
 !     call start_timer(4)
-!     call boundary
+!     call boundary_variables
 !     call stop_timer(4)
 !
 ! ! 6. iterate over all blocks in order to find the maximum speed
@@ -156,7 +156,7 @@ module evolution
   subroutine evolve
 
     use blocks      , only : block_data, list_data
-    use boundaries  , only : boundary
+    use boundaries  , only : boundary_variables
     use mesh        , only : update_mesh
     use mesh        , only : dx_min
 #ifdef MPI
@@ -198,7 +198,7 @@ module evolution
 ! update boundaries
 !
     call start_timer(4)
-    call boundary
+    call boundary_variables
     call stop_timer(4)
 
 ! check refinement and refine
@@ -210,7 +210,7 @@ module evolution
 ! update boundaries
 !
     call start_timer(4)
-    call boundary
+    call boundary_variables
     call stop_timer(4)
 
 ! reset maximum speed
