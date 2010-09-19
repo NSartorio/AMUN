@@ -35,6 +35,88 @@ module boundaries
 !
 !===============================================================================
 !
+! boundary_flux: subroutine sweeps over all leaf blocks and updates the flux
+!                boundaries in order to keep consistency between different
+!                levels
+!
+! notes: - only update the fluxes in blocks from neighbors at higher level
+!
+!! TODO:
+!!
+!! - MPI version
+!!
+!
+!===============================================================================
+!
+  subroutine boundary_flux
+
+    use blocks, only : block_meta, list_meta
+    use blocks, only : nsides, nfaces
+
+    implicit none
+
+! local variables
+!
+    integer :: idir, iside, iface
+
+! local pointers
+!
+    type(block_meta), pointer :: pblock, pneigh
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all directions
+!
+    do idir = 1, NDIMS
+
+! iterate over all leaf blocks and perform the boundary update
+!
+      pblock => list_meta
+      do while (associated(pblock))
+
+! check if the current block is a leaf
+!
+        if (pblock%leaf) then
+
+! iterate over all neighbors (directions, sides, and faces)
+!
+          do iside = 1, nsides
+            do iface = 1, nfaces
+
+! associate the pointer pneigh to the current neighbor
+!
+              pneigh => pblock%neigh(idir,iside,iface)%ptr
+
+! check if the neighbor is associated
+!
+              if (associated(pneigh)) then
+
+! if the neighbor is at the higher level update the fluxes of the current block
+!
+                if (pneigh%level .gt. pblock%level) &
+                  call restrict_flux(pneigh%data%f, pneigh%data%e, pblock%data, idir, iside, iface)
+
+              end if
+
+            end do ! iteration over faces
+          end do ! iteration over sides
+
+        end if ! condition: if the leaf
+
+! assign the pointer to the next block
+!
+        pblock => pblock%next
+
+      end do ! iteration over all blocks
+
+    end do ! iteration over directions
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_flux
+!
+!===============================================================================
+!
 ! boundary: subroutine sweeps over all leaf blocks and performs the boundary
 !           update
 !
