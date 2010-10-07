@@ -33,8 +33,8 @@ program godunov
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
-  use timer    , only : init_timers, start_timer, stop_timer          &
-                      , get_timer, get_timer_total
+  use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
+                      , get_timer_total
 !
 !-------------------------------------------------------------------------------
 !
@@ -42,7 +42,7 @@ program godunov
 !
   character(len=60) :: fmt
   integer           :: no, ed, eh, em, es, ec
-  real              :: tall, tbeg, tcur
+  real              :: tall, tbeg, tcur, per
 !
 !-------------------------------------------------------------------------------
 !
@@ -57,11 +57,12 @@ program godunov
     write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
     write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
 #ifdef MPI
-    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus, ' processors'
+    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus   &
+            , ' processors'
 #endif /* MPI */
     write (*,"(1x,78('-'))")
     write (*,*)
-  endif
+  end if
 
 ! read configuration file
 !
@@ -93,15 +94,12 @@ program godunov
   call write_data(ftype, no, ncpu)
   call stop_timer(3)
 
-! TODO: main loop, perform one step evolution of the system, do refinement/derefinement
-! TODO: get new time step, dump data, print info about the progress
-
 ! print information
 !
   if (is_master()) then
     write(*,*)
     write(*,"(1x,a)"   ) "Evolving system:"
-  endif
+  end if
 
 ! main loop
 !
@@ -128,7 +126,7 @@ program godunov
     if (dtout .gt. 0.0 .and. no .lt. (int(t/dtout))) then
       no = no + 1
       call write_data(ftype, no, ncpu)
-    endif
+    end if
     call stop_timer(3)
 
 ! get current time in seconds
@@ -146,9 +144,11 @@ program godunov
 !
     if (is_master()) then
       if (mod(n, 50) .eq. 1) &
-        write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ', 'remain. time'
-      write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') n, t, dt, dtn, ed, eh, em, es
-    endif
+        write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ' &
+               , 'remain. time'
+      write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') &
+               n, t, dt, dtn, ed, eh, em, es
+    end if
 
   end do
 
@@ -168,20 +168,22 @@ program godunov
 ! get total time
 !
   tall = get_timer_total()
+  per  = 100.0 / tall
 
 ! print info about execution times
 !
   if (is_master()) then
-    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6, ".4,' secs = ',f7.3,' %')"
+    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6            &
+             , ".4,' secs = ',f7.3,' %')"
 
     write (*,*)
-    write (*,fmt) "Time for initialization : ", get_timer(1), 100.0*get_timer(1)/tall
-    write (*,fmt) "Time for evolution      : ", get_timer(2), 100.0*get_timer(2)/tall
-    write (*,fmt) "Time for data output    : ", get_timer(3), 100.0*get_timer(3)/tall
-    write (*,fmt) "Time for boundary update: ", get_timer(4), 100.0*get_timer(4)/tall
-    write (*,fmt) "Time for mesh update    : ", get_timer(5), 100.0*get_timer(5)/tall
+    write (*,fmt) "Time for initialization : ", get_timer(1), per * get_timer(1)
+    write (*,fmt) "Time for evolution      : ", get_timer(2), per * get_timer(2)
+    write (*,fmt) "Time for data output    : ", get_timer(3), per * get_timer(3)
+    write (*,fmt) "Time for boundary update: ", get_timer(4), per * get_timer(4)
+    write (*,fmt) "Time for mesh update    : ", get_timer(5), per * get_timer(5)
     write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
-  endif
+  end if
 
 ! close access to the MPI
 !
