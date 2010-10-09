@@ -29,15 +29,46 @@ module io
   implicit none
 
   contains
-#ifdef HDF5
 !
 !===============================================================================
 !
-! write_data: subroutine writes all data to file for a given time step
+! write_data: wrapper subroutine which chooses the data writing subroutine
+!              corresponding to the selected format of the output file
 !
 !===============================================================================
 !
   subroutine write_data(ftype, nfile, nproc)
+
+    implicit none
+
+! input variables
+!
+    character, intent(in) :: ftype
+    integer  , intent(in) :: nfile, nproc
+!
+!-------------------------------------------------------------------------------
+!
+    select case(ftype)
+    case default
+#ifdef HDF5
+      call write_data_primitive_h5(ftype, nfile, nproc)
+#endif /* HDF5 */
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_data
+#ifdef HDF5
+!
+!===============================================================================
+!
+! write_data_primitive_h5: subroutine writes all primitive variables and all
+!                          parameters required to visualize the full domain in
+!                          the HDF5 format
+!
+!===============================================================================
+!
+  subroutine write_data_primitive_h5(ftype, nfile, nproc)
 
     use blocks  , only : block_data, list_data, ndims, nsides, nvr, nblocks    &
                        , nleafs, dblocks                                       &
@@ -217,7 +248,7 @@ module io
 ! prepare properties / compression
 !
         call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
-        call h5pset_chunk_f(pid, 4, qm(:), err)
+        call h5pset_chunk_f(pid, 4, qm, err)
         call h5pset_deflate_f(pid, 9, err)
 
 ! create a group for the global attributes
@@ -320,7 +351,7 @@ module io
           call h5screate_simple_f(3, pm, sid, err)
 
           call h5dcreate_f(gid, 'bounds', H5T_NATIVE_DOUBLE, sid, did, err)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, bounds(:,:,:), pm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, bounds(:,:,:), pm, err, sid)
           call h5dclose_f(did, err)
 
           call h5sclose_f(sid, err)
@@ -360,38 +391,38 @@ module io
           call h5screate_simple_f(4, qm, sid, err)
 
           call h5dcreate_f(gid, 'dens', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, dens(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, dens(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'velx', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, velx(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, velx(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'vely', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, vely(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, vely(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'velz', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, velz(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, velz(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
 #ifdef ADI
           call h5dcreate_f(gid, 'pres', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, pres(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, pres(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'ener', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, ener(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, ener(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
 #endif /* ADI */
 #ifdef MHD
           call h5dcreate_f(gid, 'magx', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magx(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magx(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'magy', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magy(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magy(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
           call h5dcreate_f(gid, 'magz', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magz(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, magz(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
 #ifdef FLUXCT
           call h5dcreate_f(gid, 'divb', H5T_NATIVE_DOUBLE, sid, did, err, pid)
-          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, divb(:,:,:,:), qm(:), err, sid)
+          call h5dwrite_f(did, H5T_NATIVE_DOUBLE, divb(:,:,:,:), qm, err, sid)
           call h5dclose_f(did, err)
 #endif /* FLUXCT */
 #endif /* MHD */
@@ -456,7 +487,8 @@ module io
 
 ! print error of closing HDF5 Fortran interface
 !
-        call print_error("io::write_data", "Could not close HDF5 Fortran interface!")
+        call print_error("io::write_data"  &
+                                    , "Could not close HDF5 Fortran interface!")
 
       endif
 
@@ -464,13 +496,14 @@ module io
 
 ! print error of initializing HDF5 Fortran interface
 !
-      call print_error("io::write_data", "Could not initialize HDF5 Fortran interface!")
+      call print_error("io::write_data"  &
+                               , "Could not initialize HDF5 Fortran interface!")
 
     endif
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data
+  end subroutine write_data_primitive_h5
 #endif /* HDF5 */
 !===============================================================================
 !
