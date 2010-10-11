@@ -113,6 +113,10 @@ module blocks
 !                                                        0 - do nothing
 !                                                        1 - refine
 
+    integer(kind=4)             :: coord(ndims)     ! coordinate of the lower
+!                                                     corner in the effective
+!                                                     resolution
+
     logical                     :: leaf             ! leaf flag
 
     real(kind=8)                :: xmin, xmax       ! bounds for the x direction
@@ -316,6 +320,10 @@ module blocks
     pmeta%config = -1
     pmeta%refine =  0
     pmeta%leaf   = .false.
+
+! initialize the coordinate
+!
+    pmeta%coord(:) = 0
 
 ! initialize bounds of the block
 !
@@ -737,6 +745,35 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_setlevel
+!
+!===============================================================================
+!
+! metablock_set_coord: subroutine sets the coordinates of the meta block
+!
+!===============================================================================
+!
+  subroutine metablock_set_coord(pmeta, px, py, pz)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: px, py, pz
+!
+!-------------------------------------------------------------------------------
+!
+! set the coordintaes
+!
+    pmeta%coord(1) = px
+    pmeta%coord(2) = py
+#if NDIMS == 3
+    pmeta%coord(3) = pz
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_coord
 !
 !===============================================================================
 !
