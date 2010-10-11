@@ -57,6 +57,12 @@ endif
 #
 FFLAGS  += -D${OUTPUT}
 
+# compression
+#
+ifeq ($(COMPRESS),Y)
+FFLAGS  += -DDEFLATE
+endif
+
 # precision
 #
 FFLAGS  += -DPREC=${PREC}

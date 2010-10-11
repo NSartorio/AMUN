@@ -115,9 +115,9 @@ module blocks
 
     logical                     :: leaf             ! leaf flag
 
-    real                        :: xmin, xmax       ! bounds for the x direction
-    real                        :: ymin, ymax       ! bounds for the y direction
-    real                        :: zmin, zmax       ! bounds for the z direction
+    real(kind=8)                :: xmin, xmax       ! bounds for the x direction
+    real(kind=8)                :: ymin, ymax       ! bounds for the y direction
+    real(kind=8)                :: zmin, zmax       ! bounds for the z direction
   end type block_meta
 
 ! define block_data structure
@@ -369,7 +369,7 @@ module blocks
 
 ! allocate space for the numerical fluxes
 !
-    allocate(pdata%f(NDIMS,nfl,im,jm,km))
+    allocate(pdata%f(ndims,nfl,im,jm,km))
 
 ! allocate space for the electromotive force
 !

@@ -6,9 +6,13 @@
 #
 PREC       = 4
 
-# output data format: HDF5
+# data format:
+#
+#   OUTPUT   - data format, currently only HDF5
+#   COMPRESS - enable/disable data compression
 #
 OUTPUT     = HDF5
+COMPRESS   = N
 
 #-------------------------------------------------------------------------------
 #
