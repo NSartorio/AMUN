@@ -729,7 +729,7 @@ module io
     integer(kind=4)                :: l, p, i, j, k
     integer                        :: err
     integer(hsize_t), dimension(1) :: am, cm
-    integer(hsize_t), dimension(2) :: dm
+    integer(hsize_t), dimension(2) :: dm, pm
     integer(hsize_t), dimension(4) :: qm
 
 ! local allocatable arrays
@@ -738,7 +738,7 @@ module io
     integer(kind=4), dimension(:)  , allocatable :: par, dat
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
-    integer(kind=4), dimension(:,:), allocatable :: chl
+    integer(kind=4), dimension(:,:), allocatable :: chl, cor
     integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
 
 ! local pointers
@@ -761,6 +761,8 @@ module io
       cm(1) = last_id
       dm(1) = nblocks
       dm(2) = nchild
+      pm(1) = nblocks
+      pm(2) = ndims
       qm(1) = nblocks
       qm(2) = ndims
       qm(3) = nsides
@@ -784,6 +786,7 @@ module io
       allocate(zmn(am(1)))
       allocate(zmx(am(1)))
       allocate(chl(dm(1),dm(2)))
+      allocate(cor(pm(1),pm(2)))
       allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 
 ! reset vectors
@@ -806,20 +809,21 @@ module io
         if (associated(pmeta%parent)) par(l) = pmeta%parent%id
         if (associated(pmeta%data)  ) dat(l) = 1
 
-        id (l) = pmeta%id
-        cpu(l) = pmeta%cpu
-        lev(l) = pmeta%level
-        cfg(l) = pmeta%config
-        ref(l) = pmeta%refine
+        id (l)   = pmeta%id
+        cpu(l)   = pmeta%cpu
+        lev(l)   = pmeta%level
+        cfg(l)   = pmeta%config
+        ref(l)   = pmeta%refine
+        cor(l,:) = pmeta%coord(:)
 
         if (pmeta%leaf) lea(l) = 1
 
-        xmn(l) = pmeta%xmin
-        xmx(l) = pmeta%xmax
-        ymn(l) = pmeta%ymin
-        ymx(l) = pmeta%ymax
-        zmn(l) = pmeta%zmin
-        zmx(l) = pmeta%zmax
+        xmn(l)   = pmeta%xmin
+        xmx(l)   = pmeta%xmax
+        ymn(l)   = pmeta%ymin
+        ymx(l)   = pmeta%ymax
+        zmn(l)   = pmeta%zmin
+        zmx(l)   = pmeta%zmax
 
         do p = 1, nchild
           if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
@@ -856,6 +860,7 @@ module io
       call write_vector_double_h5 (gid, 'zmin'   , am(1), zmn)
       call write_vector_double_h5 (gid, 'zmax'   , am(1), zmx)
       call write_array2_integer_h5(gid, 'child'  , dm(:), chl)
+      call write_array2_integer_h5(gid, 'coord'  , pm(:), cor)
       call write_array4_integer_h5(gid, 'neigh'  , qm(:), ngh)
 
 ! deallocate allocatable arrays
@@ -876,6 +881,7 @@ module io
       if (allocated(zmn)) deallocate(zmn)
       if (allocated(zmx)) deallocate(zmx)
       if (allocated(chl)) deallocate(chl)
+      if (allocated(cor)) deallocate(cor)
       if (allocated(ngh)) deallocate(ngh)
 
 ! close the group
@@ -1149,7 +1155,7 @@ module io
 
 ! fill in the coordinate array
 !
-          cor(l,:)   = 0
+          cor(l,:)   = pdata%meta%coord(:)
 
 ! fill in the bounds array
 !
