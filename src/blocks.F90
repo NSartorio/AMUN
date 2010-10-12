@@ -163,6 +163,10 @@ module blocks
 !
   integer(kind=4)     , save :: nblocks, dblocks, nleafs
 
+! the effective resolution at all levels
+!
+  integer(kind=4), dimension(:), allocatable, save :: res
+
   contains
 !
 !===============================================================================
@@ -231,6 +235,10 @@ module blocks
       call deallocate_metablock(pmeta)
       pmeta => list_meta
     end do
+
+! deallocating coordinate variables
+!
+    if (allocated(res))  deallocate(res)
 !
 !-------------------------------------------------------------------------------
 !
@@ -834,7 +842,7 @@ module blocks
 
 ! local variables
 !
-    integer :: p, i, j, k
+    integer :: p, i, j, k, ic, jc, kc
     real    :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 !
 !-------------------------------------------------------------------------------
@@ -1201,12 +1209,23 @@ module blocks
 !
         pchild => pblock%child(p)%ptr
 
-! calculate block bounds
+! calculate the block position indices
 !
         i   = mod((p - 1)    ,2)
         j   = mod((p - 1) / 2,2)
         k   = mod((p - 1) / 4,2)
 
+! set the block coordinates
+!
+        ic  = pblock%coord(1) + i * res(pchild%level)
+        jc  = pblock%coord(2) + j * res(pchild%level)
+#if NDIMS == 3
+        kc  = pblock%coord(3) + k * res(pchild%level)
+#endif /* NDIMS == 3 */
+        call metablock_set_coord(pchild, ic, jc, kc)
+
+! calculate block bounds
+!
         xmn = pblock%xmin + xln * i
         ymn = pblock%ymin + yln * j
         zmn = pblock%zmin + zln * k

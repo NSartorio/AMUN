@@ -144,7 +144,8 @@ module problem
     use blocks, only : block_meta, block_data, append_metablock                &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
-                     , metablock_setbounds, nsides, nfaces
+                     , metablock_set_coord, metablock_setbounds                &
+                     , nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax
 
@@ -176,6 +177,10 @@ module problem
 ! set block level
 !
     call metablock_setlevel(pmeta, 1)
+
+! set block coordinates
+!
+    call metablock_set_coord(pmeta, 0, 0, 0)
 
 ! set block bounds
 !
@@ -231,15 +236,16 @@ module problem
     use blocks, only : block_meta, block_data, pointer_meta, append_metablock  &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
-                     , metablock_setbounds, nsides, nfaces
+                     , metablock_setbounds, metablock_set_coord                &
+                     , nsides, nfaces, res
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims, maxlev, ncells
 
     implicit none
 
 ! local variables
 !
-    integer :: i, j
+    integer :: i, j, ih, jl, ju
     real    :: xm, yl, yu
 
 ! local pointers
@@ -350,6 +356,21 @@ module problem
     block_array(2,3)%ptr%neigh(2,2,1)%ptr => block_array(2,1)%ptr
     block_array(2,3)%ptr%neigh(2,2,2)%ptr => block_array(2,1)%ptr
 
+! prepare the coordinates
+!
+    ih = res(1)
+    jl = res(1)
+    ju = res(1) + jl
+
+! set the coordinates
+!
+    call metablock_set_coord(block_array(1,1)%ptr,  0,  0, 0)
+    call metablock_set_coord(block_array(2,1)%ptr, ih,  0, 0)
+    call metablock_set_coord(block_array(1,2)%ptr,  0, jl, 0)
+    call metablock_set_coord(block_array(2,2)%ptr, ih, jl, 0)
+    call metablock_set_coord(block_array(1,3)%ptr,  0, ju, 0)
+    call metablock_set_coord(block_array(2,3)%ptr, ih, ju, 0)
+
 ! calculate bounds
 !
     xm = 0.5 * (xmin + xmax)
@@ -380,7 +401,7 @@ module problem
     call append_datablock(pdata)
     call associate_blocks(block_array(2,3)%ptr, pdata)
 
-! set block dimensions for the lowest level
+! set the block dimensions for the lowest level
 !
     rdims(1) = 2
     rdims(2) = 3

@@ -54,7 +54,7 @@ module mesh
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , init_blocks, clear_blocks, refine_block               &
                        , deallocate_datablock, nblocks, nleafs, dblocks        &
-                       , nchild, ndims, nsides, nfaces
+                       , nchild, ndims, nsides, nfaces, res
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -86,6 +86,16 @@ module mesh
 !
     call init_blocks
 
+! allocate the effective resolution array
+!
+    allocate(res(maxlev))
+
+! calculate the effective resolution at each level
+!
+    do l = 1, maxlev
+      res(l) = ncells * 2**(maxlev - l)
+    end do
+
 ! allocate the initial structure of blocks according to the problem
 !
     call init_domain
@@ -96,7 +106,7 @@ module mesh
       write(*,"(1x,a)"         ) "Generating initial mesh:"
       write(*,"(4x,a,  1x,i6)" ) "refining to max. level  =", maxlev
       write(*,"(4x,a,3(1x,i6))") "lowest level resolution =", rdims(1:ndims) * ncells
-      write(*,"(4x,a,3(1x,i6))") "effective resolution    =", rdims(1:ndims) * ncells * 2**(maxlev - 1)
+      write(*,"(4x,a,3(1x,i6))") "effective resolution    =", rdims(1:ndims) * res(1)
     end if
 
 ! at this point we assume, that the initial structure of blocks
