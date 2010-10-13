@@ -117,320 +117,116 @@ module boundaries
 !
 !===============================================================================
 !
-! boundary: subroutine sweeps over all leaf blocks and performs the boundary
+! boundary: subroutine sweeps over all leaf blocks and performs their boundary
 !           update
 !
 !===============================================================================
 !
   subroutine boundary_variables
 
-    use config  , only : im, jm, km, maxlev
-    use blocks  , only : nvr, nqt, ndims, nsides, nfaces, nchild               &
-                       , block_meta, block_info, pointer_info, list_meta
-    use error   , only : print_error
-    use mpitools, only : ncpus, ncpu, msendf, mrecvf
+! references to other modules
+!
+    use blocks, only : block_meta, block_data, list_meta
+    use blocks, only : ndims, nsides, nfaces
 
+! declare variables
+!
     implicit none
 
 ! local variables
 !
-    integer :: idir, iside, iface, nside, nface, dlev, l, p, q
-
-#ifdef MPI
-! MPI tag
-!
-    integer(kind=4)                                       :: itag
-
-! pointer to the list of pairs of blocks belonging to different processes for
-! which we perform the boundary exchange
-!
-    type(pointer_info), dimension(0:ncpus-1,0:ncpus-1)    :: block_array
-
-! declare pointer to the info block
-!
-    type(block_info), pointer                             :: pinfo
-
-! create counter for exchanged blocks
-!
-    integer(kind=4)   , dimension(0:ncpus-1,0:ncpus-1)    :: block_counter
-
-! local arrays for boundary exchange
-!
-    real(kind=8)      , dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
+    integer :: idir, iside, iface, nside, nface
 
 ! local pointers
 !
     type(block_meta), pointer :: pblock, pneigh
+    type(block_data), pointer :: pbdata, pndata
 !
 !-------------------------------------------------------------------------------
 !
-! iterate over all directions
+! update boundaries which don't have neighbors
 !
     do idir = 1, ndims
-
-#ifdef MPI
-! nullify array pointers and reset the counter
-!
-      do p = 0, ncpus-1
-        do q = 0, ncpus-1
-          nullify(block_array(p,q)%ptr)
-          block_counter(p,q) = 0
-        end do
-      end do
-#endif /* MPI */
-
-! iterate over all leaf blocks and perform boundary update
-!
       pblock => list_meta
-      do while (associated(pblock))
-
-! if the current block is a leaf...
-!
+      do while(associated(pblock))
         if (pblock%leaf) then
-
-! iterate over all neighbors
-!
           do iside = 1, nsides
             do iface = 1, nfaces
-
-! associate pointer to the neighbor
-!
               pneigh => pblock%neigh(idir,iside,iface)%ptr
-
-! check if neighbor is associated, if yes exchange boundaries, if not call
-! specific boundary conditions
-!
-              if (associated(pneigh)) then
-
-#ifdef MPI
-! get the processor number of the current block and its neighbor
-!
-                p = pblock%cpu
-                q = pneigh%cpu
-
-! check if the neighbor is on the same cpu
-!
-                if (p .eq. q) then
-                  if (p .eq. ncpu) then
-#endif /* MPI */
-
-! calculate the difference of current and neighbor level
-!
-                    dlev = pblock%level - pneigh%level
-
-! depending on the level difference
-!
-                    select case(dlev)
-                    case(-1)  ! neighbor is on higer level -> restriction
-                      call bnd_rest(pblock%data, pneigh%data%u, idir, iside, iface)
-                    case(0)   ! block are on the same level -> copying
-                      if (iface .eq. 1) &
-                        call bnd_copy(pblock%data, pneigh%data%u, idir, iside)
-                    case(1)   ! neighbor is on lower level -> prolongation
-                      if (iface .eq. 1) then
-                        nside = 3 - iside
-                        nface = 1
-                        do while(pblock%id .ne. pneigh%neigh(idir,nside,nface)%ptr%id)
-                          nface = nface + 1
-                        end do
-
-                        call bnd_prol(pblock%data, pneigh%data%u, idir, iside, nface)
-                      end if
-                    case default
-                      call print_error("boundaries::boundary", "Level difference unsupported!")
-                    end select
-#ifdef MPI
-                  end if
-                else
-
-! neighbor is on another cpu, which means we have to update it later, so add it
-! to the list of blocks to exchange
-!
-! allocate info block
-!
-                  allocate(pinfo)
-
-! fill out its fields
-!
-                  pinfo%block            => pblock
-                  pinfo%neigh            => pneigh
-                  pinfo%direction        =  idir
-                  pinfo%side             =  iside
-                  pinfo%face             =  iface
-                  pinfo%level_difference = pblock%level - pneigh%level
-
-! nullify pointers
-!
-                  nullify(pinfo%prev)
-                  nullify(pinfo%next)
-
-! if the list is not emply append the created block
-!
-                  if (associated(block_array(p,q)%ptr)) then
-                    pinfo%prev => block_array(p,q)%ptr
-                    nullify(pinfo%next)
-                  end if
-
-! point the list to the last created block
-!
-                  block_array(p,q)%ptr => pinfo
-
-! increase the counter
-!
-                  block_counter(p,q) = block_counter(p,q) + 1
-                end if
-#endif /* MPI */
-              else
-
-! neighbor is not associated, it means that we have non periodic boundary here
-!
-#ifdef MPI
-                if (iface .eq. 1 .and. pblock%cpu .eq. ncpu) &
-                  call bnd_spec(pblock%data, idir, iside, iface)
-#else /* MPI */
+              if (.not. associated(pneigh)) then
                 if (iface .eq. 1) &
                   call bnd_spec(pblock%data, idir, iside, iface)
-#endif /* MPI */
               end if
+            end do ! faces
+          end do ! sides
+        end if ! leaf and current level
+        pblock => pblock%next ! assign pointer to the next block
+      end do ! metablocks
+    end do ! directions
 
-            end do ! iteration over faces
-          end do ! iteration over sides
-
-        end if ! if leaf
-
-! assign pointer to the next block
+! update boundaries from the blocks at the same level
 !
-        pblock => pblock%next
+    do idir = 1, ndims
+      pblock => list_meta
+      do while(associated(pblock))
+        if (pblock%leaf) then
+          do iside = 1, nsides
+            do iface = 1, nfaces
+              pneigh => pblock%neigh(idir,iside,iface)%ptr
+              if (associated(pneigh)) then
+                pbdata => pblock%data
+                pndata => pneigh%data
 
-      end do ! iteration over all blocks
+                if (pblock%level .eq. pneigh%level .and. iface .eq. 1) &
+                  call bnd_copy(pbdata, pndata%u, idir, iside)
+              end if
+            end do ! faces
+          end do ! sides
+        end if ! leaf and current level
+        pblock => pblock%next ! assign pointer to the next block
+      end do ! metablocks
+    end do ! directions
 
-#ifdef MPI
-!! TO DO:
-!!
-!! - send/receive only boundaries, not whole blocks
-!!
-! iterate over receiving and sending processors
+! TODO: update corners from the neighbors at higher level
 !
-      do p = 0, ncpus - 1
-        do q = 0, ncpus - 1
 
-          if (block_counter(p,q) .gt. 0) then
-
-! get the number of nodes to exchange
+! update boundaries from all neighbors
 !
-            l = block_counter(p,q)
+    do idir = 1, ndims
+      pblock => list_meta
+      do while(associated(pblock))
+        if (pblock%leaf) then
+          do iside = 1, nsides
+            do iface = 1, nfaces
+              pneigh => pblock%neigh(idir,iside,iface)%ptr
+              if (associated(pneigh)) then
+                pbdata => pblock%data
+                pndata => pneigh%data
 
-! get the tag for communication
-!
-            itag = p * ncpus + q + ncpus + 1
-
-! allocate space for variables
-!
-            allocate(rbuf(l,nqt,im,jm,km))
-
-! if p == ncpu we are receiving data
-!
-            if (p .eq. ncpu) then
-
-! receive data
-!
-              call mrecvf(size(rbuf(:,:,:,:,:)), q, itag, rbuf(:,:,:,:,:))
-
-! iterate over all received blocks and update boundaries
-!
-              l = 1
-
-              pinfo => block_array(p,q)%ptr
-              do while(associated(pinfo))
-
-! set indices
-!
-                iside = pinfo%side
-                iface = pinfo%face
-                dlev  = pinfo%level_difference
-
-! update boundaries
-!
-                select case(dlev)
-                case(-1)  ! neighbor is on higer level -> restriction
-                  call bnd_rest(pinfo%block%data, rbuf(l,:,:,:,:), idir, iside, iface)
-                case(0)   ! block are on the same level -> copying
-                  if (iface .eq. 1) &
-                    call bnd_copy(pinfo%block%data, rbuf(l,:,:,:,:), idir, iside)
-                case(1)   ! neighbor is on lower level -> prolongation
+                if (pblock%level .lt. pneigh%level) &
+                  call bnd_rest(pblock%data, pneigh%data%u, idir, iside, iface)
+                if (pblock%level .eq. pneigh%level .and. iface .eq. 1) &
+                  call bnd_copy(pbdata, pndata%u, idir, iside)
+                if (pblock%level .gt. pneigh%level) then
                   if (iface .eq. 1) then
-                    pblock => pinfo%block
-                    pneigh => pblock%neigh(idir,iside,iface)%ptr
-
                     nside = 3 - iside
                     nface = 1
                     do while(pblock%id .ne. pneigh%neigh(idir,nside,nface)%ptr%id)
                       nface = nface + 1
                     end do
 
-                    call bnd_prol(pinfo%block%data, rbuf(l,:,:,:,:), idir, iside, nface)
+                    pbdata => pblock%data
+                    pndata => pneigh%data
+                    call bnd_prol(pbdata, pndata%u, idir, iside, nface)
                   end if
-                case default
-                  call print_error("boundaries::boundary", "Level difference unsupported!")
-                end select
-
-                pinfo => pinfo%prev
-                l = l + 1
-              end do
-
-            end if
-
-! if q == ncpu we are sending data
-!
-            if (q .eq. ncpu) then
-
-! fill out the buffer with block data
-!
-              l = 1
-
-              pinfo => block_array(p,q)%ptr
-              do while(associated(pinfo))
-
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,:)
-
-                pinfo => pinfo%prev
-                l = l + 1
-              end do
-
-! send data buffer
-!
-              call msendf(size(rbuf), p, itag, rbuf)
-
-            end if
-
-! deallocate buffers
-!
-            deallocate(rbuf)
-
-! deallocate info blocks
-!
-            pinfo => block_array(p,q)%ptr
-            do while(associated(pinfo))
-              block_array(p,q)%ptr => pinfo%prev
-
-              nullify(pinfo%prev)
-              nullify(pinfo%next)
-              nullify(pinfo%block)
-              nullify(pinfo%neigh)
-
-              deallocate(pinfo)
-
-              pinfo => block_array(p,q)%ptr
-            end do
-
-          end if ! if block counter > 0
-
-        end do ! iteration over q
-      end do ! iteration over p
-#endif /* MPI */
-
-    end do ! iteration over directions
+                end if
+              end if
+            end do ! faces
+          end do ! sides
+        end if ! leaf and current level
+        pblock => pblock%next ! assign pointer to the next block
+      end do ! metablocks
+    end do ! directions
 !
 !-------------------------------------------------------------------------------
 !
