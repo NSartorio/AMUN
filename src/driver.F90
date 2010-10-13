@@ -55,7 +55,7 @@ program godunov
   if (is_master()) then
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
-    write (*,"(1x,18('='),4x,a,4x,19('='))") 'Copyright (C) 2008 Grzegorz Kowal'
+    write (*,"(1x,16('='),4x,a,4x,16('='))") 'Copyright (C) 2008-2010 Grzegorz Kowal'
 #ifdef MPI
     write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus   &
             , ' processors'

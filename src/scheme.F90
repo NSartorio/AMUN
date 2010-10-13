@@ -1,10 +1,10 @@
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !! module: scheme - handling the actual solver of the set of equations
 !!
-!! Copyright (C) 2008 Grzegorz Kowal <kowal@astro.wisc.edu>
+!! Copyright (C) 2008-2010 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !!  This file is part of Godunov-AMR.
 !!
@@ -21,7 +21,7 @@
 !!  You should have received a copy of the GNU General Public License
 !!  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !!
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !
 module scheme
@@ -30,7 +30,7 @@ module scheme
 
   contains
 !
-!==============================================================================
+!===============================================================================
 !
 ! numerical_flux: subroutine updates the numerical flux of the current data
 !                 block
@@ -40,7 +40,7 @@ module scheme
 !        - the magnetic fluxes must be located at the cell edge centers
 !             [ ex(i,j+1/2,j+1/2), ey(i+1/2,j,j+1/2), ez(i+1/2,j+1/2,k) ]
 !
-!==============================================================================
+!===============================================================================
 !
   subroutine numerical_flux(u, f, e)
 
@@ -293,12 +293,12 @@ module scheme
 !
   end subroutine numerical_flux
 !
-!==============================================================================
+!===============================================================================
 !
 ! update: subroutine sweeps over all directions and integrates the directional
 !         derivatives of the flux in order to get the increment of solution
 !
-!==============================================================================
+!===============================================================================
 !
   subroutine update(u, du, dxi, dyi, dzi)
 
@@ -755,7 +755,7 @@ module scheme
                             , smvl, smvr, div, pt
     real, dimension(nvr)   :: q1l, q1r, u1l, u1r
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
     f (:,:) = 0.0
     fx(:,:) = 0.0
@@ -1231,7 +1231,7 @@ module scheme
     real, dimension(nvr,im,jm,km) :: w
     real, dimension(nvr,im)       :: q
 !
-!----------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 !
     maxspeed = 0.0
 

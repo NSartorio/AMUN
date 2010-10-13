@@ -1,10 +1,10 @@
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !! module: problem - handling the initial problem definition
 !!
-!! Copyright (C) 2008 Grzegorz Kowal <kowal@astro.wisc.edu>
+!! Copyright (C) 2008-2010 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !!  This file is part of Godunov-AMR.
 !!
@@ -21,7 +21,7 @@
 !!  You should have received a copy of the GNU General Public License
 !!  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !!
-!!*****************************************************************************
+!!******************************************************************************
 !!
 !
 module problem
