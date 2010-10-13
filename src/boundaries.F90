@@ -697,56 +697,39 @@ module boundaries
 !
 !===============================================================================
 !
-  subroutine bnd_rest(pdata, ub, idir, iside, iface)
+  subroutine bnd_rest(pdata, u, idir, iside, iface)
 
-    use blocks, only : block_data, nvr, nchild, nfl, nqt
+    use blocks, only : block_data, nfl, nqt
 #ifdef MHD
     use blocks, only : ibx, iby, ibz
 #endif /* MHD */
-    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                 &
-                         , jn, jm, jb, jbl, jbu, je, jel, jeu                 &
-                         , kn, km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_warning
-    use interpolation, only : shrink
+    use config, only : ng, in, im, ih, ib, ibl, ibu, ie, iel, ieu              &
+                     , nd, jn, jm, jh, jb, jbl, jbu, je, jel, jeu              &
+                     , nh, kn, km, kh, kb, kbl, kbu, ke, kel, keu
 
     implicit none
 
 ! arguments
 !
-    type(block_data), pointer            , intent(inout) :: pdata
-    real        , dimension(nqt,im,jm,km), intent(in)    :: ub
-    integer                              , intent(in)    :: idir, iside, iface
+    type(block_data), pointer       , intent(inout) :: pdata
+    real   , dimension(nqt,im,jm,km), intent(in)    :: u
+    integer                         , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
-    integer ::  q,  i,  j,  k
-    integer :: il, iu, jl, ju, kl, ku
-    integer :: i1, i2, j1, j2, k1, k2
-    integer :: is, it, js, jt, ks, kt
-    integer :: if, jf, kf
-
-! local arrays
-!
-    integer, dimension(3)                  :: dm, cm, fm
-    real   , dimension(:,:,:), allocatable :: u
-
-! parameters
-!
-    integer :: del = 2
+    integer :: if, jf, kf, ip, jp, kp
+    integer :: il, jl, kl, iu, ju, ku
+    integer :: is, js, ks, it, jt, kt
 !
 !-------------------------------------------------------------------------------
 !
-! prepare dimensions
-!
-    dm(:)    = (/ im, jm, km /)
-    dm(idir) = ng
-    cm(:)    = dm(:) / 2
-    cm(idir) = ng + del
-    fm(:)    = 2 * cm(:)
 #if NDIMS == 2
-    dm(3)  = 1
-    cm(3)  = 1
-    fm(3)  = 1
+! prepare temporary indices
+!
+    kl   = 1
+    ku   = 1
+    ks   = 1
+    kt   = 1
 #endif /* NDIMS == 2 */
 
 ! prepare indices
@@ -757,126 +740,98 @@ module boundaries
 
       if =     iside - 1
       jf = mod(iface - 1, 2)
-      kf =    (iface - 1) / 2
-
-! indices of the input array
-!
-      if (if .eq. 0) then
-        i1 = ie - 2 * ng - del + 1
-        i2 = ie + del
-      else
-        i1 = ib - del
-        i2 = ib + 2 * ng + del - 1
-      end if
-      j1 =  1
-      j2 = jm
-      k1 =  1
-      k2 = km
-
-! indices for the output array
-!
-      il = del / 2 + 1
-      iu = il + ng - 1
-      jl =   1           + ng / 2 * jf
-      ju = (jm - ng) / 2 + ng / 2 * jf
 #if NDIMS == 3
-      kl =   1           + ng / 2 * kf
-      ku = (km - ng) / 2 + ng / 2 * kf
-#else /* NDIMS == 3 */
-      kl = 1
-      ku = 1
+      kf =    (iface - 1) / 2
 #endif /* NDIMS == 3 */
 
-! indices of the destination array
+! indices of the source and destination arrays
 !
       if (if .eq. 0) then
+        il = ie - nd + 1
+        iu = ie
         is = 1
-        it = ng
+        it = ibl
       else
+        il = ib
+        iu = ib + nd - 1
         is = ie + 1
         it = im
       end if
+      ip = il + 1
       if (jf .eq. 0) then
-        js = ng / 2 + 1
-        jt = jm / 2
+        jl = 1
+        ju = je
+        js = jb - nh
+        jt = jh
       else
-        js = jm / 2 + 1
-        jt = jm - ng / 2
+        jl = jb
+        ju = jm
+        js = jh + 1
+        jt = je + nh
       end if
+      jp = jl + 1
 #if NDIMS == 3
       if (kf .eq. 0) then
-        ks = ng / 2 + 1
-        kt = km / 2
+        kl = 1
+        ku = ke
+        ks = kb - nh
+        kt = kh
       else
-        ks = km / 2 + 1
-        kt = km - ng / 2
+        kl = kb
+        ku = km
+        ks = kh + 1
+        kt = ke + nh
       end if
-#else /* NDIMS == 3 */
-      ks = 1
-      kt = 1
+      kp = kl + 1
 #endif /* NDIMS == 3 */
 
     case(2)
 
       if = mod(iface - 1, 2)
       jf =     iside - 1
-      kf =    (iface - 1) /   2
-
-! indices of the input array
-!
-      i1 = 1
-      i2 = im
-      if (jf .eq. 0) then
-        j1 = je - 2 * ng - del + 1
-        j2 = je + del
-      else
-        j1 = jb - del
-        j2 = jb + 2 * ng + del - 1
-      end if
-      k1 = 1
-      k2 = km
-
-! indices for the output array
-!
-      il =   1           + ng / 2 * if
-      iu = (im - ng) / 2 + ng / 2 * if
-      jl = del / 2 + 1
-      ju = jl + ng - 1
 #if NDIMS == 3
-      kl =   1           + ng / 2 * kf
-      ku = (km - ng) / 2 + ng / 2 * kf
-#else /* NDIMS == 3 */
-      kl = 1
-      ku = 1
+      kf =    (iface - 1) / 2
 #endif /* NDIMS == 3 */
 
-! indices of the destination array
+! indices of the source and destination arrays
 !
       if (if .eq. 0) then
-        is = ng / 2 + 1
-        it = im / 2
+        il = 1
+        iu = ie
+        is = ib - nh
+        it = ih
       else
-        is = im / 2 + 1
-        it = im - ng / 2
+        il = ib
+        iu = im
+        is = ih + 1
+        it = ie + nh
       end if
+      ip = il + 1
       if (jf .eq. 0) then
+        jl = je - nd + 1
+        ju = je
         js = 1
-        jt = ng
+        jt = jbl
       else
-        js = je + 1
+        jl = jb
+        ju = jb + nd - 1
+        js = jeu
         jt = jm
       end if
+      jp = jl + 1
 #if NDIMS == 3
       if (kf .eq. 0) then
-        ks = ng / 2 + 1
-        kt = km / 2
+        kl = 1
+        ku = ke
+        ks = kb - nh
+        kt = kh
       else
-        ks = km / 2 + 1
-        kt = km - ng / 2
+        kl = kb
+        ku = km
+        ks = kh + 1
+        kt = ke + nh
       end if
-#else /* NDIMS == 3 */
-      ks = 1
-      kt = 1
+      kp = kl + 1
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 3
@@ -886,136 +841,160 @@ module boundaries
       jf =    (iface - 1) / 2
       kf =     iside - 1
 
-! indices of the input array
-!
-      i1 = 1
-      i2 = im
-      j1 = 1
-      j2 = jm
-      if (kf .eq. 0) then
-        k1 = ke - 2 * ng - del + 1
-        k2 = ke + del
-      else
-        k1 = kb - del
-        k2 = kb + 2 * ng + del - 1
-      end if
-
-! indices for the output array
-!
-      il =   1           + ng / 2 * if
-      iu = (im - ng) / 2 + ng / 2 * if
-      jl =   1           + ng / 2 * jf
-      ju = (jm - ng) / 2 + ng / 2 * jf
-      kl = del / 2 + 1
-      ku = kl + ng - 1
-
-! indices of the destination array
+! indices of the source and destination arrays
 !
       if (if .eq. 0) then
-        is = ng / 2 + 1
-        it = im / 2
+        il = 1
+        iu = ie
+        is = ib - nh
+        it = ih
       else
-        is = im / 2 + 1
-        it = im - ng / 2
+        il = ib
+        iu = im
+        is = ih + 1
+        it = ie + nh
       end if
+      ip = il + 1
       if (jf .eq. 0) then
-        js = ng / 2 + 1
-        jt = jm / 2
+        jl = 1
+        ju = je
+        js = jb - nh
+        jt = jh
       else
-        js = jm / 2 + 1
-        jt = jm - ng / 2
+        jl = jb
+        ju = jm
+        js = jh + 1
+        jt = je + nh
       end if
+      jp = jl + 1
       if (kf .eq. 0) then
+        kl = ke - nd + 1
+        ku = ke
         ks = 1
-        kt = ng
+        kt = kbl
       else
-        ks = ke + 1
+        kl = kb
+        ku = kb + nd - 1
+        ks = keu
         kt = km
       end if
+      kp = kl + 1
 #endif /* NDIMS == 3 */
 
     end select
 
-! allocate temporary array
+! update field variable boundaries
 !
-    allocate(u(cm(1),cm(2),cm(3)))
-
-! iterate over all variables
-!
-    do q = 1, nfl
-
-! shrink the boundary
-!
-      call shrink(fm, cm, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
-
-! copy shrinked boundary in the proper place of the block
-!
-      pdata%u(q,is:it,js:jt,ks:kt) = u(il:iu,jl:ju,kl:ku)
-
-    end do
+#if NDIMS == 2
+    pdata%u(1:nfl,is:it,js:jt,1) = 0.25 * (u(1:nfl,il:iu:2,jl:ju:2,1)          &
+                                         + u(1:nfl,ip:iu:2,jl:ju:2,1)          &
+                                         + u(1:nfl,il:iu:2,jp:ju:2,1)          &
+                                         + u(1:nfl,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    pdata%u(1:nfl,is:it,js:jt,ks:kt) =                                         &
+                                  0.125 * (u(1:nfl,il:iu:2,jl:ju:2,kl:ku:2)    &
+                                         + u(1:nfl,ip:iu:2,jl:ju:2,kl:ku:2)    &
+                                         + u(1:nfl,il:iu:2,jp:ju:2,kl:ku:2)    &
+                                         + u(1:nfl,ip:iu:2,jp:ju:2,kl:ku:2)    &
+                                         + u(1:nfl,il:iu:2,jl:ju:2,kp:ku:2)    &
+                                         + u(1:nfl,ip:iu:2,jl:ju:2,kp:ku:2)    &
+                                         + u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)    &
+                                         + u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
 
 #ifdef MHD
 #ifdef FIELDCD
-! iterate over magnetic field components
+! update magnetic field component boundaries
 !
-    do q = ibx, ibz
-
-! shrink the boundary
-!
-      call shrink(fm, cm, ub(q,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'm')
-
-! copy shrinked boundary in the proper place of the block
-!
-      pdata%u(q,is:it,js:jt,ks:kt) = u(il:iu,jl:ju,kl:ku)
-
-    end do
+#if NDIMS == 2
+    pdata%u(ibx:ibz,is:it,js:jt,1) = 0.25 * (u(ibx:ibz,il:iu:2,jl:ju:2,1)      &
+                                           + u(ibx:ibz,ip:iu:2,jl:ju:2,1)      &
+                                           + u(ibx:ibz,il:iu:2,jp:ju:2,1)      &
+                                           + u(ibx:ibz,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    pdata%u(ibx:ibz,is:it,js:jt,ks:kt) =                                       &
+                                  0.125 * (u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                         + u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                         + u(ibx:ibz,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                         + u(ibx:ibz,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                         + u(ibx:ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                         + u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                         + u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                         + u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
 #endif /* FIELDCD */
 #ifdef FLUXCT
-! X-component of magnetic field
+! update staggered magnetic field component boundaries
 !
-    call shrink(fm, cm, ub(ibx,i1:i2,j1:j2,k1:k2), u(:,:,:), 'c', 'm', 'm')
-
-! copy shrinked boundary in the proper place of the block
-!
-    if (it .eq. ng) then
-      pdata%u(ibx,is:it-1,js:jt,ks:kt) = u(il:iu-1,jl:ju,kl:ku)
+#if NDIMS == 2
+    if (it .eq. ibl) then
+      pdata%u(ibx,is:it-1,js:jt,1) = 0.5 * (u(ibx,ip:iu-2:2,jl:ju:2,1)         &
+                                          + u(ibx,ip:iu-2:2,jp:ju:2,1))
     else
-      pdata%u(ibx,is:it  ,js:jt,ks:kt) = u(il:iu  ,jl:ju,kl:ku)
+      pdata%u(ibx,is:it  ,js:jt,1) = 0.5 * (u(ibx,ip:iu  :2,jl:ju:2,1)         &
+                                          + u(ibx,ip:iu  :2,jp:ju:2,1))
     end if
 
-! Y-component of magnetic field
-!
-    call shrink(fm, cm, ub(iby,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'c', 'm')
-
-! copy shrinked boundary in the proper place of the block
-!
-    if (jt .eq. ng) then
-      pdata%u(iby,is:it,js:jt-1,ks:kt) = u(il:iu,jl:ju-1,kl:ku)
+    if (jt .eq. jbl) then
+      pdata%u(iby,is:it,js:jt-1,1) = 0.5 * (u(iby,il:iu:2,jp:ju-2:2,1)         &
+                                          + u(iby,ip:iu:2,jp:ju-2:2,1))
     else
-      pdata%u(iby,is:it,js:jt  ,ks:kt) = u(il:iu,jl:ju  ,kl:ku)
+      pdata%u(iby,is:it,js:jt  ,1) = 0.5 * (u(iby,il:iu:2,jp:ju  :2,1)         &
+                                          + u(iby,ip:iu:2,jp:ju  :2,1))
     end if
 
-! Z-component of magnetic field
-!
-    call shrink(fm, cm, ub(ibz,i1:i2,j1:j2,k1:k2), u(:,:,:), 'm', 'm', 'c')
-
-! copy shrinked boundary in the proper place of the block
-!
+    pdata%u(ibz,is:it,js:jt,1) = 0.25 * (u(ibz,il:iu:2,jl:ju:2,1)              &
+                                       + u(ibz,ip:iu:2,jl:ju:2,1)              &
+                                       + u(ibz,il:iu:2,jp:ju:2,1)              &
+                                       + u(ibz,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-    if (kt .eq. ng) then
-      pdata%u(ibz,is:it,js:jt,ks:kt-1) = u(il:iu,jl:ju,kl:ku-1)
+    if (it .eq. ibl) then
+      pdata%u(ibx,is:it-1,js:jt,ks:kt) =                                       &
+                                     0.25 * (u(ibx,ip:iu-2:2,jl:ju:2,kl:ku:2)  &
+                                           + u(ibx,ip:iu-2:2,jp:ju:2,kl:ku:2)  &
+                                           + u(ibx,ip:iu-2:2,jl:ju:2,kp:ku:2)  &
+                                           + u(ibx,ip:iu-2:2,jp:ju:2,kp:ku:2))
     else
-      pdata%u(ibz,is:it,js:jt,ks:kt  ) = u(il:iu,jl:ju,kl:ku  )
+      pdata%u(ibx,is:it  ,js:jt,ks:kt) =                                       &
+                                     0.25 * (u(ibx,ip:iu  :2,jl:ju:2,kl:ku:2)  &
+                                           + u(ibx,ip:iu  :2,jp:ju:2,kl:ku:2)  &
+                                           + u(ibx,ip:iu  :2,jl:ju:2,kp:ku:2)  &
+                                           + u(ibx,ip:iu  :2,jp:ju:2,kp:ku:2))
     end if
-#else /* NDIMS == 3 */
-    pdata%u(ibz,is:it,js:jt,ks:kt) = u(il:iu,jl:ju,kl:ku)
+
+    if (jt .eq. jbl) then
+      pdata%u(iby,is:it,js:jt-1,ks:kt) =                                       &
+                                     0.25 * (u(iby,il:iu:2,jp:ju-2:2,kl:ku:2)  &
+                                           + u(iby,ip:iu:2,jp:ju-2:2,kl:ku:2)  &
+                                           + u(iby,il:iu:2,jp:ju-2:2,kp:ku:2)  &
+                                           + u(iby,ip:iu:2,jp:ju-2:2,kp:ku:2))
+    else
+      pdata%u(iby,is:it,js:jt  ,ks:kt) =                                       &
+                                     0.25 * (u(iby,il:iu:2,jp:ju  :2,kl:ku:2)  &
+                                           + u(iby,ip:iu:2,jp:ju  :2,kl:ku:2)  &
+                                           + u(iby,il:iu:2,jp:ju  :2,kp:ku:2)  &
+                                           + u(iby,ip:iu:2,jp:ju  :2,kp:ku:2))
+    end if
+
+    if (kt .eq. kbl) then
+      pdata%u(ibz,is:it,js:jt,ks:kt-1) =                                       &
+                                     0.25 * (u(ibz,il:iu:2,jl:ju:2,kl:ku-2:2)  &
+                                           + u(ibz,ip:iu:2,jl:ju:2,kl:ku-2:2)  &
+                                           + u(ibz,il:iu:2,jp:ju:2,kl:ku-2:2)  &
+                                           + u(ibz,ip:iu:2,jp:ju:2,kl:ku-2:2))
+    else
+      pdata%u(ibz,is:it,js:jt,ks:kt  ) =                                       &
+                                     0.25 * (u(ibz,il:iu:2,jl:ju:2,kl:ku  :2)  &
+                                           + u(ibz,ip:iu:2,jl:ju:2,kl:ku  :2)  &
+                                           + u(ibz,il:iu:2,jp:ju:2,kl:ku  :2)  &
+                                           + u(ibz,ip:iu:2,jp:ju:2,kl:ku  :2))
+    end if
 #endif /* NDIMS == 3 */
 #endif /* FLUXCT */
 #endif /* MHD */
-
-! deallocate temporary array
-!
-    deallocate(u)
 !
 !-------------------------------------------------------------------------------
 !
