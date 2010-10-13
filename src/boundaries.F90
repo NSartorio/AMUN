@@ -556,74 +556,61 @@ module boundaries
     use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
                      , jm, jb, jbl, jbu, je, jel, jeu                          &
                      , km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_error
 
     implicit none
 
 ! arguments
 !
     type(block_data), pointer       , intent(inout) :: pdata
-
     real   , dimension(nqt,im,jm,km), intent(in)    :: u
     integer                         , intent(in)    :: idir, iside
-
-! local variables
-!
-    integer :: il, iu, jl, ju, kl, ku
-    integer :: is, it, js, jt, ks, kt
 !
 !-------------------------------------------------------------------------------
-!
-! prepare common indices
-!
-    il = 1
-    iu = im
-    jl = 1
-    ju = jm
-    kl = 1
-    ku = km
-
-    is = 1
-    it = im
-    js = 1
-    jt = jm
-    ks = 1
-    kt = km
-
-! prepare source and destination boundary indices
 !
     select case(idir)
 
     case(1)
 
       if (iside .eq. 1) then
-        il = iel
-        iu = ie
-
-        is = 1
-        it = ibl
+        pdata%u(1:nfl,1:ibl  ,1:jm,1:km) = u(1:nfl,iel:ie  ,1:jm,1:km)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(  ibx,1:ibl-1,1:jm,1:km) = u(  ibx,iel:ie-1,1:jm,1:km)
+        pdata%u(  iby,1:ibl  ,1:jm,1:km) = u(  iby,iel:ie  ,1:jm,1:km)
+        pdata%u(  ibz,1:ibl  ,1:jm,1:km) = u(  ibz,iel:ie  ,1:jm,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
       else
-        il = ib
-        iu = ibu
-
-        is = ieu
-        it = im
+        pdata%u(1:nfl,ieu:im ,1:jm,1:km) = u(1:nfl,ib:ibu  ,1:jm,1:km)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(  ibx,ieu:im ,1:jm,1:km) = u(  ibx,ib:ibu  ,1:jm,1:km)
+        pdata%u(  iby,ieu:im ,1:jm,1:km) = u(  iby,ib:ibu  ,1:jm,1:km)
+        pdata%u(  ibz,ieu:im ,1:jm,1:km) = u(  ibz,ib:ibu  ,1:jm,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
       end if
 
     case(2)
 
       if (iside .eq. 1) then
-        jl = jel
-        ju = je
-
-        js = 1
-        jt = jbl
+        pdata%u(1:nfl,1:im,1:jbl  ,1:km) = u(1:nfl,1:im,jel:je  ,1:km)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(  ibx,1:im,1:jbl  ,1:km) = u(  ibx,1:im,jel:je  ,1:km)
+        pdata%u(  iby,1:im,1:jbl-1,1:km) = u(  iby,1:im,jel:je-1,1:km)
+        pdata%u(  ibz,1:im,1:jbl  ,1:km) = u(  ibz,1:im,jel:je  ,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
       else
-        jl = jb
-        ju = jbu
-
-        js = jeu
-        jt = jm
+        pdata%u(1:nfl,1:im,jeu:jm ,1:km) = u(1:nfl,1:im,jb:jbu  ,1:km)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(  ibx,1:im,jeu:jm ,1:km) = u(  ibx,1:im,jb:jbu  ,1:km)
+        pdata%u(  iby,1:im,jeu:jm ,1:km) = u(  iby,1:im,jb:jbu  ,1:km)
+        pdata%u(  ibz,1:im,jeu:jm ,1:km) = u(  ibz,1:im,jb:jbu  ,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
       end if
 
 #if NDIMS == 3
@@ -635,6 +622,15 @@ module boundaries
 
         ks = 1
         kt = kbl
+
+        pdata%u(1:nfl,1:im,1:jm,1:kbl  ) = u(1:nfl,1:im,jel:je  ,1:km)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(  ibx,1:im,1:jm,1:kbl  ) = u(  ibx,1:im,jel:je  ,1:km)
+        pdata%u(  iby,1:im,1:jm,1:kbl  ) = u(  iby,1:im,jel:je-1,1:km)
+        pdata%u(  ibz,1:im,1:jm,1:kbl-1) = u(  ibz,1:im,jel:je  ,1:km)
+#endif /* FLUXCT */
+#endif /* MHD */
       else
         kl = kb
         ku = kbu
@@ -644,47 +640,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-    case default
-      call print_error("boundaries::bnd_copy", "Direction unsupported!")
-
     end select
-
-! perform update of the fluid variables
-!
-    pdata%u(1:nfl,is:it,js:jt,ks:kt) = u(1:nfl,il:iu,jl:ju,kl:ku)
-
-#ifdef MHD
-#ifdef FIELDCD
-! perform update of the cell-centered magnetic field components
-!
-    pdata%u(ibx:ibz,is:it,js:jt,ks:kt) = u(ibx:ibz,il:iu,jl:ju,kl:ku)
-#endif /* FIELDCD */
-#ifdef FLUXCT
-! perform update of the staggered magnetic field components
-!
-    if (it .eq. ibl) then
-      pdata%u(ibx,is:it-1,js:jt,ks:kt) = u(ibx,il:iu-1,jl:ju,kl:ku)
-    else
-      pdata%u(ibx,is:it  ,js:jt,ks:kt) = u(ibx,il:iu  ,jl:ju,kl:ku)
-    end if
-
-    if (jt .eq. jbl) then
-      pdata%u(iby,is:it,js:jt-1,ks:kt) = u(iby,il:iu,jl:ju-1,kl:ku)
-    else
-      pdata%u(iby,is:it,js:jt  ,ks:kt) = u(iby,il:iu,jl:ju  ,kl:ku)
-    end if
-
-#if NDIMS == 3
-    if (kt .eq. kbl) then
-      pdata%u(ibz,is:it,js:jt,ks:kt-1) = u(ibz,il:iu,jl:ju,kl:ku-1)
-    else
-      pdata%u(ibz,is:it,js:jt,ks:kt  ) = u(ibz,il:iu,jl:ju,kl:ku  )
-    end if
-#else /* NDIMS == 3 */
-    pdata%u(ibz,is:it,js:jt,ks:kt) = u(ibz,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-#endif /* FLUXCT */
-#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
