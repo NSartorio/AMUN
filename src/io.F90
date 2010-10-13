@@ -237,7 +237,7 @@ module io
 
 ! references to other modules
 !
-    use blocks  , only : last_id, nblocks, dblocks, nleafs
+    use blocks  , only : ndims, last_id, nblocks, dblocks, nleafs
     use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use config  , only : in, jn, kn, rdims
     use error   , only : print_error
@@ -271,6 +271,7 @@ module io
 
 ! store the integer attributes
 !
+      call write_attribute_integer_h5(gid, 'ndims'  , ndims)
       call write_attribute_integer_h5(gid, 'last_id', last_id)
       call write_attribute_integer_h5(gid, 'nblocks', nblocks)
       call write_attribute_integer_h5(gid, 'dblocks', dblocks)
@@ -1083,7 +1084,7 @@ module io
 ! references to other modules
 !
     use blocks, only : block_meta, block_data, list_data
-    use blocks, only : dblocks, ndims, nsides
+    use blocks, only : dblocks, ndims, nsides, res
     use config, only : maxlev
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
@@ -1174,6 +1175,7 @@ module io
 
 ! write the arrays to the HDF5 file
 !
+      call write_vector_integer_h5(gid, 'blkres', am(1), res)
       call write_vector_integer_h5(gid, 'levels', cm(1), lev)
       call write_array2_integer_h5(gid, 'coords', cm(:), cor)
       call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
