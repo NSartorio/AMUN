@@ -86,6 +86,8 @@ module problem
       call init_implosion(pb)
     case("binaries")
       call init_binaries(pb)
+    case("reconnection")
+      call init_reconnection(pb)
     end select
 
     nullify(pb)
@@ -792,6 +794,130 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_binaries
+!
+!===============================================================================
+!
+! init_reconnection: subroutine initializes the variables for the reconnection
+!                    problem
+!
+!===============================================================================
+!
+  subroutine init_reconnection(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : in, jn, kn, im, jm, km, ng                           &
+                        , gamma, csnd2, rcut, dens
+    use scheme   , only : prim2cons
+    use variables, only : nvr, nqt, idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables, only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef FLUXCT
+    use variables, only : icx, icy, icz
+#endif /* FLUXCT */
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: r, dx, dy, dz, pr
+
+! local arrays
+!
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nvr,im) :: q, u
+
+! parameters
+!
+    real, parameter :: dpi =  6.2831853071795862319959269370884d0
+!
+!-------------------------------------------------------------------------------
+!
+! calculate parameters
+!
+#ifdef ADI
+    pr = dens * csnd2 / gamma
+#endif /* ADI */
+
+! calculate cell sizes
+!
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+#if NDIMS == 3
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+#else /* NDIMS == 3 */
+    dz = 1.0
+#endif /* NDIMS == 3 */
+
+! generate coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+#if NDIMS == 3
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+#else /* NDIMS == 3 */
+    z(1) = 0.0
+#endif /* NDIMS == 3 */
+
+! set variables
+!
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
+#ifdef MHD
+    q(ibx,:) = 0.0d0
+    q(iby,:) = 0.0d0
+    q(ibz,:) = 0.0d0
+#ifdef FLUXCT
+    q(ibx,:) = 0.0d0
+    q(iby,:) = 0.0d0
+    q(ibz,:) = 0.0d0
+#endif /* FLUXCT */
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+
+! set initial pressure
+!
+    do k = 1, km
+      do j = 1, jm
+
+! initialize antiparallel magnetic field
+!
+        do i = 1, im
+          q(ibx,i) = tanh(y(j) / rcut)
+          q(iby,i) = 0.10 * sin(0.5 * dpi * x(i))
+          q(ivy,i) = 0.01 * sin(8.0 * dpi * x(i))
+        end do
+
+! convert primitive variables to conserved
+!
+        call prim2cons(im, q, u)
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_reconnection
 #ifdef SHAPE
 !
 !===============================================================================
