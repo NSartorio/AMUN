@@ -342,7 +342,7 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi
+    real    :: dxi, dyi, dzi, ch2
 
 ! local arrays
 !
@@ -376,9 +376,13 @@ module evolution
     pblock%u(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
 
 #ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
 ! update the solution for the scalar potential Psi
 !
-    pblock%u(iph,:,:,:) = pblock%u(iph,:,:,:) + dt * du(iph,:,:,:)
+    pblock%u(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 !
@@ -419,7 +423,7 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi
+    real    :: dxi, dyi, dzi, ch2
 
 ! local arrays
 !
@@ -453,9 +457,13 @@ module evolution
     u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
 
 #ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
 ! update the solution for the scalar potential Psi
 !
-    u1(iph,:,:,:) = pblock%u(iph,:,:,:) + dt * du(iph,:,:,:)
+    u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -484,7 +492,7 @@ module evolution
 ! update the solution for the scalar potential Psi
 !
     pblock%u(iph,:,:,:) = 0.5d0 * (pblock%u(iph,:,:,:)                         &
-                        + u1(iph,:,:,:) + dt * du(iph,:,:,:))
+                        + u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:))
 #endif /* GLM */
 #endif /* MHD */
 !
