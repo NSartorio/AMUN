@@ -427,7 +427,13 @@ module problem
     use variables, only : ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz
+#ifdef FLUXCT
+    use variables, only : icx, icy, icz
+#endif /* FLUXCT */
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
 #endif /* MHD */
 
 ! input arguments
@@ -490,6 +496,9 @@ module problem
     q(icy,:) = 0.70710678118654752440
     q(icz,:) = 0.0d0
 #endif /* FLUXCT */
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
 #endif /* MHD */
 
 ! set initial pressure
