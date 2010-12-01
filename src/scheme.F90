@@ -716,6 +716,15 @@ module scheme
 ! reconstruct the left and right states of the scalar potential
 !
     call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    cl(:) = 0.5d0 * ((qr(ibx,:) + ql(ibx,:)) - (qr(iph,:) - ql(iph,:)) / cmax)
+    cr(:) = 0.5d0 * ((qr(iph,:) + ql(iph,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    ql(ibx,:) = cl(:)
+    qr(ibx,:) = cl(:)
+    ql(iph,:) = cr(:)
+    qr(iph,:) = cr(:)
 #endif /* GLM */
 #endif /* MHD */
 
