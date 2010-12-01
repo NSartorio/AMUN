@@ -1044,7 +1044,13 @@ module boundaries
 #if defined MHD && defined FLUXCT
     use interpolation, only : expand_mag_bnd
 #endif /* MHD & FLUXCT */
-    use variables    , only : nvr, nqt, nfl, ibx, iby, ibz
+    use variables    , only : nvr, nqt, nfl
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -1465,6 +1471,29 @@ module boundaries
     deallocate(by)
     deallocate(bz)
 #endif /* FLUXCT */
+#ifdef GLM
+! iterate over magnetic field components
+!
+    do q = ibx, ibz
+
+! expand the boundary
+!
+      call expand_tvd(cm, dm, dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
+
+! copy expanded boundary in the proper place of the block
+!
+      pdata%u(q,is:it,js:jt,ks:kt) = u(:,:,:)
+
+    end do
+
+! expand and update the scalar potential
+!
+    call expand_tvd(cm, dm, dl, ub(iph,il:iu,jl:ju,kl:ku), u(:,:,:))
+
+! copy expanded boundary in the proper place of the block
+!
+    pdata%u(iph,is:it,js:jt,ks:kt) = u(:,:,:)
+#endif /* GLM */
 #endif /* MHD */
 
 ! deallocate temporary array
