@@ -685,7 +685,13 @@ module boundaries
     use config   , only : ng, in, im, ih, ib, ibl, ibu, ie, iel, ieu           &
                         , nd, jn, jm, jh, jb, jbl, jbu, je, jel, jeu           &
                         , nh, kn, km, kh, kb, kbl, kbu, ke, kel, keu
-    use variables, only : nqt, nfl, ibx, iby, ibz
+    use variables, only : nqt, nfl
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -974,6 +980,46 @@ module boundaries
     end if
 #endif /* NDIMS == 3 */
 #endif /* FLUXCT */
+#ifdef GLM
+! update magnetic field components
+!
+#if NDIMS == 2
+    pdata%u(ibx:ibz,is:it,js:jt,1) = 0.25d0 * (u(ibx:ibz,il:iu:2,jl:ju:2,1)    &
+                                            +  u(ibx:ibz,ip:iu:2,jl:ju:2,1)    &
+                                            +  u(ibx:ibz,il:iu:2,jp:ju:2,1)    &
+                                            +  u(ibx:ibz,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    pdata%u(ibx:ibz,is:it,js:jt,ks:kt) =                                       &
+                                0.125d0 * (u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                        +  u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                        +  u(ibx:ibz,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                        +  u(ibx:ibz,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                        +  u(ibx:ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                        +  u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                        +  u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                        +  u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+
+! update the scalar potential
+!
+#if NDIMS == 2
+    pdata%u(iph,is:it,js:jt,1) = 0.25d0 * (u(iph,il:iu:2,jl:ju:2,1)            &
+                                        +  u(iph,ip:iu:2,jl:ju:2,1)            &
+                                        +  u(iph,il:iu:2,jp:ju:2,1)            &
+                                        +  u(iph,ip:iu:2,jp:ju:2,1))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    pdata%u(iph,is:it,js:jt,ks:kt) = 0.125d0 * (u(iph,il:iu:2,jl:ju:2,kl:ku:2) &
+                                             +  u(iph,ip:iu:2,jl:ju:2,kl:ku:2) &
+                                             +  u(iph,il:iu:2,jp:ju:2,kl:ku:2) &
+                                             +  u(iph,ip:iu:2,jp:ju:2,kl:ku:2) &
+                                             +  u(iph,il:iu:2,jl:ju:2,kp:ku:2) &
+                                             +  u(iph,ip:iu:2,jl:ju:2,kp:ku:2) &
+                                             +  u(iph,il:iu:2,jp:ju:2,kp:ku:2) &
+                                             +  u(iph,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+#endif /* GLM */
 #endif /* MHD */
 !
 !-------------------------------------------------------------------------------
