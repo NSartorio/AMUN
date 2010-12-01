@@ -74,6 +74,7 @@ module blocks
 !                                                        0 - do nothing
 !                                                        1 - refine
 
+    integer(kind=4)             :: pos(ndims)       ! the position in the parent block
     integer(kind=4)             :: coord(ndims)     ! coordinate of the lower
 !                                                     corner in the effective
 !                                                     resolution
@@ -279,6 +280,10 @@ module blocks
     pmeta%config = -1
     pmeta%refine =  0
     pmeta%leaf   = .false.
+
+! initialize the position in the parent block
+!
+    pmeta%pos(:)   = -1
 
 ! initialize the coordinate
 !
@@ -705,6 +710,36 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_setlevel
+!
+!===============================================================================
+!
+! metablock_set_position: subroutine sets the position of the meta block in the
+!                         parent block
+!
+!===============================================================================
+!
+  subroutine metablock_set_position(pmeta, px, py, pz)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: px, py, pz
+!
+!-------------------------------------------------------------------------------
+!
+! set the position in the parent block
+!
+    pmeta%pos(1) = px
+    pmeta%pos(2) = py
+#if NDIMS == 3
+    pmeta%pos(3) = pz
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_position
 !
 !===============================================================================
 !
@@ -1166,6 +1201,10 @@ module blocks
         i   = mod((p - 1)    ,2)
         j   = mod((p - 1) / 2,2)
         k   = mod((p - 1) / 4,2)
+
+! set the block position
+!
+        call metablock_set_position(pchild, i, j, k)
 
 ! set the block coordinates
 !
