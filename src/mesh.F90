@@ -819,6 +819,9 @@ module mesh
     use variables    , only : nfl, nqt
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -888,6 +891,17 @@ module mesh
     call expand_mag(dm, fm, ng, pdata%u(ibx,:,:,:), pdata%u(iby,:,:,:), pdata%u(ibz,:,:,:)  &
                               , u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
 #endif /* FLUXCT */
+#ifdef GLM
+! expand the cell centered magnetic field components
+!
+    do q = ibx, ibz
+      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+    end do
+
+! expand the scalar potential Psi
+!
+    call expand(dm, fm, ng, pdata%u(iph,:,:,:), u(iph,:,:,:), 't', 't', 't')
+#endif /* GLM */
 #endif /* MHD */
 ! iterate over all children
 !
