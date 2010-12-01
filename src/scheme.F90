@@ -705,7 +705,7 @@ module scheme
 #ifdef GLM
 ! reconstruct the left and right states of the magnetic field components
 !
-    do p = ibx, iby
+    do p = ibx, ibz
       call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
     end do
 
@@ -744,8 +744,7 @@ module scheme
         ap  = ar * al
         div = 1.0 / (ar - al)
 
-        fn(1:nqt,i) = div * (ar * fl(1:nqt,i) - al * fr(1:nqt,i)               &
-                                             + ap * (ur(1:nqt,i) - ul(1:nqt,i)))
+        fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
       end if
     end do
 
