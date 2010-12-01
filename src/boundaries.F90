@@ -28,9 +28,6 @@ module boundaries
 
   implicit none
 
-  integer, save :: n
-  real   , save :: t, dt, dtn
-
   contains
 !
 !===============================================================================
