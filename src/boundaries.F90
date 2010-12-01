@@ -544,7 +544,7 @@ module boundaries
 !===============================================================================
 !
 ! bnd_copy: subroutine copies the interior of neighbor to update the
-!           boundaries of current block
+!           boundaries of the current block
 !
 !===============================================================================
 !
@@ -554,7 +554,13 @@ module boundaries
     use config   , only : im, ib, ibl, ibu, ie, iel, ieu                       &
                         , jm, jb, jbl, jbu, je, jel, jeu                       &
                         , km, kb, kbl, kbu, ke, kel, keu
-    use variables, only : nqt, nfl, ibx, iby, ibz
+    use variables, only : nqt, nfl
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -571,44 +577,60 @@ module boundaries
     case(1)
 
       if (iside .eq. 1) then
-        pdata%u(1:nfl,1:ibl  ,1:jm,1:km) = u(1:nfl,iel:ie  ,1:jm,1:km)
+        pdata%u(  1:nfl,1:ibl  ,1:jm,1:km) = u(  1:nfl,iel:ie  ,1:jm,1:km)
 #ifdef MHD
 #ifdef FLUXCT
-        pdata%u(  ibx,1:ibl-1,1:jm,1:km) = u(  ibx,iel:ie-1,1:jm,1:km)
-        pdata%u(  iby,1:ibl  ,1:jm,1:km) = u(  iby,iel:ie  ,1:jm,1:km)
-        pdata%u(  ibz,1:ibl  ,1:jm,1:km) = u(  ibz,iel:ie  ,1:jm,1:km)
+        pdata%u(ibx    ,1:ibl-1,1:jm,1:km) = u(ibx    ,iel:ie-1,1:jm,1:km)
+        pdata%u(iby    ,1:ibl  ,1:jm,1:km) = u(iby    ,iel:ie  ,1:jm,1:km)
+        pdata%u(ibz    ,1:ibl  ,1:jm,1:km) = u(ibz    ,iel:ie  ,1:jm,1:km)
 #endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,1:ibl  ,1:jm,1:km) = u(ibx:iby,iel:ie  ,1:jm,1:km)
+        pdata%u(iph    ,1:ibl  ,1:jm,1:km) = u(iph    ,iel:ie  ,1:jm,1:km)
+#endif /* GLM */
 #endif /* MHD */
       else
-        pdata%u(1:nfl,ieu:im ,1:jm,1:km) = u(1:nfl,ib:ibu  ,1:jm,1:km)
+        pdata%u(  1:nfl,ieu:im,1:jm,1:km) = u(  1:nfl,ib:ibu,1:jm,1:km)
 #ifdef MHD
 #ifdef FLUXCT
-        pdata%u(  ibx,ieu:im ,1:jm,1:km) = u(  ibx,ib:ibu  ,1:jm,1:km)
-        pdata%u(  iby,ieu:im ,1:jm,1:km) = u(  iby,ib:ibu  ,1:jm,1:km)
-        pdata%u(  ibz,ieu:im ,1:jm,1:km) = u(  ibz,ib:ibu  ,1:jm,1:km)
+        pdata%u(ibx    ,ieu:im,1:jm,1:km) = u(ibx    ,ib:ibu,1:jm,1:km)
+        pdata%u(iby    ,ieu:im,1:jm,1:km) = u(iby    ,ib:ibu,1:jm,1:km)
+        pdata%u(ibz    ,ieu:im,1:jm,1:km) = u(ibz    ,ib:ibu,1:jm,1:km)
 #endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,ieu:im,1:jm,1:km) = u(ibx:ibz,ib:ibu,1:jm,1:km)
+        pdata%u(iph    ,ieu:im,1:jm,1:km) = u(iph    ,ib:ibu,1:jm,1:km)
+#endif /* GLM */
 #endif /* MHD */
       end if
 
     case(2)
 
       if (iside .eq. 1) then
-        pdata%u(1:nfl,1:im,1:jbl  ,1:km) = u(1:nfl,1:im,jel:je  ,1:km)
+        pdata%u(  1:nfl,1:im,1:jbl  ,1:km) = u(  1:nfl,1:im,jel:je  ,1:km)
 #ifdef MHD
 #ifdef FLUXCT
-        pdata%u(  ibx,1:im,1:jbl  ,1:km) = u(  ibx,1:im,jel:je  ,1:km)
-        pdata%u(  iby,1:im,1:jbl-1,1:km) = u(  iby,1:im,jel:je-1,1:km)
-        pdata%u(  ibz,1:im,1:jbl  ,1:km) = u(  ibz,1:im,jel:je  ,1:km)
+        pdata%u(ibx    ,1:im,1:jbl  ,1:km) = u(ibx    ,1:im,jel:je  ,1:km)
+        pdata%u(iby    ,1:im,1:jbl-1,1:km) = u(iby    ,1:im,jel:je-1,1:km)
+        pdata%u(ibz    ,1:im,1:jbl  ,1:km) = u(ibz    ,1:im,jel:je  ,1:km)
 #endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,1:im,1:jbl  ,1:km) = u(ibx:ibz,1:im,jel:je  ,1:km)
+        pdata%u(iph    ,1:im,1:jbl  ,1:km) = u(iph    ,1:im,jel:je  ,1:km)
+#endif /* GLM */
 #endif /* MHD */
       else
-        pdata%u(1:nfl,1:im,jeu:jm ,1:km) = u(1:nfl,1:im,jb:jbu  ,1:km)
+        pdata%u(  1:nfl,1:im,jeu:jm,1:km) = u(  1:nfl,1:im,jb:jbu,1:km)
 #ifdef MHD
 #ifdef FLUXCT
-        pdata%u(  ibx,1:im,jeu:jm ,1:km) = u(  ibx,1:im,jb:jbu  ,1:km)
-        pdata%u(  iby,1:im,jeu:jm ,1:km) = u(  iby,1:im,jb:jbu  ,1:km)
-        pdata%u(  ibz,1:im,jeu:jm ,1:km) = u(  ibz,1:im,jb:jbu  ,1:km)
+        pdata%u(ibx    ,1:im,jeu:jm,1:km) = u(ibx    ,1:im,jb:jbu,1:km)
+        pdata%u(iby    ,1:im,jeu:jm,1:km) = u(iby    ,1:im,jb:jbu,1:km)
+        pdata%u(ibz    ,1:im,jeu:jm,1:km) = u(ibz    ,1:im,jb:jbu,1:km)
 #endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,1:im,jeu:jm,1:km) = u(ibx:ibz,1:im,jb:jbu,1:km)
+        pdata%u(iph    ,1:im,jeu:jm,1:km) = u(iph    ,1:im,jb:jbu,1:km)
+#endif /* GLM */
 #endif /* MHD */
       end if
 
@@ -616,26 +638,31 @@ module boundaries
     case(3)
 
       if (iside .eq. 1) then
-        kl = kel
-        ku = ke
-
-        ks = 1
-        kt = kbl
-
-        pdata%u(1:nfl,1:im,1:jm,1:kbl  ) = u(1:nfl,1:im,jel:je  ,1:km)
+        pdata%u(  1:nfl,1:im,1:jm,1:kbl  ) = u(  1:nfl,1:im,1:jm,kel:ke  )
 #ifdef MHD
 #ifdef FLUXCT
-        pdata%u(  ibx,1:im,1:jm,1:kbl  ) = u(  ibx,1:im,jel:je  ,1:km)
-        pdata%u(  iby,1:im,1:jm,1:kbl  ) = u(  iby,1:im,jel:je-1,1:km)
-        pdata%u(  ibz,1:im,1:jm,1:kbl-1) = u(  ibz,1:im,jel:je  ,1:km)
+        pdata%u(ibx    ,1:im,1:jm,1:kbl  ) = u(ibx    ,1:im,1:jm,kel:ke  )
+        pdata%u(iby    ,1:im,1:jm,1:kbl-1) = u(iby    ,1:im,1:jm,kel:ke-1)
+        pdata%u(ibz    ,1:im,1:jm,1:kbl  ) = u(ibz    ,1:im,1:jm,kel:ke  )
 #endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,1:im,1:jm,1:kbl  ) = u(ibx:ibz,1:im,1:jm,kel:ke  )
+        pdata%u(iph    ,1:im,1:jm,1:kbl  ) = u(iph    ,1:im,1:jm,kel:ke  )
+#endif /* GLM */
 #endif /* MHD */
       else
-        kl = kb
-        ku = kbu
-
-        ks = keu
-        kt = km
+        pdata%u(  1:nfl,1:im,1:jm,keu:km ) = u(  1:nfl,1:im,1:jm,kb:kbu)
+#ifdef MHD
+#ifdef FLUXCT
+        pdata%u(ibx    ,1:im,1:jm,keu:km ) = u(ibx    ,1:im,1:jm,kb:kbu)
+        pdata%u(iby    ,1:im,1:jm,keu:km ) = u(iby    ,1:im,1:jm,kb:kbu)
+        pdata%u(ibz    ,1:im,1:jm,keu:km ) = u(ibz    ,1:im,1:jm,kb:kbu)
+#endif /* FLUXCT */
+#ifdef GLM
+        pdata%u(ibx:ibz,1:im,1:jm,keu:km) = u(ibx:ibz,1:im,1:jm,kb:kbu)
+        pdata%u(iph    ,1:im,1:jm,keu:km) = u(iph    ,1:im,1:jm,kb:kbu)
+#endif /* GLM */
+#endif /* MHD */
       end if
 #endif /* NDIMS == 3 */
 
