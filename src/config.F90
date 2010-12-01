@@ -105,6 +105,12 @@ module config
   character(len = 32), save :: zlbndry = "periodic"
   character(len = 32), save :: zubndry = "periodic"
 
+#if defined MHD && defined GLM
+! coefficient controlling the decay of scalar potential Psi
+!
+  real               , save :: alpha_p = 0.5d0
+#endif /* MHD & GLM */
+
   contains
 !
 !===============================================================================
@@ -270,6 +276,10 @@ module config
     case ('zubndry')
       l = len_trim(value)
       write(zubndry  , "(a)") value(2:l-1)
+#if defined MHD && defined GLM
+    case("alpha_p")
+      read(value,        *) alpha_p
+#endif /* MHD & GLM */
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
