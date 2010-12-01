@@ -313,6 +313,9 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
     use variables    , only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -388,6 +391,9 @@ module scheme
           ux(icy,i) = w(icy,i,j,k)
           ux(icz,i) = w(icz,i,j,k)
 #endif /* FLUXCT */
+#ifdef GLM
+          ux(iph,i) = w(iph,i,j,k)
+#endif /* GLM */
 #endif /* MHD */
         end do
 
@@ -413,8 +419,8 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          im1 = max(i - 1, 1)
 #ifdef FIELDCD
+          im1 = max(i - 1, 1)
           ip1 = min(i + 1,im)
 
           du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dxi * (fx(iby,ip1) - fx(iby,im1))
@@ -423,6 +429,7 @@ module scheme
 #endif /* NDIMS == 3 */
 #endif /* FIELDCD */
 #ifdef FLUXCT
+          im1 = max(i - 1, 1)
           du(ibx,i  ,jm1,k  ) = du(ibx,i  ,jm1,k  ) + dyi *  fx(iby,i)
           du(ibx,i  ,jp1,k  ) = du(ibx,i  ,jp1,k  ) - dyi *  fx(iby,i)
           du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dxi * (fx(iby,i) - fx(iby,im1))
@@ -434,6 +441,12 @@ module scheme
           du(ibz,i  ,j  ,km1) = du(ibz,i  ,j  ,km1) - dxi * (fx(ibz,i) - fx(ibz,im1))
 #endif /* NDIMS == 3 */
 #endif /* FLUXCT */
+#ifdef GLM
+          du(ibx,i,j,k) = du(ibx,i,j,k) + dxi * fx(ibx,i)
+          du(iby,i,j,k) = du(iby,i,j,k) + dxi * fx(iby,i)
+          du(ibz,i,j,k) = du(ibz,i,j,k) + dxi * fx(ibz,i)
+          du(iph,i,j,k) = du(iph,i,j,k) + dxi * fx(iph,i)
+#endif /* GLM */
 #endif /* MHD */
         end do
       end do
@@ -473,6 +486,9 @@ module scheme
           uy(icy,j) = w(icz,i,j,k)
           uy(icz,j) = w(icx,i,j,k)
 #endif /* FLUXCT */
+#ifdef GLM
+          uy(iph,j) = w(iph,i,j,k)
+#endif /* GLM */
 #endif /* MHD */
         end do
 
@@ -498,8 +514,8 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          jm1 = max(j - 1, 1)
 #ifdef FIELDCD
+          jm1 = max(j - 1, 1)
           jp1 = min(j + 1,jm)
 
 #if NDIMS == 3
@@ -508,6 +524,7 @@ module scheme
           du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dyi * (fy(ibz,jp1) - fy(ibz,jm1))
 #endif /* FIELDCD */
 #ifdef FLUXCT
+          jm1 = max(j - 1, 1)
 #if NDIMS == 3
           du(iby,i  ,j  ,km1) = du(iby,i  ,j  ,km1) + dzi *  fy(iby,j)
           du(iby,i  ,j  ,kp1) = du(iby,i  ,j  ,kp1) - dzi *  fy(iby,j)
@@ -519,6 +536,12 @@ module scheme
           du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
           du(ibx,im1,j  ,k  ) = du(ibx,im1,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
 #endif /* FLUXCT */
+#ifdef GLM
+          du(ibx,i,j,k) = du(ibx,i,j,k) + dyi * fy(ibz,j)
+          du(iby,i,j,k) = du(iby,i,j,k) + dyi * fy(ibx,j)
+          du(ibz,i,j,k) = du(ibz,i,j,k) + dyi * fy(iby,j)
+          du(iph,i,j,k) = du(iph,i,j,k) + dyi * fy(iph,j)
+#endif /* GLM */
 #endif /* MHD */
         end do
       end do
@@ -557,6 +580,9 @@ module scheme
           uz(icy,k) = w(icx,i,j,k)
           uz(icz,k) = w(icy,i,j,k)
 #endif /* FLUXCT */
+#ifdef GLM
+          uz(iph,k) = w(iph,i,j,k)
+#endif /* GLM */
 #endif /* MHD */
         end do
 
@@ -582,14 +608,15 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-          km1 = max(k - 1, 1)
 #ifdef FIELDCD
+          km1 = max(k - 1, 1)
           kp1 = min(k + 1,km)
 
           du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dzi * (fz(iby,kp1) - fz(iby,km1))
           du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dzi * (fz(ibz,kp1) - fz(ibz,km1))
 #endif /* FIELDCD */
 #ifdef FLUXCT
+          km1 = max(k - 1, 1)
           du(ibz,im1,j  ,k  ) = du(ibz,im1,j  ,k  ) + dxi *  fz(iby,k)
           du(ibz,ip1,j  ,k  ) = du(ibz,ip1,j  ,k  ) - dxi *  fz(iby,k)
           du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dzi * (fz(iby,k) - fz(iby,km1))
@@ -600,6 +627,12 @@ module scheme
           du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
           du(iby,i  ,jm1,k  ) = du(iby,i  ,jm1,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
 #endif /* FLUXCT */
+#ifdef GLM
+          du(ibx,i,j,k) = du(ibx,i,j,k) + dzi * fz(iby,k)
+          du(iby,i,j,k) = du(iby,i,j,k) + dzi * fz(ibz,k)
+          du(ibz,i,j,k) = du(ibz,i,j,k) + dzi * fz(ibx,k)
+          du(iph,i,j,k) = du(iph,i,j,k) + dzi * fz(iph,k)
+#endif /* GLM */
 #endif /* MHD */
         end do
       end do
