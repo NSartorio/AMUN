@@ -68,6 +68,21 @@ module variables
   integer(kind=4), parameter :: nvr = 11, nfl =  5, nqt =  8
 #endif /* ADI */
 #endif /* FLUXCT */
+#ifdef GLM
+#ifdef ISO
+  integer(kind=4), parameter :: ibx =  5, iby =  6, ibz =  7
+  integer(kind=4), parameter :: icx =  5, icy =  6, icz =  7
+  integer(kind=4), parameter :: iph =  8
+  integer(kind=4), parameter :: nvr =  8, nfl =  4, nqt =  8
+#endif /* ISO */
+#ifdef ADI
+  integer(kind=4), parameter :: ien =  5, ipr =  5
+  integer(kind=4), parameter :: ibx =  6, iby =  7, ibz =  8
+  integer(kind=4), parameter :: icx =  6, icy =  7, icz =  8
+  integer(kind=4), parameter :: iph =  9
+  integer(kind=4), parameter :: nvr =  9, nfl =  5, nqt =  9
+#endif /* ADI */
+#endif /* GLM */
 #endif /* MHD */
 !
 !===============================================================================
