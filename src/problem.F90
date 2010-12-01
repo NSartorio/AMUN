@@ -909,12 +909,17 @@ module problem
   function check_ref(pblock)
 
     use blocks   , only : block_data
-    use config   , only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i   &
+    use config   , only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu             &
                         , crefmin, crefmax
-    use variables, only : idn, imx, imy, imz, nvr
+    use scheme   , only : cons2prim
+    use variables, only : nvr, nqt
+    use variables, only : idn
 #ifdef ADI
-    use variables, only : ien
+    use variables, only : ipr
 #endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#endif /* MHD */
 
 ! input arguments
 !
@@ -927,87 +932,186 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dpmax, vx, vy, vz, en, ek, ei
-    real    :: dnl, dnr, prl, prr, ddndx, ddndy, ddndz, ddn, dprdx, dprdy      &
-             , dprdz, dpr
+    real    :: dpmax
+    real    :: dnl, dnr, ddndx, ddndy, ddndz, ddn
+#ifdef ADI
+    real    :: prl, prr, dprdx, dprdy, dprdz, dpr
+#endif /* ADI */
+#ifdef MHD
+    real    :: bxl, bxr, dbxdx, dbxdy, dbxdz, dbx
+    real    :: byl, byr, dbydx, dbydy, dbydz, dby
+    real    :: bzl, bzr, dbzdx, dbzdy, dbzdz, dbz
+#endif /* MHD */
 
 ! local arrays
 !
-    real, dimension(im,jm,km) :: dn, pr
+    real, dimension(nvr,im)   :: u, q
+    real, dimension(im,jm,km) :: dn
+#ifdef ADI
+    real, dimension(im,jm,km) :: pr
+#endif /* ADI */
+#ifdef MHD
+    real, dimension(im,jm,km) :: bx, by, bz
+#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
+! convert conserved variables to primitive ones
+!
     do k = 1, km
       do j = 1, jm
-        do i = 1, im
-          dn(i,j,k) = pblock%u(idn,i,j,k)
+        dn(1:im,j,k) = pblock%u(idn,1:im,j,k)
 #ifdef ADI
-          vx = pblock%u(imx,i,j,k) / dn(i,j,k)
-          vy = pblock%u(imy,i,j,k) / dn(i,j,k)
-          vz = pblock%u(imz,i,j,k) / dn(i,j,k)
-          en = pblock%u(ien,i,j,k)
+        u(1:nqt,1:im) = pblock%u(1:nqt,1:im,j,k)
 
-          ek = 0.5 * dn(i,j,k) * (vx*vx + vy*vy + vz*vz)
-          ei = en - ek
-          pr(i,j,k) = gammam1i * ei
+        call cons2prim(im, u(:,:), q(:,:))
+
+        pr(1:im,j,k) = q(ipr,1:im)
 #endif /* ADI */
-        end do
+#ifdef MHD
+        bx(1:im,j,k) = pblock%u(ibx,1:im,j,k)
+        by(1:im,j,k) = pblock%u(iby,1:im,j,k)
+        bz(1:im,j,k) = pblock%u(ibz,1:im,j,k)
+#endif /* MHD */
       end do
     end do
 
-! check gradient of pressure
+! reset indicators
 !
     dpmax = 0.0d0
+    ddn   = 0.0d0
+#ifdef ADI
+    dpr   = 0.0d0
+#endif /* ADI */
+#ifdef MHD
+    dbx   = 0.0d0
+    dby   = 0.0d0
+    dbz   = 0.0d0
+#endif /* MHD */
 
+
+! check gradients of selected variables
+!
     do k = kbl, keu
       do j = jbl, jeu
         do i = ibl, ieu
 
+! density
+!
           dnl = dn(i-1,j,k)
           dnr = dn(i+1,j,k)
-          ddndx = abs(dnr-dnl)/(dnr+dnl)
+          ddndx = abs(dnr - dnl) / (dnr + dnl)
           dnl = dn(i,j-1,k)
           dnr = dn(i,j+1,k)
-          ddndy = abs(dnr-dnl)/(dnr+dnl)
-#if NDIMS == 3
-          dnl = dn(i,j,k-1)
-          dnr = dn(i,j,k+1)
-          ddndz = abs(dnr-dnl)/(dnr+dnl)
-
-          ddn = sqrt(ddndx**2 + ddndy**2 + ddndz**2)
-#else /* NDIMS == 3 */
+          ddndy = abs(dnr - dnl) / (dnr + dnl)
+#if NDIMS == 2
 
           ddn = sqrt(ddndx**2 + ddndy**2)
-#endif /* NDIMS == 3 */
+#else /* NDIMS == 2 */
+          dnl = dn(i,j,k-1)
+          dnr = dn(i,j,k+1)
+          ddndz = abs(dnr - dnl) / (dnr + dnl)
 
+          ddn = sqrt(ddndx**2 + ddndy**2 + ddndz**2)
+#endif /* NDIMS == 2 */
+
+! update the indicator
+!
           dpmax = max(dpmax, ddn)
 
 #ifdef ADI
+! pressure
+!
           prl = pr(i-1,j,k)
           prr = pr(i+1,j,k)
-          dprdx = abs(prr-prl)/(prr+prl)
+          dprdx = abs(prr - prl) / (prr + prl)
           prl = pr(i,j-1,k)
           prr = pr(i,j+1,k)
-          dprdy = abs(prr-prl)/(prr+prl)
-#if NDIMS == 3
-          prl = pr(i,j,k-1)
-          prr = pr(i,j,k+1)
-          dprdz = abs(prr-prl)/(prr+prl)
-
-          dpr = sqrt(dprdx**2 + dprdy**2 + dprdz**2)
-#else /* NDIMS == 3 */
+          dprdy = abs(prr - prl) / (prr + prl)
+#if NDIMS == 2
 
           dpr = sqrt(dprdx**2 + dprdy**2)
-#endif /* NDIMS == 3 */
+#else /* NDIMS == 2 */
+          prl = pr(i,j,k-1)
+          prr = pr(i,j,k+1)
+          dprdz = abs(prr - prl) / (prr + prl)
 
+          dpr = sqrt(dprdx**2 + dprdy**2 + dprdz**2)
+#endif /* NDIMS == 2 */
+
+! update the indicator
+!
           dpmax = max(dpmax, dpr)
 #endif /* ADI */
+
+#ifdef MHD
+! X magnetic component
+!
+          bxl = bx(i-1,j,k)
+          bxr = bx(i+1,j,k)
+          dbxdx = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+          bxl = bx(i,j-1,k)
+          bxr = bx(i,j+1,k)
+          dbxdy = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+#if NDIMS == 2
+
+          dbx = sqrt(dbxdx**2 + dbxdy**2)
+#else /* NDIMS == 2 */
+          bxl = bx(i,j,k-1)
+          bxr = bx(i,j,k+1)
+          dbxdz = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+
+          dbx = sqrt(dbxdx**2 + dbxdy**2 + dbxdz**2)
+#endif /* NDIMS == 2 */
+
+! Y magnetic component
+!
+          byl = by(i-1,j,k)
+          byr = by(i+1,j,k)
+          dbydx = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+          byl = by(i,j-1,k)
+          byr = by(i,j+1,k)
+          dbydy = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+#if NDIMS == 2
+
+          dby = sqrt(dbydx**2 + dbydy**2)
+#else /* NDIMS == 2 */
+          byl = by(i,j,k-1)
+          byr = by(i,j,k+1)
+          dbydz = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+
+          dby = sqrt(dbydx**2 + dbydy**2 + dbydz**2)
+#endif /* NDIMS == 2 */
+
+! Z magnetic component
+!
+          bzl = bz(i-1,j,k)
+          bzr = bz(i+1,j,k)
+          dbzdx = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+          bzl = bz(i,j-1,k)
+          bzr = bz(i,j+1,k)
+          dbzdy = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+#if NDIMS == 2
+
+          dbz = sqrt(dbzdx**2 + dbzdy**2)
+#else /* NDIMS == 2 */
+          bzl = bz(i,j,k-1)
+          bzr = bz(i,j,k+1)
+          dbzdz = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+
+          dbz = sqrt(dbzdx**2 + dbzdy**2 + dbzdz**2)
+#endif /* NDIMS == 2 */
+
+! update the indicator
+!
+          dpmax = max(dpmax, dbx, dby, dbz)
+#endif /* MHD */
 
         end do
       end do
     end do
 
-! check condition
+! return the refinement flag depending on the condition value
 !
     check_ref = 0
 
