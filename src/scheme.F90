@@ -992,6 +992,9 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
     use variables, only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -1043,6 +1046,12 @@ module scheme
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
 #endif /* FLUXCT */
+#ifdef GLM
+      f(ibx,i) = q(iph,i)
+      f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
+      f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
+      f(iph,i) = q(ibx,i)
+#endif /* GLM */
 #endif /* MHD */
 
 ! compute speeds
