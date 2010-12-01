@@ -330,6 +330,8 @@ module evolution
 #ifdef MHD
     use variables, only : ibx, ibz
 #ifdef GLM
+    use config   , only : alpha_p
+    use mesh     , only : dx_min
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -343,6 +345,9 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi, ch2
+#if defined MHD && defined GLM
+    real    :: decay
+#endif /* MHD & GLM */
 
 ! local arrays
 !
@@ -383,6 +388,11 @@ module evolution
 ! update the solution for the scalar potential Psi
 !
     pblock%u(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
+
+! evolve Psi due to the source term
+!
+    decay = exp(- alpha_p * cmax * dt / dx_min)
+    pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 !
@@ -411,6 +421,8 @@ module evolution
 #ifdef MHD
     use variables, only : ibx, ibz
 #ifdef GLM
+    use config   , only : alpha_p
+    use mesh     , only : dx_min
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -424,6 +436,9 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi, ch2
+#if defined MHD && defined GLM
+    real    :: decay
+#endif /* MHD & GLM */
 
 ! local arrays
 !
@@ -493,6 +508,11 @@ module evolution
 !
     pblock%u(iph,:,:,:) = 0.5d0 * (pblock%u(iph,:,:,:)                         &
                         + u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:))
+
+! evolve Psi due to the source term
+!
+    decay = exp(- alpha_p * cmax * dt / dx_min)
+    pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 !
