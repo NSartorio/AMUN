@@ -52,8 +52,8 @@ module mesh
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
                        , ncells, maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
-                       , init_blocks, clear_blocks, refine_block               &
-                       , deallocate_datablock, nblocks, nleafs, dblocks        &
+                       , init_blocks, refine_block               &
+                       , deallocate_datablock, mblocks, nleafs, dblocks        &
                        , nchild, ndims, nsides, nfaces, res
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
@@ -74,17 +74,9 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! check if the list is allocated, if yes deallocate it
-!
-    if (associated(list_meta)) then
-      call print_info("mesh::init_mesh", "Block list is allocated, deallocate it!")
-
-      call clear_blocks
-    end if
-
 ! initialize blocks
 !
-    call init_blocks
+    call init_blocks()
 
 ! allocate the effective resolution array
 !
@@ -156,7 +148,7 @@ module mesh
 ! if there is only one block, and it is set not to be refined, refine it anyway
 ! because the resolution for the problem initiation may be too small
 !
-            if (nblocks .eq. 1 .and. l .eq. 1) &
+            if (mblocks .eq. 1 .and. l .eq. 1) &
               pdata_block%meta%refine = 1
           end if
 
@@ -333,14 +325,14 @@ module mesh
       p = p * rdims(1) * rdims(2) * rdims(3)
       k = k * rdims(1) * rdims(2) * rdims(3)
 
-      i = nint(alog10(1.0*nblocks + 1)) + 1
+      i = nint(alog10(1.0*mblocks + 1)) + 1
       j = nint(alog10(1.0*p + 1)) + 1
 
       write(fmt, "(a,i1,a,i1,a)") "(4x,a,1x,i", i, ",' / ',i", j, ",' = ',f8.4,' %')"
 
       write(*,*)
       write(*,fmt) "leafs    /cover blocks  =", nleafs , k, (100.0 * nleafs ) / k
-      write(*,fmt) "allocated/total blocks  =", nblocks, p, (100.0 * nblocks) / p
+      write(*,fmt) "allocated/total blocks  =", mblocks, p, (100.0 * mblocks) / p
     end if
 
 ! allocating space for coordinate variables

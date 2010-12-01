@@ -237,7 +237,7 @@ module io
 
 ! references to other modules
 !
-    use blocks  , only : ndims, last_id, nblocks, dblocks, nleafs
+    use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
     use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use config  , only : in, jn, kn, rdims
     use error   , only : print_error
@@ -273,7 +273,7 @@ module io
 !
       call write_attribute_integer_h5(gid, 'ndims'  , ndims)
       call write_attribute_integer_h5(gid, 'last_id', last_id)
-      call write_attribute_integer_h5(gid, 'nblocks', nblocks)
+      call write_attribute_integer_h5(gid, 'mblocks', mblocks)
       call write_attribute_integer_h5(gid, 'dblocks', dblocks)
       call write_attribute_integer_h5(gid, 'nleafs' , nleafs)
       call write_attribute_integer_h5(gid, 'nghost' , nghost)
@@ -711,7 +711,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : last_id, nblocks, nchild, ndims, nsides, nfaces
+    use blocks  , only : last_id, mblocks, nchild, ndims, nsides, nfaces
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gcreate_f, h5gclose_f
@@ -758,13 +758,13 @@ module io
 
 ! prepate dimensions
 !
-      am(1) = nblocks
+      am(1) = mblocks
       cm(1) = last_id
-      dm(1) = nblocks
+      dm(1) = mblocks
       dm(2) = nchild
-      pm(1) = nblocks
+      pm(1) = mblocks
       pm(2) = ndims
-      qm(1) = nblocks
+      qm(1) = mblocks
       qm(2) = ndims
       qm(3) = nsides
       qm(4) = nfaces

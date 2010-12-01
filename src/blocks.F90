@@ -161,7 +161,7 @@ module blocks
 
 ! store number of allocated blocks and leafs
 !
-  integer(kind=4)     , save :: nblocks, dblocks, nleafs
+  integer(kind=4)     , save :: mblocks, dblocks, nleafs
 
 ! the effective resolution at all levels
 !
@@ -183,24 +183,14 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! check if metadata list is empty
-!
-    if (associated(list_meta)) &
-      call print_warning("blocks::init_blocks", "Block metadata list is already associated!")
-
-! check if data list is empty
-!
-    if (associated(list_data)) &
-      call print_warning("blocks::init_blocks", "Block data list is already associated!")
-
-! nullify all pointers
+! nullify list pointers
 !
     nullify(list_meta)
     nullify(list_data)
 
-! reset number of blocks and leafs
+! reset the number of meta and data blocks, and leafs
 !
-    nblocks = 0
+    mblocks = 0
     dblocks = 0
     nleafs  = 0
 
@@ -218,7 +208,7 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine clear_blocks
+  subroutine clear_blocks()
 
     implicit none
 
@@ -344,7 +334,7 @@ module blocks
 
 ! increase the number of allocated meta blocks
 !
-    nblocks = nblocks + 1
+    mblocks = mblocks + 1
 !
 !-------------------------------------------------------------------------------
 !
@@ -474,7 +464,7 @@ module blocks
 
 ! decrease the number of allocated blocks
 !
-      nblocks = nblocks - 1
+      mblocks = mblocks - 1
 
     end if
 !
