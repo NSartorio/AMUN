@@ -657,6 +657,9 @@ module scheme
     use variables    , only : ivx, ivz
 #ifdef MHD
     use variables    , only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -699,6 +702,17 @@ module scheme
     ql(icx:icz,:) = ql(ibx:ibz,:)
     qr(icx:icz,:) = qr(ibx:ibz,:)
 #endif /* FLUXCT */
+#ifdef GLM
+! reconstruct the left and right states of the magnetic field components
+!
+    do p = ibx, iby
+      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! reconstruct the left and right states of the scalar potential
+!
+    call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+#endif /* GLM */
 #endif /* MHD */
 
 ! calculate conservative variables at states
@@ -748,6 +762,10 @@ module scheme
 #ifdef FLUXCT
       f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
 #endif /* FLUXCT */
+#ifdef GLM
+#endif /* GLM */
+      f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+      f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* MHD */
     end if
 
