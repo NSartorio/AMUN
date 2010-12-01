@@ -1132,6 +1132,9 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
     use variables, only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -1174,6 +1177,9 @@ module scheme
       q(icy,i) = u(icy,i)
       q(icz,i) = u(icz,i)
 #endif /* FLUXCT */
+#ifdef GLM
+      q(iph,i) = u(iph,i)
+#endif /* GLM */
 #endif /* MHD */
     end do
 
@@ -1197,6 +1203,9 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
     use variables, only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -1237,6 +1246,9 @@ module scheme
       u(icy,i) = q(icy,i)
       u(icz,i) = q(icz,i)
 #endif /* FLUXCT */
+#ifdef GLM
+      u(iph,i) = q(iph,i)
+#endif /* GLM */
 #endif /* MHD */
     end do
 
