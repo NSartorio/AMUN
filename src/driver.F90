@@ -29,7 +29,7 @@ program godunov
 ! modules
 !
   use config   , only : read_config, nmax, tmax, dtini, dtout, ftype, cfl
-  use evolution, only : evolve, n, t, dt, dtn
+  use evolution, only : evolve, update_maximum_speed, n, t, dt, dtn
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
@@ -87,6 +87,12 @@ program godunov
   call start_timer(1)
   call init_mesh
   call stop_timer(1)
+
+! update the maximum speed in the system
+!
+  call start_timer(2)
+  call update_maximum_speed()
+  call stop_timer(2)
 
 ! write down the initial state
 !
