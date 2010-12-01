@@ -947,6 +947,9 @@ module mesh
     use variables    , only : nfl
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
     implicit none
@@ -1058,6 +1061,18 @@ module mesh
                                            + pchild%u(ibz,il:iu:2,jp:ju:2,1)   &
                                            + pchild%u(ibz,ip:iu:2,jp:ju:2,1))
 #endif /* FLUXCT */
+#ifdef GLM
+      pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
+                                 0.25 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,1)   &
+                                       + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,1))
+      pparent%u(iph    ,is:it,js:jt,1) =                                       &
+                                 0.25 * (pchild%u(iph    ,il:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(iph    ,ip:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(iph    ,il:iu:2,jp:ju:2,1)   &
+                                       + pchild%u(iph    ,ip:iu:2,jp:ju:2,1))
+#endif /* GLM */
 #endif /* MHD */
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
@@ -1099,6 +1114,26 @@ module mesh
                                       + pchild%u(ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
                                       + pchild%u(ibz,ip:iu:2,jp:ju:2,kp:ku:2))
 #endif /* FLUXCT */
+#ifdef GLM
+      pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
+                           0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(iph    ,is:it,js:jt,ks:kt) =                                   &
+                           0.125 * (pchild%u(iph    ,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(iph    ,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(iph    ,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(iph    ,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(iph    ,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(iph    ,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(iph    ,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                  + pchild%u(iph    ,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* GLM */
 #endif /* MHD */
 #endif /* NDIMS == 3 */
     end do
