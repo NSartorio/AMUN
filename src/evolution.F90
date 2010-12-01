@@ -327,6 +327,12 @@ module evolution
 #endif /* SHAPE */
     use scheme   , only : update
     use variables, only : nqt, nfl
+#ifdef MHD
+    use variables, only : ibx, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -360,9 +366,21 @@ module evolution
     call update_shapes(pblock, du)
 #endif /* SHAPE */
 
-! update solution
+! update the solution for the fluid variables
 !
-    pblock%u(:,:,:,:) = pblock%u(:,:,:,:) + dt * du(:,:,:,:)
+    pblock%u(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    pblock%u(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    pblock%u(iph,:,:,:) = pblock%u(iph,:,:,:) + dt * du(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
@@ -386,6 +404,12 @@ module evolution
 #endif /* SHAPE */
     use scheme   , only : update
     use variables, only : nqt, nfl
+#ifdef MHD
+    use variables, only : ibx, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -419,9 +443,21 @@ module evolution
     call update_shapes(pblock, du)
 #endif /* SHAPE */
 
-! update solution
+! update the solution for the fluid variables
 !
-    u1(:,:,:,:) = pblock%u(:,:,:,:) + dt * du(:,:,:,:)
+    u1(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    u1(iph,:,:,:) = pblock%u(iph,:,:,:) + dt * du(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
 
 ! 2nd step of integration
 !
@@ -433,9 +469,24 @@ module evolution
     call update_shapes(pblock, du)
 #endif /* SHAPE */
 
-! update solution
+! update the solution for the fluid variables
 !
-    pblock%u(:,:,:,:) = 0.5 * (pblock%u(:,:,:,:) + u1(:,:,:,:) + dt * du(:,:,:,:))
+    pblock%u(1:nfl,:,:,:) = 0.5d0 * (pblock%u(1:nfl,:,:,:)                     &
+                          + u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    pblock%u(ibx:ibz,:,:,:) = 0.5d0 * (pblock%u(ibx:ibz,:,:,:)                 &
+                            + u1(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:))
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    pblock%u(iph,:,:,:) = 0.5d0 * (pblock%u(iph,:,:,:)                         &
+                        + u1(iph,:,:,:) + dt * du(iph,:,:,:))
+#endif /* GLM */
+#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
