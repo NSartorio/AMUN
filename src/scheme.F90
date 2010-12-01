@@ -28,6 +28,10 @@ module scheme
 
   implicit none
 
+! the maximal speed in the system
+!
+  real, save :: cmax
+
   contains
 !
 !===============================================================================

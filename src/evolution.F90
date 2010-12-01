@@ -29,7 +29,7 @@ module evolution
   implicit none
 
   integer, save :: n
-  real   , save :: t, dt, dtn, cmax
+  real   , save :: t, dt, dtn
 
   contains
 !
@@ -162,7 +162,7 @@ module evolution
 #ifdef MPI
     use mpitools    , only : mallreduceminr
 #endif /* MPI */
-    use scheme      , only : maxspeed
+    use scheme      , only : maxspeed, cmax
     use timer       , only : start_timer, stop_timer
 
     implicit none
@@ -241,7 +241,7 @@ module evolution
   subroutine update_maximum_speed()
 
     use blocks, only : block_data, list_data
-    use scheme, only : maxspeed
+    use scheme, only : maxspeed, cmax
 
     implicit none
 
@@ -325,7 +325,7 @@ module evolution
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
-    use scheme   , only : update
+    use scheme   , only : update, cmax
     use variables, only : nqt, nfl
 #ifdef MHD
     use variables, only : ibx, ibz
@@ -416,7 +416,7 @@ module evolution
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
-    use scheme   , only : update
+    use scheme   , only : update, cmax
     use variables, only : nqt, nfl
 #ifdef MHD
     use variables, only : ibx, ibz
