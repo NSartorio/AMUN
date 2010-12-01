@@ -1250,6 +1250,9 @@ module io
 #endif /* ADI */
 #ifdef MHD
     use variables    , only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
 ! declare variables
@@ -1286,6 +1289,9 @@ module io
     real(kind=8), dimension(  :,:,:), allocatable :: db
     real(kind=8), dimension(:,:,:,:), allocatable :: divb
 #endif /* FLUXCT */
+#ifdef GLM
+    real(kind=8), dimension(:,:,:,:), allocatable :: bpsi
+#endif /* GLM */
 #endif /* MHD */
 
 ! local pointers
@@ -1336,6 +1342,9 @@ module io
       allocate(divb(dm(1),dm(2),dm(3),dm(4)))
       allocate(db(im,jm,km))
 #endif /* FLUXCT */
+#ifdef GLM
+      allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
+#endif /* GLM */
 #endif /* MHD */
 
 ! iterate over all data blocks and fill in the arrays
@@ -1384,6 +1393,9 @@ module io
         macz(l,1:im,1:jm,1:km) = q(icz,1:im,1:jm,1:km)
         divb(l,1:im,1:jm,1:km) = db(   1:im,1:jm,1:km)
 #endif /* FLUXCT */
+#ifdef GLM
+        bpsi(l,1:im,1:jm,1:km) = q(iph,1:im,1:jm,1:km)
+#endif /* GLM */
 #endif /* MHD */
 
         l = l + 1
@@ -1413,6 +1425,9 @@ module io
       call write_array4_double_h5(gid, 'macz', dm, macz)
       call write_array4_double_h5(gid, 'divb', dm, divb)
 #endif /* FLUXCT */
+#ifdef GLM
+      call write_array4_double_h5(gid, 'bpsi', dm, bpsi)
+#endif /* GLM */
 #endif /* MHD */
 
 ! deallocate allocatable arrays
@@ -1439,6 +1454,9 @@ module io
       if (allocated(divb)) deallocate(divb)
       if (allocated(db))   deallocate(db)
 #endif /* FLUXCT */
+#ifdef GLM
+      if (allocated(bpsi)) deallocate(bpsi)
+#endif /* GLM */
 #endif /* MHD */
       if (allocated(u))    deallocate(u)
       if (allocated(q))    deallocate(q)
