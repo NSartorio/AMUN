@@ -336,6 +336,11 @@ module evolution
 ! update the solution for the scalar potential Psi
 !
     u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
+
+! evolve Psi due to the source term
+!
+    decay = exp(- 0.5d0 * alpha_p * cmax * dt / dx_min)
+    u1(iph,:,:,:) = decay * u1(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 
