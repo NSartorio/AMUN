@@ -45,18 +45,18 @@ module scheme
   subroutine numerical_flux(u, f, e)
 
     use blocks       , only : block_data
-    use blocks       , only : nvr, nqt
-    use blocks       , only : idn, imx, imy, imz
-#ifdef ADI
-    use blocks       , only : ien
-#endif /* ADI */
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
-#endif /* MHD */
     use config       , only : im, jm, km
 #ifdef FLUXCT
     use interpolation, only : magtocen
 #endif /* FLUXCT */
+    use variables    , only : nvr, nqt
+    use variables    , only : idn, imx, imy, imz
+#ifdef ADI
+    use variables    , only : ien
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
 
     implicit none
 
@@ -302,18 +302,18 @@ module scheme
 !
   subroutine update(u, du, dxi, dyi, dzi)
 
-    use blocks       , only : nvr, nqt, nfl
-    use blocks       , only : idn, imx, imy, imz
-#ifdef ADI
-    use blocks       , only : ien
-#endif /* ADI */
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
-#endif /* MHD */
     use config       , only : im, jm, km
 #ifdef FLUXCT
     use interpolation, only : magtocen
 #endif /* FLUXCT */
+    use variables    , only : nvr, nqt, nfl
+    use variables    , only : idn, imx, imy, imz
+#ifdef ADI
+    use variables    , only : ien
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
 
     implicit none
 
@@ -619,12 +619,12 @@ module scheme
 !
   subroutine hll(n, u, f, d)
 
-    use blocks       , only : nvr, nfl, nqt
-    use blocks       , only : ivx, ivz
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
-#endif /* MHD */
     use interpolation, only : reconstruct
+    use variables    , only : nvr, nfl, nqt
+    use variables    , only : ivx, ivz
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
 
     implicit none
 
@@ -733,8 +733,8 @@ module scheme
 !
   subroutine hllc(n, u, f, d)
 
-    use blocks       , only : nvr, nfl, nqt
     use interpolation, only : reconstruct
+    use variables    , only : nvr, nfl, nqt
 
     implicit none
 
@@ -933,15 +933,15 @@ module scheme
 !
   subroutine fluxspeed(n, q, u, f, c)
 
-    use blocks, only : nvr, nqt
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+    use config   , only : gamma, csnd, csnd2
+    use variables, only : nvr, nqt
+    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
-    use blocks, only : ipr, ien
+    use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config, only : gamma, csnd, csnd2
 
     implicit none
 
@@ -1064,15 +1064,15 @@ module scheme
 !
   subroutine cons2prim(n, u, q)
 
-    use blocks, only : nvr
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+    use config   , only : gammam1
+    use variables, only : nvr
+    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
-    use blocks, only : ipr, ien
+    use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config, only : gammam1
 
     implicit none
 
@@ -1129,15 +1129,15 @@ module scheme
 !
   subroutine prim2cons(n, q, u)
 
-    use blocks, only : nvr
-    use blocks, only : idn, imx, imy, imz, ivx, ivy, ivz
+    use config   , only : gammam1i
+    use variables, only : nvr
+    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
-    use blocks, only : ipr, ien
+    use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config, only : gammam1i
 
     implicit none
 
@@ -1192,14 +1192,6 @@ module scheme
 !
   function maxspeed(u)
 
-    use blocks       , only : nvr, nqt
-    use blocks       , only : idn, ivx, ivz
-#ifdef ADI
-    use blocks       , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
-#endif /* MHD */
     use config       , only : im, jm, km, ib, ie, jb, je, kb, ke
 #ifdef ADI
     use config       , only : gamma
@@ -1210,6 +1202,14 @@ module scheme
 #if defined MHD && defined FLUXCT
     use interpolation, only : magtocen
 #endif /* MHD && FLUXCT */
+    use variables    , only : nvr, nqt
+    use variables    , only : idn, ivx, ivz
+#ifdef ADI
+    use variables    , only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
 
     implicit none
 

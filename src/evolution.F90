@@ -260,9 +260,10 @@ module evolution
 !
   subroutine update_flux(pblock)
 
-    use blocks       , only : block_data, nqt
-    use config       , only : im, jm, km
-    use scheme       , only : numerical_flux
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use scheme   , only : numerical_flux
+    use variables, only : nqt
 
     implicit none
 
@@ -289,13 +290,14 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks       , only : block_data, nqt, nfl
-    use config       , only : im, jm, km
-    use mesh         , only : adxi, adyi, adzi
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem      , only : update_shapes
+    use problem  , only : update_shapes
 #endif /* SHAPE */
-    use scheme       , only : update
+    use scheme   , only : update
+    use variables, only : nqt, nfl
 
     implicit none
 
@@ -347,13 +349,14 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks       , only : block_data, nqt, nfl
-    use config       , only : im, jm, km
-    use mesh         , only : adxi, adyi, adzi
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem      , only : update_shapes
+    use problem  , only : update_shapes
 #endif /* SHAPE */
-    use scheme       , only : update
+    use scheme   , only : update
+    use variables, only : nqt, nfl
 
     implicit none
 

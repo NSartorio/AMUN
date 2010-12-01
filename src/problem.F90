@@ -418,17 +418,17 @@ module problem
 !
   subroutine init_blast(pblock)
 
-    use blocks, only : nvr, nqt
-    use blocks, only : block_data, idn, ivx, ivy, ivz
+    use blocks   , only : block_data
+    use config   , only : in, jn, kn, im, jm, km, ng                           &
+                        , gamma, csnd2, rcut, dens, dnrat
+    use scheme   , only : prim2cons
+    use variables, only : nvr, nqt, idn, ivx, ivy, ivz
 #ifdef ADI
-    use blocks, only : ipr
+    use variables, only : ipr
 #endif /* ADI */
 #ifdef MHD
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz, icx, icy, icz
 #endif /* MHD */
-    use config       , only : in, jn, kn, im, jm, km, ng                       &
-                     , gamma, csnd2, rcut, dens, dnrat
-    use scheme       , only : prim2cons
 
 ! input arguments
 !
@@ -543,11 +543,12 @@ module problem
 !
   subroutine init_implosion(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz
+    use blocks   , only : block_data
+    use config   , only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
+    use variables, only : idn, imx, imy, imz
 #ifdef ADI
-    use blocks, only : ien
+    use variables, only : ien
 #endif /* ADI */
-    use config, only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
 
 ! input arguments
 !
@@ -642,13 +643,14 @@ module problem
 !
   subroutine init_binaries(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz
+    use blocks   , only : block_data
+    use config   , only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat &
+                        , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini &
+                        , csnd2, gamma, gammam1i
+    use variables, only : idn, imx, imy, imz
 #ifdef ADI
-    use blocks, only : ien
+    use variables, only : ien
 #endif /* ADI */
-    use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
-                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini    &
-                     , csnd2, gamma, gammam1i
 
 ! input arguments
 !
@@ -792,10 +794,11 @@ module problem
 !
   subroutine shape_binaries(pblock, du)
 
-    use blocks, only : block_data, idn, imx, imy, imz, ien
-    use config, only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat    &
-                     , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c                  &
-                     , csnd2, gamma, gammam1i
+    use blocks   , only : block_data
+    use config   , only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat &
+                        , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c               &
+                        , csnd2, gamma, gammam1i
+    use variables, only : idn, imx, imy, imz, ien
 
 ! input arguments
 !
@@ -896,12 +899,13 @@ module problem
 !
   function check_ref(pblock)
 
-    use blocks, only : block_data, idn, imx, imy, imz, nvr
+    use blocks   , only : block_data
+    use config   , only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i   &
+                        , crefmin, crefmax
+    use variables, only : idn, imx, imy, imz, nvr
 #ifdef ADI
-    use blocks, only : ien
+    use variables, only : ien
 #endif /* ADI */
-    use config, only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu, gammam1i      &
-                     , crefmin, crefmax
 
 ! input arguments
 !

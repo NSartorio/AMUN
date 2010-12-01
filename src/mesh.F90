@@ -382,16 +382,17 @@ module mesh
 !
   subroutine update_mesh
 
-    use config  , only : maxlev, im, jm, km
-    use blocks  , only : block_meta, block_data, list_meta, list_data          &
-                       , nleafs, dblocks, nchild, ndims, nsides, nfaces        &
-                       , refine_block, derefine_block, append_datablock        &
-                       , associate_blocks, deallocate_datablock, nqt
-    use error   , only : print_info
+    use config   , only : maxlev, im, jm, km
+    use blocks   , only : block_meta, block_data, list_meta, list_data         &
+                        , nleafs, dblocks, nchild, ndims, nsides, nfaces       &
+                        , refine_block, derefine_block, append_datablock       &
+                        , associate_blocks, deallocate_datablock
+    use error    , only : print_info
 #ifdef MPI
-    use mpitools, only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
+    use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
 #endif /* MPI */
-    use problem , only : check_ref
+    use problem  , only : check_ref
+    use variables, only : nqt
 
     implicit none
 
@@ -809,15 +810,16 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nchild, nfl, nqt
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz
-#endif /* MHD */
+    use blocks       , only : block_meta, block_data, nchild
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
 #if defined MHD && defined FLUXCT
     use interpolation, only : expand_mag
 #endif /* MHD & FLUXCT */
+    use variables    , only : nfl, nqt
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz
+#endif /* MHD */
 
     implicit none
 
@@ -939,12 +941,13 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nchild, nfl
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz
-#endif /* MHD */
+    use blocks       , only : block_meta, block_data, nchild
     use config       , only : ng, in, ih, im, ib, ie, nh, jn, jh, jm, jb, je   &
                                 , kn, kh, km, kb, ke
+    use variables    , only : nfl
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz
+#endif /* MHD */
 
     implicit none
 

@@ -540,9 +540,8 @@ module interpolation
 !
   subroutine magtocen(u)
 
-    use blocks, only : nvr
-    use blocks, only : ibx, iby, ibz, icx, icy, icz
-    use config, only : im, jm, km
+    use config   , only : im, jm, km
+    use variables, only : nvr, ibx, iby, ibz, icx, icy, icz
 
     implicit none
 
@@ -748,8 +747,8 @@ module interpolation
 !
   subroutine divergence(b, db, dx, dy, dz)
 
-    use blocks, only : nvr
-    use config, only : im, jm, km
+    use config   , only : im, jm, km
+    use variables, only : nvr
 
     implicit none
 

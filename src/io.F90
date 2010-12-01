@@ -927,12 +927,13 @@ module io
 
 ! references to other modules
 !
-    use blocks, only : block_meta, block_data, list_data
-    use blocks, only : dblocks, ndims, nqt
-    use config, only : im, jm, km
-    use error , only : print_error
-    use hdf5  , only : hid_t, hsize_t
-    use hdf5  , only : h5gcreate_f, h5gclose_f
+    use blocks   , only : block_meta, block_data, list_data
+    use blocks   , only : dblocks, ndims
+    use config   , only : im, jm, km
+    use error    , only : print_error
+    use hdf5     , only : hid_t, hsize_t
+    use hdf5     , only : h5gcreate_f, h5gclose_f
+    use variables, only : nqt
 
 ! declare variables
 !
@@ -1233,14 +1234,7 @@ module io
 ! references to other modules
 !
     use blocks       , only : block_data, list_data
-    use blocks       , only : dblocks, nvr, nqt
-    use blocks       , only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use blocks       , only : ien, ipr
-#endif /* ADI */
-#ifdef MHD
-    use blocks       , only : ibx, iby, ibz, icx, icy, icz
-#endif /* MHD */
+    use blocks       , only : dblocks
     use config       , only : im, jm, km
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
@@ -1249,6 +1243,14 @@ module io
     use interpolation, only : magtocen, divergence
 #endif /* MHD & FLUXCT */
     use scheme       , only : cons2prim
+    use variables    , only : nvr, nqt
+    use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
+#ifdef ADI
+    use variables    , only : ien, ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#endif /* MHD */
 
 ! declare variables
 !
@@ -1487,14 +1489,7 @@ module io
 ! references to other modules
 !
     use blocks       , only : block_data, list_data
-    use blocks       , only : dblocks, nvr, nqt
-    use blocks       , only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use blocks       , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use blocks       , only : icx, icy, icz
-#endif /* MHD */
+    use blocks       , only : dblocks
     use config       , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
@@ -1503,6 +1498,14 @@ module io
     use interpolation, only : magtocen, divergence
 #endif /* MHD & FLUXCT */
     use scheme       , only : cons2prim
+    use variables    , only : nvr, nqt
+    use variables    , only : idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables    , only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : icx, icy, icz
+#endif /* MHD */
 
 ! declare variables
 !

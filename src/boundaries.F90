@@ -241,9 +241,10 @@ module boundaries
 !
   subroutine restrict_flux(f, e, pdata, idir, iside, iface)
 
-    use config, only : ng, nd, nh, im, jm, km, ih, jh, kh, ib, jb, kb  &
-                     , ie, je, ke, ibl, jbl, kbl, ieu, jeu, keu
-    use blocks, only : block_data, nfl
+    use config   , only : ng, nd, nh, im, jm, km, ih, jh, kh, ib, jb, kb       &
+                        , ie, je, ke, ibl, jbl, kbl, ieu, jeu, keu
+    use blocks   , only : block_data
+    use variables, only : nfl
 
     implicit none
 
@@ -549,13 +550,11 @@ module boundaries
 !
   subroutine bnd_copy(pdata, u, idir, iside)
 
-    use blocks, only : block_data, nfl, nqt
-#ifdef MHD
-    use blocks, only : ibx, iby, ibz
-#endif /* MHD */
-    use config, only : im, ib, ibl, ibu, ie, iel, ieu                          &
-                     , jm, jb, jbl, jbu, je, jel, jeu                          &
-                     , km, kb, kbl, kbu, ke, kel, keu
+    use blocks   , only : block_data
+    use config   , only : im, ib, ibl, ibu, ie, iel, ieu                       &
+                        , jm, jb, jbl, jbu, je, jel, jeu                       &
+                        , km, kb, kbl, kbu, ke, kel, keu
+    use variables, only : nqt, nfl, ibx, iby, ibz
 
     implicit none
 
@@ -655,13 +654,11 @@ module boundaries
 !
   subroutine bnd_rest(pdata, u, idir, iside, iface)
 
-    use blocks, only : block_data, nfl, nqt
-#ifdef MHD
-    use blocks, only : ibx, iby, ibz
-#endif /* MHD */
-    use config, only : ng, in, im, ih, ib, ibl, ibu, ie, iel, ieu              &
-                     , nd, jn, jm, jh, jb, jbl, jbu, je, jel, jeu              &
-                     , nh, kn, km, kh, kb, kbl, kbu, ke, kel, keu
+    use blocks   , only : block_data
+    use config   , only : ng, in, im, ih, ib, ibl, ibu, ie, iel, ieu           &
+                        , nd, jn, jm, jh, jb, jbl, jbu, je, jel, jeu           &
+                        , nh, kn, km, kh, kb, kbl, kbu, ke, kel, keu
+    use variables, only : nqt, nfl, ibx, iby, ibz
 
     implicit none
 
@@ -965,18 +962,16 @@ module boundaries
 !
   subroutine bnd_prol(pdata, ub, idir, iside, iface)
 
-    use blocks, only : block_data, nvr, nfl, nqt
-#ifdef MHD
-    use blocks, only : ibx, iby, ibz
-#endif /* MHD */
-    use config, only : ng, in, im, ib, ibl, ibu, ie, iel, ieu                  &
-                         , jn, jm, jb, jbl, jbu, je, jel, jeu                  &
-                         , kn, km, kb, kbl, kbu, ke, kel, keu
-    use error , only : print_warning
+    use blocks       , only : block_data
+    use config       , only : ng, in, im, ib, ibl, ibu, ie, iel, ieu           &
+                            , jn, jm, jb, jbl, jbu, je, jel, jeu               &
+                            , kn, km, kb, kbl, kbu, ke, kel, keu
+    use error        , only : print_warning
     use interpolation, only : expand_tvd
 #if defined MHD && defined FLUXCT
     use interpolation, only : expand_mag_bnd
 #endif /* MHD & FLUXCT */
+    use variables    , only : nvr, nqt, nfl, ibx, iby, ibz
 
     implicit none
 
@@ -1415,11 +1410,12 @@ module boundaries
 !
   subroutine bnd_spec(pb, id, il, ip)
 
-    use blocks, only : block_data, nvr, imx, imy, imz
-    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu      &
-                     , kb, kbl, ke, keu
-    use error , only : print_warning
+    use blocks   , only : block_data
+    use config   , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry &
+                        , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu   &
+                        , kb, kbl, ke, keu
+    use error    , only : print_warning
+    use variables, only : nvr, imx, imy, imz
 
     implicit none
 
