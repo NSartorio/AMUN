@@ -29,7 +29,7 @@ module evolution
   implicit none
 
   integer, save :: n
-  real   , save :: t, dt, dtn
+  real   , save :: t, dt, dtn, cmax
 
   contains
 !
@@ -59,7 +59,7 @@ module evolution
 ! local variables
 !
     type(block_data), pointer :: pblock
-    real                      :: cmax, cm
+    real                      :: cm
 !
 !-------------------------------------------------------------------------------
 !
@@ -170,7 +170,7 @@ module evolution
 ! local variables
 !
     type(block_data), pointer :: pblock
-    real                      :: cmax, cm
+    real                      :: cm
 !
 !-------------------------------------------------------------------------------
 !
@@ -213,9 +213,48 @@ module evolution
     call boundary_variables
     call stop_timer(4)
 
-! reset maximum speed
+! update the maximum speed
 !
-    cmax = 1.0e-8
+    call update_maximum_speed()
+
+! get maximum time step
+!
+    dtn = dx_min / max(cmax, 1.0d-16)
+
+#ifdef MPI
+! reduce new time step over all processes
+!
+    call mallreduceminr(dtn)
+#endif /* MPI */
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve
+!
+!===============================================================================
+!
+! update_maximum_speed: subroutine updates module variable cmax with the value
+!                       corresponding to the maximum speed in the system
+!
+!===============================================================================
+!
+  subroutine update_maximum_speed()
+
+    use blocks, only : block_data, list_data
+    use scheme, only : maxspeed
+
+    implicit none
+
+! local variables
+!
+    type(block_data), pointer :: pblock
+    real                      :: cm
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    cmax = 1.0d-16
 
 ! iterate over all blocks in order to find the maximum speed
 !
@@ -236,20 +275,10 @@ module evolution
       pblock => pblock%next
 
     end do
-
-! get maximum time step
-!
-    dtn = dx_min / max(cmax, 1.e-8)
-
-#ifdef MPI
-! reduce new time step over all processes
-!
-    call mallreduceminr(dtn)
-#endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine evolve
+  end subroutine update_maximum_speed
 !
 !===============================================================================
 !
