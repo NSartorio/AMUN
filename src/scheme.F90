@@ -763,9 +763,9 @@ module scheme
       f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
 #endif /* FLUXCT */
 #ifdef GLM
-#endif /* GLM */
       f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
       f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
+#endif /* GLM */
 #endif /* MHD */
     end if
 
