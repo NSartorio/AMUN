@@ -1124,7 +1124,6 @@ module problem
     dbz   = 0.0d0
 #endif /* MHD */
 
-
 ! check gradients of selected variables
 !
     do k = kbl, keu
