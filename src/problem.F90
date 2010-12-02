@@ -806,9 +806,10 @@ module problem
 
     use blocks   , only : block_data
     use config   , only : in, jn, kn, im, jm, km, ng                           &
-                        , gamma, csnd2, rcut, dens
+                        , xmin, xmax, dens, pres, bamp, bper, ydel, ycut
     use scheme   , only : prim2cons
-    use variables, only : nvr, nqt, idn, ivx, ivy, ivz
+    use variables, only : nvr, nqt
+    use variables, only : idn, ivx, ivy, ivz
 #ifdef ADI
     use variables, only : ipr
 #endif /* ADI */
@@ -830,7 +831,7 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: r, dx, dy, dz, pr
+    real                          :: xlen, dx, dy, dz
 
 ! local arrays
 !
@@ -841,17 +842,15 @@ module problem
 
 ! parameters
 !
-    real, parameter :: dpi =  6.2831853071795862319959269370884d0
+    real, parameter :: pi = 3.1415926535897931159979634685442d0
 !
 !-------------------------------------------------------------------------------
 !
-! calculate parameters
+! calculate the length of the box
 !
-#ifdef ADI
-    pr = dens * csnd2 / gamma
-#endif /* ADI */
+    xlen = xmax - xmin
 
-! calculate cell sizes
+! calculate the cell sizes
 !
     dx = (pblock%meta%xmax - pblock%meta%xmin) / in
     dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
@@ -861,7 +860,7 @@ module problem
     dz = 1.0
 #endif /* NDIMS == 3 */
 
-! generate coordinates
+! generate the coordinates
 !
     x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
     y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
@@ -877,6 +876,9 @@ module problem
     q(ivx,:) = 0.0d0
     q(ivy,:) = 0.0d0
     q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
 #ifdef MHD
     q(ibx,:) = 0.0d0
     q(iby,:) = 0.0d0
@@ -891,22 +893,22 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 
-! set initial pressure
+! set the initial profiles
 !
     do k = 1, km
       do j = 1, jm
 
-! initialize antiparallel magnetic field
+! initialize the magnetic field components
 !
         do i = 1, im
-          q(ibx,i) = tanh(y(j) / rcut)
-          q(iby,i) = 0.10 * sin(0.5 * dpi * x(i))
-          q(ivy,i) = 0.01 * sin(8.0 * dpi * x(i))
+          q(ibx,i) = bamp * tanh(y(j) / ydel)
+          q(iby,i) = bper * sin(pi * x(i) / xlen)                              &
+                          * exp(- 0.5d0 * (y(j) / ycut)**2)
         end do
 
 ! convert primitive variables to conserved
 !
-        call prim2cons(im, q, u)
+        call prim2cons(im, q(:,:), u(:,:))
 
 ! copy conservative variables to the current block
 !

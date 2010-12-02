@@ -95,6 +95,8 @@ module config
   real               , save :: x2c = 0.0, y2c = 0.0, z2c = 0.0, r2c = 0.1
   real               , save :: dnfac = 1.0, dnrat = 1.0
   real               , save :: v1ini = 0.0, v2ini = 2.0
+  real               , save :: bamp = 1.0, bper = 0.0
+  real               , save :: ydel = 0.1, ycut = 0.1
 
 ! boundary conditions
 !
@@ -251,6 +253,14 @@ module config
       read(value,        *) v1ini
     case("v2ini")
       read(value,        *) v2ini
+    case("bamp")
+      read(value,        *) bamp
+    case("bper")
+      read(value,        *) bper
+    case("ydel")
+      read(value,        *) ydel
+    case("ycut")
+      read(value,        *) ycut
     case("crefmin")
       read(value,        *) crefmin
     case("crefmax")
