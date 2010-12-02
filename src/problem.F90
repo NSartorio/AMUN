@@ -422,7 +422,7 @@ module problem
 
     use blocks   , only : block_data
     use config   , only : in, jn, kn, im, jm, km, ng                           &
-                        , gamma, csnd2, rcut, dens, dnrat
+                        , gamma, dens, pres, ratio, rcut
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt, idn, ivx, ivy, ivz
 #ifdef ADI
@@ -430,9 +430,6 @@ module problem
 #endif /* ADI */
 #ifdef MHD
     use variables, only : ibx, iby, ibz
-#ifdef FLUXCT
-    use variables, only : icx, icy, icz
-#endif /* FLUXCT */
 #ifdef GLM
     use variables, only : iph
 #endif /* GLM */
@@ -446,7 +443,7 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: r, dx, dy, dz, pr
+    real                          :: dx, dy, dz, r
 
 ! local arrays
 !
@@ -457,85 +454,73 @@ module problem
 !
 !-------------------------------------------------------------------------------
 !
-! calculate parameters
-!
-#ifdef ADI
-    pr = dens * csnd2 / gamma
-#endif /* ADI */
-
-! calculate cell sizes
+! calculate the cell sizes
 !
     dx = (pblock%meta%xmax - pblock%meta%xmin) / in
     dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
     dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
 #else /* NDIMS == 3 */
-    dz = 1.0
+    dz = 1.0d0
 #endif /* NDIMS == 3 */
 
-! generate coordinates
+! generate the coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
-    z(1) = 0.0
+    z(1) = 0.0d0
 #endif /* NDIMS == 3 */
 
-! set variables
+! set the uniform variables
 !
     q(idn,:) = dens
     q(ivx,:) = 0.0d0
     q(ivy,:) = 0.0d0
     q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
 #ifdef MHD
-    q(ibx,:) = 0.70710678118654752440
-    q(iby,:) = 0.70710678118654752440
+    q(ibx,:) = 1.0d0 / sqrt(2.0d0)
+    q(iby,:) = 1.0d0 / sqrt(2.0d0)
     q(ibz,:) = 0.0d0
-#ifdef FLUXCT
-    q(icx,:) = 0.70710678118654752440
-    q(icy,:) = 0.70710678118654752440
-    q(icz,:) = 0.0d0
-#endif /* FLUXCT */
 #ifdef GLM
     q(iph,:) = 0.0d0
 #endif /* GLM */
 #endif /* MHD */
 
-! set initial pressure
+! set the initial star profile (density for ISO or pressure for ADI)
 !
     do k = 1, km
       do j = 1, jm
-
-! fill out the pressure profile
-!
         do i = 1, im
 
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 
 #ifdef ISO
           if (r .lt. rcut) then
-            q(idn,i) = dens * dnrat
+            q(idn,i) = dens * ratio
           else
             q(idn,i) = dens
           end if
 #endif /* ISO */
 #ifdef ADI
           if (r .lt. rcut) then
-            q(ipr,i) = pr * dnrat
+            q(ipr,i) = pres * ratio
           else
-            q(ipr,i) = pr
+            q(ipr,i) = pres
           end if
 #endif /* ADI */
-
         end do
 
-! convert primitive variables to conserved
+! convert the primitive variables to conserved ones
 !
-        call prim2cons(im, q, u)
+        call prim2cons(im, q(:,:), u(:,:))
 
-! copy conservative variables to the current block
+! copy the conserved variables to the current block
 !
         pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
