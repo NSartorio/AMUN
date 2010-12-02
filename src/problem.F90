@@ -1069,6 +1069,7 @@ module problem
     real    :: bxl, bxr, dbxdx, dbxdy, dbxdz, dbx
     real    :: byl, byr, dbydx, dbydy, dbydz, dby
     real    :: bzl, bzr, dbzdx, dbzdy, dbzdz, dbz
+    real    :: bbl, bbr
 #endif /* MHD */
 
 ! local arrays
@@ -1079,7 +1080,7 @@ module problem
     real, dimension(im,jm,km) :: pr
 #endif /* ADI */
 #ifdef MHD
-    real, dimension(im,jm,km) :: bx, by, bz
+    real, dimension(im,jm,km) :: bx, by, bz, bb
 #endif /* MHD */
 !
 !-------------------------------------------------------------------------------
@@ -1100,6 +1101,12 @@ module problem
         bx(1:im,j,k) = pblock%u(ibx,1:im,j,k)
         by(1:im,j,k) = pblock%u(iby,1:im,j,k)
         bz(1:im,j,k) = pblock%u(ibz,1:im,j,k)
+#if NDIMS == 2
+        bb(1:im,j,k) = sqrt(bx(1:im,j,k)**2 + by(1:im,j,k)**2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        bb(1:im,j,k) = sqrt(bx(1:im,j,k)**2 + by(1:im,j,k)**2 + bz(1:im,j,k)**2)
+#endif /* NDIMS == 3 */
 #endif /* MHD */
       end do
     end do
@@ -1135,13 +1142,14 @@ module problem
 #if NDIMS == 2
 
           ddn = sqrt(ddndx**2 + ddndy**2)
-#else /* NDIMS == 2 */
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
           dnl = dn(i,j,k-1)
           dnr = dn(i,j,k+1)
           ddndz = abs(dnr - dnl) / (dnr + dnl)
 
           ddn = sqrt(ddndx**2 + ddndy**2 + ddndz**2)
-#endif /* NDIMS == 2 */
+#endif /* NDIMS == 3 */
 
 ! update the indicator
 !
@@ -1159,13 +1167,14 @@ module problem
 #if NDIMS == 2
 
           dpr = sqrt(dprdx**2 + dprdy**2)
-#else /* NDIMS == 2 */
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
           prl = pr(i,j,k-1)
           prr = pr(i,j,k+1)
           dprdz = abs(prr - prl) / (prr + prl)
 
           dpr = sqrt(dprdx**2 + dprdy**2 + dprdz**2)
-#endif /* NDIMS == 2 */
+#endif /* NDIMS == 3 */
 
 ! update the indicator
 !
@@ -1177,58 +1186,79 @@ module problem
 !
           bxl = bx(i-1,j,k)
           bxr = bx(i+1,j,k)
-          dbxdx = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+          bbl = bb(i-1,j,k)
+          bbr = bb(i+1,j,k)
+          dbxdx = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
           bxl = bx(i,j-1,k)
           bxr = bx(i,j+1,k)
-          dbxdy = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+          bbl = bb(i,j-1,k)
+          bbr = bb(i,j+1,k)
+          dbxdy = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
 #if NDIMS == 2
 
           dbx = sqrt(dbxdx**2 + dbxdy**2)
-#else /* NDIMS == 2 */
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
           bxl = bx(i,j,k-1)
           bxr = bx(i,j,k+1)
-          dbxdz = abs(bxr - bxl) / max(1.0d-16, abs(bxr) + abs(bxl))
+          bbl = bb(i,j,k-1)
+          bbr = bb(i,j,k+1)
+          dbxdz = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
 
           dbx = sqrt(dbxdx**2 + dbxdy**2 + dbxdz**2)
-#endif /* NDIMS == 2 */
+#endif /* NDIMS == 3 */
 
 ! Y magnetic component
 !
           byl = by(i-1,j,k)
           byr = by(i+1,j,k)
-          dbydx = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+          bbl = bb(i-1,j,k)
+          bbr = bb(i+1,j,k)
+          dbydx = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
           byl = by(i,j-1,k)
           byr = by(i,j+1,k)
-          dbydy = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+          bbl = bb(i,j-1,k)
+          bbr = bb(i,j+1,k)
+          dbydy = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
 #if NDIMS == 2
 
           dby = sqrt(dbydx**2 + dbydy**2)
-#else /* NDIMS == 2 */
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
           byl = by(i,j,k-1)
           byr = by(i,j,k+1)
-          dbydz = abs(byr - byl) / max(1.0d-16, abs(byr) + abs(byl))
+          bbl = bb(i,j,k-1)
+          bbr = bb(i,j,k+1)
+          dbydz = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
 
           dby = sqrt(dbydx**2 + dbydy**2 + dbydz**2)
-#endif /* NDIMS == 2 */
+#endif /* NDIMS == 3 */
 
 ! Z magnetic component
 !
           bzl = bz(i-1,j,k)
           bzr = bz(i+1,j,k)
-          dbzdx = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+          bbl = bb(i-1,j,k)
+          bbr = bb(i+1,j,k)
+          dbzdx = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
           bzl = bz(i,j-1,k)
           bzr = bz(i,j+1,k)
-          dbzdy = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+          bbl = bb(i,j-1,k)
+          bbr = bb(i,j+1,k)
+          dbzdy = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
 #if NDIMS == 2
 
           dbz = sqrt(dbzdx**2 + dbzdy**2)
-#else /* NDIMS == 2 */
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
           bzl = bz(i,j,k-1)
           bzr = bz(i,j,k+1)
-          dbzdz = abs(bzr - bzl) / max(1.0d-16, abs(bzr) + abs(bzl))
+          bbl = bb(i,j,k-1)
+          bbr = bb(i,j,k+1)
+          dbzdz = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
 
           dbz = sqrt(dbzdx**2 + dbzdy**2 + dbzdz**2)
-#endif /* NDIMS == 2 */
+#endif /* NDIMS == 3 */
 
 ! update the indicator
 !
