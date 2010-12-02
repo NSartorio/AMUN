@@ -146,6 +146,9 @@ module scheme
 #ifdef HLLC
         call hllc(im, ux(:,:), fx(:,:))
 #endif /* HLLC */
+#ifdef HLLD
+        call hlld(im, ux(:,:), fx(:,:))
+#endif /* HLLD */
 
 ! update the arrays of increments
 !
@@ -241,6 +244,9 @@ module scheme
 #ifdef HLLC
         call hllc(jm, uy(:,:), fy(:,:))
 #endif /* HLLC */
+#ifdef HLLD
+        call hlld(jm, uy(:,:), fy(:,:))
+#endif /* HLLD */
 
 ! update the arrays of increments
 !
@@ -335,6 +341,9 @@ module scheme
 #ifdef HLLC
         call hllc(km, uz(:,:), fz(:,:))
 #endif /* HLLC */
+#ifdef HLLD
+        call hlld(km, uz(:,:), fz(:,:))
+#endif /* HLLD */
 
 ! update the arrays of increments
 !
@@ -714,6 +723,254 @@ module scheme
 !
   end subroutine hllc
 #endif /* HLLC */
+#ifdef MHD
+#ifdef HLLD
+#ifdef ISO
+!
+!===============================================================================
+!
+! hlld: subroutine computes the approximated flux using the HLLD method
+!       for the isothermal equation of state
+!
+!===============================================================================
+!
+  subroutine hlld(n, u, f)
+
+    use interpolation, only : reconstruct
+    use variables    , only : nvr, nfl, nqt
+    use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
+    use variables    , only : ibx, iby, ibz, icx, icy, icz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
+
+    implicit none
+
+! input/output arguments
+!
+    integer               , intent(in)  :: n
+    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nqt,n), intent(out) :: f
+
+! local variables
+!
+    integer                :: p, i
+    real, dimension(nvr,n) :: q, ql, qr, ul, ur
+    real, dimension(nqt,n) :: fl, fr, fn
+    real, dimension(n)     :: cl, cr
+    real, dimension(nvr)   :: u1l, u1r, u2
+    real                   :: sl, sr, srl, srml, sm, sml, smr
+    real                   :: dnm, mxm, sqd, div, fac, bxs
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the primitive variables
+!
+    call cons2prim(n, u, q)
+
+! reconstruct the left and right states of the primitive variables
+!
+    do p = 1, nfl
+      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+#ifdef GLM
+! reconstruct the left and right states of the magnetic field components
+!
+    do p = ibx, ibz
+      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! reconstruct the left and right states of the scalar potential
+!
+    call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    cl(:) = 0.5d0 * ((qr(ibx,:) + ql(ibx,:)) - (qr(iph,:) - ql(iph,:)) / cmax)
+    cr(:) = 0.5d0 * ((qr(iph,:) + ql(iph,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    ql(ibx,:) = cl(:)
+    qr(ibx,:) = cl(:)
+    ql(iph,:) = cr(:)
+    qr(iph,:) = cr(:)
+#endif /* GLM */
+
+! calculate conservative variables at states
+!
+    call prim2cons(n, ql, ul)
+    call prim2cons(n, qr, ur)
+
+! calculate fluxes and speeds
+!
+    call fluxspeed(n, ql, ul, fl, cl)
+    call fluxspeed(n, qr, ur, fr, cr)
+
+! iterate over all points and calculate the HLLD flux
+!
+    do i = 1, n
+
+! calculate min and max and intermediate speeds: eq. (67)
+!
+      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
+      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+
+! all speeds > 0, left side flux
+!
+      if (sl .ge. 0.0) then
+
+        fn(:,i) = fl(:,i)
+
+! all speeds < 0, right side flux
+!
+      else if (sr .le. 0.0) then
+
+        fn(:,i) = fr(:,i)
+
+! intermediate states
+!
+      else  ! sl < 0 & sr > 0
+
+! product and difference of speeds
+!
+        srl  = sr * sl
+        srml = sr - sl
+
+! density of the intermediate state (eq. 20 and 21)
+!
+        dnm = (sr * ur(idn,i) - sl * ul(idn,i) - fr(idn,i) + fl(idn,i)) / srml
+        mxm = (sr * ur(imx,i) - sl * ul(imx,i) - fr(imx,i) + fl(imx,i)) / srml
+        sqd = sqrt(dnm)
+
+! fluxes for density and x-momentum are the same for all intermediate states (eq. 22 and 23)
+!
+        fn(idn,i) = (sr * fl(idn,i) - sl * fr(idn,i)                           &
+                                    + srl * (ur(idn,i) - ul(idn,i))) / srml
+        fn(imx,i) = (sr * fl(imx,i) - sl * fr(imx,i)                           &
+                                    + srl * (ur(imx,i) - ul(imx,i))) / srml
+
+#ifdef GLM
+! fluxes for parallel magnetic component and the scalar potential is the same
+! as well
+        fn(ibx,i) = (sr * fl(ibx,i) - sl * fr(ibx,i)                           &
+                                    + srl * (ur(ibx,i) - ul(ibx,i))) / srml
+        fn(iph,i) = (sr * fl(iph,i) - sl * fr(iph,i)                           &
+                                    + srl * (ur(iph,i) - ul(iph,i))) / srml
+#endif /* GLM */
+
+! the speed of contact discontinuity (from eq. 15 and eq. 17)
+!
+        sm  = fn(idn,i) / dnm
+
+! Alfven speeds (eq. 29)
+!
+        sml = sm - abs(ql(ibx,i)) / sqd
+        smr = sm + abs(qr(ibx,i)) / sqd
+
+! calculate the left intermediate state
+!
+        u1l(idn) = dnm
+        u1l(imx) = mxm
+
+        div    = (sl - sml) * (sl - smr)
+        if (sm .eq. ql(ivx,i) .or. div .eq. 0.0 .or. ql(ibx,i) .eq. 0.0) then
+          u1l(imy) = dnm * ql(ivy,i)
+          u1l(imz) = dnm * ql(ivz,i)
+          u1l(iby) = ql(iby,i)
+          u1l(ibz) = ql(ibz,i)
+        else
+          fac      = ql(ibx,i) * (sm - ql(ivx,i)) / div
+          u1l(imy) = dnm * ql(ivy,i) - ql(iby,i) * fac
+          u1l(imz) = dnm * ql(ivz,i) - ql(ibz,i) * fac
+          fac      = (ql(idn,i) * (sl - ql(ivx,i))**2 - ql(ibx,i)**2)          &
+                                                                / (dnm * div)
+          u1l(iby) = ql(iby,i) * fac
+          u1l(ibz) = ql(ibz,i) * fac
+        end if
+
+! calculate the right intermediate state
+!
+        u1r(idn) = dnm
+        u1r(imx) = mxm
+
+        div    = (sr - sml) * (sr - smr)
+        if (sm .eq. qr(ivx,i) .or. div .eq. 0.0 .or. qr(ibx,i) .eq. 0.0) then
+          u1r(imy) = dnm * qr(ivy,i)
+          u1r(imz) = dnm * qr(ivz,i)
+          u1r(iby) = qr(iby,i)
+          u1r(ibz) = qr(ibz,i)
+        else
+          fac      = qr(ibx,i) * (sm - qr(ivx,i)) / div
+          u1r(imy) = dnm * qr(ivy,i) - qr(iby,i) * fac
+          u1r(imz) = dnm * qr(ivz,i) - qr(ibz,i) * fac
+          fac      = (qr(idn,i) * (sr - qr(ivx,i))**2 - qr(ibx,i)**2)          &
+                                                                / (dnm * div)
+          u1r(iby) = qr(iby,i) * fac
+          u1r(ibz) = qr(ibz,i) * fac
+        end if
+
+! intermediate discontinuities
+!
+        if (sml .ge. 0.0) then
+
+! calculate the left intermediate flux
+!
+          fn(imy,i) = fl(imy,i) + sl * (u1l(imy) - ul(imy,i))  ! eq. (38)
+          fn(imz,i) = fl(imz,i) + sl * (u1l(imz) - ul(imz,i))
+          fn(iby,i) = fl(iby,i) + sl * (u1l(iby) - ul(iby,i))
+          fn(ibz,i) = fl(ibz,i) + sl * (u1l(ibz) - ul(ibz,i))
+
+        else if (smr .le. 0.0) then
+
+! calculate right intermediate flux
+!
+          fn(imy,i) = fr(imy,i) + sr * (u1r(imy) - ur(imy,i))  ! eq. (38)
+          fn(imz,i) = fr(imz,i) + sr * (u1r(imz) - ur(imz,i))
+          fn(iby,i) = fr(iby,i) + sr * (u1r(iby) - ur(iby,i))
+          fn(ibz,i) = fr(ibz,i) + sr * (u1r(ibz) - ur(ibz,i))
+
+        else ! sml < 0 & smr > 0
+
+! normal component of magnetic field multiplied by sqrt(dnm)
+!
+          if (ql(ibx,i) .ge. 0.0) then
+            bxs =   sqd
+          else
+            bxs = - sqd
+          end if
+
+! calculate the intermediate state (eq. 34-37)
+!
+          u2(imy) = 0.5d0 * (u1r(imy) + u1l(imy) + bxs * (u1r(iby) - u1l(iby)))
+          u2(imz) = 0.5d0 * (u1r(imz) + u1l(imz) + bxs * (u1r(ibz) - u1l(ibz)))
+          u2(iby) = 0.5d0 * (u1r(iby) + u1l(iby) + (u1r(imy) - u1l(imy)) / bxs)
+          u2(ibz) = 0.5d0 * (u1r(ibz) + u1l(ibz) + (u1r(imz) - u1l(imz)) / bxs)
+
+! calculate the intermediate flux (eq. 24)
+!
+          fn(imy,i) = sm * u2(imy) - ql(ibx,i) * u2(iby)
+          fn(imz,i) = sm * u2(imz) - ql(ibx,i) * u2(ibz)
+          fn(iby,i) = sm * u2(iby) - ql(ibx,i) * u2(imy) / dnm
+          fn(ibz,i) = sm * u2(ibz) - ql(ibx,i) * u2(imz) / dnm
+
+        end if
+      end if
+
+    end do
+
+! calculate numerical flux
+!
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
+    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+#ifdef GLM
+    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
+#endif /* GLM */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine hlld
+#endif /* ISO */
+#endif /* HLLD */
+#endif /* MHD */
 !
 !===============================================================================
 !
