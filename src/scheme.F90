@@ -141,10 +141,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (im, ux, fx, .false.)
+        call hll (im, ux(:,:), fx(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(im, ux, fx, .false.)
+        call hllc(im, ux(:,:), fx(:,:))
 #endif /* HLLC */
 
 ! update the arrays of increments
@@ -236,10 +236,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (jm, uy, fy, .false.)
+        call hll (jm, uy(:,:), fy(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(jm, uy, fy, .false.)
+        call hllc(jm, uy(:,:), fy(:,:))
 #endif /* HLLC */
 
 ! update the arrays of increments
@@ -330,10 +330,10 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (km, uz, fz, .false.)
+        call hll (km, uz(:,:), fz(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(km, uz, fz, .false.)
+        call hllc(km, uz(:,:), fz(:,:))
 #endif /* HLLC */
 
 ! update the arrays of increments
@@ -387,11 +387,11 @@ module scheme
 !
 !===============================================================================
 !
-! hll: subroutine computes the approximated flux using HLL method
+! hll: subroutine computes the approximated flux using the HLL method
 !
 !===============================================================================
 !
-  subroutine hll(n, u, f, d)
+  subroutine hll(n, u, f)
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
@@ -410,7 +410,6 @@ module scheme
     integer               , intent(in)  :: n
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
-    logical               , intent(in)  :: d
 
 ! local variables
 !
@@ -500,23 +499,19 @@ module scheme
 
 ! calculate numerical flux
 !
-    if (d) then
-      f(1:nqt,1:n) = fn(1:nqt,1:n)
-    else
-      f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
 #ifdef MHD
 #ifdef FIELDCD
-      call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
+    call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
 #endif /* FIELDCD */
 #ifdef FLUXCT
-      f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
+    f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
 #endif /* FLUXCT */
 #ifdef GLM
-      f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
-      f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
+    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
-    end if
 
 !-------------------------------------------------------------------------------
 !
@@ -531,7 +526,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hllc(n, u, f, d)
+  subroutine hllc(n, u, f)
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
@@ -543,7 +538,6 @@ module scheme
     integer               , intent(in)  :: n
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
-    logical               , intent(in)  :: d
 
 ! local variables
 !
@@ -714,11 +708,7 @@ module scheme
 
 ! calculate numerical flux
 !
-    if (d) then
-      f(:,:) = fx(:,:)
-    else
-      f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
-    end if
+    f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
 
 !-------------------------------------------------------------------------------
 !
