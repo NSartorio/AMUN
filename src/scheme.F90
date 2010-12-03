@@ -1078,8 +1078,8 @@ module scheme
 
 ! calculate the total left and right pressures
 !
-        ptl = ql(ipr,i) + 0.5d0 * sum(ul(ibx:ibz,i)**2)
-        ptr = qr(ipr,i) + 0.5d0 * sum(ur(ibx:ibz,i)**2)
+        ptl = ql(ipr,i) + 0.5d0 * sum(ql(ibx:ibz,i)**2)
+        ptr = qr(ipr,i) + 0.5d0 * sum(qr(ibx:ibz,i)**2)
 
 ! useful speed differences
 !
@@ -1258,9 +1258,9 @@ module scheme
             u2(imz) = u1l(idn) * q2(ivz)
             u2(ien) = u1l(ien) - dlsq * (sum(q1l(ivx:ivz) * q1l(ibx:ibz))      &
                                        - sum(q2 (ivx:ivz) * q2 (ibx:ibz))) * bxs
-            u2(ibx) = q2(ibx)
-            u2(iby) = q2(iby)
-            u2(ibz) = q2(ibz)
+            u2(ibx) = u1l(ibx)
+            u2(iby) =  q2(iby)
+            u2(ibz) =  q2(ibz)
 #ifdef GLM
             u2(iph) = u1l(iph)
 #endif /* GLM */
@@ -1278,10 +1278,10 @@ module scheme
             u2(imy) = u1r(idn) * q2(ivy)
             u2(imz) = u1r(idn) * q2(ivz)
             u2(ien) = u1r(ien) + drsq * (sum(q1r(ivx:ivz) * q1r(ibx:ibz))      &
-                    - sum(q2(ivx:ivz) * q2(ibx:ibz))) * bxs
-            u2(ibx) = q2(ibx)
-            u2(iby) = q2(iby)
-            u2(ibz) = q2(ibz)
+                                       - sum(q2 (ivx:ivz) * q2 (ibx:ibz))) * bxs
+            u2(ibx) = u1r(ibx)
+            u2(iby) =  q2(iby)
+            u2(ibz) =  q2(ibz)
 #ifdef GLM
             u2(iph) = u1r(iph)
 #endif /* GLM */
@@ -1299,7 +1299,7 @@ module scheme
 
 ! calculate the numerical flux derivative
 !
-    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
     f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
 #ifdef GLM
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
