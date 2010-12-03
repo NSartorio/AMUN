@@ -46,10 +46,7 @@ module evolution
     use boundaries  , only : boundary_variables
     use mesh        , only : update_mesh
     use mesh        , only : dx_min
-#ifdef MPI
-    use mpitools    , only : mallreduceminr
-#endif /* MPI */
-    use scheme      , only : maxspeed, cmax
+    use scheme      , only : cmax
     use timer       , only : start_timer, stop_timer
 
     implicit none
@@ -110,12 +107,6 @@ module evolution
 ! get maximum time step
 !
     dtn = dx_min / max(cmax, 1.0d-16)
-
-#ifdef MPI
-! reduce new time step over all processes
-!
-    call mallreduceminr(dtn)
-#endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
@@ -130,8 +121,11 @@ module evolution
 !
   subroutine update_maximum_speed()
 
-    use blocks, only : block_data, list_data
-    use scheme, only : maxspeed, cmax
+    use blocks  , only : block_data, list_data
+#ifdef MPI
+    use mpitools, only : mallreducemaxr
+#endif /* MPI */
+    use scheme  , only : maxspeed, cmax
 
     implicit none
 
@@ -165,6 +159,12 @@ module evolution
       pblock => pblock%next
 
     end do
+
+#ifdef MPI
+! reduce the maximum speed over all processes
+!
+    call mallreducemaxr(cmax)
+#endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
