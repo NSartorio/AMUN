@@ -32,12 +32,12 @@ module boundaries
 !
 !===============================================================================
 !
-! boundary: subroutine sweeps over all leaf blocks and performs their boundary
-!           update
+! boundary_variables: subroutine sweeps over all leaf blocks and performs
+!                    their boundary update
 !
 !===============================================================================
 !
-  subroutine boundary_variables
+  subroutine boundary_variables()
 
 ! references to other modules
 !
@@ -61,10 +61,10 @@ module boundaries
 !
 ! update boundaries which don't have neighbors
 !
-    do idir = 1, ndims
-      pblock => list_meta
-      do while(associated(pblock))
-        if (pblock%leaf) then
+    pblock => list_meta
+    do while(associated(pblock))
+      if (pblock%leaf) then
+        do idir = 1, ndims
           do iside = 1, nsides
             do iface = 1, nfaces
               pneigh => pblock%neigh(idir,iside,iface)%ptr
@@ -74,42 +74,18 @@ module boundaries
               end if
             end do ! faces
           end do ! sides
-        end if ! leaf and current level
-        pblock => pblock%next ! assign pointer to the next block
-      end do ! metablocks
-    end do ! directions
-
-! update boundaries from the blocks at the same level
-!
-    do idir = 1, ndims
-      pblock => list_meta
-      do while(associated(pblock))
-        if (pblock%leaf) then
-          do iside = 1, nsides
-            do iface = 1, nfaces
-              pneigh => pblock%neigh(idir,iside,iface)%ptr
-              if (associated(pneigh)) then
-                pbdata => pblock%data
-                pndata => pneigh%data
-
-                if (pblock%level .eq. pneigh%level .and. iface .eq. 1) &
-                  call bnd_copy(pbdata, pndata%u, idir, iside)
-              end if
-            end do ! faces
-          end do ! sides
-        end if ! leaf and current level
-        pblock => pblock%next ! assign pointer to the next block
-      end do ! metablocks
-    end do ! directions
-
-! TODO: update corners from the neighbors at higher level
-!
+        end do ! directions
+      end if ! leaf and current level
+      pblock => pblock%next ! assign pointer to the next block
+    end do ! meta blocks
 
 ! update boundaries from all neighbors
 !
     do idir = 1, ndims
+
       pblock => list_meta
       do while(associated(pblock))
+
         if (pblock%leaf) then
           do iside = 1, nsides
             do iface = 1, nfaces
@@ -139,8 +115,10 @@ module boundaries
             end do ! faces
           end do ! sides
         end if ! leaf and current level
+
         pblock => pblock%next ! assign pointer to the next block
-      end do ! metablocks
+
+      end do ! meta blocks
     end do ! directions
 !
 !-------------------------------------------------------------------------------
