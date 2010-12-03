@@ -883,6 +883,7 @@ module problem
     do k = 1, km
       do j = 1, jm
 
+#ifdef MHD
 ! initialize the magnetic field components
 !
         do i = 1, im
@@ -890,6 +891,7 @@ module problem
           q(iby,i) = bper * sin(pi * x(i) / xlen)                              &
                           * exp(- 0.5d0 * (y(j) / ycut)**2)
         end do
+#endif /* MHD */
 
 ! convert primitive variables to conserved
 !
