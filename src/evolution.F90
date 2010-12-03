@@ -75,6 +75,9 @@ module evolution
 #ifdef RK2
         call evolve_rk2(pblock)
 #endif /* RK2 */
+#ifdef RK3
+        call evolve_rk3(pblock)
+#endif /* RK3 */
 
 ! assign pointer to the next block
 !
@@ -261,7 +264,8 @@ module evolution
 !
 !===============================================================================
 !
-! evolve_rk2: subroutine evolves the current block using RK2 integration
+! evolve_rk2: subroutine evolves the current block using the 2nd order
+!             Runge-Kutta method
 !
 !===============================================================================
 !
@@ -309,14 +313,20 @@ module evolution
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
 
-! 1st step of integration
+#if defined MHD && defined GLM
+! calculate c_h^2
 !
-    call update(pblock%u, du, dxi, dyi, dzi)
+    ch2 = cmax * cmax
+
+#endif /* MHD & GLM */
+!! 1st step of integration
+!!
+    call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock, du)
+    call update_shapes(pblock, du(:,:,:,:))
 #endif /* SHAPE */
 
 ! update the solution for the fluid variables
@@ -329,47 +339,38 @@ module evolution
     u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
 
 #ifdef GLM
-! calculate c_h^2
-!
-    ch2 = cmax * cmax
-
 ! update the solution for the scalar potential Psi
 !
     u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
-
-! evolve Psi due to the source term
-!
-    decay = exp(- 0.5d0 * alpha_p * cmax * dt / dx_min)
-    u1(iph,:,:,:) = decay * u1(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
 
 ! 2nd step of integration
 !
-    call update(u1, du, dxi, dyi, dzi)
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock, du)
+    call update_shapes(pblock, du(:,:,:,:))
 #endif /* SHAPE */
 
 ! update the solution for the fluid variables
 !
     pblock%u(1:nfl,:,:,:) = 0.5d0 * (pblock%u(1:nfl,:,:,:)                     &
-                          + u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
+                                    + u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
 
 #ifdef MHD
 ! update the solution for the magnetic variables
 !
     pblock%u(ibx:ibz,:,:,:) = 0.5d0 * (pblock%u(ibx:ibz,:,:,:)                 &
-                            + u1(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:))
+                                + u1(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:))
 
 #ifdef GLM
 ! update the solution for the scalar potential Psi
 !
     pblock%u(iph,:,:,:) = 0.5d0 * (pblock%u(iph,:,:,:)                         &
-                        + u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:))
+                                  + u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:))
 
 ! evolve Psi due to the source term
 !
@@ -382,6 +383,162 @@ module evolution
 !
   end subroutine evolve_rk2
 #endif /* RK2 */
+#ifdef RK3
+!
+!===============================================================================
+!
+! evolve_rk3: subroutine evolves the current block using the 3rd order
+!             Runge-Kutta method
+!
+!===============================================================================
+!
+  subroutine evolve_rk3(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
+#ifdef SHAPE
+    use problem  , only : update_shapes
+#endif /* SHAPE */
+    use scheme   , only : update, cmax
+    use variables, only : nqt, nfl
+#ifdef MHD
+    use variables, only : ibx, ibz
+#ifdef GLM
+    use config   , only : alpha_p
+    use mesh     , only : dx_min
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    real    :: dxi, dyi, dzi, ch2
+#if defined MHD && defined GLM
+    real    :: decay
+#endif /* MHD & GLM */
+
+! local arrays
+!
+    real, dimension(nqt,im,jm,km) :: u1, du
+
+! parameters
+!
+    real, parameter :: f4 = 1.0d0 / 4.0d0, f3 = 1.0d0 / 3.0d0
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
+#if defined MHD && defined GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
+#endif /* MHD & GLM */
+!! 1st step of integration
+!!
+    call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
+
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pblock, du(:,:,:,:))
+#endif /* SHAPE */
+
+! update the solution for the fluid variables
+!
+    u1(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
+
+!! 2nd step of integration
+!!
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
+
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pblock, du(:,:,:,:))
+#endif /* SHAPE */
+
+! update the solution for the fluid variables
+!
+    u1(1:nfl,:,:,:) = f4 * (3.0d0 * pblock%u(1:nfl,:,:,:)                      &
+                                    + u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    u1(ibx:ibz,:,:,:) = f4 * (3.0d0 * pblock%u(ibx:ibz,:,:,:)                  &
+                                + u1(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:))
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    u1(iph,:,:,:) = f4 * (3.0d0 * pblock%u(iph,:,:,:)                          &
+                                  + u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:))
+#endif /* GLM */
+#endif /* MHD */
+
+!! 3rd step of integration
+!!
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
+
+#ifdef SHAPE
+! restrict update in a defined shape
+!
+    call update_shapes(pblock, du(:,:,:,:))
+#endif /* SHAPE */
+
+! update the solution for the fluid variables
+!
+    pblock%u(1:nfl,:,:,:) = f3 * (pblock%u(1:nfl,:,:,:)                        &
+                          + 2.0d0 * (u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)))
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    pblock%u(ibx:ibz,:,:,:) = f3 * (pblock%u(ibx:ibz,:,:,:)                    &
+                      + 2.0d0 * (u1(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)))
+
+#ifdef GLM
+! update the solution for the scalar potential Psi
+!
+    pblock%u(iph,:,:,:) = f3 * (pblock%u(iph,:,:,:)                            &
+                        + 2.0d0 * (u1(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)))
+
+! evolve analytically Psi due to the source term
+!
+    decay = exp(- alpha_p * cmax * dt / dx_min)
+    pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_rk3
+#endif /* RK3 */
 !
 !===============================================================================
 !
