@@ -108,6 +108,8 @@ module config
   character(len = 32), save :: zlbndry = "periodic"
   character(len = 32), save :: zubndry = "periodic"
 
+  logical, dimension(NDIMS), save :: periodic = .true.
+
 #if defined MHD && defined GLM
 ! coefficient controlling the decay of scalar potential Psi
 !
@@ -376,6 +378,15 @@ module config
     gammam1  = gamma - 1.0
     gammam1i = 1.0 / gammam1
     csnd2    = csnd * csnd
+
+    if (xlbndry .ne. 'periodic' .or. xubndry .ne. 'periodic')  &
+      periodic(1) = .false.
+    if (ylbndry .ne. 'periodic' .or. yubndry .ne. 'periodic')  &
+      periodic(2) = .false.
+#if NDIMS == 3
+    if (zlbndry .ne. 'periodic' .or. zubndry .ne. 'periodic')  &
+      periodic(3) = .false.
+#endif /* NDIMS == 3 */
 
 ! return before error messages
 !

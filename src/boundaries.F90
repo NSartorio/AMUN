@@ -43,6 +43,7 @@ module boundaries
 !
     use blocks, only : block_meta, block_data, list_meta
     use blocks, only : ndims, nsides, nfaces
+    use config, only : periodic
 
 ! declare variables
 !
@@ -61,23 +62,25 @@ module boundaries
 !
 ! update boundaries which don't have neighbors
 !
-    pblock => list_meta
-    do while(associated(pblock))
-      if (pblock%leaf) then
-        do idir = 1, ndims
-          do iside = 1, nsides
-            do iface = 1, nfaces
-              pneigh => pblock%neigh(idir,iside,iface)%ptr
-              if (.not. associated(pneigh)) then
-                if (iface .eq. 1) &
-                  call bnd_spec(pblock%data, idir, iside, iface)
-              end if
-            end do ! faces
-          end do ! sides
-        end do ! directions
-      end if ! leaf and current level
-      pblock => pblock%next ! assign pointer to the next block
-    end do ! meta blocks
+    do idir = 1, ndims
+      if (.not. periodic(idir)) then
+        pblock => list_meta
+        do while(associated(pblock))
+          if (pblock%leaf) then
+            do iside = 1, nsides
+              do iface = 1, nfaces
+                pneigh => pblock%neigh(idir,iside,iface)%ptr
+                if (.not. associated(pneigh)) then
+                  if (iface .eq. 1) &
+                    call bnd_spec(pblock%data, idir, iside, iface)
+                end if
+              end do ! faces
+            end do ! sides
+          end if ! leaf and current level
+          pblock => pblock%next ! assign pointer to the next block
+        end do ! meta blocks
+      end if
+    end do ! directions
 
 ! update boundaries from all neighbors
 !
