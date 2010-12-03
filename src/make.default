@@ -8,11 +8,9 @@ PREC       = 4
 
 # data format:
 #
-#   OUTPUT   - data format, currently only HDF5
-#   COMPRESS - enable/disable data compression
+#   OUTPUT   - data format: HDF5
 #
 OUTPUT     = HDF5
-COMPRESS   = N
 
 #-------------------------------------------------------------------------------
 #
@@ -26,7 +24,7 @@ SHAPE      = N
 
 # physics:
 #
-#   EQS   - set of equations to solve: HD or MHD
+#   EQS   - set of equations to solve: HYDRO or MHD
 #   EOS   - equation of state: ADI of ISO for adiabatic or isothermal, resp.
 #
 EQS        = HYDRO
@@ -34,15 +32,15 @@ EOS        = ADI
 
 # methods
 #
-#  SOLVER    - family of solvers: GODUNOV, GALERKIN
-#  ORDER     - order of the solution: 2, 3, or 4
+#  SOLVER    - family of solvers: GODUNOV
 #  TIME      - time integration: EULER, RK2, RK3
-#  FLUX      - flux approximation: HLL
-#  FLUXEMF   - electromotive force approximation: FIELDCD, FLUXCT
+#  FLUX      - flux approximation: HLL, HLLC, HLLD
+#  FLUXEMF   - electromotive force approximation: GLM
 #
+SOLVER     = GODUNOV
 TIME       = RK2
 FLUX       = HLL
-FLUXEMF    = FIELDCD
+FLUXEMF    = GLM
 
 #
 #-------------------------------------------------------------------------------
