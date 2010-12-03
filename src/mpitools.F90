@@ -423,6 +423,39 @@ module mpitools
 !
 !===============================================================================
 !
+! mallreducemaxr: subroutine reduces the maximum value over all processes
+!
+!===============================================================================
+!
+  subroutine mallreducemaxr(buf)
+
+#ifdef MPI
+    use mpi, only : mpi_real8, mpi_max
+#endif /* MPI */
+
+! arguments
+!
+    real(kind=8), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    real(kind=8)        :: tbuf
+    integer             :: err
+!
+!-------------------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce(buf, tbuf, 1, mpi_real8, mpi_max, comm3d, err)
+    buf = tbuf
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreducemaxr
+!
+!===============================================================================
+!
 ! mfindmaxi: subroutine finds the maximum integer value across all proceeses
 !
 !===============================================================================
