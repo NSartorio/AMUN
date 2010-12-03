@@ -36,9 +36,17 @@ endif
 #
 # check flag conditions
 #
+ifeq ($(EQS),HYDRO)
+ifeq ($(FLUX),HLLD)
+FLUX = HLLC
+endif
+ifeq ($(EOS),ISO)
+FLUX = HLL
+endif
+endif
 ifeq ($(EQS),MHD)
 ifeq ($(FLUX),HLLC)
-FLUX = HLL
+FLUX = HLLD
 endif
 endif
 

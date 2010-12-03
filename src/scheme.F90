@@ -539,6 +539,7 @@ module scheme
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
+    use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
 
     implicit none
 
@@ -551,8 +552,8 @@ module scheme
 ! local variables
 !
     integer                :: p, i
-    real, dimension(nvr,n) :: ql, qr, qc, ul, ur
-    real, dimension(nfl,n) :: fl, fr, fx
+    real, dimension(nvr,n) :: ql, qr, q, ul, ur
+    real, dimension(nfl,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr, cm
     real                   :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm     &
                             , smvl, smvr, div, pt
@@ -560,49 +561,46 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-    f (:,:) = 0.0
-    fx(:,:) = 0.0
-
-! calculate primitive variables
+! obtain the primitive variables
 !
-    call cons2prim(n, uc, qc)
+    call cons2prim(n, u(:,:), q(:,:))
 
-! reconstruct left and right states of primitive variables
+! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
-      call reconstruct(n, qc(p,:), ql(p,:), qr(p,:))
-    enddo
+      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+    end do
 
-! calculate conservative variables at states
+! obtain the conservative variables at both states
 !
-    call prim2cons(n, ql, ul)
-    call prim2cons(n, qr, ur)
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
 
-! calculate fluxes and speeds
+! calculate the physical fluxes and speeds
 !
-    call fluxspeed(n, ql, ul, fl, cl)
-    call fluxspeed(n, qr, ur, fr, cr)
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
 
-! calculate fluxes
+! iterate along the direction
 !
     do i = 1, n
 
-! calculate min and max and intermediate speeds: eq. (67)
+! calculate the minimum and maxximum speeds
 !
-      sl = min(ql(2,i) - cl(i),qr(2,i) - cr(i))
-      sr = max(ql(2,i) + cl(i),qr(2,i) + cr(i))
+      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
+      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
 
 ! all speeds >= 0, left side flux
 !
       if (sl .ge. 0.0) then
 
-        fx(:,i) = fl(:,i)
+        fn(:,i) = fl(:,i)
 
 ! all speeds <= 0, right side flux
 !
       else if (sr .le. 0.0) then
 
-        fx(:,i) = fr(:,i)
+        fn(:,i) = fr(:,i)
 
 ! intermediate states
 !
@@ -610,49 +608,51 @@ module scheme
 
 ! useful differences
 !
-        slmv = sl - ql(2,i)
-        srmv = sr - qr(2,i)
+        slmv = sl - ql(ivx,i)
+        srmv = sr - qr(ivx,i)
 
-! speed of contact discontinuity (eq. 34 [1], 14 [2])
+! speed of the contact discontinuity (eq. 34 [1], 14 [2])
 !
-        div =  srmv*qr(1,i) - slmv*ql(1,i)
-        sml = (srmv*ur(2,i) - slmv*ul(2,i) - qr(5,i) + ql(5,i))/div
-        div =  slmv*ql(1,i) - srmv*qr(1,i)
-        smr = (slmv*ul(2,i) - srmv*ur(2,i) - ql(5,i) + qr(5,i))/div
+        div =  srmv * qr(idn,i) - slmv * ql(idn,i)
+        sml = (srmv * ur(imx,i) - slmv * ul(imx,i)                             &
+                                - qr(ipr,i) + ql(ipr,i)) / div
+        div =  slmv * ql(idn,i) - srmv * qr(idn,i)
+        smr = (slmv * ul(imx,i) - srmv * ur(imx,i)                             &
+                                - ql(ipr,i) + qr(ipr,i)) / div
         sm  = 0.5d0 * (sml + smr)
 
         if (sm .eq. 0.0d0) then
 
-! calculate left intermediate state
+! calculate the left intermediate state
 !
-          pt = ql(5,i) - ul(2,i)*slmv
-          u1l(1) = ql(1,i)*slmv/sl
-          u1l(2) = 0.0d0
-          u1l(3) = u1l(1)*ql(3,i)
-          u1l(4) = u1l(1)*ql(4,i)
-          if (sl .eq. 0.0) then
-            u1l(5) = ul(5,i)
+          pt = ql(ipr,i) - ul(imx,i) * slmv
+          u1l(idn) = ql(idn,i) * slmv / sl
+          u1l(imx) = 0.0d0
+          u1l(imy) = u1l(idn) * ql(ivy,i)
+          u1l(imz) = u1l(idn) * ql(ivz,i)
+          if (sl .eq. 0.0d0) then
+            u1l(ien) = ul(ien,i)
           else
-            u1l(5) = (slmv*ul(5,i) - ql(5,i)*ql(2,i))/sl
-          endif
+            u1l(ien) = (slmv * ul(ien,i) - ql(ipr,i) * ql(ivx,i)) / sl
+          end if
 
 ! calculate right intermediate state
 !
-            pt = qr(5,i) - ur(2,i)*srmv
-            u1r(1) = qr(1,i)*srmv/sr
-            u1r(2) = 0.0d0
-            u1r(3) = u1r(1)*qr(3,i)
-            u1r(4) = u1r(1)*qr(4,i)
-            if (sr .eq. 0.0) then
-              u1r(5) = ur(5,i)
-            else
-              u1r(5) = (srmv*ur(5,i) - qr(5,i)*qr(2,i))/sr
-            endif
+          pt = qr(ipr,i) - ur(imx,i) * srmv
+          u1r(idn) = qr(idn,i) * srmv / sr
+          u1r(imx) = 0.0d0
+          u1r(imy) = u1r(idn) * qr(ivy,i)
+          u1r(imz) = u1r(idn) * qr(ivz,i)
+          if (sr .eq. 0.0d0) then
+            u1r(ien) = ur(ien,i)
+          else
+            u1r(ien) = (srmv * ur(ien,i) - qr(ipr,i) * qr(ivx,i)) / sr
+          endif
 
 ! calculate intermediate flux
 !
-            fx(:,i) = 0.5*(fl(:,i) + sl*(u1l(:) - ul(:,i)) &
-                    +      fr(:,i) + sr*(u1r(:) - ur(:,i)))
+          fn(:,i) = 0.5d0 * (fl(:,i) + sl * (u1l(:) - ul(:,i))                 &
+                          +  fr(:,i) + sr * (u1r(:) - ur(:,i)))
 
         else
 
@@ -660,64 +660,66 @@ module scheme
 !
           slmm = sl - sm
           srmm = sr - sm
-          smvl = sm - ql(2,i)
-          smvr = sm - qr(2,i)
+          smvl = sm - ql(ivx,i)
+          smvr = sm - qr(ivx,i)
 
 ! intermediate discontinuities
 !
-          if (sm .gt. 0.0) then
+          if (sm .gt. 0.0d0) then
 
 ! pressure of intermediate states (eq. 36 [1], 16 [2])
 !
-            pt = ql(5,i) + ql(1,i)*slmv*smvl
+            pt = ql(ipr,i) + ql(idn,i) * slmv * smvl
 
-! calculate left intermediate state
+! calculate the left intermediate state
 !
-            u1l(1) = ql(1,i)*slmv/slmm                               ! eq. (35 [1], 17 [2])
-            u1l(2) = u1l(1)*sm                                       ! eq. (37 [1])
-            u1l(3) = u1l(1)*ql(3,i)                                  ! eq. (38 [1], 18 [2])
-            u1l(4) = u1l(1)*ql(4,i)                                  ! eq. (39 [1], 19 [2])
-            if (slmm .eq. 0.0) then
-              u1l(5) = ul(5,i)
+            u1l(idn) = ql(idn,i) * slmv / slmm
+            u1l(imx) = u1l(idn) * sm
+            u1l(imy) = u1l(idn) * ql(ivy,i)
+            u1l(imz) = u1l(idn) * ql(ivz,i)
+            if (slmm .eq. 0.0d0) then
+              u1l(ien) = ul(ien,i)
             else
-              u1l(5) = (slmv*ul(5,i) - ql(5,i)*ql(2,i) + pt*sm)/slmm ! eq. (40 [1], 20 [2])
-            endif
+              u1l(ien) = (slmv * ul(ien,i) - ql(ipr,i) * ql(ivx,i)             &
+                                                            + pt * sm) / slmm
+            end if
 
-! calculate left intermediate flux
+! calculate the left intermediate flux
 !
-            fx(:,i) = fl(:,i) + sl*(u1l(:) - ul(:,i))    ! eq. (29 [1], 15 [2])
+            fn(:,i) = fl(:,i) + sl * (u1l(:) - ul(:,i))
 
           else if (sm .lt. 0.0) then
 
 ! pressure of intermediate states (eq. 36 [1], 16 [2])
 !
-            pt = qr(5,i) + qr(1,i)*srmv*smvr
+            pt = qr(ipr,i) + qr(idn,i) * srmv * smvr
 
-! calculate right intermediate state
+! calculate the right intermediate state
 !
-            u1r(1) = qr(1,i)*srmv/srmm                               ! eq. (35 [1], 17 [2])
-            u1r(2) = u1r(1)*sm                                       ! eq. (37 [1])
-            u1r(3) = u1r(1)*qr(3,i)                                  ! eq. (38 [1], 18 [2])
-            u1r(4) = u1r(1)*qr(4,i)                                  ! eq. (39 [1], 19 [2])
-            if (srmm .eq. 0.0) then
-              u1r(5) = ur(5,i)
+            u1r(idn) = qr(idn,i) * srmv / srmm
+            u1r(imx) = u1r(idn) * sm
+            u1r(imy) = u1r(idn) * qr(ivy,i)
+            u1r(imz) = u1r(idn) * qr(ivz,i)
+            if (srmm .eq. 0.0d0) then
+              u1r(ien) = ur(ien,i)
             else
-              u1r(5) = (srmv*ur(5,i) - qr(5,i)*qr(2,i) + pt*sm)/srmm ! eq. (40 [1], 20 [2])
-            endif
+              u1r(ien) = (srmv * ur(ien,i) - qr(ipr,i) * qr(ivx,i)             &
+                                                            + pt * sm) / srmm
+            end if
 
-! calculate right intermediate flux
+! calculate the right intermediate flux
 !
-            fx(:,i) = fr(:,i) + sr*(u1r(:) - ur(:,i))    ! eq. (30 [1], 15 [2])
+            fn(:,i) = fr(:,i) + sr * (u1r(:) - ur(:,i))
 
-          endif
-        endif
-      endif
+          end if
+        end if
+      end if
 
-    enddo
+    end do
 
 ! calculate numerical flux
 !
-    f(:,2:n) = - fx(:,2:n) + fx(:,1:n-1)
+    f(:,2:n) = - fn(:,2:n) + fn(:,1:n-1)
 
 !-------------------------------------------------------------------------------
 !
