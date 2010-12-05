@@ -877,20 +877,6 @@ module mesh
     end do
 
 #ifdef MHD
-#ifdef FIELDCD
-! expand the cell centered magnetic field components
-!
-    do q = ibx, ibz
-      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
-    end do
-#endif /* FIELDCD */
-#ifdef FLUXCT
-! expand the staggered magnetic field components preserving divergence-free
-! condition
-!
-    call expand_mag(dm, fm, ng, pdata%u(ibx,:,:,:), pdata%u(iby,:,:,:), pdata%u(ibz,:,:,:)  &
-                              , u(ibx,:,:,:), u(iby,:,:,:), u(ibz,:,:,:))
-#endif /* FLUXCT */
 #ifdef GLM
 ! expand the cell centered magnetic field components
 !
@@ -1058,23 +1044,6 @@ module mesh
                                          + pchild%u(1:nfl,ip:iu:2,jp:ju:2,1))
 
 #ifdef MHD
-#ifdef FIELDCD
-      pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
-                                 0.25 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,1)   &
-                                       + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,1)   &
-                                       + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,1)   &
-                                       + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,1))
-#endif /* FIELDCD */
-#ifdef FLUXCT
-      pparent%u(ibx,is:it,js:jt,1) = 0.50 * (pchild%u(ibx,ip:iu:2,jl:ju:2,1)   &
-                                           + pchild%u(ibx,ip:iu:2,jp:ju:2,1))
-      pparent%u(iby,is:it,js:jt,1) = 0.50 * (pchild%u(iby,il:iu:2,jp:ju:2,1)   &
-                                           + pchild%u(iby,ip:iu:2,jp:ju:2,1))
-      pparent%u(ibz,is:it,js:jt,1) = 0.25 * (pchild%u(ibz,il:iu:2,jl:ju:2,1)   &
-                                           + pchild%u(ibz,ip:iu:2,jl:ju:2,1)   &
-                                           + pchild%u(ibz,il:iu:2,jp:ju:2,1)   &
-                                           + pchild%u(ibz,ip:iu:2,jp:ju:2,1))
-#endif /* FLUXCT */
 #ifdef GLM
       pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
                                  0.25 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,1)   &
@@ -1100,34 +1069,6 @@ module mesh
                                     + pchild%u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)  &
                                     + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
 #ifdef MHD
-#ifdef FIELDCD
-      pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
-                           0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
-                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
-                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kl:ku:2)  &
-                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                  + pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
-                                  + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                  + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                  + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
-#endif /* FIELDCD */
-#ifdef FLUXCT
-      pparent%u(ibx,is:it,js:jt,ks:kt) =                                       &
-                                0.25 * (pchild%u(ibx,ip:iu:2,jl:ju:2,kl:ku:2)  &
-                                      + pchild%u(ibx,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                      + pchild%u(ibx,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                      + pchild%u(ibx,ip:iu:2,jp:ju:2,kp:ku:2))
-      pparent%u(iby,is:it,js:jt,ks:kt) =                                       &
-                                0.25 * (pchild%u(iby,il:iu:2,jp:ju:2,kl:ku:2)  &
-                                      + pchild%u(iby,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                      + pchild%u(iby,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                      + pchild%u(iby,ip:iu:2,jp:ju:2,kp:ku:2))
-      pparent%u(ibz,is:it,js:jt,ks:kt) =                                       &
-                                0.25 * (pchild%u(ibz,il:iu:2,jl:ju:2,kp:ku:2)  &
-                                      + pchild%u(ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                      + pchild%u(ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                      + pchild%u(ibz,ip:iu:2,jp:ju:2,kp:ku:2))
-#endif /* FLUXCT */
 #ifdef GLM
       pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
                            0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
