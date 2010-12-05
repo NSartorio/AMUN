@@ -474,7 +474,12 @@ module interpolation
       ds  = dup * dum
 
       if (ds .gt. 0.0) then
+#ifdef MINMOD
+        du  = sign(0.25, dup) * min(abs(dup), abs(dum))
+#endif /* MINMOD */
+#ifdef LF
         du    = 0.5 * ds / (dup + dum)
+#endif /* LF */
         v(il) = u(i) - du
         v(ir) = u(i) + du
       else
