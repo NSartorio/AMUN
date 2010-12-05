@@ -69,7 +69,12 @@ module interpolation
       ds (i) = dvr(i) * dvl(i)
 
       if (ds(i) .gt. 0.0) then
+#ifdef MINMOD
+        dv  = sign(0.5, dvr(i)) * min(abs(dvr(i)), abs(dvl(i)))
+#endif /* MINMOD */
+#ifdef LF
         dv  = ds(i) / (dvr(i) + dvl(i))
+#endif /* LF */
 
         vl(i) = vx(i) + dv
         vr(i) = vx(i) - dv
