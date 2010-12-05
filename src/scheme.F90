@@ -44,9 +44,6 @@ module scheme
   subroutine update(u, du, dxi, dyi, dzi)
 
     use config       , only : im, jm, km
-#ifdef FLUXCT
-    use interpolation, only : magtocen
-#endif /* FLUXCT */
     use variables    , only : nvr, nqt, nfl
     use variables    , only : idn, imx, imy, imz
 #ifdef ADI
@@ -88,11 +85,6 @@ module scheme
 ! copy variables to a new array
 !
     w(1:nqt,:,:,:) = u(1:nqt,:,:,:)
-#ifdef FLUXCT
-! interpolate cell centered components of the magnetic field
-!
-    call magtocen(w)
-#endif /* FLUXCT */
 
 ! reset the increment array
 !
@@ -127,11 +119,6 @@ module scheme
           ux(ibx,i) = w(ibx,i,j,k)
           ux(iby,i) = w(iby,i,j,k)
           ux(ibz,i) = w(ibz,i,j,k)
-#ifdef FLUXCT
-          ux(icx,i) = w(icx,i,j,k)
-          ux(icy,i) = w(icy,i,j,k)
-          ux(icz,i) = w(icz,i,j,k)
-#endif /* FLUXCT */
 #ifdef GLM
           ux(iph,i) = w(iph,i,j,k)
 #endif /* GLM */
@@ -163,28 +150,6 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
-          im1 = max(i - 1, 1)
-          ip1 = min(i + 1,im)
-
-          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dxi * (fx(iby,ip1) - fx(iby,im1))
-#if NDIMS == 3
-          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dxi * (fx(ibz,ip1) - fx(ibz,im1))
-#endif /* NDIMS == 3 */
-#endif /* FIELDCD */
-#ifdef FLUXCT
-          im1 = max(i - 1, 1)
-          du(ibx,i  ,jm1,k  ) = du(ibx,i  ,jm1,k  ) + dyi *  fx(iby,i)
-          du(ibx,i  ,jp1,k  ) = du(ibx,i  ,jp1,k  ) - dyi *  fx(iby,i)
-          du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dxi * (fx(iby,i) - fx(iby,im1))
-          du(iby,i  ,jm1,k  ) = du(iby,i  ,jm1,k  ) - dxi * (fx(iby,i) - fx(iby,im1))
-#if NDIMS == 3
-          du(ibx,i  ,j  ,km1) = du(ibx,i  ,j  ,km1) + dzi *  fx(ibz,i)
-          du(ibx,i  ,j  ,kp1) = du(ibx,i  ,j  ,kp1) - dzi *  fx(ibz,i)
-          du(ibz,i  ,j  ,k  ) = du(ibz,i  ,j  ,k  ) - dxi * (fx(ibz,i) - fx(ibz,im1))
-          du(ibz,i  ,j  ,km1) = du(ibz,i  ,j  ,km1) - dxi * (fx(ibz,i) - fx(ibz,im1))
-#endif /* NDIMS == 3 */
-#endif /* FLUXCT */
 #ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dxi * fx(ibx,i)
           du(iby,i,j,k) = du(iby,i,j,k) + dxi * fx(iby,i)
@@ -225,11 +190,6 @@ module scheme
           uy(ibx,j) = w(iby,i,j,k)
           uy(iby,j) = w(ibz,i,j,k)
           uy(ibz,j) = w(ibx,i,j,k)
-#ifdef FLUXCT
-          uy(icx,j) = w(icy,i,j,k)
-          uy(icy,j) = w(icz,i,j,k)
-          uy(icz,j) = w(icx,i,j,k)
-#endif /* FLUXCT */
 #ifdef GLM
           uy(iph,j) = w(iph,i,j,k)
 #endif /* GLM */
@@ -261,28 +221,6 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
-          jm1 = max(j - 1, 1)
-          jp1 = min(j + 1,jm)
-
-#if NDIMS == 3
-          du(ibz,i,j,k) = du(ibz,i,j,k) - 0.5 * dyi * (fy(iby,jp1) - fy(iby,jm1))
-#endif /* NDIMS == 3 */
-          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dyi * (fy(ibz,jp1) - fy(ibz,jm1))
-#endif /* FIELDCD */
-#ifdef FLUXCT
-          jm1 = max(j - 1, 1)
-#if NDIMS == 3
-          du(iby,i  ,j  ,km1) = du(iby,i  ,j  ,km1) + dzi *  fy(iby,j)
-          du(iby,i  ,j  ,kp1) = du(iby,i  ,j  ,kp1) - dzi *  fy(iby,j)
-          du(ibz,i  ,j  ,k  ) = du(ibz,i  ,j  ,k  ) - dyi * (fy(iby,j) - fy(iby,jm1))
-          du(ibz,i  ,j  ,km1) = du(ibz,i  ,j  ,km1) - dyi * (fy(iby,j) - fy(iby,jm1))
-#endif /* NDIMS == 3 */
-          du(iby,im1,j  ,k  ) = du(iby,im1,j  ,k  ) + dxi *  fy(ibz,j)
-          du(iby,ip1,j  ,k  ) = du(iby,ip1,j  ,k  ) - dxi *  fy(ibz,j)
-          du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
-          du(ibx,im1,j  ,k  ) = du(ibx,im1,j  ,k  ) - dyi * (fy(ibz,j) - fy(ibz,jm1))
-#endif /* FLUXCT */
 #ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dyi * fy(ibz,j)
           du(iby,i,j,k) = du(iby,i,j,k) + dyi * fy(ibx,j)
@@ -322,11 +260,6 @@ module scheme
           uz(ibx,k) = w(ibz,i,j,k)
           uz(iby,k) = w(ibx,i,j,k)
           uz(ibz,k) = w(iby,i,j,k)
-#ifdef FLUXCT
-          uz(icx,k) = w(icz,i,j,k)
-          uz(icy,k) = w(icx,i,j,k)
-          uz(icz,k) = w(icy,i,j,k)
-#endif /* FLUXCT */
 #ifdef GLM
           uz(iph,k) = w(iph,i,j,k)
 #endif /* GLM */
@@ -358,25 +291,6 @@ module scheme
 #ifdef MHD
 ! update magnetic variables
 !
-#ifdef FIELDCD
-          km1 = max(k - 1, 1)
-          kp1 = min(k + 1,km)
-
-          du(ibx,i,j,k) = du(ibx,i,j,k) - 0.5 * dzi * (fz(iby,kp1) - fz(iby,km1))
-          du(iby,i,j,k) = du(iby,i,j,k) - 0.5 * dzi * (fz(ibz,kp1) - fz(ibz,km1))
-#endif /* FIELDCD */
-#ifdef FLUXCT
-          km1 = max(k - 1, 1)
-          du(ibz,im1,j  ,k  ) = du(ibz,im1,j  ,k  ) + dxi *  fz(iby,k)
-          du(ibz,ip1,j  ,k  ) = du(ibz,ip1,j  ,k  ) - dxi *  fz(iby,k)
-          du(ibx,i  ,j  ,k  ) = du(ibx,i  ,j  ,k  ) - dzi * (fz(iby,k) - fz(iby,km1))
-          du(ibx,im1,j  ,k  ) = du(ibx,im1,j  ,k  ) - dzi * (fz(iby,k) - fz(iby,km1))
-
-          du(ibz,i  ,jm1,k  ) = du(ibz,i  ,jm1,k  ) + dyi *  fz(ibz,k)
-          du(ibz,i  ,jp1,k  ) = du(ibz,i  ,jp1,k  ) - dyi *  fz(ibz,k)
-          du(iby,i  ,j  ,k  ) = du(iby,i  ,j  ,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
-          du(iby,i  ,jm1,k  ) = du(iby,i  ,jm1,k  ) - dzi * (fz(ibz,k) - fz(ibz,km1))
-#endif /* FLUXCT */
 #ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dzi * fz(iby,k)
           du(iby,i,j,k) = du(iby,i,j,k) + dzi * fz(ibz,k)
@@ -441,16 +355,6 @@ module scheme
     end do
 
 #ifdef MHD
-#ifdef FLUXCT
-! reconstruct the left and right states of the magnetic field components
-!
-    ql(ibx,:) = q(ibx,:)
-    qr(ibx,:) = q(ibx,:)
-    call reconstruct(n, q(icy,:), ql(iby,:), qr(iby,:))
-    call reconstruct(n, q(icz,:), ql(ibz,:), qr(ibz,:))
-    ql(icx:icz,:) = ql(ibx:ibz,:)
-    qr(icx:icz,:) = qr(ibx:ibz,:)
-#endif /* FLUXCT */
 #ifdef GLM
 ! reconstruct the left and right states of the magnetic field components
 !
@@ -510,12 +414,6 @@ module scheme
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
 #ifdef MHD
-#ifdef FIELDCD
-    call emf(n, q(ivx:ivz,:), q(ibx:ibz,:), f(ibx:ibz,:))
-#endif /* FIELDCD */
-#ifdef FLUXCT
-    f(ibx:ibz,1:n) = 0.25 * fn(ibx:ibz,1:n)
-#endif /* FLUXCT */
 #ifdef GLM
     f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
@@ -1379,11 +1277,6 @@ module scheme
 #ifdef ADI
       f(ien,i) = f(ien,i) + q(ivx,i) * pm - q(ibx,i) * vb
 #endif /* ADI */
-#ifdef FLUXCT
-      f(ibx,i) = 0.0
-      f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
-      f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
-#endif /* FLUXCT */
 #ifdef GLM
       f(ibx,i) = q(iph,i)
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
@@ -1510,11 +1403,6 @@ module scheme
       q(ibx,i) = u(ibx,i)
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
-#ifdef FLUXCT
-      q(icx,i) = u(icx,i)
-      q(icy,i) = u(icy,i)
-      q(icz,i) = u(icz,i)
-#endif /* FLUXCT */
 #ifdef GLM
       q(iph,i) = u(iph,i)
 #endif /* GLM */
@@ -1579,11 +1467,6 @@ module scheme
       u(ibx,i) = q(ibx,i)
       u(iby,i) = q(iby,i)
       u(ibz,i) = q(ibz,i)
-#ifdef FLUXCT
-      u(icx,i) = q(icx,i)
-      u(icy,i) = q(icy,i)
-      u(icz,i) = q(icz,i)
-#endif /* FLUXCT */
 #ifdef GLM
       u(iph,i) = q(iph,i)
 #endif /* GLM */
@@ -1609,9 +1492,6 @@ module scheme
 #ifdef ISO
     use config       , only : csnd, csnd2
 #endif /* ISO */
-#if defined MHD && defined FLUXCT
-    use interpolation, only : magtocen
-#endif /* MHD && FLUXCT */
     use variables    , only : nvr, nqt
     use variables    , only : idn, ivx, ivz
 #ifdef ADI
@@ -1648,11 +1528,6 @@ module scheme
 ! copy variables to a new array
 !
     w(1:nqt,1:im,1:jm,1:km) = u(1:nqt,1:im,1:jm,1:km)
-#ifdef FLUXCT
-! interpolate cell centered components of the magnetic field
-!
-    call magtocen(w)
-#endif /* FLUXCT */
 
 ! iterate over all points and calculate maximum speed
 !
