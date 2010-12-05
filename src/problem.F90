@@ -800,9 +800,6 @@ module problem
 #endif /* ADI */
 #ifdef MHD
     use variables, only : ibx, iby, ibz
-#ifdef FLUXCT
-    use variables, only : icx, icy, icz
-#endif /* FLUXCT */
 #ifdef GLM
     use variables, only : iph
 #endif /* GLM */
@@ -868,11 +865,6 @@ module problem
     q(ibx,:) = 0.0d0
     q(iby,:) = 0.0d0
     q(ibz,:) = 0.0d0
-#ifdef FLUXCT
-    q(ibx,:) = 0.0d0
-    q(iby,:) = 0.0d0
-    q(ibz,:) = 0.0d0
-#endif /* FLUXCT */
 #ifdef GLM
     q(iph,:) = 0.0d0
 #endif /* GLM */
