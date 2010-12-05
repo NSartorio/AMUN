@@ -981,12 +981,12 @@ module mesh
 !
       pchild  => pblock%child(p)%ptr%data
 
-! calculate the position of the current child in the parent block
+! obtain the position of the current child in the parent block
 !
-      if = mod((p - 1)    ,2)
-      jf = mod((p - 1) / 2,2)
+      if = pchild%pos(1)
+      jf = pchild%pos(2)
 #if NDIMS == 3
-      kf = mod((p - 1) / 4,2)
+      kf = pchild%pos(3)
 #endif /* NDIMS == 3 */
 
 ! calculate the bound indices of the source nad destination arrays
