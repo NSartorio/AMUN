@@ -1239,9 +1239,6 @@ module io
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-#if defined MHD && defined FLUXCT
-    use interpolation, only : magtocen, divergence
-#endif /* MHD & FLUXCT */
     use scheme       , only : cons2prim
     use variables    , only : nvr, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
@@ -1284,11 +1281,6 @@ module io
 #endif /* ADI */
 #ifdef MHD
     real(kind=8), dimension(:,:,:,:), allocatable :: magx, magy, magz
-#ifdef FLUXCT
-    real(kind=8), dimension(:,:,:,:), allocatable :: macx, macy, macz
-    real(kind=8), dimension(  :,:,:), allocatable :: db
-    real(kind=8), dimension(:,:,:,:), allocatable :: divb
-#endif /* FLUXCT */
 #ifdef GLM
     real(kind=8), dimension(:,:,:,:), allocatable :: bpsi
 #endif /* GLM */
@@ -1335,13 +1327,6 @@ module io
       allocate(magx(dm(1),dm(2),dm(3),dm(4)))
       allocate(magy(dm(1),dm(2),dm(3),dm(4)))
       allocate(magz(dm(1),dm(2),dm(3),dm(4)))
-#ifdef FLUXCT
-      allocate(macx(dm(1),dm(2),dm(3),dm(4)))
-      allocate(macy(dm(1),dm(2),dm(3),dm(4)))
-      allocate(macz(dm(1),dm(2),dm(3),dm(4)))
-      allocate(divb(dm(1),dm(2),dm(3),dm(4)))
-      allocate(db(im,jm,km))
-#endif /* FLUXCT */
 #ifdef GLM
       allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
 #endif /* GLM */
@@ -1356,13 +1341,6 @@ module io
 ! copy conserved variables from the current block to the temporary array
 !
         u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
-
-#if defined MHD && defined FLUXCT
-! obtain the cell centered components of the magnetic field
-!
-        call magtocen(u)
-        call divergence(u(ibx:ibz,:,:,:), db)
-#endif /* MHD & FLUXCT */
 
 ! obtain the primitive variables from the conserved ones
 !
@@ -1387,12 +1365,6 @@ module io
         magx(l,1:im,1:jm,1:km) = u(ibx,1:im,1:jm,1:km)
         magy(l,1:im,1:jm,1:km) = u(iby,1:im,1:jm,1:km)
         magz(l,1:im,1:jm,1:km) = u(ibz,1:im,1:jm,1:km)
-#ifdef FLUXCT
-        macx(l,1:im,1:jm,1:km) = q(icx,1:im,1:jm,1:km)
-        macy(l,1:im,1:jm,1:km) = q(icy,1:im,1:jm,1:km)
-        macz(l,1:im,1:jm,1:km) = q(icz,1:im,1:jm,1:km)
-        divb(l,1:im,1:jm,1:km) = db(   1:im,1:jm,1:km)
-#endif /* FLUXCT */
 #ifdef GLM
         bpsi(l,1:im,1:jm,1:km) = q(iph,1:im,1:jm,1:km)
 #endif /* GLM */
@@ -1419,12 +1391,6 @@ module io
       call write_array4_double_h5(gid, 'magx', dm, magx)
       call write_array4_double_h5(gid, 'magy', dm, magy)
       call write_array4_double_h5(gid, 'magz', dm, magz)
-#ifdef FLUXCT
-      call write_array4_double_h5(gid, 'macx', dm, macx)
-      call write_array4_double_h5(gid, 'macy', dm, macy)
-      call write_array4_double_h5(gid, 'macz', dm, macz)
-      call write_array4_double_h5(gid, 'divb', dm, divb)
-#endif /* FLUXCT */
 #ifdef GLM
       call write_array4_double_h5(gid, 'bpsi', dm, bpsi)
 #endif /* GLM */
@@ -1447,13 +1413,6 @@ module io
       if (allocated(magx)) deallocate(magx)
       if (allocated(magy)) deallocate(magy)
       if (allocated(magz)) deallocate(magz)
-#ifdef FLUXCT
-      if (allocated(macx)) deallocate(macx)
-      if (allocated(macy)) deallocate(macy)
-      if (allocated(macz)) deallocate(macz)
-      if (allocated(divb)) deallocate(divb)
-      if (allocated(db))   deallocate(db)
-#endif /* FLUXCT */
 #ifdef GLM
       if (allocated(bpsi)) deallocate(bpsi)
 #endif /* GLM */
@@ -1512,9 +1471,6 @@ module io
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-#if defined MHD && defined FLUXCT
-    use interpolation, only : magtocen, divergence
-#endif /* MHD & FLUXCT */
     use scheme       , only : cons2prim
     use variables    , only : nvr, nqt
     use variables    , only : idn, ivx, ivy, ivz
@@ -1602,12 +1558,6 @@ module io
 ! copy conserved variables from the current block to the temporary array
 !
         u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
-
-#if defined MHD && defined FLUXCT
-! obtain the cell centered components of the magnetic field
-!
-        call magtocen(u)
-#endif /* MHD & FLUXCT */
 
 ! obtain the primitive variables from the conserved ones
 !
