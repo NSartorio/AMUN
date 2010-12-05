@@ -50,7 +50,7 @@ module scheme
     use variables    , only : ien
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz, icx, icy, icz
+    use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -78,14 +78,9 @@ module scheme
     real, dimension(nvr,km)       :: uz
     real, dimension(nqt,km)       :: fz
 #endif /* NDIMS == 3 */
-    real, dimension(nvr,im,jm,km) :: w
 !
 !-------------------------------------------------------------------------------
 !
-! copy variables to a new array
-!
-    w(1:nqt,:,:,:) = u(1:nqt,:,:,:)
-
 ! reset the increment array
 !
     du(:,:,:,:) = 0.0
@@ -108,19 +103,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do i = 1, im
-          ux(idn,i) = w(idn,i,j,k)
-          ux(imx,i) = w(imx,i,j,k)
-          ux(imy,i) = w(imy,i,j,k)
-          ux(imz,i) = w(imz,i,j,k)
+          ux(idn,i) = u(idn,i,j,k)
+          ux(imx,i) = u(imx,i,j,k)
+          ux(imy,i) = u(imy,i,j,k)
+          ux(imz,i) = u(imz,i,j,k)
 #ifdef ADI
-          ux(ien,i) = w(ien,i,j,k)
+          ux(ien,i) = u(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          ux(ibx,i) = w(ibx,i,j,k)
-          ux(iby,i) = w(iby,i,j,k)
-          ux(ibz,i) = w(ibz,i,j,k)
+          ux(ibx,i) = u(ibx,i,j,k)
+          ux(iby,i) = u(iby,i,j,k)
+          ux(ibz,i) = u(ibz,i,j,k)
 #ifdef GLM
-          ux(iph,i) = w(iph,i,j,k)
+          ux(iph,i) = u(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
         end do
@@ -179,19 +174,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do j = 1, jm
-          uy(idn,j) = w(idn,i,j,k)
-          uy(imx,j) = w(imy,i,j,k)
-          uy(imy,j) = w(imz,i,j,k)
-          uy(imz,j) = w(imx,i,j,k)
+          uy(idn,j) = u(idn,i,j,k)
+          uy(imx,j) = u(imy,i,j,k)
+          uy(imy,j) = u(imz,i,j,k)
+          uy(imz,j) = u(imx,i,j,k)
 #ifdef ADI
-          uy(ien,j) = w(ien,i,j,k)
+          uy(ien,j) = u(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          uy(ibx,j) = w(iby,i,j,k)
-          uy(iby,j) = w(ibz,i,j,k)
-          uy(ibz,j) = w(ibx,i,j,k)
+          uy(ibx,j) = u(iby,i,j,k)
+          uy(iby,j) = u(ibz,i,j,k)
+          uy(ibz,j) = u(ibx,i,j,k)
 #ifdef GLM
-          uy(iph,j) = w(iph,i,j,k)
+          uy(iph,j) = u(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
         end do
@@ -249,19 +244,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
         do k = 1, km
-          uz(idn,k) = w(idn,i,j,k)
-          uz(imx,k) = w(imz,i,j,k)
-          uz(imy,k) = w(imx,i,j,k)
-          uz(imz,k) = w(imy,i,j,k)
+          uz(idn,k) = u(idn,i,j,k)
+          uz(imx,k) = u(imz,i,j,k)
+          uz(imy,k) = u(imx,i,j,k)
+          uz(imz,k) = u(imy,i,j,k)
 #ifdef ADI
-          uz(ien,k) = w(ien,i,j,k)
+          uz(ien,k) = u(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          uz(ibx,k) = w(ibz,i,j,k)
-          uz(iby,k) = w(ibx,i,j,k)
-          uz(ibz,k) = w(iby,i,j,k)
+          uz(ibx,k) = u(ibz,i,j,k)
+          uz(iby,k) = u(ibx,i,j,k)
+          uz(ibz,k) = u(iby,i,j,k)
 #ifdef GLM
-          uz(iph,k) = w(iph,i,j,k)
+          uz(iph,k) = u(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
         end do
@@ -320,7 +315,7 @@ module scheme
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx, ivz
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz, icx, icy, icz
+    use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -639,7 +634,7 @@ module scheme
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
-    use variables    , only : ibx, iby, ibz, icx, icy, icz
+    use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1227,7 +1222,7 @@ module scheme
     use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use variables, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz
 #ifdef GLM
     use variables, only : iph
 #endif /* GLM */
@@ -1362,7 +1357,7 @@ module scheme
     use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use variables, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz
 #ifdef GLM
     use variables, only : iph
 #endif /* GLM */
@@ -1394,7 +1389,7 @@ module scheme
       ek       = 0.5 * sum(u(imx:imz,i) * q(ivx:ivz,i))
       ei       = u(ien,i) - ek
 #ifdef MHD
-      em       = 0.5 * sum(u(icx:icz,i) * u(icx:icz,i))
+      em       = 0.5 * sum(u(ibx:ibz,i) * u(ibx:ibz,i))
       ei       = ei - em
 #endif /* MHD */
       q(ipr,i) = gammam1 * ei
@@ -1428,7 +1423,7 @@ module scheme
     use variables, only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use variables, only : ibx, iby, ibz, icx, icy, icz
+    use variables, only : ibx, iby, ibz
 #ifdef GLM
     use variables, only : iph
 #endif /* GLM */
@@ -1461,7 +1456,7 @@ module scheme
 #endif /* ADI */
 #ifdef MHD
 #ifdef ADI
-      em       = 0.5 * sum(q(icx:icz,i) * q(icx:icz,i))
+      em       = 0.5 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       u(ien,i) = u(ien,i) + em
 #endif /* ADI */
       u(ibx,i) = q(ibx,i)
@@ -1498,7 +1493,7 @@ module scheme
     use variables    , only : ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz, icx, icy, icz
+    use variables    , only : ibx, iby, ibz
 #endif /* MHD */
 
     implicit none
@@ -1518,23 +1513,18 @@ module scheme
 
 ! local arrays
 !
-    real, dimension(nvr,im,jm,km) :: w
     real, dimension(nvr,im)       :: q
 !
 !-------------------------------------------------------------------------------
 !
     maxspeed = 0.0
 
-! copy variables to a new array
-!
-    w(1:nqt,1:im,1:jm,1:km) = u(1:nqt,1:im,1:jm,1:km)
-
 ! iterate over all points and calculate maximum speed
 !
     do k = kb, ke
       do j = jb, je
 
-        call cons2prim(im, w(1:nvr,1:im,j,k), q(1:nvr,1:im))
+        call cons2prim(im, u(1:nqt,1:im,j,k), q(1:nqt,1:im))
 
         do i = ib, ie
 
@@ -1543,7 +1533,7 @@ module scheme
           vv = sum(q(ivx:ivz,i)**2)
           v  = sqrt(vv)
 #ifdef MHD
-          bb = sum(q(icx:icz,i)**2)
+          bb = sum(q(ibx:ibz,i)**2)
 #endif /* MHD */
 
 ! calculate the maximum characteristic speed
