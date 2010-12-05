@@ -768,7 +768,7 @@ module boundaries
                             , jn, jm, jb, jbl, jbu, je, jel, jeu               &
                             , kn, km, kb, kbl, kbu, ke, kel, keu
     use error        , only : print_warning
-    use interpolation, only : expand_tvd
+    use interpolation, only : expand
     use variables    , only : nvr, nqt, nfl
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
@@ -948,7 +948,7 @@ module boundaries
 
 ! expand the boundary
 !
-      call expand_tvd(cm, dm, dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
+      call expand(cm(:), dm(:), dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
 
 ! copy expanded boundary in the proper place of the block
 !
@@ -956,14 +956,13 @@ module boundaries
 
     end do
 #ifdef MHD
-#ifdef GLM
 ! iterate over magnetic field components
 !
     do q = ibx, ibz
 
 ! expand the boundary
 !
-      call expand_tvd(cm, dm, dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
+      call expand(cm(:), dm(:), dl, ub(q,il:iu,jl:ju,kl:ku), u(:,:,:))
 
 ! copy expanded boundary in the proper place of the block
 !
@@ -971,9 +970,10 @@ module boundaries
 
     end do
 
+#ifdef GLM
 ! expand and update the scalar potential
 !
-    call expand_tvd(cm, dm, dl, ub(iph,il:iu,jl:ju,kl:ku), u(:,:,:))
+    call expand(cm(:), dm(:), dl, ub(iph,il:iu,jl:ju,kl:ku), u(:,:,:))
 
 ! copy expanded boundary in the proper place of the block
 !

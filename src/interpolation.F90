@@ -95,12 +95,12 @@ module interpolation
 !
 !===============================================================================
 !
-! expand_tvd: expands a multi-dimentional array similar to EXPAND but using
-!             only the second-order TVD interpolation
+! expand: expands a multi-dimentional array similar using only TVD or high order
+!         interpolation
 !
 !===============================================================================
 !
-  subroutine expand_tvd(cm, dm, ng, u, v)
+  subroutine expand(cm, dm, ng, u, v)
 
     implicit none
 
@@ -178,7 +178,7 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine expand_tvd
+  end subroutine expand
 !
 !===============================================================================
 !
