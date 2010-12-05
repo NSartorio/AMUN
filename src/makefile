@@ -79,6 +79,10 @@ FFLAGS  += -DPREC=${PREC}
 #
 FFLAGS  += -D${TIME}
 
+# spacial reconstruction method
+#
+FFLAGS  += -D${SPACE}
+
 # set of equations
 #
 FFLAGS  += -D${EQS}
