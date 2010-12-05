@@ -813,9 +813,6 @@ module mesh
     use blocks       , only : block_meta, block_data, nchild
     use config       , only : ng, in, jn, kn, im, jm, km
     use interpolation, only : expand
-#if defined MHD && defined FLUXCT
-    use interpolation, only : expand_mag
-#endif /* MHD & FLUXCT */
     use variables    , only : nfl, nqt
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
