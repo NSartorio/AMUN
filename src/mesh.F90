@@ -811,8 +811,8 @@ module mesh
   subroutine prolong_block(pblock)
 
     use blocks       , only : block_meta, block_data, nchild
-    use config       , only : ng, in, jn, kn, im, jm, km
-    use interpolation, only : expand
+    use config       , only : ng, nh, in, jn, kn, im, jm, km
+    use interpolation, only : expand_tvd
     use variables    , only : nfl, nqt
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
@@ -870,7 +870,7 @@ module mesh
 ! expand all variables and place them in the array u
 !
     do q = 1, nfl
-      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+      call expand_tvd(dm, fm, nh, pdata%u(q,:,:,:), u(q,:,:,:))
     end do
 
 #ifdef MHD
@@ -878,12 +878,12 @@ module mesh
 ! expand the cell centered magnetic field components
 !
     do q = ibx, ibz
-      call expand(dm, fm, ng, pdata%u(q,:,:,:), u(q,:,:,:), 't', 't', 't')
+      call expand_tvd(dm, fm, nh, pdata%u(q,:,:,:), u(q,:,:,:))
     end do
 
 ! expand the scalar potential Psi
 !
-    call expand(dm, fm, ng, pdata%u(iph,:,:,:), u(iph,:,:,:), 't', 't', 't')
+    call expand_tvd(dm, fm, nh, pdata%u(iph,:,:,:), u(iph,:,:,:))
 #endif /* GLM */
 #endif /* MHD */
 ! iterate over all children
