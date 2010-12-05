@@ -894,12 +894,12 @@ module mesh
 !
       pchild => pblock%child(p)%ptr
 
-! calculate the position of child in the parent block
+! obtain the position of child in the parent block
 !
-      is = mod((p - 1)    ,2)
-      js = mod((p - 1) / 2,2)
+      is = pchild%pos(1)
+      js = pchild%pos(2)
 #if NDIMS == 3
-      ks = mod((p - 1) / 4,2)
+      ks = pchild%pos(3)
 #endif /* NDIMS == 3 */
 
 ! calculate indices of the current child subdomain
