@@ -1246,7 +1246,7 @@ module io
     use variables    , only : ien, ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz, icx, icy, icz
+    use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1477,9 +1477,9 @@ module io
 #ifdef ADI
     use variables    , only : ipr
 #endif /* ADI */
-#ifdef MHD
-    use variables    , only : icx, icy, icz
-#endif /* MHD */
+#ifdef MPI
+    use variables    , only : ibx, iby, ibz
+#endif /* MPI */
 
 ! declare variables
 !
@@ -1575,9 +1575,9 @@ module io
         pres(l,1:in,1:jn,1:kn) = q(ipr,ib:ie,jb:je,kb:ke)
 #endif /* ADI */
 #ifdef MHD
-        magx(l,1:in,1:jn,1:kn) = q(icx,ib:ie,jb:je,kb:ke)
-        magy(l,1:in,1:jn,1:kn) = q(icy,ib:ie,jb:je,kb:ke)
-        magz(l,1:in,1:jn,1:kn) = q(icz,ib:ie,jb:je,kb:ke)
+        magx(l,1:in,1:jn,1:kn) = q(ibx,ib:ie,jb:je,kb:ke)
+        magy(l,1:in,1:jn,1:kn) = q(iby,ib:ie,jb:je,kb:ke)
+        magz(l,1:in,1:jn,1:kn) = q(ibz,ib:ie,jb:je,kb:ke)
 #endif /* MHD */
 
         l = l + 1
