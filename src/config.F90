@@ -115,6 +115,13 @@ module config
 !
   real               , save :: alpha_p = 0.5d0
 #endif /* MHD & GLM */
+#ifdef LIMO3
+
+! parameters for the LIMO3 reconstruction
+!
+  real               , save :: eps = 1.0d-12
+  real               , save :: rad = 1.0d0
+#endif /* LIMO3 */
 
   contains
 !
@@ -295,6 +302,12 @@ module config
     case("alpha_p")
       read(value,        *) alpha_p
 #endif /* MHD & GLM */
+#ifdef LIMO3
+    case("eps")
+      read(value,        *) eps
+    case("rad")
+      read(value,        *) rad
+#endif /* LIMO3 */
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select

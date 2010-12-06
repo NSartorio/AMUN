@@ -39,6 +39,10 @@ module interpolation
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
+#ifdef LIMO3
+    use config, only : eps, rad
+#endif /* LIMO3 */
+
     implicit none
 
 ! input/output arguments
@@ -53,13 +57,16 @@ module interpolation
     integer            :: i
     real               :: df, ds
     real, dimension(n) :: dfl, dfr
+#ifdef LIMO3
+    real               :: rdx, th, et, f0, f1, f2, ft
+#endif /* LIMO3 */
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef TVD
 !! second order TVD interpolation
 !!
-! calculate left and right derivatives
+! calculate the left and right derivatives
 !
     do i = 1, n - 1
       dfr(i  ) = f(i+1) - f(i)
@@ -96,6 +103,82 @@ module interpolation
     end do
     fr(n) = f(n)
 #endif /* TVD */
+#ifdef LIMO3
+!! third order interpolation
+!!
+! prepare parameters
+!
+    rdx = rad * h
+    rdx = rdx * rdx
+
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      dfr(i  ) = f(i+1) - f(i)
+      dfl(i+1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
+
+! calculate values at i+1/2
+!
+    do i = 1, n
+      if (dfr(i) .eq. 0.0d0) then
+        fl(i) = f(i)
+      else
+        th = dfl(i) / dfr(i)
+
+        et = (dfl(i) * dfl(i) + dfr(i) * dfr(i)) / rdx
+
+        f1 = (2.0d0 + th) / 3.0d0
+
+        if (et .le. (1.0d0 - eps)) then
+          f0 = f1
+        else if (et .ge. (1.0d0 + eps)) then
+          f0 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
+        else
+          ft = (et - 1.0d0) / eps
+          f2 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
+          f0 = 0.5d0 * ((1.0d0 - ft) * f1 + (1.0d0 + ft) * f2)
+        end if
+
+        fl(i) = f(i) + 0.5d0 * dfr(i) * f0
+      end if
+    end do
+
+! calculate values at i-1/2
+!
+    do i = 1, n
+      if (dfl(i) .eq. 0.0d0) then
+        fr(i) = f(i)
+      else
+        th = dfr(i) / dfl(i)
+
+        et = (dfl(i) * dfl(i) + dfr(i) * dfr(i)) / rdx
+
+        f1 = (2.0d0 + th) / 3.0d0
+
+        if (et .le. (1.0d0 - eps)) then
+          f0 = f1
+        else if (et .ge. (1.0d0 + eps)) then
+          f0 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
+        else
+          ft = (et - 1.0d0) / eps
+          f2 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
+          f0 = 0.5d0 * ((1.0d0 - ft) * f1 + (1.0d0 + ft) * f2)
+        end if
+
+        fr(i) = f(i) - 0.5d0 * dfl(i) * f0
+      end if
+    end do
+
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
+#endif /* LIMO3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -329,6 +412,20 @@ module interpolation
         v(ir) = u(i)
       end if
 #endif /* TVD */
+#ifdef LIMO3
+      dup = u(i+1) - u(i)
+      dum = u(i) - u(i-1)
+      ds  = dup * dum
+
+      if (ds .gt. 0.0) then
+        du  = sign(0.25, dup) * min(abs(dup), abs(dum))
+        v(il) = u(i) - du
+        v(ir) = u(i) + du
+      else
+        v(il) = u(i)
+        v(ir) = u(i)
+      end if
+#endif /* LIMO3 */
 
     end do
 !
