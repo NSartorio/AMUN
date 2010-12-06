@@ -37,7 +37,7 @@ module interpolation
 !
 !===============================================================================
 !
-  subroutine reconstruct(n, h, vx, vl, vr)
+  subroutine reconstruct(n, h, f, fl, fr)
 
     implicit none
 
@@ -45,51 +45,56 @@ module interpolation
 !
     integer           , intent(in)  :: n
     real              , intent(in)  :: h
-    real, dimension(n), intent(in)  :: vx
-    real, dimension(n), intent(out) :: vl, vr
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
 
 ! local variables
 !
     integer            :: i
-    real               :: dv
-    real, dimension(n) :: ds, dvl, dvr
+    real               :: df, ds
+    real, dimension(n) :: dfl, dfr
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef TVD
-! second order TVD interpolation
+!! second order TVD interpolation
+!!
+! calculate left and right derivatives
 !
-    do i = 1, n-1
-      dvr(i  ) = vx(i+1) - vx(i)
-      dvl(i+1) = dvr(i)
-    enddo
+    do i = 1, n - 1
+      dfr(i  ) = f(i+1) - f(i)
+      dfl(i+1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
 
-    dvl(1) = dvr(1)
-    dvr(n) = dvl(n)
-
+! interpolate the values at i-1/2 and i+1/2
+!
     do i = 1, n
-      ds (i) = dvr(i) * dvl(i)
+      ds = dfr(i) * dfl(i)
 
-      if (ds(i) .gt. 0.0) then
+      if (ds .gt. 0.0d0) then
 #ifdef MINMOD
-        dv  = sign(0.5, dvr(i)) * min(abs(dvr(i)), abs(dvl(i)))
+        df = sign(0.5d0, dfr(i)) * min(abs(dfr(i)), abs(dfl(i)))
 #endif /* MINMOD */
 #ifdef LF
-        dv  = ds(i) / (dvr(i) + dvl(i))
+        df  = ds / (dfr(i) + dfl(i))
 #endif /* LF */
 
-        vl(i) = vx(i) + dv
-        vr(i) = vx(i) - dv
+        fl(i) = f(i) + df
+        fr(i) = f(i) - df
       else
-        vl(i) = vx(i)
-        vr(i) = vx(i)
-      endif
-    enddo
+        fl(i) = f(i)
+        fr(i) = f(i)
+      end if
+    end do
 
-    do i = 1, n-1
-      vr(i) = vr(i+1)
-    enddo
-    vr(n) = vx(n)
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
 #endif /* TVD */
 !
 !-------------------------------------------------------------------------------
