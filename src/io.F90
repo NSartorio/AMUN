@@ -1477,9 +1477,9 @@ module io
 #ifdef ADI
     use variables    , only : ipr
 #endif /* ADI */
-#ifdef MPI
+#ifdef MHD
     use variables    , only : ibx, iby, ibz
-#endif /* MPI */
+#endif /* MHD */
 
 ! declare variables
 !
