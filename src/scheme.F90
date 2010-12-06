@@ -41,9 +41,10 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine update(u, du, dxi, dyi, dzi)
+  subroutine update(l, u, du)
 
     use config       , only : im, jm, km
+    use mesh         , only : adx, ady, adz, adxi, adyi, adzi
     use variables    , only : nvr, nqt, nfl
     use variables    , only : idn, imx, imy, imz
 #ifdef ADI
@@ -60,13 +61,14 @@ module scheme
 
 ! input arguments
 !
-    real, dimension(nqt,im,jm,km)      , intent(in)  :: u
-    real, dimension(nqt,im,jm,km)      , intent(out) :: du
-    real                               , intent(in)  :: dxi, dyi, dzi
+    integer                      , intent(in)  :: l
+    real, dimension(nqt,im,jm,km), intent(in)  :: u
+    real, dimension(nqt,im,jm,km), intent(out) :: du
 
 ! local variables
 !
     integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
+    real    :: dx, dy, dz, dxi, dyi, dzi
 
 ! local temporary arrays
 !
@@ -84,6 +86,17 @@ module scheme
 ! reset the increment array
 !
     du(:,:,:,:) = 0.0
+
+! prepare spacial intervals
+!
+    dx  = adx (l)
+    dxi = adxi(l)
+    dy  = ady (l)
+    dyi = adyi(l)
+#if NDIMS == 3
+    dz  = adz (l)
+    dzi = adzi(l)
+#endif /* NDIMS == 3 */
 
 !  update along X-direction
 !
@@ -123,13 +136,13 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (im, ux(:,:), fx(:,:))
+        call hll (im, dx, ux(:,:), fx(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(im, ux(:,:), fx(:,:))
+        call hllc(im, dx, ux(:,:), fx(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-        call hlld(im, ux(:,:), fx(:,:))
+        call hlld(im, dx, ux(:,:), fx(:,:))
 #endif /* HLLD */
 
 ! update the arrays of increments
@@ -194,13 +207,13 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (jm, uy(:,:), fy(:,:))
+        call hll (jm, dy, uy(:,:), fy(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(jm, uy(:,:), fy(:,:))
+        call hllc(jm, dy, uy(:,:), fy(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-        call hlld(jm, uy(:,:), fy(:,:))
+        call hlld(jm, dy, uy(:,:), fy(:,:))
 #endif /* HLLD */
 
 ! update the arrays of increments
@@ -264,13 +277,13 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (km, uz(:,:), fz(:,:))
+        call hll (km, dz, uz(:,:), fz(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(km, uz(:,:), fz(:,:))
+        call hllc(km, dz, uz(:,:), fz(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-        call hlld(km, uz(:,:), fz(:,:))
+        call hlld(km, dz, uz(:,:), fz(:,:))
 #endif /* HLLD */
 
 ! update the arrays of increments
@@ -309,7 +322,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hll(n, u, f)
+  subroutine hll(n, h, u, f)
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
@@ -326,6 +339,7 @@ module scheme
 ! input/output arguments
 !
     integer               , intent(in)  :: n
+    real                  , intent(in)  :: h
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
 
@@ -346,20 +360,20 @@ module scheme
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
 #ifdef MHD
-#ifdef GLM
 ! reconstruct the left and right states of the magnetic field components
 !
     do p = ibx, ibz
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
+#ifdef GLM
 ! reconstruct the left and right states of the scalar potential
 !
-    call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+    call reconstruct(n, h, q(iph,:), ql(iph,:), qr(iph,:))
 
 ! obtain the state values for Bx and Psi for the GLM-MHD equations
 !
@@ -428,7 +442,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hllc(n, u, f)
+  subroutine hllc(n, h, u, f)
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
@@ -439,6 +453,7 @@ module scheme
 ! input/output arguments
 !
     integer               , intent(in)  :: n
+    real                  , intent(in)  :: h
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
 
@@ -461,7 +476,7 @@ module scheme
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
 ! obtain the conservative variables at both states
@@ -629,7 +644,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hlld(n, u, f)
+  subroutine hlld(n, h, u, f)
 
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
@@ -644,6 +659,7 @@ module scheme
 ! input/output arguments
 !
     integer               , intent(in)  :: n
+    real                  , intent(in)  :: h
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
 
@@ -666,19 +682,19 @@ module scheme
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
-#ifdef GLM
 ! reconstruct the left and right states of the magnetic field components
 !
     do p = ibx, ibz
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
+#ifdef GLM
 ! reconstruct the left and right states of the scalar potential
 !
-    call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+    call reconstruct(n, h, q(iph,:), ql(iph,:), qr(iph,:))
 
 ! obtain the state values for Bx and Psi for the GLM-MHD equations
 !
@@ -873,7 +889,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hlld(n, u, f)
+  subroutine hlld(n, h, u, f)
 
     use config       , only : gamma
     use interpolation, only : reconstruct
@@ -889,6 +905,7 @@ module scheme
 ! input/output arguments
 !
     integer               , intent(in)  :: n
+    real                  , intent(in)  :: h
     real, dimension(nvr,n), intent(in)  :: u
     real, dimension(nqt,n), intent(out) :: f
 
@@ -912,19 +929,19 @@ module scheme
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
-#ifdef GLM
 ! reconstruct the left and right states of the magnetic field components
 !
     do p = ibx, ibz
-      call reconstruct(n, q(p,:), ql(p,:), qr(p,:))
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
+#ifdef GLM
 ! reconstruct the left and right states of the scalar potential
 !
-    call reconstruct(n, q(iph,:), ql(iph,:), qr(iph,:))
+    call reconstruct(n, h, q(iph,:), ql(iph,:), qr(iph,:))
 
 ! obtain the state values for Bx and Psi for the GLM-MHD equations
 !
