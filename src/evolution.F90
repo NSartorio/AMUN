@@ -181,6 +181,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -203,8 +204,9 @@ module evolution
 
 ! local variables
 !
+    real    :: dxi, dyi, dzi, ch2
 #if defined MHD && defined GLM
-    real    :: ch2, decay
+    real    :: decay
 #endif /* MHD & GLM */
 
 ! local arrays
@@ -213,14 +215,20 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
 ! 1st step of integration
 !
-    call update(pblock%meta%level, pblock%u(:,:,:,:), du(:,:,:,:))
+    call update(pblock%u, du, dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock, du(:,:,:,:))
+    call update_shapes(pblock, du)
 #endif /* SHAPE */
 
 ! update the solution for the fluid variables
@@ -265,6 +273,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -287,8 +296,9 @@ module evolution
 
 ! local variables
 !
+    real    :: dxi, dyi, dzi, ch2
 #if defined MHD && defined GLM
-    real    :: ch2, decay
+    real    :: decay
 #endif /* MHD & GLM */
 
 ! local arrays
@@ -297,6 +307,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
 #if defined MHD && defined GLM
 ! calculate c_h^2
 !
@@ -305,7 +321,7 @@ module evolution
 #endif /* MHD & GLM */
 !! 1st step of integration
 !!
-    call update(pblock%meta%level, pblock%u(:,:,:,:), du(:,:,:,:))
+    call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -331,7 +347,7 @@ module evolution
 
 ! 2nd step of integration
 !
-    call update(pblock%meta%level, u1(:,:,:,:), du(:,:,:,:))
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -380,6 +396,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -402,8 +419,9 @@ module evolution
 
 ! local variables
 !
+    real    :: dxi, dyi, dzi, ch2
 #if defined MHD && defined GLM
-    real    :: ch2, decay
+    real    :: decay
 #endif /* MHD & GLM */
 
 ! local arrays
@@ -416,6 +434,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
 #if defined MHD && defined GLM
 ! calculate c_h^2
 !
@@ -424,7 +448,7 @@ module evolution
 #endif /* MHD & GLM */
 !! 1st step of integration
 !!
-    call update(pblock%meta%level, pblock%u(:,:,:,:), du(:,:,:,:))
+    call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -450,7 +474,7 @@ module evolution
 
 !! 2nd step of integration
 !!
-    call update(pblock%meta%level, u1(:,:,:,:), du(:,:,:,:))
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -479,7 +503,7 @@ module evolution
 
 !! 3rd step of integration
 !!
-    call update(pblock%meta%level, u1(:,:,:,:), du(:,:,:,:))
+    call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
 #ifdef SHAPE
 ! restrict update in a defined shape

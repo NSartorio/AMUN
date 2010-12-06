@@ -152,8 +152,7 @@ mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90
 problem.o       : problem.F90 blocks.o scheme.o variables.o
-scheme.o        : scheme.F90 blocks.o config.o interpolation.o mesh.o          \
-                  variables.o
+scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
 timer.o         : timer.F90
 variables.o     : variables.F90
 
