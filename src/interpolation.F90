@@ -37,13 +37,14 @@ module interpolation
 !
 !===============================================================================
 !
-  subroutine reconstruct(n, vx, vl, vr)
+  subroutine reconstruct(n, h, vx, vl, vr)
 
     implicit none
 
 ! input/output arguments
 !
     integer           , intent(in)  :: n
+    real              , intent(in)  :: h
     real, dimension(n), intent(in)  :: vx
     real, dimension(n), intent(out) :: vl, vr
 
