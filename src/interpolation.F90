@@ -56,7 +56,8 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! second order interpolation
+#ifdef TVD
+! second order TVD interpolation
 !
     do i = 1, n-1
       dvr(i  ) = vx(i+1) - vx(i)
@@ -89,7 +90,8 @@ module interpolation
       vr(i) = vr(i+1)
     enddo
     vr(n) = vx(n)
-
+#endif /* TVD */
+!
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -303,6 +305,7 @@ module interpolation
       ir = 2 * (i - ng)
       il = ir - 1
 
+#ifdef TVD
       dup = u(i+1) - u(i)
       dum = u(i) - u(i-1)
       ds  = dup * dum
@@ -320,6 +323,7 @@ module interpolation
         v(il) = u(i)
         v(ir) = u(i)
       end if
+#endif /* TVD */
 
     end do
 !

@@ -61,6 +61,15 @@ ifeq ($(SHAPE),Y)
 FFLAGS  += -DSHAPE
 endif
 
+# check if reconstruction is TVD
+#
+ifeq ($(SPACE),MINMOD)
+FFLAGS  += -DTVD
+endif
+ifeq ($(SPACE),LF)
+FFLAGS  += -DTVD
+endif
+
 # output data format
 #
 FFLAGS  += -D${OUTPUT}
