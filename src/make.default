@@ -34,7 +34,7 @@ EOS        = ADI
 #
 #  SOLVER    - family of solvers: GODUNOV
 #  TIME      - time integration: EULER, RK2, RK3
-#  SPACE     - spacial reconstruction: MINMOD, LF, LIMO3
+#  SPACE     - spacial reconstruction: MINMOD, LF, LIMO3, MP5, MP7, MP9
 #  FLUX      - flux approximation: HLL, HLLC, HLLD
 #  FLUXEMF   - electromotive force approximation: GLM
 #

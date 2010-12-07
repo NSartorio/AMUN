@@ -42,6 +42,9 @@ module interpolation
 #ifdef LIMO3
     use config, only : eps, rad
 #endif /* LIMO3 */
+#ifdef MP
+    use config, only : alpha
+#endif /* MP */
 
     implicit none
 
@@ -60,6 +63,17 @@ module interpolation
 #ifdef LIMO3
     real               :: rdx, th, et, f0, f1, f2, ft
 #endif /* LIMO3 */
+#ifdef MP
+    integer            :: im2, im1, ip1, ip2
+#ifndef MP5
+    integer            :: im3, ip3
+#endif /* !MP5 */
+#ifdef MP9
+    integer            :: im4, ip4
+#endif /* MP9 */
+    real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
+    real, dimension(n) :: df2, dm4, dp4
+#endif /* MP */
 !
 !-------------------------------------------------------------------------------
 !
@@ -179,10 +193,176 @@ module interpolation
     end do
     fr(n) = f(n)
 #endif /* LIMO3 */
+#ifdef MP
+!! fifth or higher order monotonicity preserving interpolation
+!!
+
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      dfr(i  ) = f(i+1) - f(i)
+      dfl(i+1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
+
+! calculate the cell centered second derivative
+!
+    do i = 1, n
+      df2(i) = dfr(i) - dfl(i)
+    end do
+
+! calculate the smoothness indicator for values at i+1/2
+!
+    do i = 1, n - 1
+      dm4(i) = sign(1.0d0, df2(i)) * min(abs(df2(i)), abs(df2(i+1)),           &
+               abs(4.0d0 * df2(i) - df2(i+1)), abs(4.0d0 * df2(i+1) - df2(i)))
+    end do
+    dm4(n) = dm4(n-1)
+
+! calculate the smoothness indicator for values at i-1/2
+!
+    do i = 2, n
+      dp4(i) = sign(1.0d0, df2(i)) * min(abs(df2(i)), abs(df2(i-1)),           &
+               abs(4.0d0 * df2(i) - df2(i-1)), abs(4.0d0 * df2(i-1) - df2(i)))
+    end do
+    dp4(1) = dp4(2)
+
+! iterate over all positions
+!
+    do i = 1, n
+#ifdef MP9
+      im4 = max(1, i-4)
+#endif /* MP9 */
+#ifndef MP5
+      im3 = max(1, i-3)
+#endif /* !MP5 */
+      im2 = max(1, i-2)
+      im1 = max(1, i-1)
+      ip1 = min(n, i+1)
+      ip2 = min(n, i+2)
+#ifndef MP5
+      ip3 = min(n, i+3)
+#endif /* !MP5 */
+#ifdef MP9
+      ip4 = min(n, i+4)
+#endif /* MP9 */
+
+! calculate values at i+1/2
+!
+#ifdef MP5
+      fh = (2.0d0 * f(im2) - 13.0d0 * f(im1) + 47.0d0 * f(i)                   &
+                           + 27.0d0 * f(ip1) -  3.0d0 * f(ip2)) / 60.0d0
+#endif /* MP5 */
+#ifdef MP7
+      fh = (-3.0d0 * f(im3) +  25.0d0 * f(im2) - 101.0d0 * f(im1)              &
+                            + 319.0d0 * f(i)   + 214.0d0 * f(ip1)              &
+                            -  38.0d0 * f(ip2) +   4.0d0 * f(ip3)) / 420.0d0
+#endif /* MP7 */
+#ifdef MP9
+      fh = (  4.0d0 * f(im4) -   41.0d0 * f(im3) +  199.0d0 * f(im2)           &
+          - 641.0d0 * f(im1) + 1879.0d0 * f(i)   + 1375.0d0 * f(ip1)           &
+          - 305.0d0 * f(ip2) +   55.0d0 * f(ip3) -    5.0d0 * f(ip4)) / 2520.0d0
+#endif /* MP9 */
+
+      fmp = f(i) + minmod(f(ip1) - f(i), alpha * (f(i) - f(im1)))
+      ds = (fh - f(i)) * (fh - fmp)
+      if (ds .le. 1.0d-10) then
+        fl(i) = fh
+      else
+        ful = f(i) + alpha * (f(i) - f(im1))
+        fav = 0.5d0 * (f(i) + f(ip1))
+        fmd = fav - 0.5d0 * dm4(i)
+        flc = f(i) + 0.5d0 * (f(i) - f(im1)) + 4.0d0 / 3.0d0 * dm4(im1)
+        fmn = max(min(f(i),f(ip1),fmd), min(f(i),ful,flc))
+        fmx = min(max(f(i),f(ip1),fmd), max(f(i),ful,flc))
+        fl(i) = median(fh, fmn, fmx)
+      end if
+
+! calculate values at i-1/2
+!
+#ifdef MP5
+      fh = (2.0d0 * f(ip2) - 13.0d0 * f(ip1) + 47.0d0 * f(i)                   &
+                           + 27.0d0 * f(im1) -  3.0d0 * f(im2)) / 60.0d0
+#endif /* MP5 */
+#ifdef MP7
+      fh = (-3.0d0 * f(ip3) +  25.0d0 * f(ip2) - 101.0d0 * f(ip1)              &
+                            + 319.0d0 * f(i)   + 214.0d0 * f(im1)              &
+                            -  38.0d0 * f(im2) +   4.0d0 * f(im3)) / 420.0d0
+#endif /* MP7 */
+#ifdef MP9
+      fh = (  4.0d0 * f(ip4) -   41.0d0 * f(ip3) +  199.0d0 * f(ip2)           &
+          - 641.0d0 * f(ip1) + 1879.0d0 * f(i)   + 1375.0d0 * f(im1)           &
+          - 305.0d0 * f(im2) +   55.0d0 * f(im3) -    5.0d0 * f(im4)) / 2520.0d0
+#endif /* MP9 */
+
+      fmp = f(i) + minmod(f(im1) - f(i), alpha * (f(i) - f(ip1)))
+      ds = (fh - f(i)) * (fh - fmp)
+      if (ds .le. 1.0d-10) then
+        fr(i) = fh
+      else
+        ful = f(i) + alpha * (f(i) - f(ip1))
+        fav = 0.5d0 * (f(i) + f(im1))
+        fmd = fav - 0.5d0 * dp4(i)
+        flc = f(i) + 0.5d0 * (f(i) - f(ip1)) + 4.0d0 / 3.0d0 * dp4(ip1)
+        fmn = max(min(f(i),f(im1),fmd), min(f(i),ful,flc))
+        fmx = min(max(f(i),f(im1),fmd), max(f(i),ful,flc))
+        fr(i) = median(fh, fmn, fmx)
+      end if
+    end do
+
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
+#endif /* MP */
 !
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
+!
+!===============================================================================
+!
+! minmod: function returns the minimum module value among two arguments
+!
+!===============================================================================
+!
+  real function minmod(a, b)
+
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: a, b
+!
+!-------------------------------------------------------------------------------
+!
+    minmod = (sign(0.5d0, a) + sign(0.5d0, b)) * min(abs(a), abs(b))
+    return
+  end function minmod
+!
+!===============================================================================
+!
+! median: function returns the median of three numbers
+!
+!===============================================================================
+!
+  real function median(a, b, c)
+
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: a, b, c
+!
+!-------------------------------------------------------------------------------
+!
+    median = a + minmod(b - a, c - a)
+
+    return
+  end function median
 !
 !===============================================================================
 !
@@ -412,7 +592,7 @@ module interpolation
         v(ir) = u(i)
       end if
 #endif /* TVD */
-#ifdef LIMO3
+#if defined LIMO3 || defined MP
       dup = u(i+1) - u(i)
       dum = u(i) - u(i-1)
       ds  = dup * dum
@@ -425,7 +605,7 @@ module interpolation
         v(il) = u(i)
         v(ir) = u(i)
       end if
-#endif /* LIMO3 */
+#endif /* LIMO3 | MP */
 
     end do
 !

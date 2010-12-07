@@ -122,6 +122,12 @@ module config
   real               , save :: eps = 1.0d-12
   real               , save :: rad = 1.0d0
 #endif /* LIMO3 */
+#ifdef MP
+
+! parameters for the monitonicity preserving reconstruction
+!
+  real               , save :: alpha = 4.0d0
+#endif /* MP */
 
   contains
 !
@@ -308,6 +314,10 @@ module config
     case("rad")
       read(value,        *) rad
 #endif /* LIMO3 */
+#ifdef MP
+    case("alpha")
+      read(value,        *) alpha
+#endif /* MP */
     case default
       call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select

@@ -69,6 +69,15 @@ endif
 ifeq ($(SPACE),LF)
 FFLAGS  += -DTVD
 endif
+ifeq ($(SPACE),MP5)
+FFLAGS  += -DMP
+endif
+ifeq ($(SPACE),MP7)
+FFLAGS  += -DMP
+endif
+ifeq ($(SPACE),MP9)
+FFLAGS  += -DMP
+endif
 
 # output data format
 #
