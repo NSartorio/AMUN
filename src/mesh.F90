@@ -50,7 +50,7 @@ module mesh
   subroutine init_mesh
 
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
-                       , ncells, maxlev, rdims
+                       , ncells, maxlev, rdims, ng
     use blocks  , only : block_meta, block_data, list_meta, list_data          &
                        , init_blocks, refine_block               &
                        , deallocate_datablock, mblocks, nleafs, dblocks        &
@@ -347,21 +347,40 @@ module mesh
     allocate(adyi(maxlev))
     allocate(adzi(maxlev))
 
+! reset the coordinate variables
+!
+    ax  (:,:) = 0.0d0
+    ay  (:,:) = 0.0d0
+    az  (:,:) = 0.0d0
+    adx (:)   = 1.0d0
+    ady (:)   = 1.0d0
+    adz (:)   = 1.0d0
+    adxi(:)   = 1.0d0
+    adyi(:)   = 1.0d0
+    adzi(:)   = 1.0d0
+
 ! generating coordinates for all levels
 !
     do l = 1, maxlev
       p = ncells * 2**(l - 1)
 
       adx (l) = (xmax - xmin) / (rdims(1) * p)
-      adxi(l) = 1.0 / adx(l)
       ady (l) = (ymax - ymin) / (rdims(2) * p)
-      adyi(l) = 1.0 / ady(l)
 #if NDIMS == 3
       adz (l) = (zmax - zmin) / (rdims(3) * p)
-#else
-      adz (l) = 1.0
 #endif /* NDIMS == 3 */
-      adzi(l) = 1.0 / adz(l)
+
+      ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
+      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
+#if NDIMS == 3
+      az(l,:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * adz(l)
+#endif /* NDIMS == 3 */
+
+      adxi(l) = 1.0d0 / adx(l)
+      adyi(l) = 1.0d0 / ady(l)
+#if NDIMS == 3
+      adzi(l) = 1.0d0 / adz(l)
+#endif /* NDIMS == 3 */
     end do
 
 ! get the minimum grid step
