@@ -90,12 +90,16 @@ module random
 
 ! fill seeds with random numbers
 !
+#ifdef MPI
     if (is_master()) then
+#endif /* MPI */
       do i = 0, npar - 1
         call random_number(q)
         seeds(i) = 123456789 * q
       end do
+#ifdef MPI
     end if
+#endif /* MPI */
 
 #ifdef MPI
 ! redistribute seeds
