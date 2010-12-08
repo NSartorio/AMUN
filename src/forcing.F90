@@ -310,9 +310,9 @@ module forcing
 
 ! input/output arguments
 !
-    integer                        , intent(in)    :: l
-    real                           , intent(in)    :: xmn, ymn, zmn
-    real, dimension(NDIMS,im,jm,km), intent(inout) :: f
+    integer                    , intent(in)    :: l
+    real                       , intent(in)    :: xmn, ymn, zmn
+    real, dimension(3,im,jm,km), intent(inout) :: f
 
 ! local variables
 !
