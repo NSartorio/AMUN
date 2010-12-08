@@ -28,21 +28,173 @@ module forcing
 
   implicit none
 
+#ifdef FORCE
+! number of driven components
+!
+  integer                             , save :: nf
+
+! array of k vectors, mode amplitudes, and unit vectors
+!
+  integer, dimension(:,:), allocatable, save :: ktab
+  real   , dimension(:,:), allocatable, save :: e1, e2
+#endif /* FORCE */
+
   contains
 !
 !===============================================================================
 !
 ! init_forcing: subroutine allocates and initializes the forcing variables
-!               required i.e. for driving turbulence
+!               required e.g. for driving turbulence
 !
 !===============================================================================
 !
   subroutine init_forcing()
 
+#ifdef FORCE
+    use config, only : fpow, fani, fdt, kf, kl, ku, kc, kd
+#endif /* FORCE */
+
     implicit none
+
+#ifdef FORCE
+! local variables
+!
+    integer :: kmx, i, j, k, l
+    real    :: rk, kr, fnor, famp, fa, kx, ky, kz, kxy
+#endif /* FORCE */
 
 !-------------------------------------------------------------------------------
 !
+#ifdef FORCE
+! initialize the number of drived components, normalization factor, and
+! maximum wave number
+!
+    nf   = 0
+    fnor = 0.0d0
+    kmx  = int(ku + 1)
+
+! calculate the number of drived components and normalization factor
+!
+#if NDIMS == 2
+    do j = - kmx, kmx, kd
+      do i = - kmx, kmx, kd
+        rk = sqrt(real(i * i + j * j))
+        if (rk .ge. kl .and. rk .le. ku) then
+          nf   = nf + 1
+          kr   = (rk - kf) / kc
+          fnor = fnor + exp(-0.5d0 * kr * kr)
+        end if
+      end do
+    end do
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = - kmx, kmx, kd
+      do j = - kmx, kmx, kd
+        do i = - kmx, kmx, kd
+          rk = sqrt(real(i * i + j * j + k * k))
+          if (rk .ge. kl .and. rk .le. ku) then
+            nf   = nf + 1
+            kr   = (rk - kf) / kc
+            fnor = fnor + exp(-0.5d0 * kr * kr)
+          end if
+        end do
+      end do
+    end do
+#endif /* NDIMS == 3 */
+
+! calculate the maximum driving amplitude
+!
+    famp = sqrt(fpow * fdt / fnor)
+
+! allocate arrays for k vectors, mode amplitudes and unit vectors
+!
+    allocate(ktab(nf,3))
+    allocate(e1  (nf,3))
+    allocate(e2  (nf,3))
+
+! prepare k vector, amplitude and unit vectors for each node
+!
+    l = 0
+#if NDIMS == 2
+    do j = - kmx, kmx, kd
+      do i = - kmx, kmx, kd
+        rk = sqrt(real(i * i + j * j))
+        if (rk .ge. kl .and. rk .le. ku) then
+          l    = l + 1
+
+! prepare k vector
+!
+          ktab(l,1) = i
+          ktab(l,2) = j
+          ktab(l,3) = 0
+
+! compute its amplitude
+!
+          kr  = (rk - kf) / kc
+          fa  = famp * exp(-0.5d0 * kr * kr)
+
+! prepare the unit vectors
+!
+          kx  = real(i)
+          ky  = real(j)
+          kxy = sqrt(kx * kx + ky * ky)
+
+          e1(l,1) =   ky / kxy
+          e1(l,2) = - kx / kxy
+          e1(l,3) = 0.0d0
+
+          e2(l,1) = 0.0d0
+          e2(l,2) = 0.0d0
+          e2(l,3) = 1.0d0
+
+          e1(l,:) = fa * e1(l,:)
+          e2(l,:) = fa * e2(l,:)
+        end if
+      end do
+    end do
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = - kmx, kmx, kd
+      do j = - kmx, kmx, kd
+        do i = - kmx, kmx, kd
+          rk = sqrt(real(i * i + j * j + k * k))
+          if (rk .ge. kl .and. rk .le. ku) then
+            l    = l + 1
+
+! prepare k vector
+!
+            ktab(l,1) = i
+            ktab(l,2) = j
+            ktab(l,3) = k
+
+! compute its amplitude
+!
+            kr = (rk - kf) / kc
+            fa = famp * exp(-0.5d0 * kr * kr)
+
+! prepare the unit vectors
+!
+            kx  = real(i)
+            ky  = real(j)
+            kz  = real(k)
+            kxy = sqrt(kx * kx + ky * ky)
+
+            e1(l,1) =   ky / kxy
+            e1(l,2) = - kx / kxy
+            e1(l,3) = 0.0d0
+
+            e2(l,1) =   kx * kz / (rk * kxy)
+            e2(l,2) =   ky * kz / (rk * kxy)
+            e2(l,3) = - kxy / rk
+
+            e1(l,:) = fa * e1(l,:)
+            e2(l,:) = fa * e2(l,:)
+          end if
+        end do
+      end do
+    end do
+#endif /* NDIMS == 3 */
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
@@ -60,11 +212,17 @@ module forcing
 
 !-------------------------------------------------------------------------------
 !
+#ifdef FORCE
+    if (allocated(ktab)) deallocate(ktab)
+    if (allocated(e1))   deallocate(e1)
+    if (allocated(e2))   deallocate(e2)
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_forcing
-
+#ifdef FORCE
+#endif /* FORCE */
 !===============================================================================
 !
 end module forcing
