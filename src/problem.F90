@@ -792,6 +792,7 @@ module problem
     use blocks   , only : block_data
     use config   , only : in, jn, kn, im, jm, km, ng                           &
                         , xmin, xmax, dens, pres, bamp, bper, ydel, ycut
+    use constants, only : pi
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -821,10 +822,6 @@ module problem
     real, dimension(jm)     :: y
     real, dimension(km)     :: z
     real, dimension(nvr,im) :: q, u
-
-! parameters
-!
-    real, parameter :: pi = 3.1415926535897931159979634685442d0
 !
 !-------------------------------------------------------------------------------
 !

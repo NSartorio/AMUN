@@ -133,12 +133,13 @@ name = godunov-amr
 
 default: $(name).x
 
-sources = blocks.F90 boundaries.F90 config.F90 driver.F90 error.F90            \
-          evolution.F90 interpolation.F90 io.F90 mesh.F90 mpitools.F90         \
-          problem.F90 random.F90 scheme.F90 timer.F90 variables.F90
-objects = blocks.o boundaries.o config.o driver.o error.o evolution.o          \
-          interpolation.o io.o mesh.o mpitools.o problem.o random.o scheme.o   \
-          timer.o variables.o
+sources = blocks.F90 boundaries.F90 config.F90 constants.F90 driver.F90        \
+          error.F90 evolution.F90 interpolation.F90 io.F90 mesh.F90            \
+          mpitools.F90 problem.F90 random.F90 scheme.F90 timer.F90             \
+          variables.F90
+objects = blocks.o boundaries.o config.o constants.o driver.o error.o          \
+          evolution.o interpolation.o io.o mesh.o mpitools.o problem.o         \
+          random.o scheme.o timer.o variables.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
 $(name).x: $(objects)
@@ -159,6 +160,7 @@ blocks.o        : blocks.F90 config.o error.o mpitools.o variables.o
 boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
                   mpitools.o variables.o
 config.o        : config.F90 error.o
+constants.o     : constants.F90
 driver.o        : driver.F90 config.o evolution.o io.o mesh.o mpitools.o       \
                   random.o timer.o
 error.o         : error.F90
@@ -169,7 +171,7 @@ io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90
-problem.o       : problem.F90 blocks.o scheme.o variables.o
+problem.o       : problem.F90 blocks.o constants.o scheme.o variables.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
 random.o        : random.F90 mpitools.o
 timer.o         : timer.F90
