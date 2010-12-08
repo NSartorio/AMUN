@@ -110,6 +110,18 @@ module config
 
   logical, dimension(NDIMS), save :: periodic = .true.
 
+#ifdef FORCE
+! forcing terms parameters
+!
+  real               , save :: fpow  = 1.0d+0 ! the power of driving
+  real               , save :: fdt   = 1.0d-6 ! the time step
+  real               , save :: fani  = 1.0d+0 ! the anisotropy
+  real               , save :: kf    = 2.5d+0 ! the wave number of maximum
+  real               , save :: kl    = 2.0d+0 ! the minimum cut-off wave number
+  real               , save :: ku    = 3.0d+0 ! the maximum cut-off wave number
+  real               , save :: kc    = 0.1d+0 ! the spectrum width
+  integer            , save :: kd    = 1      ! the wave number increment
+#endif /* FORCE */
 #if defined MHD && defined GLM
 ! coefficient controlling the decay of scalar potential Psi
 !
@@ -304,6 +316,24 @@ module config
     case ('zubndry')
       l = len_trim(value)
       write(zubndry  , "(a)") value(2:l-1)
+#ifdef FORCE
+    case("fpow")
+      read(value,*) fpow
+    case("fdt")
+      read(value,*) fdt
+    case("fani")
+      read(value,*) fani
+    case("kf")
+      read(value,*) kf
+    case("kl")
+      read(value,*) kl
+    case("ku")
+      read(value,*) ku
+    case("kc")
+      read(value,*) kc
+    case("kd")
+      read(value,*) kd
+#endif /* FORCE */
 #if defined MHD && defined GLM
     case("alpha_p")
       read(value,        *) alpha_p
