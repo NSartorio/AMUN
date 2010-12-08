@@ -42,12 +42,15 @@ module evolution
 !
   subroutine evolve()
 
-    use blocks      , only : block_data, list_data
-    use boundaries  , only : boundary_variables
-    use mesh        , only : update_mesh
-    use mesh        , only : dx_min
-    use scheme      , only : cmax
-    use timer       , only : start_timer, stop_timer
+    use blocks    , only : block_data, list_data
+    use boundaries, only : boundary_variables
+#ifdef FORCE
+    use forcing   , only : evolve_forcing
+#endif /* FORCE */
+    use mesh      , only : update_mesh
+    use mesh      , only : dx_min
+    use scheme    , only : cmax
+    use timer     , only : start_timer, stop_timer
 
     implicit none
 
@@ -58,6 +61,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef FORCE
+! evolve the forcing source terms by the time interval dt
+!
+    call evolve_forcing(dt)
+#endif /* FORCE */
+
 ! iterate over all data blocks and perform one step of time evolution
 !
     pblock => list_data
