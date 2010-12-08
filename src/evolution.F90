@@ -306,6 +306,9 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+#ifdef FORCE
+    use forcing  , only : real_forcing
+#endif /* FORCE */
     use mesh     , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
@@ -320,6 +323,9 @@ module evolution
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
+#ifdef FORCE
+    use variables, only : idn, imx, imy, imz
+#endif /* FORCE */
 
     implicit none
 
@@ -337,6 +343,9 @@ module evolution
 ! local arrays
 !
     real, dimension(nqt,im,jm,km) :: u1, du
+#ifdef FORCE
+    real, dimension(  3,im,jm,km) :: f
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
@@ -345,6 +354,13 @@ module evolution
     dxi = adxi(pblock%meta%level)
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
+
+#ifdef FORCE
+! obtain the forcing terms in real space
+!
+    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+                                       , pblock%meta%zmin, f(:,:,:,:))
+#endif /* FORCE */
 
 #if defined MHD && defined GLM
 ! calculate c_h^2
@@ -355,6 +371,14 @@ module evolution
 !! 1st step of integration
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
+
+#ifdef FORCE
+! update du due to forcing terms
+!
+    du(imx,:,:,:) = du(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    du(imy,:,:,:) = du(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    du(imz,:,:,:) = du(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -381,6 +405,14 @@ module evolution
 ! 2nd step of integration
 !
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
+
+#ifdef FORCE
+! update du due to forcing terms
+!
+    du(imx,:,:,:) = du(imx,:,:,:) + u1(idn,:,:,:) * f(1,:,:,:)
+    du(imy,:,:,:) = du(imy,:,:,:) + u1(idn,:,:,:) * f(2,:,:,:)
+    du(imz,:,:,:) = du(imz,:,:,:) + u1(idn,:,:,:) * f(3,:,:,:)
+#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
