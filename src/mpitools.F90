@@ -484,5 +484,30 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine mfindmaxi
+!
+!=========================
+!
+  subroutine mbcasti(n, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_integer
+#endif /* MPI */
+
+! arguments
+!
+    integer              , intent(in)    :: n
+    integer, dimension(n), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    integer :: ierr
+!
+!----------------------------------------------------------------------
+!
+    call mpi_bcast(buf, n, mpi_integer, 0, comm3d, ierr)
+#endif /* MPI */
+
+  end subroutine mbcasti
 
 end module

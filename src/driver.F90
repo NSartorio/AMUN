@@ -33,6 +33,7 @@ program godunov
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
+  use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
                       , get_timer_total
 !
@@ -71,6 +72,10 @@ program godunov
 ! initialize timers
 !
   call init_timers
+
+! init random number generator
+!
+  call init_generator()
 
 ! reset number of iterations and time, etc.
 !
