@@ -36,6 +36,7 @@ module forcing
 ! array of k vectors, mode amplitudes, and unit vectors
 !
   integer, dimension(:,:), allocatable, save :: ktab
+  complex, dimension(:,:), allocatable, save :: ftab
   real   , dimension(:,:), allocatable, save :: e1, e2
 #endif /* FORCE */
 
@@ -109,6 +110,7 @@ module forcing
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
     allocate(ktab(nf,3))
+    allocate(ftab(nf,3))
     allocate(e1  (nf,3))
     allocate(e2  (nf,3))
 
@@ -214,6 +216,7 @@ module forcing
 !
 #ifdef FORCE
     if (allocated(ktab)) deallocate(ktab)
+    if (allocated(ftab)) deallocate(ftab)
     if (allocated(e1))   deallocate(e1)
     if (allocated(e2))   deallocate(e2)
 #endif /* FORCE */
@@ -222,6 +225,73 @@ module forcing
 !
   end subroutine clear_forcing
 #ifdef FORCE
+!
+!===============================================================================
+!
+! evolve_forcing: subroutine evolves the forcing terms in Fourier space
+!
+!===============================================================================
+!
+  subroutine evolve_forcing(dt)
+
+    use config   , only : fdt
+    use constants, only : dpi
+    use mpitools , only : ncpu
+    use random   , only : randomu
+
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: dt
+
+! local variables
+!
+    integer :: l, n, ni
+    complex :: aran, bran
+    real    :: phi, th1, th2
+
+!-------------------------------------------------------------------------------
+!
+! calculate the number of forcing integration iteration for the current timestep
+!
+    ni = int(dt / fdt)
+
+! iterate over all perturbed Fourier components
+!
+    do l = 1, nf
+
+! reset complex wave coefficient
+!
+      aran = cmplx(0.0d0, 0.0d0)
+      bran = cmplx(0.0d0, 0.0d0)
+
+! integrate over all forcing substeps
+!
+      do n = 1, ni
+
+! obtain random phases phi, th1, and th2
+!
+        phi = dpi * randomu(ncpu)
+        th1 = dpi * randomu(ncpu)
+        th2 = dpi * randomu(ncpu)
+
+! update coefficients for the current k-vector
+!
+        aran = aran + sin(phi) * cmplx(cos(th1), sin(th1))
+        bran = bran + cos(phi) * cmplx(cos(th2), sin(th2))
+
+      end do
+
+! update the Fourier coefficients for the current k-vector
+!
+      ftab(l,:) = aran * e1(l,:) + bran * e2(l,:)
+
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_forcing
 #endif /* FORCE */
 !===============================================================================
 !

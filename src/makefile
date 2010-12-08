@@ -172,7 +172,7 @@ driver.o        : driver.F90 config.o evolution.o forcing.o io.o mesh.o        \
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o interpolation.o \
                   mesh.o mpitools.o problem.o scheme.o timer.o variables.o
-forcing.o       : forcing.F90 config.o constants.o
+forcing.o       : forcing.F90 config.o constants.o mpitools.o random.o
 interpolation.o : interpolation.F90 blocks.o config.o variables.o
 io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
