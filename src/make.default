@@ -30,6 +30,12 @@ SHAPE      = N
 EQS        = HYDRO
 EOS        = ADI
 
+# source terms:
+#
+#  FORCING   - enables forcing terms, such as turbulence driving
+#
+FORCING    = N
+
 # methods
 #
 #  SOLVER    - family of solvers: GODUNOV

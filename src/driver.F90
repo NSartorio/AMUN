@@ -30,6 +30,9 @@ program godunov
 !
   use config   , only : read_config, nmax, tmax, dtini, dtout, ftype, cfl
   use evolution, only : evolve, update_maximum_speed, n, t, dt, dtn
+#ifdef FORCE
+  use forcing  , only : init_forcing, clear_forcing
+#endif /* FORCE */
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
@@ -73,7 +76,7 @@ program godunov
 !
   call init_timers()
 
-! init random number generator
+! initialize random number generator
 !
   call init_generator()
 
@@ -85,6 +88,12 @@ program godunov
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+
+#ifdef FORCE
+! initialize forcing module
+!
+  call init_forcing()
+#endif /* FORCE */
 
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
@@ -175,6 +184,12 @@ program godunov
   call start_timer(1)
   call clear_mesh()
   call stop_timer(1)
+
+#ifdef FORCE
+! finalize forcing module
+!
+  call clear_forcing()
+#endif /* FORCE */
 
 ! get total time
 !
