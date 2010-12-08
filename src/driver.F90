@@ -49,7 +49,7 @@ program godunov
 !
 ! initialize MPI
 !
-  call init_mpi
+  call init_mpi()
 
 ! print info message
 !
@@ -67,11 +67,11 @@ program godunov
 
 ! read configuration file
 !
-  call read_config
+  call read_config()
 
 ! initialize timers
 !
-  call init_timers
+  call init_timers()
 
 ! init random number generator
 !
@@ -90,7 +90,7 @@ program godunov
 ! according to the initialized problem
 !
   call start_timer(1)
-  call init_mesh
+  call init_mesh()
   call stop_timer(1)
 
 ! update the maximum speed in the system
@@ -128,7 +128,7 @@ program godunov
 ! performe one step evolution
 !
     call start_timer(2)
-    call evolve
+    call evolve()
     call stop_timer(2)
 
 ! store data
@@ -173,7 +173,7 @@ program godunov
 ! deallocate and reset mesh
 !
   call start_timer(1)
-  call clear_mesh
+  call clear_mesh()
   call stop_timer(1)
 
 ! get total time
@@ -198,7 +198,7 @@ program godunov
 
 ! close access to the MPI
 !
-  call clear_mpi
+  call clear_mpi()
 
 !-------------------------------------------------------------------------------
 !
