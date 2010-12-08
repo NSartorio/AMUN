@@ -29,6 +29,9 @@ program godunov
 ! modules
 !
   use config   , only : read_config, nmax, tmax, dtini, dtout, ftype, cfl
+#ifdef FORCE
+  use config   , only : fdt
+#endif /* FORCE */
   use evolution, only : evolve, update_maximum_speed, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
@@ -84,10 +87,19 @@ program godunov
 !
   n    = 0
   t    = 0.0
-  dt   = cfl*dtini
+  dt   = cfl * dtini
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+#ifdef FORCE
+! if the forcing time step is larger than the initial time step decrease it
+!
+  fdt = min(fdt, 0.1d0 * dtini)
+
+! round the initial time step to the integer number of forcing time steps
+!
+  dt  = fdt * floor(dt / fdt)
+#endif /* FORCE */
 
 #ifdef FORCE
 ! initialize forcing module
@@ -127,7 +139,13 @@ program godunov
 
 ! compute new time step
 !
-    dt = min(cfl*dtn, 2.*dt)
+    dt = min(cfl * dtn, 2.0d0 * dt)
+
+#ifdef FORCE
+! limit the time step to the integer number of forcing time steps
+!
+    dt = fdt * floor(dt / fdt)
+#endif /* FORCE */
 
 ! advance the iteration number and time
 !
