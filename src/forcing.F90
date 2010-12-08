@@ -292,6 +292,88 @@ module forcing
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_forcing
+!
+!===============================================================================
+!
+! real_forcing: subroutine returns the forcing terms in transformed to the real
+!               space for a given position and level
+!
+!===============================================================================
+!
+  subroutine real_forcing(l, xmn, ymn, zmn, f)
+
+    use config   , only : im, jm, km
+    use constants, only : dpi
+    use mesh     , only : ax, ay, az
+
+    implicit none
+
+! input/output arguments
+!
+    integer                        , intent(in)    :: l
+    real                           , intent(in)    :: xmn, ymn, zmn
+    real, dimension(NDIMS,im,jm,km), intent(inout) :: f
+
+! local variables
+!
+    integer :: i, j, k, p
+    real    :: fx, fy, fz, kr, cs, sn
+
+! local arrays
+!
+    real, dimension(im) :: x
+    real, dimension(jm) :: y
+#if NDIMS == 3
+    real, dimension(km) :: z
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+! prepare local block coordinates
+!
+    x(:) = xmn + ax(l,:)
+    y(:) = ymn + ay(l,:)
+#if NDIMS == 3
+    z(:) = zmn + az(l,:)
+#endif /* NDIMS == 3 */
+
+! perform inverse Fourier transform
+!
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          fx = 0.0d0
+          fy = 0.0d0
+          fz = 0.0d0
+
+          do p = 1, nf
+#if NDIMS == 2
+            kr = dpi * (ktab(p,1) * x(i) + ktab(p,2) * y(j))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            kr = dpi * (ktab(p,1) * x(i) + ktab(p,2) * y(j) + ktab(p,3) * z(k))
+#endif /* NDIMS == 3 */
+
+            cs = cos(kr)
+            sn = sin(kr)
+
+            fx = fx + real(ftab(p,1)) * cs + aimag(ftab(p,1)) * sn
+            fy = fy + real(ftab(p,2)) * cs + aimag(ftab(p,2)) * sn
+            fz = fz + real(ftab(p,3)) * cs + aimag(ftab(p,3)) * sn
+          end do
+
+! update coefficients
+!
+          f(1,i,j,k) = fx
+          f(2,i,j,k) = fy
+          f(3,i,j,k) = fz
+        end do
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine real_forcing
 #endif /* FORCE */
 !===============================================================================
 !
