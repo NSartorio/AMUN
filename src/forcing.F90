@@ -288,6 +288,10 @@ module forcing
       ftab(l,:) = aran * e1(l,:) + bran * e2(l,:)
 
     end do
+
+! normalize the forcing terms by the time step
+!
+    ftab(:,:) = ftab(:,:) / dt
 !
 !-------------------------------------------------------------------------------
 !
