@@ -331,10 +331,10 @@ module forcing
 !
 ! prepare local block coordinates
 !
-    x(:) = xmn + ax(l,:)
-    y(:) = ymn + ay(l,:)
+    x(:) = dpi * (xmn + ax(l,:))
+    y(:) = dpi * (ymn + ay(l,:))
 #if NDIMS == 3
-    z(:) = zmn + az(l,:)
+    z(:) = dpi * (zmn + az(l,:))
 #endif /* NDIMS == 3 */
 
 ! perform inverse Fourier transform
@@ -348,10 +348,10 @@ module forcing
 
           do p = 1, nf
 #if NDIMS == 2
-            kr = dpi * (ktab(p,1) * x(i) + ktab(p,2) * y(j))
+            kr = ktab(p,1) * x(i) + ktab(p,2) * y(j)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            kr = dpi * (ktab(p,1) * x(i) + ktab(p,2) * y(j) + ktab(p,3) * z(k))
+            kr = ktab(p,1) * x(i) + ktab(p,2) * y(j) + ktab(p,3) * z(k)
 #endif /* NDIMS == 3 */
 
             cs = cos(kr)
