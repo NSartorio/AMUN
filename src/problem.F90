@@ -88,6 +88,8 @@ module problem
       call init_binaries(pb)
     case("reconnection")
       call init_reconnection(pb)
+    case("turbulence")
+      call init_turbulence(pb)
     end select
 
     nullify(pb)
@@ -896,6 +898,83 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_reconnection
+!
+!===============================================================================
+!
+! init_turbulence: subroutine initializes the variables for the turbulence
+!                  problem
+!
+!===============================================================================
+!
+  subroutine init_turbulence(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : im, jm, km, dens, pres, bamp
+    use scheme   , only : prim2cons
+    use variables, only : nvr, nqt
+    use variables, only : idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables, only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+
+! local arrays
+!
+    real, dimension(nvr,im) :: q, u
+!
+!-------------------------------------------------------------------------------
+!
+! set variables
+!
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
+#ifdef MHD
+    q(ibx,:) = bamp
+    q(iby,:) = 0.0d0
+    q(ibz,:) = 0.0d0
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+
+! set the initial profiles
+!
+    do k = 1, km
+      do j = 1, jm
+
+! convert primitive variables to conserved
+!
+        call prim2cons(im, q(1:nqt,1:im), u(1:nvr,1:im))
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_turbulence
 #ifdef SHAPE
 !
 !===============================================================================
