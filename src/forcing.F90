@@ -236,7 +236,6 @@ module forcing
 
     use config   , only : fdt
     use constants, only : dpi
-    use mpitools , only : ncpu
     use random   , only : randomu
 
     implicit none
@@ -272,9 +271,9 @@ module forcing
 
 ! obtain random phases phi, th1, and th2
 !
-        phi = dpi * randomu(ncpu)
-        th1 = dpi * randomu(ncpu)
-        th2 = dpi * randomu(ncpu)
+        phi = dpi * randomu(0)
+        th1 = dpi * randomu(0)
+        th2 = dpi * randomu(0)
 
 ! update coefficients for the current k-vector
 !
