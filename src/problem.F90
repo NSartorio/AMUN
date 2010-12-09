@@ -934,7 +934,8 @@ module problem
 
 ! local arrays
 !
-    real, dimension(nvr,im) :: q, u
+    real, dimension(nvr,im) :: q
+    real, dimension(nqt,im) :: u
 !
 !-------------------------------------------------------------------------------
 !
@@ -963,7 +964,7 @@ module problem
 
 ! convert primitive variables to conserved
 !
-        call prim2cons(im, q(1:nqt,1:im), u(1:nvr,1:im))
+        call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
 
 ! copy conservative variables to the current block
 !
