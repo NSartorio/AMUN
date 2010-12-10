@@ -122,6 +122,11 @@ module config
   real               , save :: kc    = 0.1d+0 ! the spectrum width
   integer            , save :: kd    = 1      ! the wave number increment
 #endif /* FORCE */
+#ifdef RESIS
+! resistive terms parameters
+!
+  real               , save :: ueta  = 1.0d-3 ! the uniform resistivity
+#endif /* RESIS */
 #if defined MHD && defined GLM
 ! coefficient controlling the decay of scalar potential Psi
 !
@@ -334,6 +339,10 @@ module config
     case("kd")
       read(value,*) kd
 #endif /* FORCE */
+#ifdef RESIS
+    case("ueta")
+      read(value,*) ueta
+#endif /* RESIS */
 #if defined MHD && defined GLM
     case("alpha_p")
       read(value,        *) alpha_p
