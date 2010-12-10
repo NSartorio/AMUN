@@ -916,7 +916,7 @@ module problem
 #ifdef ISO
     use config   , only : csnd2
 #endif /* ISO */
-    use constants, only : pi
+    use constants, only : dpi
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -938,7 +938,7 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: xlen, dx, dy, dz
+    real                          :: xlen, dx, dy, dz, yexp
 #ifdef MHD
     real                          :: ptot, pmag
 #endif /* MHD */
@@ -1005,20 +1005,30 @@ module problem
     do k = 1, km
       do j = 1, jm
 
+! calculate the exponent factor
+!
+        yexp = exp(- 0.5d0 * (y(j) / ycut)**2)
+
 #ifdef MHD
+        do i = 1, im
+
 ! initialize the magnetic field components
 !
-        do i = 1, im
           q(ibx,i) = bamp * tanh(y(j) / ydel)
-          q(iby,i) = bper * sin(pi * x(i) / xlen)                              &
-                          * exp(- 0.5d0 * (y(j) / ycut)**2)
-        end do
+
+! calculate magnetic pressure
+!
+          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
+
+! add perturbation
+!
+          q(ibx,i) = 2.0d0 * q(ibx,i) * (0.5d0                                 &
+                   - bper * yexp * cos(dpi * x(i) / xlen))
+          q(iby,i) = bper * yexp * sin(dpi * x(i) / xlen)
 
 ! initialize density or pressure depending on EOS, so the total pressure is
 ! uniform
 !
-        do i = 1, im
-          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
 
 #ifdef ADI
           q(ipr,i) = pres + (ptot - pmag)
