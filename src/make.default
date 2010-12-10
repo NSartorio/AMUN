@@ -6,9 +6,7 @@
 #
 PREC       = 4
 
-# data format:
-#
-#   OUTPUT   - data format: HDF5
+# output data format: HDF5
 #
 OUTPUT     = HDF5
 
@@ -16,39 +14,42 @@ OUTPUT     = HDF5
 #
 # geometry:
 #
-#   NDIMS - number of dimensions, currently 2 or 3 are supported
-#   SHAPE - if set Y allows to define a fixed shape in the domain
+#  NDIMS       - number of dimensions, currently 2 or 3 are supported
+#  SHAPE       - if set Y allows to define a fixed shape in the domain
 #
-NDIMS      = 2
-SHAPE      = N
+NDIMS       = 2
+SHAPE       = N
 
 # physics:
 #
-#   EQS   - set of equations to solve: HYDRO or MHD
-#   EOS   - equation of state: ADI of ISO for adiabatic or isothermal, resp.
+#  EQS         - set of equations to solve: HYDRO or MHD
+#  EOS         - equation of state: ADI of ISO for adiabatic or isothermal,
+#                respectively
 #
-EQS        = HYDRO
-EOS        = ADI
+EQS         = HYDRO
+EOS         = ADI
 
 # source terms:
 #
-#  FORCING   - enables forcing terms, such as turbulence driving
+#  FORCING     - enables forcing terms, such as turbulence driving
+#  RESISTIVITY - enable resistivity terms
 #
-FORCING    = N
+FORCING     = N
+RESISTIVITY = N
 
 # methods
 #
-#  SOLVER    - family of solvers: GODUNOV
-#  TIME      - time integration: EULER, RK2, RK3
-#  SPACE     - spacial reconstruction: MINMOD, LF, LIMO3, MP5, MP7, MP9
-#  FLUX      - flux approximation: HLL, HLLC, HLLD
-#  FLUXEMF   - electromotive force approximation: GLM
+#  SOLVER      - family of solvers: GODUNOV
+#  TIME        - time integration: EULER, RK2, RK3
+#  SPACE       - spacial reconstruction: MINMOD, LF, LIMO3, MP5, MP7, MP9
+#  FLUX        - flux approximation: HLL, HLLC, HLLD
+#  FLUXEMF     - electromotive force approximation: GLM
 #
-SOLVER     = GODUNOV
-TIME       = RK2
-SPACE      = MINMOD
-FLUX       = HLL
-FLUXEMF    = GLM
+SOLVER      = GODUNOV
+TIME        = RK2
+SPACE       = MINMOD
+FLUX        = HLL
+FLUXEMF     = GLM
 
 #
 #-------------------------------------------------------------------------------

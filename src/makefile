@@ -124,6 +124,9 @@ endif
 ifeq ($(FORCING),Y)
 FFLAGS  += -DFORCE
 endif
+ifeq ($(RESISTIVITY),Y)
+FFLAGS  += -DRESIS
+endif
 
 #-------------------------------------------------------------------------------
 
