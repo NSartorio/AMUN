@@ -320,6 +320,9 @@ module scheme
 !
   subroutine hll(n, h, u, f)
 
+#if defined MHD && defined RESIS
+    use config       , only : ueta
+#endif /* MHD & RESIS */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx, ivz
@@ -346,6 +349,9 @@ module scheme
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real                   :: al, ar, ap, div
+#if defined MHD && defined RESIS
+    real                   :: dbx, dby, dbz
+#endif /* MHD & RESIS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -414,6 +420,18 @@ module scheme
         fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
       end if
     end do
+
+#if defined MHD && defined RESIS
+! add resistivity term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
+      fn(iby,i  ) = fn(iby,i  ) - dby
+
+      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
+      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+    end do
+#endif /* MHD & RESIS */
 
 ! calculate numerical flux
 !
@@ -642,6 +660,9 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
+#if defined MHD && defined RESIS
+    use config       , only : ueta
+#endif /* MHD & RESIS */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
@@ -668,6 +689,9 @@ module scheme
     real, dimension(nvr)   :: u1l, u1r, u2
     real                   :: sl, sr, srl, srml, sm, sml, smr
     real                   :: dnm, mxm, sqd, div, fac, bxs
+#if defined MHD && defined RESIS
+    real                   :: dbx, dby, dbz
+#endif /* MHD & RESIS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -864,6 +888,18 @@ module scheme
 
     end do
 
+#if defined MHD && defined RESIS
+! add resistivity term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
+      fn(iby,i  ) = fn(iby,i  ) - dby
+
+      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
+      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+    end do
+#endif /* MHD & RESIS */
+
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
@@ -888,6 +924,9 @@ module scheme
   subroutine hlld(n, h, u, f)
 
     use config       , only : gamma
+#if defined MHD && defined RESIS
+    use config       , only : ueta
+#endif /* MHD & RESIS */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -915,6 +954,9 @@ module scheme
     real                   :: sl, sr, slmv, srmv, slmm, srmm, sm, smvl, smvr   &
                             , sml, smr
     real                   :: ptl, ptr, pt, bx2, div, fac, bxs, dlsq, drsq
+#if defined MHD && defined RESIS
+    real                   :: dbx, dby, dbz
+#endif /* MHD & RESIS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1204,6 +1246,18 @@ module scheme
       end if
 
     end do
+
+#if defined MHD && defined RESIS
+! add resistivity term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
+      fn(iby,i  ) = fn(iby,i  ) - dby
+
+      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
+      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+    end do
+#endif /* MHD & RESIS */
 
 ! calculate the numerical flux derivative
 !
