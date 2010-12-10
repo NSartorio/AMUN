@@ -47,6 +47,8 @@ module problem
     case("blast")
       call domain_blast()
 #endif /* NDIMS == 2 */
+    case("reconnection")
+      call domain_reconnection()
     case default
       call domain_default()
     end select
@@ -230,8 +232,7 @@ module problem
 !
 !===============================================================================
 !
-! domain_default: subroutine initializes the default domain of 2x2 blocks in
-!                'N' configuration
+! domain_blast: subroutine initializes the domain of 2x3 for the blast problem
 !
 !===============================================================================
 !
@@ -243,7 +244,7 @@ module problem
                      , metablock_setbounds, metablock_set_coord                &
                      , nsides, nfaces, res
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims, maxlev, ncells
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
 
     implicit none
 
@@ -413,6 +414,124 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine domain_blast
+!
+!===============================================================================
+!
+! domain_reconnection: subroutine initializes the domain of 1x2 for
+!                      the reconnection problem
+!
+!===============================================================================
+!
+  subroutine domain_reconnection
+
+    use blocks, only : block_meta, block_data, pointer_meta, append_metablock  &
+                     , append_datablock, associate_blocks, metablock_setleaf   &
+                     , metablock_setconfig, metablock_setlevel                 &
+                     , metablock_setbounds, metablock_set_coord                &
+                     , nsides, nfaces, res
+    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
+
+    implicit none
+
+! local variables
+!
+    integer :: i, j, jh
+    real    :: ym
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+
+! local pointer array
+!
+    type(pointer_meta)        :: block_array(1,2)
+!
+!-------------------------------------------------------------------------------
+!
+! create root meta blocks
+!
+    call append_metablock(block_array(1,1)%ptr)
+    call append_metablock(block_array(1,2)%ptr)
+
+! mark blocks as leafs
+!
+    call metablock_setleaf(block_array(1,1)%ptr)
+    call metablock_setleaf(block_array(1,2)%ptr)
+
+! set block config flags
+!
+    call metablock_setconfig(block_array(1,1)%ptr, 13)
+    call metablock_setconfig(block_array(1,2)%ptr, 13)
+
+! set block levels
+!
+    call metablock_setlevel(block_array(1,1)%ptr, 1)
+    call metablock_setlevel(block_array(1,2)%ptr, 1)
+
+! set boundary conditions
+!
+    block_array(1,1)%ptr%neigh(2,2,1)%ptr => block_array(1,2)%ptr
+    block_array(1,1)%ptr%neigh(2,2,2)%ptr => block_array(1,2)%ptr
+    block_array(1,2)%ptr%neigh(2,1,1)%ptr => block_array(1,1)%ptr
+    block_array(1,2)%ptr%neigh(2,1,2)%ptr => block_array(1,1)%ptr
+
+    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        do i = 1, nsides
+          block_array(1,1)%ptr%neigh(1,i,j)%ptr => block_array(1,1)%ptr
+          block_array(1,2)%ptr%neigh(1,i,j)%ptr => block_array(1,2)%ptr
+        end do
+      end do
+    end if
+    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        block_array(1,1)%ptr%neigh(2,1,j)%ptr => block_array(1,2)%ptr
+        block_array(1,2)%ptr%neigh(2,2,j)%ptr => block_array(1,1)%ptr
+      end do
+    end if
+#if NDIMS == 3
+    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
+      do j = 1, nfaces
+        do i = 1, nsides
+          block_array(1,1)%ptr%neigh(3,i,j)%ptr => block_array(1,1)%ptr
+          block_array(1,2)%ptr%neigh(3,i,j)%ptr => block_array(1,2)%ptr
+        end do
+      end do
+    end if
+#endif /* NDIMS == 3 */
+
+! set the coordinates
+!
+    call metablock_set_coord(block_array(1,1)%ptr,  0,      0, 0)
+    call metablock_set_coord(block_array(1,2)%ptr,  0, res(1), 0)
+
+! calculate the block bounds
+!
+    ym = 0.5d0 * (ymin + ymax)
+
+! set block bounds
+!
+    call metablock_setbounds(block_array(1,1)%ptr, xmin, xmax                  &
+                                                 , ymin, ym  , zmin, zmax)
+    call metablock_setbounds(block_array(1,2)%ptr, xmin, xmax                  &
+                                                 , ym  , ymax, zmin, zmax)
+
+! create the data blocks
+!
+    call append_datablock(pdata)
+    call associate_blocks(block_array(1,1)%ptr, pdata)
+    call append_datablock(pdata)
+    call associate_blocks(block_array(1,2)%ptr, pdata)
+
+! set the block dimensions for the lowest level
+!
+    rdims(1) = 1
+    rdims(2) = 2
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine domain_reconnection
 !
 !===============================================================================
 !
