@@ -794,6 +794,9 @@ module problem
     use blocks   , only : block_data
     use config   , only : in, jn, kn, im, jm, km, ng                           &
                         , xmin, xmax, dens, pres, bamp, bper, ydel, ycut
+#ifdef ISO
+    use config   , only : csnd2
+#endif /* ISO */
     use constants, only : pi
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
@@ -817,6 +820,9 @@ module problem
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
     real                          :: xlen, dx, dy, dz
+#ifdef MHD
+    real                          :: ptot, pmag
+#endif /* MHD */
 
 ! local arrays
 !
@@ -830,6 +836,12 @@ module problem
 ! calculate the length of the box
 !
     xlen = xmax - xmin
+
+#ifdef MHD
+! calculate the total pressure
+!
+    ptot = 0.5d0 * bamp * bamp
+#endif /* MHD */
 
 ! calculate the cell sizes
 !
@@ -881,6 +893,20 @@ module problem
           q(ibx,i) = bamp * tanh(y(j) / ydel)
           q(iby,i) = bper * sin(pi * x(i) / xlen)                              &
                           * exp(- 0.5d0 * (y(j) / ycut)**2)
+        end do
+
+! initialize density or pressure depending on EOS, so the total pressure is
+! uniform
+!
+        do i = 1, im
+          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
+
+#ifdef ADI
+          q(ipr,i) = pres + (ptot - pmag)
+#endif /* ADI */
+#ifdef ISO
+          q(idn,i) = dens + (ptot - pmag) / csnd2
+#endif /* ISO */
         end do
 #endif /* MHD */
 
