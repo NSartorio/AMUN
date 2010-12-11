@@ -1336,10 +1336,11 @@ module scheme
 #ifdef ADI
       f(ien,i) = f(ien,i) + q(ivx,i) * pm - q(ibx,i) * vb
 #endif /* ADI */
-#ifdef GLM
-      f(ibx,i) = q(iph,i)
+      f(ibx,i) = 0.0d0
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
+#ifdef GLM
+      f(ibx,i) = q(iph,i)
       f(iph,i) = q(ibx,i)
 #endif /* GLM */
 #endif /* MHD */
