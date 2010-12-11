@@ -1002,7 +1002,13 @@ module boundaries
                         , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu   &
                         , kb, kbl, ke, keu
     use error    , only : print_warning
-    use variables, only : nvr, imx, imy, imz
+    use variables, only : nvr, nfl, imx, imy, imz
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -1013,18 +1019,18 @@ module boundaries
 
 ! local variables
 !
-    integer :: ii, i, j, k, it, jt, kt, is, js, ks, itm1, itp1, jtm1, jtp1, ktm1, ktp1
+    integer :: ii, i, j, k, it, jt, kt, is, js, ks
 !
 !-------------------------------------------------------------------------------
 !
 ! calcuate the flag determinig the side of boundary to update
 !
-    ii = 100 * id + 10 * il
+    ii = 10 * id + il
 
 ! perform update according to the flag
 !
     select case(ii)
-    case(110)
+    case(11)
       select case(xlbndry)
       case("reflecting")
         do i = 1, ng
@@ -1038,18 +1044,23 @@ module boundaries
           end do
         end do
       case default ! set "open" for default
-        do i = 1, ng
-          it   = ib - i
-          itp1 = it + 1
-
-          do k = 1, km
-            do j = 1, jm
-              pb%u(:,it,j,k) = pb%u(:,itp1,j,k)
+        do k = 1, km
+          do j = 1, jm
+            do i = 1, ng
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ib,j,k)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,ib,j,k)
+              pb%u(iby,i,j,k) = pb%u(iby,ib,j,k)
+              pb%u(ibz,i,j,k) = pb%u(ibz,ib,j,k)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
-    case(120)
+    case(12)
       select case(xubndry)
       case("reflecting")
         do i = 1, ng
@@ -1063,18 +1074,23 @@ module boundaries
           end do
         end do
       case default ! set "open" for default
-        do i = 1, ng
-          it   = ie + i
-          itm1 = it - 1
-
-          do k = 1, km
-            do j = 1, jm
-              pb%u(:,it,j,k) = pb%u(:,itm1,j,k)
+        do k = 1, km
+          do j = 1, jm
+            do i = ieu, im
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ie,j,k)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,ie,j,k)
+              pb%u(iby,i,j,k) = pb%u(iby,ie,j,k)
+              pb%u(ibz,i,j,k) = pb%u(ibz,ie,j,k)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
-    case(210)
+    case(21)
       select case(ylbndry)
       case("reflecting")
         do j = 1, ng
@@ -1088,18 +1104,23 @@ module boundaries
           end do
         end do
       case default ! set "open" for default
-        do j = 1, ng
-          jt   = jb - j
-          jtp1 = jt + 1
-
-          do k = 1, km
-            do i = 1, im
-              pb%u(:,i,jt,k) = pb%u(:,i,jtp1,k)
+        do i = 1, im
+          do j = 1, ng
+            do k = 1, km
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,jb,k)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
+              pb%u(iby,i,j,k) = pb%u(iby,i,jb,k)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,jb,k)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
-    case(220)
+    case(22)
       select case(yubndry)
       case("reflecting")
         do j = 1, ng
@@ -1113,18 +1134,24 @@ module boundaries
           end do
         end do
       case default ! set "open" for default
-        do j = 1, ng
-          jt   = je + j
-          jtm1 = jt - 1
-
-          do k = 1, km
+        do k = 1, km
+          do j = jeu, jm
             do i = 1, im
-              pb%u(:,i,jt,k) = pb%u(:,i,jtm1,k)
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,je,k)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
+              pb%u(iby,i,j,k) = pb%u(iby,i,je,k)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,je,k)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
-    case(310)
+#if NDIMS == 3
+    case(31)
       select case(zlbndry)
       case("reflecting")
         do k = 1, ng
@@ -1139,17 +1166,22 @@ module boundaries
         end do
       case default ! set "open" for default
         do k = 1, ng
-          kt   = kb - k
-          ktp1 = kt + 1
-
           do j = 1, jm
             do i = 1, im
-              pb%u(:,i,j,kt) = pb%u(:,i,j,ktp1)
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,kb)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,kb)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j,kb)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,kb)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
-    case(320)
+    case(32)
       select case(zubndry)
       case("reflecting")
         do k = 1, ng
@@ -1163,17 +1195,23 @@ module boundaries
           end do
         end do
       case default ! set "open" for default
-        do k = 1, ng
-          kt   = ke + k
-          ktm1 = kt - 1
-
+        do k = keu, km
           do j = 1, jm
             do i = 1, im
-              pb%u(:,i,j,kt) = pb%u(:,i,j,ktm1)
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,ke)
+#ifdef MHD
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,ke)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j,ke)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,ke)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
             end do
           end do
         end do
       end select
+#endif /* NDIMS == 3 */
     case default
       call print_warning("boundaries::bnd_spec", "Boundary flag unsupported!")
     end select
