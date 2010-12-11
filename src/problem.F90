@@ -1022,9 +1022,9 @@ module problem
 
 ! add perturbation
 !
-          q(ibx,i) = 2.0d0 * q(ibx,i) * (0.5d0                                 &
-                   - bper * yexp * cos(dpi * x(i) / xlen))
-          q(iby,i) = bper * yexp * sin(dpi * x(i) / xlen)
+          q(ibx,i) = q(ibx,i) &
+                   - bper * yexp * y(j) * cos(dpi * x(i) / xlen) / ycut**2
+          q(iby,i) = bper * yexp * dpi  * sin(dpi * x(i) / xlen)
 
 ! initialize density or pressure depending on EOS, so the total pressure is
 ! uniform
