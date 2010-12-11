@@ -344,7 +344,7 @@ module scheme
 
 ! local variables
 !
-    integer                :: p, i
+    integer                :: p, i, nm1
     real, dimension(nvr,n) :: q, ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
@@ -355,9 +355,13 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
+! usefull parameters
+!
+    nm1 = n - 1
+
 ! calculate the primitive variables
 !
-    call cons2prim(n, u, q)
+    call cons2prim(n, u(:,:), q(:,:))
 
 ! reconstruct the left and right states of the primitive variables
 !
@@ -390,13 +394,13 @@ module scheme
 
 ! calculate conservative variables at states
 !
-    call prim2cons(n, ql, ul)
-    call prim2cons(n, qr, ur)
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
 
 ! calculate fluxes and speeds
 !
-    call fluxspeed(n, ql, ul, fl, cl)
-    call fluxspeed(n, qr, ur, fr, cr)
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
 
 ! iterate over all points
 !
@@ -424,7 +428,7 @@ module scheme
 #if defined MHD && defined RESIS
 ! add resistivity term to the left and right fluxes
 !
-    do i = 1, n - 1
+    do i = 1, nm1
       dby = ueta * (q(iby,i+1) - q(iby,i)) / h
       fn(iby,i  ) = fn(iby,i  ) - dby
 
@@ -435,11 +439,11 @@ module scheme
 
 ! calculate numerical flux
 !
-    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:nm1)
 #ifdef MHD
 #ifdef GLM
-    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
-    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
+    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:nm1)
+    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:nm1)
 #endif /* GLM */
 #endif /* MHD */
 
