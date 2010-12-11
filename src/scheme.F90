@@ -66,7 +66,7 @@ module scheme
 
 ! local variables
 !
-    integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
+    integer :: i, j, k
     real    :: dx, dy, dz
 
 ! local temporary arrays
@@ -97,17 +97,7 @@ module scheme
 !  update along X-direction
 !
     do k = 1, km
-#if NDIMS == 3
-#ifdef MHD
-      km1 = max(k - 1, 1)
-      kp1 = min(k + 1,km)
-#endif /* MHD */
-#endif /* NDIMS == 3 */
       do j = 1, jm
-#ifdef MHD
-        jm1 = max(j - 1, 1)
-        jp1 = min(j + 1,jm)
-#endif /* MHD */
 
 ! copy directional vectors of variables for the one dimensional solver
 !
@@ -144,6 +134,9 @@ module scheme
 ! update the arrays of increments
 !
         do i = 1, im
+
+! update fluid variables
+!
           du(idn,i,j,k) = du(idn,i,j,k) + dxi * fx(idn,i)
           du(imx,i,j,k) = du(imx,i,j,k) + dxi * fx(imx,i)
           du(imy,i,j,k) = du(imy,i,j,k) + dxi * fx(imy,i)
@@ -152,12 +145,16 @@ module scheme
           du(ien,i,j,k) = du(ien,i,j,k) + dxi * fx(ien,i)
 #endif /* ADI */
 #ifdef MHD
+
 ! update magnetic variables
 !
-#ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dxi * fx(ibx,i)
           du(iby,i,j,k) = du(iby,i,j,k) + dxi * fx(iby,i)
           du(ibz,i,j,k) = du(ibz,i,j,k) + dxi * fx(ibz,i)
+#ifdef GLM
+
+! update scalar potential
+!
           du(iph,i,j,k) = du(iph,i,j,k) + dxi * fx(iph,i)
 #endif /* GLM */
 #endif /* MHD */
@@ -168,17 +165,7 @@ module scheme
 !  update along Y-direction
 !
     do k = 1, km
-#if NDIMS == 3
-#ifdef MHD
-      km1 = max(k - 1, 1)
-      kp1 = min(k + 1,km)
-#endif /* MHD */
-#endif /* NDIMS == 3 */
       do i = 1, im
-#ifdef MHD
-        im1 = max(i - 1, 1)
-        ip1 = min(i + 1,im)
-#endif /* MHD */
 
 ! copy directional vectors of variables for the one dimensional solver
 !
@@ -215,6 +202,9 @@ module scheme
 ! update the arrays of increments
 !
         do j = 1, jm
+
+! update fluid variables
+!
           du(idn,i,j,k) = du(idn,i,j,k) + dyi * fy(idn,j)
           du(imx,i,j,k) = du(imx,i,j,k) + dyi * fy(imz,j)
           du(imy,i,j,k) = du(imy,i,j,k) + dyi * fy(imx,j)
@@ -223,12 +213,16 @@ module scheme
           du(ien,i,j,k) = du(ien,i,j,k) + dyi * fy(ien,j)
 #endif /* ADI */
 #ifdef MHD
+
 ! update magnetic variables
 !
-#ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dyi * fy(ibz,j)
           du(iby,i,j,k) = du(iby,i,j,k) + dyi * fy(ibx,j)
           du(ibz,i,j,k) = du(ibz,i,j,k) + dyi * fy(iby,j)
+#ifdef GLM
+
+! update scalar potential
+!
           du(iph,i,j,k) = du(iph,i,j,k) + dyi * fy(iph,j)
 #endif /* GLM */
 #endif /* MHD */
@@ -240,15 +234,7 @@ module scheme
 !  update along Z-direction
 !
     do j = 1, jm
-#ifdef MHD
-      jm1 = max(j - 1, 1)
-      jp1 = min(j + 1,jm)
-#endif /* MHD */
       do i = 1, im
-#ifdef MHD
-        im1 = max(i - 1, 1)
-        ip1 = min(i + 1,im)
-#endif /* MHD */
 
 ! copy directional vectors of variables for the one dimensional solver
 !
@@ -285,6 +271,9 @@ module scheme
 ! update the arrays of increments
 !
         do k = 1, km
+
+! update fluid variables
+!
           du(idn,i,j,k) = du(idn,i,j,k) + dzi * fz(idn,k)
           du(imx,i,j,k) = du(imx,i,j,k) + dzi * fz(imy,k)
           du(imy,i,j,k) = du(imy,i,j,k) + dzi * fz(imz,k)
@@ -293,12 +282,16 @@ module scheme
           du(ien,i,j,k) = du(ien,i,j,k) + dzi * fz(ien,k)
 #endif /* ADI */
 #ifdef MHD
+
 ! update magnetic variables
 !
-#ifdef GLM
           du(ibx,i,j,k) = du(ibx,i,j,k) + dzi * fz(iby,k)
           du(iby,i,j,k) = du(iby,i,j,k) + dzi * fz(ibz,k)
           du(ibz,i,j,k) = du(ibz,i,j,k) + dzi * fz(ibx,k)
+#ifdef GLM
+
+! update scalar potential
+!
           du(iph,i,j,k) = du(iph,i,j,k) + dzi * fz(iph,k)
 #endif /* GLM */
 #endif /* MHD */
