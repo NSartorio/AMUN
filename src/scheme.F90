@@ -1370,42 +1370,6 @@ module scheme
 !-------------------------------------------------------------------------------
 !
   end subroutine fluxspeed
-#ifdef MHD
-!
-!===============================================================================
-!
-! emf: subroutine computes magnetic fluxes (electromotive force)
-!
-!===============================================================================
-!
-  subroutine emf(n, v, b, f)
-
-    implicit none
-
-! input/output arguments
-!
-    integer             , intent(in)  :: n
-    real, dimension(3,n), intent(in)  :: v, b
-    real, dimension(3,n), intent(out) :: f
-
-! local variables
-!
-    integer :: i
-!
-!-------------------------------------------------------------------------------
-!
-! sweep over all points
-!
-    do i = 1, n
-      f(1,i) = 0.0
-      f(2,i) = v(1,i) * b(2,i) - b(1,i) * v(2,i)
-      f(3,i) = v(1,i) * b(3,i) - b(1,i) * v(3,i)
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine emf
-#endif /* MHD */
 !
 !===============================================================================
 !
