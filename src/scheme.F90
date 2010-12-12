@@ -318,7 +318,7 @@ module scheme
 #endif /* MHD & RESIS */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
-    use variables    , only : ivx, ivz
+    use variables    , only : ivx
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
@@ -406,13 +406,13 @@ module scheme
 
 ! calculate HLL flux
 !
-      if (al .ge. 0.0) then
+      if (al .ge. 0.0d0) then
         fn(:,i) = fl(:,i)
-      else if (ar .le. 0.0) then
+      else if (ar .le. 0.0d0) then
         fn(:,i) = fr(:,i)
       else
         ap  = ar * al
-        div = 1.0 / (ar - al)
+        div = 1.0d0 / (ar - al)
 
         fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
       end if
