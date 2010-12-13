@@ -1020,6 +1020,13 @@ module boundaries
 ! local variables
 !
     integer :: ii, i, j, k, it, jt, kt, is, js, ks
+#ifdef MHD
+    integer :: im1, ip1
+    integer :: jm1, jp1
+#if NDIMS == 3
+    integer :: km1, kp1
+#endif /* NDIMS == 3 */
+#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1043,19 +1050,45 @@ module boundaries
           end do
           end do
         end do
-      case default ! set "open" for default
-        do k = 1, km
-          do j = 1, jm
-            do i = 1, ng
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ib,j,k)
 #ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,ib,j,k)
+      case("divb")
+        do k = 1, km
+#if NDIMS == 3
+          km1 = max( 1, k-1)
+          kp1 = min(km, k+1)
+#endif /* NDIMS == 3 */
+          do j = 1, jm
+            jm1 = max( 1, j-1)
+            jp1 = min(jm, j+1)
+            do i = ng, 1, -1
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ib,j,k)
+              ip1 = i + 1
+#if NDIMS == 2
+              pb%u(ibx,i,j,k) = pb%u(ibx,i+2,j  ,k)                            &
+                              - pb%u(iby,ip1,jm1,k) + pb%u(iby,ip1,jp1,k)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              pb%u(ibx,i,j,k) = pb%u(ibx,i+2,j  ,k  )                          &
+                              - pb%u(iby,ip1,jm1,k  ) + pb%u(iby,ip1,jp1,k  )  &
+                              - pb%u(ibz,ip1,j  ,km1) + pb%u(ibz,ip1,j  ,kp1)
+#endif /* NDIMS == 3 */
               pb%u(iby,i,j,k) = pb%u(iby,ib,j,k)
               pb%u(ibz,i,j,k) = pb%u(ibz,ib,j,k)
 #ifdef GLM
               pb%u(iph,i,j,k) = 0.0d0
 #endif /* GLM */
+            end do
+          end do
+        end do
 #endif /* MHD */
+      case default ! set "open" for default
+        do k = 1, km
+          do j = 1, jm
+            do i = 1, ng
+              pb%u(:,i,j,k) = pb%u(:,ib,j,k)
+#if defined MHD && defined GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* MHD & GLM */
             end do
           end do
         end do
@@ -1073,19 +1106,45 @@ module boundaries
             end do
           end do
         end do
-      case default ! set "open" for default
+#ifdef MHD
+      case("divb")
         do k = 1, km
+#if NDIMS == 3
+          km1 = max( 1, k-1)
+          kp1 = min(km, k+1)
+#endif /* NDIMS == 3 */
           do j = 1, jm
+            jm1 = max( 1, j-1)
+            jp1 = min(jm, j+1)
             do i = ieu, im
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ie,j,k)
-#ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,ie,j,k)
+              im1 = i - 1
+#if NDIMS == 2
+              pb%u(ibx,i,j,k) = pb%u(ibx,i-2,j  ,k)                            &
+                              - pb%u(iby,im1,jp1,k) + pb%u(iby,im1,jm1,k)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              pb%u(ibx,i,j,k) = pb%u(ibx,i-2,j  ,k  )                          &
+                              - pb%u(iby,im1,jp1,k  ) + pb%u(iby,im1,jm1,k  )  &
+                              - pb%u(ibz,im1,j  ,kp1) + pb%u(ibz,im1,j  ,km1)
+#endif /* NDIMS == 3 */
               pb%u(iby,i,j,k) = pb%u(iby,ie,j,k)
               pb%u(ibz,i,j,k) = pb%u(ibz,ie,j,k)
 #ifdef GLM
               pb%u(iph,i,j,k) = 0.0d0
 #endif /* GLM */
+            end do
+          end do
+        end do
 #endif /* MHD */
+      case default ! set "open" for default
+        do k = 1, km
+          do j = 1, jm
+            do i = ieu, im
+              pb%u(:,i,j,k) = pb%u(:,ie,j,k)
+#if defined MHD && defined GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* MHD & GLM */
             end do
           end do
         end do
@@ -1103,19 +1162,45 @@ module boundaries
             end do
           end do
         end do
-      case default ! set "open" for default
-        do i = 1, im
-          do j = 1, ng
-            do k = 1, km
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,jb,k)
 #ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
-              pb%u(iby,i,j,k) = pb%u(iby,i,jb,k)
+      case("divb")
+        do k = 1, km
+#if NDIMS == 3
+          km1 = max( 1, k-1)
+          kp1 = min(km, k+1)
+#endif /* NDIMS == 3 */
+          do i = 1, im
+            im1 = max( 1, i-1)
+            ip1 = min(im, i+1)
+            do j = ng, 1, -1
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,jb,k)
+              jp1 = j + 1
+#if NDIMS == 2
+              pb%u(iby,i,j,k) = pb%u(iby,i  ,j+2,k)                            &
+                              - pb%u(ibx,im1,jp1,k) + pb%u(ibx,ip1,jp1,k)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              pb%u(iby,i,j,k) = pb%u(iby,i  ,j+2,k  )                          &
+                              - pb%u(ibx,im1,jp1,k  ) + pb%u(ibx,ip1,jp1,k  )  &
+                              - pb%u(ibz,i  ,jp1,km1) + pb%u(ibz,i  ,jp1,kp1)
+#endif /* NDIMS == 3 */
               pb%u(ibz,i,j,k) = pb%u(ibz,i,jb,k)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
 #ifdef GLM
               pb%u(iph,i,j,k) = 0.0d0
 #endif /* GLM */
+            end do
+          end do
+        end do
 #endif /* MHD */
+      case default ! set "open" for default
+        do k = 1, km
+          do j = 1, ng
+            do i = 1, im
+              pb%u(:,i,j,k) = pb%u(:,i,jb,k)
+#if defined MHD && defined GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* MHD & GLM */
             end do
           end do
         end do
@@ -1133,19 +1218,45 @@ module boundaries
             end do
           end do
         end do
+#ifdef MHD
+      case("divb")
+        do k = 1, km
+#if NDIMS == 3
+          km1 = max( 1, k-1)
+          kp1 = min(km, k+1)
+#endif /* NDIMS == 3 */
+          do i = 1, im
+            im1 = max( 1, i-1)
+            ip1 = min(im, i+1)
+            do j = jeu, jm
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,je,k)
+              jm1 = j - 1
+#if NDIMS == 2
+              pb%u(iby,i,j,k) = pb%u(iby,i  ,j-2,k)                            &
+                              - pb%u(ibx,ip1,jm1,k) + pb%u(ibx,im1,jm1,k)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              pb%u(iby,i,j,k) = pb%u(iby,i  ,j-2,k  )                          &
+                              - pb%u(ibx,ip1,jm1,k  ) + pb%u(ibx,im1,jm1,k  )  &
+                              - pb%u(ibz,i  ,jm1,kp1) + pb%u(ibz,i  ,jm1,km1)
+#endif /* NDIMS == 3 */
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,je,k)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+            end do
+          end do
+        end do
+#endif /* MHD */
       case default ! set "open" for default
         do k = 1, km
           do j = jeu, jm
             do i = 1, im
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,je,k)
-#ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
-              pb%u(iby,i,j,k) = pb%u(iby,i,je,k)
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,je,k)
-#ifdef GLM
+              pb%u(:,i,j,k) = pb%u(:,i,je,k)
+#if defined MHD && defined GLM
               pb%u(iph,i,j,k) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
+#endif /* MHD & GLM */
             end do
           end do
         end do
@@ -1164,19 +1275,37 @@ module boundaries
             end do
           end do
         end do
+#ifdef MHD
+      case("divb")
+        do j = 1, jm
+          jm1 = max( 1, j-1)
+          jp1 = min(jm, j+1)
+          do i = 1, im
+            im1 = max( 1, i-1)
+            ip1 = min(im, i+1)
+            do k = ng, 1, -1
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,kb)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,kb)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j,kb)
+              kp1 = k + 1
+              pb%u(ibz,i,j,k) = pb%u(ibz,i  ,j  ,k+2)                          &
+                              - pb%u(ibx,im1,j  ,kp1) + pb%u(ibx,ip1,j  ,kp1)  &
+                              - pb%u(iby,i  ,jm1,kp1) + pb%u(iby,i  ,jp1,kp1)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+            end do
+          end do
+        end do
+#endif /* MHD */
       case default ! set "open" for default
         do k = 1, ng
           do j = 1, jm
             do i = 1, im
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,kb)
-#ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,kb)
-              pb%u(iby,i,j,k) = pb%u(iby,i,j,kb)
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,kb)
-#ifdef GLM
+              pb%u(:,i,j,k) = pb%u(:,i,j,kb)
+#if defined MHD && defined GLM
               pb%u(iph,i,j,k) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
+#endif /* MHD & GLM */
             end do
           end do
         end do
@@ -1194,19 +1323,37 @@ module boundaries
             end do
           end do
         end do
+#ifdef MHD
+      case("divb")
+        do j = 1, jm
+          jm1 = max( 1, j-1)
+          jp1 = min(jm, j+1)
+          do i = 1, im
+            im1 = max( 1, i-1)
+            ip1 = min(im, i+1)
+            do k = keu, km
+              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,ke)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,ke)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j,ke)
+              km1 = k - 1
+              pb%u(ibz,i,j,k) = pb%u(ibz,i  ,j  ,k-2)                          &
+                              - pb%u(ibx,ip1,j  ,km1) + pb%u(ibx,im1,j  ,km1)  &
+                              - pb%u(iby,i  ,jp1,km1) + pb%u(iby,i  ,jm1,km1)
+#ifdef GLM
+              pb%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+            end do
+          end do
+        end do
+#endif /* MHD */
       case default ! set "open" for default
         do k = keu, km
           do j = 1, jm
             do i = 1, im
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,ke)
-#ifdef MHD
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,ke)
-              pb%u(iby,i,j,k) = pb%u(iby,i,j,ke)
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,ke)
-#ifdef GLM
+              pb%u(:,i,j,k) = pb%u(:,i,j,ke)
+#if defined MHD && defined GLM
               pb%u(iph,i,j,k) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
+#endif /* MHD & GLM */
             end do
           end do
         end do
