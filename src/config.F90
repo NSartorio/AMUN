@@ -358,7 +358,6 @@ module config
       read(value,        *) alpha
 #endif /* MP */
     case default
-      call print_warning("config::read_config", "Parameter '" // trim(name) // "' not implemented!")
     end select
 
 ! return to read the next line
