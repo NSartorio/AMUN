@@ -1073,12 +1073,12 @@ module mesh
                                          + pchild%u(1:nfl,ip:iu:2,jp:ju:2,1))
 
 #ifdef MHD
-#ifdef GLM
       pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
                                  0.25 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,1)   &
                                        + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,1)   &
                                        + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,1)   &
                                        + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,1))
+#ifdef GLM
       pparent%u(iph    ,is:it,js:jt,1) =                                       &
                                  0.25 * (pchild%u(iph    ,il:iu:2,jl:ju:2,1)   &
                                        + pchild%u(iph    ,ip:iu:2,jl:ju:2,1)   &
@@ -1098,7 +1098,6 @@ module mesh
                                     + pchild%u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)  &
                                     + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
 #ifdef MHD
-#ifdef GLM
       pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
                            0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
                                   + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kl:ku:2)  &
@@ -1108,6 +1107,7 @@ module mesh
                                   + pchild%u(ibx:ibz,ip:iu:2,jl:ju:2,kp:ku:2)  &
                                   + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
                                   + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
+#ifdef GLM
       pparent%u(iph    ,is:it,js:jt,ks:kt) =                                   &
                            0.125 * (pchild%u(iph    ,il:iu:2,jl:ju:2,kl:ku:2)  &
                                   + pchild%u(iph    ,ip:iu:2,jl:ju:2,kl:ku:2)  &
