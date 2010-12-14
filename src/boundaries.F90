@@ -427,16 +427,16 @@ module boundaries
       if (iside .eq. 1) then
         pdata%u(  1:nfl,1:ibl  ,1:jm,1:km) = u(  1:nfl,iel:ie  ,1:jm,1:km)
 #ifdef MHD
+        pdata%u(ibx:ibz,1:ibl  ,1:jm,1:km) = u(ibx:ibz,iel:ie  ,1:jm,1:km)
 #ifdef GLM
-        pdata%u(ibx:ibz,1:ibl  ,1:jm,1:km) = u(ibx:iby,iel:ie  ,1:jm,1:km)
         pdata%u(iph    ,1:ibl  ,1:jm,1:km) = u(iph    ,iel:ie  ,1:jm,1:km)
 #endif /* GLM */
 #endif /* MHD */
       else
         pdata%u(  1:nfl,ieu:im,1:jm,1:km) = u(  1:nfl,ib:ibu,1:jm,1:km)
 #ifdef MHD
-#ifdef GLM
         pdata%u(ibx:ibz,ieu:im,1:jm,1:km) = u(ibx:ibz,ib:ibu,1:jm,1:km)
+#ifdef GLM
         pdata%u(iph    ,ieu:im,1:jm,1:km) = u(iph    ,ib:ibu,1:jm,1:km)
 #endif /* GLM */
 #endif /* MHD */
@@ -447,16 +447,16 @@ module boundaries
       if (iside .eq. 1) then
         pdata%u(  1:nfl,1:im,1:jbl  ,1:km) = u(  1:nfl,1:im,jel:je  ,1:km)
 #ifdef MHD
-#ifdef GLM
         pdata%u(ibx:ibz,1:im,1:jbl  ,1:km) = u(ibx:ibz,1:im,jel:je  ,1:km)
+#ifdef GLM
         pdata%u(iph    ,1:im,1:jbl  ,1:km) = u(iph    ,1:im,jel:je  ,1:km)
 #endif /* GLM */
 #endif /* MHD */
       else
         pdata%u(  1:nfl,1:im,jeu:jm,1:km) = u(  1:nfl,1:im,jb:jbu,1:km)
 #ifdef MHD
-#ifdef GLM
         pdata%u(ibx:ibz,1:im,jeu:jm,1:km) = u(ibx:ibz,1:im,jb:jbu,1:km)
+#ifdef GLM
         pdata%u(iph    ,1:im,jeu:jm,1:km) = u(iph    ,1:im,jb:jbu,1:km)
 #endif /* GLM */
 #endif /* MHD */
@@ -468,16 +468,16 @@ module boundaries
       if (iside .eq. 1) then
         pdata%u(  1:nfl,1:im,1:jm,1:kbl  ) = u(  1:nfl,1:im,1:jm,kel:ke  )
 #ifdef MHD
-#ifdef GLM
         pdata%u(ibx:ibz,1:im,1:jm,1:kbl  ) = u(ibx:ibz,1:im,1:jm,kel:ke  )
+#ifdef GLM
         pdata%u(iph    ,1:im,1:jm,1:kbl  ) = u(iph    ,1:im,1:jm,kel:ke  )
 #endif /* GLM */
 #endif /* MHD */
       else
         pdata%u(  1:nfl,1:im,1:jm,keu:km ) = u(  1:nfl,1:im,1:jm,kb:kbu)
 #ifdef MHD
-#ifdef GLM
         pdata%u(ibx:ibz,1:im,1:jm,keu:km) = u(ibx:ibz,1:im,1:jm,kb:kbu)
+#ifdef GLM
         pdata%u(iph    ,1:im,1:jm,keu:km) = u(iph    ,1:im,1:jm,kb:kbu)
 #endif /* GLM */
 #endif /* MHD */
