@@ -956,10 +956,6 @@ module io
 !
     integer(kind=4), dimension(:)          , allocatable :: met
     real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: u
-    real(kind=8)   , dimension(:,:,:,:,:,:), allocatable :: f
-#ifdef MHD
-    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: e
-#endif /* MHD */
 
 ! local pointers
 !
@@ -1004,10 +1000,6 @@ module io
 !
         allocate(met(am(1)))
         allocate(u  (dm(1),dm(2),dm(3),dm(4),dm(5)))
-        allocate(f  (qm(1),qm(2),qm(3),qm(4),qm(5),qm(6)))
-#ifdef MHD
-        allocate(e  (cm(1),cm(2),cm(3),cm(4),cm(5)))
-#endif /* MHD */
 
 ! iterate over all metablocks and fill in the arrays for storage
 !
@@ -1018,10 +1010,6 @@ module io
           if (associated(pdata%meta)) met(l) = pdata%meta%id
 
           u(l,:,:,:,:)   = pdata%u(:,:,:,:)
-          f(l,:,:,:,:,:) = pdata%f(:,:,:,:,:)
-#ifdef MHD
-          e(l,:,:,:,:)   = pdata%e(:,:,:,:)
-#endif /* MHD */
 
           l = l + 1
           pdata => pdata%next
@@ -1031,19 +1019,11 @@ module io
 !
         call write_vector_integer_h5(gid, 'meta', am(1), met)
         call write_array5_double_h5 (gid, 'u'   , dm(:), u)
-        call write_array6_double_h5 (gid, 'f'   , qm(:), f)
-#ifdef MHD
-        call write_array5_double_h5 (gid, 'e'   , cm(:), e)
-#endif /* MHD */
 
 ! deallocate allocatable arrays
 !
         if (allocated(met)) deallocate(met)
         if (allocated(u)  ) deallocate(u)
-        if (allocated(f)  ) deallocate(f)
-#ifdef MHD
-        if (allocated(e)  ) deallocate(e)
-#endif /* MHD */
 
       end if ! dblocks > 0
 
