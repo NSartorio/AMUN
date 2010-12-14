@@ -68,9 +68,12 @@ module mesh
 
 ! local variables
 !
-    integer(kind=4)      :: l, p, i, j, k, n
+    integer(kind=4)      :: i, j, k, l, n
     character(len=64)    :: fmt
     character(len=32)    :: bstr, tstr
+#ifdef MPI
+    integer(kind=4), dimension(0:ncpus-1) :: lb
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
@@ -269,9 +272,13 @@ module mesh
 ! divide blocks between all processes, use the number of data blocks to do this,
 ! but keep blocks from the top level which have the same parent packed together
 !
-    l = nleafs / ncpus
+    l       = mod(nleafs, ncpus) - 1
+    lb( : ) = nleafs / ncpus
+    lb(0:l) = lb(0:l) + 1
+
+! reset the processor and block numbers
     n = 0
-    p = 0
+    l = 0
 
     pmeta_block => list_meta
     do while (associated(pmeta_block))
@@ -284,10 +291,10 @@ module mesh
 ! allowed number reset the counter and increase the processor number
 !
       if (pmeta_block%leaf) then
-        p = p + 1
-        if (p .ge. l) then
+        l = l + 1
+        if (l .ge. lb(n)) then
           n = min(ncpus - 1, n + 1)
-          p = 0
+          l = 0
         end if
       end if
 
@@ -317,22 +324,22 @@ module mesh
 ! print information about the generated geometry
 !
     if (is_master()) then
-      p = 0
+      n = 0
       do l = 0, maxlev - 1
         k = 2**(ndims * l)
-        p = p + k
+        n = n + k
       end do
-      p = p * rdims(1) * rdims(2) * rdims(3)
+      n = n * rdims(1) * rdims(2) * rdims(3)
       k = k * rdims(1) * rdims(2) * rdims(3)
 
       i = nint(alog10(1.0*mblocks + 1)) + 1
-      j = nint(alog10(1.0*p + 1)) + 1
+      j = nint(alog10(1.0*n + 1)) + 1
 
       write(fmt, "(a,i1,a,i1,a)") "(4x,a,1x,i", i, ",' / ',i", j, ",' = ',f8.4,' %')"
 
       write(*,*)
       write(*,fmt) "leafs    /cover blocks  =", nleafs , k, (100.0 * nleafs ) / k
-      write(*,fmt) "allocated/total blocks  =", mblocks, p, (100.0 * mblocks) / p
+      write(*,fmt) "allocated/total blocks  =", mblocks, n, (100.0 * mblocks) / n
     end if
 
 ! allocating space for coordinate variables
@@ -362,12 +369,12 @@ module mesh
 ! generating coordinates for all levels
 !
     do l = 1, maxlev
-      p = ncells * 2**(l - 1)
+      n = ncells * 2**(l - 1)
 
-      adx (l) = (xmax - xmin) / (rdims(1) * p)
-      ady (l) = (ymax - ymin) / (rdims(2) * p)
+      adx (l) = (xmax - xmin) / (rdims(1) * n)
+      ady (l) = (ymax - ymin) / (rdims(2) * n)
 #if NDIMS == 3
-      adz (l) = (zmax - zmin) / (rdims(3) * p)
+      adz (l) = (zmax - zmin) / (rdims(3) * n)
 #endif /* NDIMS == 3 */
 
       ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
@@ -428,6 +435,10 @@ module mesh
 ! array for the update of the refinement flag on all processors
 !
     integer(kind=4), dimension(nleafs)      :: ibuf
+
+! array for number of data block for autobalancing
+!
+    integer(kind=4), dimension(0:ncpus-1) :: lb
 
 ! local buffer for data block exchange
 !
@@ -736,12 +747,14 @@ module mesh
 !!
 ! calculate the new division
 !
-    l = nleafs / ncpus
+    l       = mod(nleafs, ncpus) - 1
+    lb( : ) = nleafs / ncpus
+    lb(0:l) = lb(0:l) + 1
 
 ! iterate over all metablocks and reassign the processor numbers
 !
     n = 0
-    p = 0
+    l = 0
 
     pmeta => list_meta
     do while (associated(pmeta))
@@ -804,10 +817,10 @@ module mesh
 ! allowed number reset the counter and increase the processor number
 !
       if (pmeta%leaf) then
-        p = p + 1
-        if (p .ge. l) then
+        l = l + 1
+        if (l .ge. lb(n)) then
           n = min(ncpus - 1, n + 1)
-          p = 0
+          l = 0
         end if
       end if
 
