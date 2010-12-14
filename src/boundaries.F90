@@ -706,9 +706,8 @@ module boundaries
                                          + u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)    &
                                          + u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
 #endif /* NDIMS == 3 */
-
 #ifdef MHD
-#ifdef GLM
+
 ! update magnetic field components
 !
 #if NDIMS == 2
@@ -728,6 +727,7 @@ module boundaries
                                         +  u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
                                         +  u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
 #endif /* NDIMS == 3 */
+#ifdef GLM
 
 ! update the scalar potential
 !
