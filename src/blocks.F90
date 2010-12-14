@@ -95,8 +95,6 @@ module blocks
     type(block_meta), pointer :: meta             ! pointer to the metadata block
 
     real, dimension(:,:,:,:)  , allocatable :: u  ! the array of the conserved variables
-    real, dimension(:,:,:,:,:), allocatable :: f  ! the array of the numerical fluxes
-    real, dimension(:,:,:,:)  , allocatable :: e  ! the array of the electomagnetic force
   end type block_data
 
 ! define block_info structure for boundary exchange
@@ -340,14 +338,6 @@ module blocks
 !
     allocate(pdata%u(      nqt,im,jm,km))
 
-! allocate space for the numerical fluxes
-!
-    allocate(pdata%f(ndims,nfl,im,jm,km))
-
-! allocate space for the electromotive force
-!
-    allocate(pdata%e(        3,im,jm,km))
-
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
@@ -478,11 +468,6 @@ module blocks
 ! deallocate variables
 !
       deallocate(pdata%u)
-
-! deallocate fluxes
-!
-      deallocate(pdata%f)
-      deallocate(pdata%e)
 
 ! nullify pointers
 !
