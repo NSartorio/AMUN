@@ -1136,7 +1136,7 @@ module io
 !
     if (err .ge. 0) then
 
-! store coordinates only if there are some data blocks at the current processor
+! store coordinates only if there are some data blocks on the current processor
 !
       if (dblocks .gt. 0) then
 
@@ -1312,7 +1312,7 @@ module io
 !
     if (err .ge. 0) then
 
-! store variables only if there are some data blocks at the current processor
+! store variables only if there are some data blocks on the current processor
 !
       if (dblocks .gt. 0) then
 
@@ -1542,7 +1542,7 @@ module io
 !
     if (err .ge. 0) then
 
-! store variables only if there are some data blocks at the current processor
+! store variables only if there are some data blocks on the current processor
 !
       if (dblocks .gt. 0) then
 
