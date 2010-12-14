@@ -997,16 +997,17 @@ module boundaries
 !
   subroutine bnd_spec(pb, id, il, ip)
 
-    use blocks   , only : block_data
-    use config   , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry &
-                        , ng, im, jm, km, ib, ibl, ie, ieu, jb, jbl, je, jeu   &
-                        , kb, kbl, ke, keu
-    use error    , only : print_warning
-    use variables, only : nvr, nfl, imx, imy, imz
+    use blocks       , only : block_data
+    use config       , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry      &
+                            , zubndry, ng, im, jm, km, ib, ibl, ie, ieu, jb    &
+                            , jbl, je, jeu, kb, kbl, ke, keu
+    use error        , only : print_warning
+    use interpolation, only : limiter
+    use variables    , only : nvr, nfl, imx, imy, imz
 #ifdef MHD
-    use variables, only : ibx, iby, ibz
+    use variables    , only : ibx, iby, ibz
 #ifdef GLM
-    use variables, only : iph
+    use variables    , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -1026,6 +1027,7 @@ module boundaries
 #if NDIMS == 3
     integer :: km1, kp1
 #endif /* NDIMS == 3 */
+    real    :: dbm, dbp, dbx, dby, dbz
 #endif /* MHD */
 !
 !-------------------------------------------------------------------------------
@@ -1062,20 +1064,25 @@ module boundaries
             jp1 = min(jm, j+1)
             do i = ng, 1, -1
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ib,j,k)
-              ip1 = i + 1
+
+              dbp = pb%u(iby,ib,jp1,k) - pb%u(iby,ib,j  ,k)
+              dbm = pb%u(iby,ib,j  ,k) - pb%u(iby,ib,jm1,k)
+              dby = limiter(dbp, dbm)
+#if NDIMS == 3
+              dbp = pb%u(ibz,ib,j,kp1) - pb%u(ibz,ib,j,k  )
+              dbm = pb%u(ibz,ib,j,k  ) - pb%u(ibz,ib,j,km1)
+              dbz = limiter(dbp, dbm)
+#endif /* NDIMS == 3 */
 #if NDIMS == 2
-              pb%u(ibx,i,j,k) = pb%u(ibx,i+2,j  ,k)                            &
-                              - pb%u(iby,ip1,jm1,k) + pb%u(iby,ip1,jp1,k)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i+1,j,k) + dby
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(ibx,i,j,k) = pb%u(ibx,i+2,j  ,k  )                          &
-                              - pb%u(iby,ip1,jm1,k  ) + pb%u(iby,ip1,jp1,k  )  &
-                              - pb%u(ibz,ip1,j  ,km1) + pb%u(ibz,ip1,j  ,kp1)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i+1,j,k) + dby + dbz
 #endif /* NDIMS == 3 */
               pb%u(iby,i,j,k) = pb%u(iby,ib,j,k)
               pb%u(ibz,i,j,k) = pb%u(ibz,ib,j,k)
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,ib,j,k)
 #endif /* GLM */
             end do
           end do
@@ -1118,20 +1125,26 @@ module boundaries
             jp1 = min(jm, j+1)
             do i = ieu, im
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ie,j,k)
-              im1 = i - 1
+
+              dbp = pb%u(iby,ie,jp1,k) - pb%u(iby,ie,j  ,k)
+              dbm = pb%u(iby,ie,j  ,k) - pb%u(iby,ie,jm1,k)
+              dby = limiter(dbp, dbm)
+#if NDIMS == 3
+              dbp = pb%u(ibz,ie,j,kp1) - pb%u(ibz,ie,j,k  )
+              dbm = pb%u(ibz,ie,j,k  ) - pb%u(ibz,ie,j,km1)
+              dbz = limiter(dbp, dbm)
+#endif /* NDIMS == 3 */
+
 #if NDIMS == 2
-              pb%u(ibx,i,j,k) = pb%u(ibx,i-2,j  ,k)                            &
-                              - pb%u(iby,im1,jp1,k) + pb%u(iby,im1,jm1,k)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i-1,j,k) - dby
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(ibx,i,j,k) = pb%u(ibx,i-2,j  ,k  )                          &
-                              - pb%u(iby,im1,jp1,k  ) + pb%u(iby,im1,jm1,k  )  &
-                              - pb%u(ibz,im1,j  ,kp1) + pb%u(ibz,im1,j  ,km1)
+              pb%u(ibx,i,j,k) = pb%u(ibx,i-1,j,k) - dby - dbz
 #endif /* NDIMS == 3 */
               pb%u(iby,i,j,k) = pb%u(iby,ie,j,k)
               pb%u(ibz,i,j,k) = pb%u(ibz,ie,j,k)
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,ie,j,k)
 #endif /* GLM */
             end do
           end do
@@ -1174,20 +1187,26 @@ module boundaries
             ip1 = min(im, i+1)
             do j = ng, 1, -1
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,jb,k)
-              jp1 = j + 1
+
+              dbp = pb%u(ibx,ip1,jb,k) - pb%u(ibx,i  ,jb,k)
+              dbm = pb%u(ibx,i  ,jb,k) - pb%u(ibx,im1,jb,k)
+              dbx = limiter(dbp, dbm)
+#if NDIMS == 3
+              dbp = pb%u(ibz,i,jb,kp1) - pb%u(ibz,i,jb,k  )
+              dbm = pb%u(ibz,i,jb,k  ) - pb%u(ibz,i,jb,km1)
+              dbz = limiter(dbp, dbm)
+#endif /* NDIMS == 3 */
+
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
 #if NDIMS == 2
-              pb%u(iby,i,j,k) = pb%u(iby,i  ,j+2,k)                            &
-                              - pb%u(ibx,im1,jp1,k) + pb%u(ibx,ip1,jp1,k)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j+1,k) + dbx
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(iby,i,j,k) = pb%u(iby,i  ,j+2,k  )                          &
-                              - pb%u(ibx,im1,jp1,k  ) + pb%u(ibx,ip1,jp1,k  )  &
-                              - pb%u(ibz,i  ,jp1,km1) + pb%u(ibz,i  ,jp1,kp1)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j+1,k) + dbx + dbz
 #endif /* NDIMS == 3 */
               pb%u(ibz,i,j,k) = pb%u(ibz,i,jb,k)
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,i,jb,k)
 #endif /* GLM */
             end do
           end do
@@ -1230,20 +1249,26 @@ module boundaries
             ip1 = min(im, i+1)
             do j = jeu, jm
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,je,k)
-              jm1 = j - 1
+
+              dbp = pb%u(ibx,ip1,je,k) - pb%u(ibx,i  ,je,k)
+              dbm = pb%u(ibx,i  ,je,k) - pb%u(ibx,im1,je,k)
+              dbx = limiter(dbp, dbm)
+#if NDIMS == 3
+              dbp = pb%u(ibz,i,je,kp1) - pb%u(ibz,i,je,k  )
+              dbm = pb%u(ibz,i,je,k  ) - pb%u(ibz,i,je,km1)
+              dbz = limiter(dbp, dbm)
+#endif /* NDIMS == 3 */
+
+              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
 #if NDIMS == 2
-              pb%u(iby,i,j,k) = pb%u(iby,i  ,j-2,k)                            &
-                              - pb%u(ibx,ip1,jm1,k) + pb%u(ibx,im1,jm1,k)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j-1,k) - dbx
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(iby,i,j,k) = pb%u(iby,i  ,j-2,k  )                          &
-                              - pb%u(ibx,ip1,jm1,k  ) + pb%u(ibx,im1,jm1,k  )  &
-                              - pb%u(ibz,i  ,jm1,kp1) + pb%u(ibz,i  ,jm1,km1)
+              pb%u(iby,i,j,k) = pb%u(iby,i,j-1,k) - dbx - dbz
 #endif /* NDIMS == 3 */
               pb%u(ibz,i,j,k) = pb%u(ibz,i,je,k)
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,i,je,k)
 #endif /* GLM */
             end do
           end do
@@ -1285,14 +1310,20 @@ module boundaries
             ip1 = min(im, i+1)
             do k = ng, 1, -1
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,kb)
+
+              dbp = pb%u(ibx,ip1,j,kb) - pb%u(ibx,i  ,j,kb)
+              dbm = pb%u(ibx,i  ,j,kb) - pb%u(ibx,im1,j,kb)
+              dbx = limiter(dbp, dbm)
+
+              dbp = pb%u(iby,i,jp1,kb) - pb%u(iby,i,j  ,kb)
+              dbm = pb%u(iby,i,j  ,kb) - pb%u(iby,i,jm1,kb)
+              dbz = limiter(dbp, dbm)
+
               pb%u(ibx,i,j,k) = pb%u(ibx,i,j,kb)
               pb%u(iby,i,j,k) = pb%u(iby,i,j,kb)
-              kp1 = k + 1
-              pb%u(ibz,i,j,k) = pb%u(ibz,i  ,j  ,k+2)                          &
-                              - pb%u(ibx,im1,j  ,kp1) + pb%u(ibx,ip1,j  ,kp1)  &
-                              - pb%u(iby,i  ,jm1,kp1) + pb%u(iby,i  ,jp1,kp1)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,k+1) + dbx + dbz
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,i,j,kb)
 #endif /* GLM */
             end do
           end do
@@ -1333,14 +1364,20 @@ module boundaries
             ip1 = min(im, i+1)
             do k = keu, km
               pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,ke)
+
+              dbp = pb%u(ibx,ip1,j,ke) - pb%u(ibx,i  ,j,ke)
+              dbm = pb%u(ibx,i  ,j,ke) - pb%u(ibx,im1,j,ke)
+              dbx = limiter(dbp, dbm)
+
+              dbp = pb%u(iby,i,jp1,ke) - pb%u(iby,i,j  ,ke)
+              dbm = pb%u(iby,i,j  ,ke) - pb%u(iby,i,jm1,ke)
+              dbz = limiter(dbp, dbm)
+
               pb%u(ibx,i,j,k) = pb%u(ibx,i,j,ke)
               pb%u(iby,i,j,k) = pb%u(iby,i,j,ke)
-              km1 = k - 1
-              pb%u(ibz,i,j,k) = pb%u(ibz,i  ,j  ,k-2)                          &
-                              - pb%u(ibx,ip1,j  ,km1) + pb%u(ibx,im1,j  ,km1)  &
-                              - pb%u(iby,i  ,jp1,km1) + pb%u(iby,i  ,jm1,km1)
+              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,k-1) - dbx - dbz
 #ifdef GLM
-              pb%u(iph,i,j,k) = 0.0d0
+              pb%u(iph,i,j,k) = pb%u(iph,i,j,ke)
 #endif /* GLM */
             end do
           end do

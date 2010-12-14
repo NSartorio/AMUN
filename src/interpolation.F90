@@ -366,6 +366,41 @@ module interpolation
 !
 !===============================================================================
 !
+! limiter: function returns the minimum module value among two arguments
+!
+!===============================================================================
+!
+  real function limiter(a, b)
+
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: a, b
+
+! local variables
+!
+    real             :: ds
+!
+!-------------------------------------------------------------------------------
+!
+    limiter = 0.0d0
+
+    ds = a * b
+
+    if (ds .gt. 0.0d0) then
+#ifdef MINMOD
+      limiter = sign(1.0d0, a) * min(abs(a), abs(b))
+#else /* MINMOD */
+      limiter = 2.0d0 * ds / (a + b)
+#endif /* MINMOD */
+    end if
+
+    return
+  end function limiter
+!
+!===============================================================================
+!
 ! expand: expands a multi-dimentional array similar using only TVD or high order
 !         interpolation
 !
