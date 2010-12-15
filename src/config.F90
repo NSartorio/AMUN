@@ -211,12 +211,12 @@ module config
     case("kblocks")
       read(value, "(i9.9)") kblocks
 #endif /* NDIMS == 3 */
-    case("rdimsx")
+    case("rdimx")
       read(value, "(i9.9)") rdims(1)
-    case("rdimsy")
+    case("rdimy")
       read(value, "(i9.9)") rdims(2)
 #if NDIMS == 3
-    case("rdimsz")
+    case("rdimz")
       read(value, "(i9.9)") rdims(3)
 #endif /* NDIMS == 3 */
     case("ncells")
