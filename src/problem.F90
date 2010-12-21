@@ -140,91 +140,375 @@ module problem
 !
 !===============================================================================
 !
-! domain_default: subroutine initializes the default domain of 2x2 blocks in
-!                'N' configuration
+! domain_default: subroutine initializes the default domain of N1xN2xN3 blocks
+!                 in the proper configuration; the dimensions N1xN2xN3 are set
+!                 in variable rdims
 !
 !===============================================================================
 !
   subroutine domain_default
 
-    use blocks, only : block_meta, block_data, append_metablock                &
+    use blocks, only : pointer_meta, block_meta, block_data, append_metablock  &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
                      , metablock_set_coord, metablock_setbounds                &
-                     , nsides, nfaces
+                     , nsides, nfaces, res
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , xmin, xmax, ymin, ymax, zmin, zmax
+                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
 
     implicit none
 
 ! local variables
 !
-    integer :: i, j
+    integer :: i, j, k, n, p, il, jl, kl, ip, jp, kp, cf, cfg
+    real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
+
+! local arrays
+!
+    integer, dimension(3) :: id, df
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta
+    type(block_meta), pointer :: pmeta, pnext
     type(block_data), pointer :: pdata
+
+! allocatable arrays
+!
+    integer, dimension(:,:), allocatable :: loc
+
+! local pointer array
+!
+    type(pointer_meta), dimension(:,:,:), allocatable :: block_array
 !
 !-------------------------------------------------------------------------------
 !
-! create root meta blocks
+! obtain the number of blocks
 !
-    call append_metablock(pmeta)
+    n = product(rdims(:))
 
-! mark block as a leaf
+! allocate the location array
 !
-    call metablock_setleaf(pmeta)
+    allocate(loc(n,3))
 
-! set block config flag
+! calculate the block sizes
 !
-    call metablock_setconfig(pmeta, 12)
+    xl = (xmax - xmin) / rdims(1)
+    yl = (ymax - ymin) / rdims(2)
+    zl = (zmax - zmin) / rdims(3)
 
-! set block level
+! allocate the block pointer array
 !
-    call metablock_setlevel(pmeta, 1)
+    allocate(block_array(rdims(1),rdims(2),rdims(3)))
+
+! sort dimensions
+!
+    if (rdims(1) .le. rdims(2)) then
+      ip = 1
+      jp = 2
+    else
+      ip = 2
+      jp = 1
+    end if
+    if (rdims(jp) .le. rdims(3)) then
+      kp = 3
+    else
+      if (rdims(ip) .le. rdims(3)) then
+        kp = jp
+        jp = 3
+      else
+        kp = jp
+        jp = ip
+        ip = 3
+      end if
+    end if
+    cf = 100 * ip + 10 * jp + kp
+
+! generate the gray code for a given configuration and allocate the meta blocks
+!
+    id(:) = (/ 0, 0, 0 /)
+    df(:) = (/ 1, 1, 1 /)
+
+    p = 1
+    do k = 1, rdims(kp)
+      if (df(kp) .eq. 1) id(kp) = id(kp) + df(kp)
+      do j = 1, rdims(jp)
+        if (df(jp) .eq. 1) id(jp) = id(jp) + df(jp)
+        do i = 1, rdims(ip)
+          if (df(ip) .eq. 1) id(ip) = id(ip) + df(ip)
+
+! append a new metablock
+!
+          call append_metablock(block_array(id(1),id(2),id(3))%ptr)
+
+! fill out the block location array
+!
+          loc(p,1:3) = id(1:3)
+
+! increase the block number
+!
+          p = p + 1
+
+          if (df(ip) .eq. -1) id(ip) = id(ip) + df(ip)
+        end do
+        if (df(jp) .eq. -1) id(jp) = id(jp) + df(jp)
+        df(ip) = - df(ip)
+      end do
+      if (df(kp) .eq. -1) id(kp) = id(kp) + df(kp)
+      df(jp) = - df(jp)
+    end do
+
+! set the configuration of the first block
+!
+    if (rdims(3) .eq. 1) then
+      if(rdims(1) .le. rdims(2)) then
+        do k = 1, rdims(3)
+          cfg = 12
+          do j = 1, rdims(2)
+            do i = 1, rdims(1)
+              pmeta => block_array(i,j,k)%ptr
+              call metablock_setconfig(pmeta, cfg)
+            end do
+            i = rdims(1)
+            pmeta => block_array(i,j,k)%ptr
+            call metablock_setconfig(pmeta, 13)
+            if (cfg .eq. 12) then
+              cfg = 43
+            else
+              cfg = 12
+            end if
+          end do
+        end do
+      else
+        cfg = 13
+        do k = 1, rdims(3)
+          do i = 1, rdims(1)
+            do j = 1, rdims(2)
+              pmeta => block_array(i,j,k)%ptr
+              call metablock_setconfig(pmeta, cfg)
+            end do
+            j = rdims(2)
+            pmeta => block_array(i,j,k)%ptr
+            call metablock_setconfig(pmeta, 12)
+            if (cfg .eq. 13) then
+              cfg = 42
+            else
+              cfg = 13
+            end if
+          end do
+        end do
+      end if
+    else
+    end if
+
+! fill out block structure fields
+!
+    do k = 1, rdims(3)
+
+! claculate the block position along Z
+!
+      kl  = (k - 1) * res(1)
+
+! calculate the Z bounds
+!
+      zmn = zmin + (k - 1) * zl
+      zmx = zmin +  k      * zl
+
+      do j = 1, rdims(2)
+
+! claculate the block position along Y
+!
+        jl  = (j - 1) * res(1)
+
+! calculate the Y bounds
+!
+        ymn = ymin + (j - 1) * yl
+        ymx = ymin +  j      * yl
+
+        do i = 1, rdims(1)
+
+! claculate the block position along Y
+!
+          il  = (i - 1) * res(1)
+
+! calculate the Z bounds
+!
+          xmn = xmin + (i - 1) * xl
+          xmx = xmin +  i      * xl
+
+! assign a pointer
+!
+          pmeta => block_array(i,j,k)%ptr
+
+! mark it as the leaf
+!
+          call metablock_setleaf(pmeta)
+
+! set the level
+!
+          call metablock_setlevel(pmeta, 1)
+
+! create a new data block
+!
+          call append_datablock(pdata)
+
+! associate meta and data blocks
+!
+          call associate_blocks(pmeta, pdata)
 
 ! set block coordinates
 !
-    call metablock_set_coord(pmeta, 0, 0, 0)
+          call metablock_set_coord(pmeta, il, jl, kl)
 
-! set block bounds
+! set the bounds
 !
-    call metablock_setbounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
+          call metablock_setbounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
+        end do
+      end do
+    end do
 
-! if periodic boundary conditions set all neighbors to itself
+! assign boundaries along the X direction
+!
+    do k = 1, rdims(3)
+      do j = 1, rdims(2)
+        do i = 1, rdims(1) - 1
+
+! assign a pointer
+!
+          pmeta => block_array(i  ,j,k)%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i+1,j,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(1,2,p)%ptr => pnext
+            pnext%neigh(1,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
 !
     if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
-      do j = 1, nfaces
-        do i = 1, nsides
-          pmeta%neigh(1,i,j)%ptr => pmeta
+      do k = 1, rdims(3)
+        do j = 1, rdims(2)
+
+! assign pointers
+!
+          pmeta => block_array(      1 ,j,k)%ptr
+          pnext => block_array(rdims(1),j,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(1,1,p)%ptr => pnext
+            pnext%neigh(1,2,p)%ptr => pmeta
+          end do
         end do
       end do
     end if
+
+! assign boundaries along the Y direction
+!
+    do k = 1, rdims(3)
+      do j = 1, rdims(2) - 1
+        do i = 1, rdims(1)
+
+! assign a pointer
+!
+          pmeta => block_array(i,j  ,k)%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i,j+1,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(2,2,p)%ptr => pnext
+            pnext%neigh(2,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
+!
     if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
-      do j = 1, nfaces
-        do i = 1, nsides
-          pmeta%neigh(2,i,j)%ptr => pmeta
+      do k = 1, rdims(3)
+        do i = 1, rdims(1)
+
+! assign pointers
+!
+          pmeta => block_array(i,      1 ,k)%ptr
+          pnext => block_array(i,rdims(2),k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(2,1,p)%ptr => pnext
+            pnext%neigh(2,2,p)%ptr => pmeta
+          end do
         end do
       end do
     end if
 #if NDIMS == 3
+
+! assign boundaries along the Z direction
+!
+    do k = 1, rdims(3) - 1
+      do j = 1, rdims(2)
+        do i = 1, rdims(1)
+
+! assign a pointer
+!
+          pmeta => block_array(i,j,k  )%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i,j,k+1)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(3,2,p)%ptr => pnext
+            pnext%neigh(3,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
+!
     if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
-      do j = 1, nfaces
-        do i = 1, nsides
-          pmeta%neigh(3,i,j)%ptr => pmeta
+      do j = 1, rdims(2)
+        do i = 1, rdims(1)
+
+! assign pointers
+!
+          pmeta => block_array(i,j,      1 )%ptr
+          pnext => block_array(i,j,rdims(3))%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(3,1,p)%ptr => pnext
+            pnext%neigh(3,2,p)%ptr => pmeta
+          end do
         end do
       end do
     end if
 #endif /* NDIMS == 3 */
 
-! create root data block
+! deallocate the block pointer array
 !
-    call append_datablock(pdata)
-
-! associate root blocks
-!
-    call associate_blocks(pmeta, pdata)
+    deallocate(block_array)
 !
 !-------------------------------------------------------------------------------
 !
