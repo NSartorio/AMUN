@@ -140,7 +140,7 @@ module problem
 !
 !===============================================================================
 !
-  subroutine domain_default
+  subroutine domain_default()
 
     use blocks, only : pointer_meta, block_meta, block_data, append_metablock  &
                      , append_datablock, associate_blocks, metablock_setleaf   &
@@ -154,12 +154,12 @@ module problem
 
 ! local variables
 !
-    integer :: i, j, k, n, p, il, jl, kl, ip, jp, kp, cf, cfg
+    integer :: i, j, k, n, p, il, jl, kl
     real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
 
 ! local arrays
 !
-    integer, dimension(3) :: id, df
+    integer, dimension(3) :: loc, del
 
 ! local pointers
 !
@@ -168,7 +168,7 @@ module problem
 
 ! allocatable arrays
 !
-    integer, dimension(:,:), allocatable :: loc
+    integer, dimension(:,:,:), allocatable :: cfg
 
 ! local pointer array
 !
@@ -180,119 +180,87 @@ module problem
 !
     n = product(rdims(:))
 
-! allocate the location array
+!! PREPARE BLOCK CONFIGURATION ARRAY
+!!
+! allocate the configuration array
 !
-    allocate(loc(n,3))
+    allocate(cfg(rdims(1),rdims(2),rdims(3)))
 
-! calculate the block sizes
+! set the block configurations
 !
-    xl = (xmax - xmin) / rdims(1)
-    yl = (ymax - ymin) / rdims(2)
-    zl = (zmax - zmin) / rdims(3)
+    cfg(1:rdims(1),1:rdims(2):2,1:rdims(3):2) = 12
 
+    if (rdims(2) .gt. 1) then
+      cfg(1:rdims(1),2:rdims(2):2,1:rdims(3):2) = 43
+      cfg(  rdims(1),1:rdims(2)  ,1:rdims(3):2) = 13
+    end if
+
+    if (rdims(3) .gt. 1) then
+      cfg(1:rdims(1),1:rdims(2):2,2:rdims(3):2) = 65
+      if (rdims(2) .gt. 1) then
+        cfg(1:rdims(1),2:rdims(2):2,2:rdims(3):2) = 78
+        cfg(  rdims(1),1:rdims(2)  ,2:rdims(3):2) = 75
+      end if
+      if (rdims(1) .eq. 1 .or. mod(rdims(2),2) .eq. 1) then
+        cfg(  rdims(1),  rdims(2)  ,1:rdims(3)  ) = 15
+      else
+        cfg(  1       ,  rdims(2)  ,1:rdims(3)  ) = 48
+      end if
+    end if
+
+!! ALLOCATE AND GENERATE META BLOCK CHAIN AND SET BLOCK CONFIGURATIONS
+!!
 ! allocate the block pointer array
 !
     allocate(block_array(rdims(1),rdims(2),rdims(3)))
 
-! sort dimensions
+! generate the gray code for a given configuration and link the block in
+! the proper order
 !
-    if (rdims(1) .le. rdims(2)) then
-      ip = 1
-      jp = 2
-    else
-      ip = 2
-      jp = 1
-    end if
-    if (rdims(jp) .le. rdims(3)) then
-      kp = 3
-    else
-      if (rdims(ip) .le. rdims(3)) then
-        kp = jp
-        jp = 3
-      else
-        kp = jp
-        jp = ip
-        ip = 3
-      end if
-    end if
-    cf = 100 * ip + 10 * jp + kp
-
-! generate the gray code for a given configuration and allocate the meta blocks
-!
-    id(:) = (/ 0, 0, 0 /)
-    df(:) = (/ 1, 1, 1 /)
+    loc(:) = (/ 0, 0, 0 /)
+    del(:) = (/ 1, 1, 1 /)
 
     p = 1
-    do k = 1, rdims(kp)
-      if (df(kp) .eq. 1) id(kp) = id(kp) + df(kp)
-      do j = 1, rdims(jp)
-        if (df(jp) .eq. 1) id(jp) = id(jp) + df(jp)
-        do i = 1, rdims(ip)
-          if (df(ip) .eq. 1) id(ip) = id(ip) + df(ip)
+    do k = 1, rdims(3)
+      if (del(3) .eq. 1) loc(3) = loc(3) + del(3)
+      do j = 1, rdims(2)
+        if (del(2) .eq. 1) loc(2) = loc(2) + del(2)
+        do i = 1, rdims(1)
+          if (del(1) .eq. 1) loc(1) = loc(1) + del(1)
 
 ! append a new metablock
 !
-          call append_metablock(block_array(id(1),id(2),id(3))%ptr)
+          call append_metablock(block_array(loc(1),loc(2),loc(3))%ptr)
 
-! fill out the block location array
+! set the configuration type
 !
-          loc(p,1:3) = id(1:3)
+          call metablock_setconfig(block_array(loc(1),loc(2),loc(3))%ptr       &
+                                         , cfg(loc(1),loc(2),loc(3)))
 
 ! increase the block number
 !
           p = p + 1
 
-          if (df(ip) .eq. -1) id(ip) = id(ip) + df(ip)
+          if (del(1) .eq. -1) loc(1) = loc(1) + del(1)
         end do
-        if (df(jp) .eq. -1) id(jp) = id(jp) + df(jp)
-        df(ip) = - df(ip)
+        if (del(2) .eq. -1) loc(2) = loc(2) + del(2)
+        del(1) = - del(1)
       end do
-      if (df(kp) .eq. -1) id(kp) = id(kp) + df(kp)
-      df(jp) = - df(jp)
+      if (del(3) .eq. -1) loc(3) = loc(3) + del(3)
+      del(2) = - del(2)
     end do
 
-! set the configuration of the first block
+! deallocate the configuration array
 !
-    if (rdims(3) .eq. 1) then
-      if(rdims(1) .le. rdims(2)) then
-        do k = 1, rdims(3)
-          cfg = 12
-          do j = 1, rdims(2)
-            do i = 1, rdims(1)
-              pmeta => block_array(i,j,k)%ptr
-              call metablock_setconfig(pmeta, cfg)
-            end do
-            i = rdims(1)
-            pmeta => block_array(i,j,k)%ptr
-            call metablock_setconfig(pmeta, 13)
-            if (cfg .eq. 12) then
-              cfg = 43
-            else
-              cfg = 12
-            end if
-          end do
-        end do
-      else
-        cfg = 13
-        do k = 1, rdims(3)
-          do i = 1, rdims(1)
-            do j = 1, rdims(2)
-              pmeta => block_array(i,j,k)%ptr
-              call metablock_setconfig(pmeta, cfg)
-            end do
-            j = rdims(2)
-            pmeta => block_array(i,j,k)%ptr
-            call metablock_setconfig(pmeta, 12)
-            if (cfg .eq. 13) then
-              cfg = 42
-            else
-              cfg = 13
-            end if
-          end do
-        end do
-      end if
-    else
-    end if
+    deallocate(cfg)
+
+!! FILL OUT THE REMAINING FIELDS AND ALLOCATE AND ASSOCIATE DATA BLOCKS
+!!
+! calculate block sizes
+!
+    xl = (xmax - xmin) / rdims(1)
+    yl = (ymax - ymin) / rdims(2)
+    zl = (zmax - zmin) / rdims(3)
 
 ! fill out block structure fields
 !
@@ -360,6 +328,8 @@ module problem
       end do
     end do
 
+!! ASSIGN THE BLOCK NEIGHBORS
+!!
 ! assign boundaries along the X direction
 !
     do k = 1, rdims(3)
