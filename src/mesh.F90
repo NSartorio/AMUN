@@ -98,10 +98,11 @@ module mesh
 ! print general information about resolutions
 !
     if (is_master()) then
-      write(*,"(1x,a)"         ) "Generating initial mesh:"
-      write(*,"(4x,a,  1x,i6)" ) "refining to max. level  =", maxlev
-      write(*,"(4x,a,3(1x,i6))") "lowest level resolution =", rdims(1:ndims) * ncells
-      write(*,"(4x,a,3(1x,i6))") "effective resolution    =", rdims(1:ndims) * res(1)
+      write(*,"(1x,a)"         ) "Generating the initial mesh:"
+      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:ndims)
+      write(*,"(4x,a,3(1x,i6))") "base resolution        =", rdims(1:ndims) * ncells
+      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rdims(1:ndims) * res(1)
+      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
     end if
 
 ! at this point we assume, that the initial structure of blocks
@@ -109,7 +110,7 @@ module mesh
 ! is done yet; we fill out the coarse blocks with the initial condition
 !
     if (is_master()) &
-      write(*,"(4x,a,$)") "refining level          =    "
+      write(*,"(4x,a,$)") "generating level       =    "
 
     l = 1
     do while (l .le. maxlev)
@@ -338,8 +339,8 @@ module mesh
       write(fmt, "(a,i1,a,i1,a)") "(4x,a,1x,i", i, ",' / ',i", j, ",' = ',f8.4,' %')"
 
       write(*,*)
-      write(*,fmt) "leafs    /cover blocks  =", nleafs , k, (100.0 * nleafs ) / k
-      write(*,fmt) "allocated/total blocks  =", mblocks, n, (100.0 * mblocks) / n
+      write(*,fmt) "leafs    /cover blocks =", nleafs , k, (100.0 * nleafs ) / k
+      write(*,fmt) "allocated/total blocks =", mblocks, n, (100.0 * mblocks) / n
     end if
 
 ! allocating space for coordinate variables
