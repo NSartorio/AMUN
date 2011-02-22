@@ -61,7 +61,7 @@ module forcing
 ! local variables
 !
     integer :: kmx, i, j, k, l
-    real    :: rk, kr, fnor, famp, fa, kx, ky, kz, kxy
+    real    :: rk, kr, fnor, famp, fa, kx, ky, kz, kxy, kyz
 #endif /* FORCE */
 
 !-------------------------------------------------------------------------------
@@ -181,13 +181,24 @@ module forcing
             kz  = real(k)
             kxy = sqrt(kx * kx + ky * ky)
 
-            e1(l,1) =   ky / kxy
-            e1(l,2) = - kx / kxy
-            e1(l,3) = 0.0d0
+            if (kxy .gt. 0.0d0) then
+              e1(l,1) =   ky / kxy
+              e1(l,2) = - kx / kxy
+              e1(l,3) = 0.0d0
 
-            e2(l,1) =   kx * kz / (rk * kxy)
-            e2(l,2) =   ky * kz / (rk * kxy)
-            e2(l,3) = - kxy / rk
+              e2(l,1) =   kx * kz / (rk * kxy)
+              e2(l,2) =   ky * kz / (rk * kxy)
+              e2(l,3) = - kxy / rk
+            else
+              kyz = sqrt(ky * ky + kz * kz)
+              e1(l,1) = 0.0d0
+              e1(l,2) =   kz / kyz
+              e1(l,3) = - ky / kyz
+
+              e2(l,1) = - kyz / rk
+              e2(l,2) =   ky * kx / (rk * kyz)
+              e2(l,3) =   kz * kx / (rk * kyz)
+            end if
 
             e1(l,:) = fa * e1(l,:)
             e2(l,:) = fa * e2(l,:)
