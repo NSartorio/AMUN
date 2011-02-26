@@ -36,7 +36,7 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_domain
+  subroutine init_domain()
 
     use config, only : problem
 !
