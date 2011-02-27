@@ -47,7 +47,7 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine init_mesh
+  subroutine init_mesh()
 
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
                        , ncells, maxlev, rdims, ng
@@ -407,7 +407,7 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine update_mesh
+  subroutine update_mesh()
 
     use config   , only : maxlev, im, jm, km
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
@@ -1133,7 +1133,7 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine clear_mesh
+  subroutine clear_mesh()
 
     use blocks, only : clear_blocks
     use error , only : print_info
