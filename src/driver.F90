@@ -131,6 +131,10 @@ program godunov
   if (is_master()) then
     write(*,*)
     write(*,"(1x,a)"   ) "Evolving system:"
+    write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew '     &
+           , 'remain. time'
+    write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s"' //  &
+            ',a1,$)') n, t, dt, dtn, ed, eh, em, es, char(13)
   end if
 
 ! main loop
@@ -180,15 +184,15 @@ program godunov
 
 ! print progress information
 !
-    if (is_master()) then
-      if (mod(n, 50) .eq. 1) &
-        write(*,'(4x,a4,3(3x,a9,3x),4x,a12)') 'iter', 'time ', 'dt ', 'dtnew ' &
-               , 'remain. time'
-      write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2,"s")') &
-               n, t, dt, dtn, ed, eh, em, es
-    end if
+    if (is_master())                                                           &
+      write(*,'(i8,3(1x,1pe14.6),2x,1i4.1,"d",1i2.2,"h",1i2.2,"m",1i2.2' //    &
+              ',"s",a1,$)') n, t, dt, dtn, ed, eh, em, es, char(13)
 
   end do
+
+! add one empty line
+!
+  if (is_master()) write(*,*)
 
 ! write down the final state
 !
