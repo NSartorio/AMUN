@@ -170,8 +170,8 @@ boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
                   mpitools.o variables.o
 config.o        : config.F90 error.o
 constants.o     : constants.F90
-driver.o        : driver.F90 config.o evolution.o forcing.o io.o mesh.o        \
-                  mpitools.o random.o timer.o
+driver.o        : driver.F90 blocks.o config.o evolution.o forcing.o io.o      \
+                  mesh.o mpitools.o random.o timer.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o forcing.o       \
                   interpolation.o mesh.o mpitools.o problem.o scheme.o timer.o \
