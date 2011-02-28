@@ -157,11 +157,24 @@ $(name).x: $(objects)
 arch: $(files)
 	tar czvf $(name)-$(DATE).tar.gz $(files)
 
-clean:
-	rm -rf *.x *.o *.mod *.il
+clean-bak:
+	rm -rf *.bak *~
 
-clean-all:
-	rm -rf *.x *.o *.mod *.il *.out *.dat *.bin *.h5 *.hdf *~ gprof.txt
+clean-data:
+	rm -rf *.dat *.h5
+
+clean-exec:
+	rm -rf *.x
+
+clean-modules:
+	rm -rf *.mod
+
+clean-objects:
+	rm -rf *.o
+
+clean: clean-bak clean-modules clean-objects
+
+clean-all: clean-bak clean-data clean-exec clean-modules clean-objects
 
 #-------------------------------------------------------------------------------
 
