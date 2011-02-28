@@ -8,7 +8,7 @@
 !!
 !! Copyright (C) 2000 George Marsaglia, Wai Wan Tsang
 !! Copyright (C) 2008 John Burkardt
-!! Copyright (C) 2010 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2010,2011 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
 !!******************************************************************************
 !!

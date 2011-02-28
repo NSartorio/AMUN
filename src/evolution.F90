@@ -2,7 +2,7 @@
 !!
 !! module: evolution - handling the time evolution of the block structure
 !!
-!! Copyright (C) 2008-2010 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
 !!******************************************************************************
 !!

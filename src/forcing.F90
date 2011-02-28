@@ -2,7 +2,7 @@
 !!
 !! module: forcing - handles turbulence driving
 !!
-!! Copyright (C) 2007-2010 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2007-2011 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
 !!******************************************************************************
 !!

@@ -2,7 +2,7 @@
 !!
 !! module: boundaries - routines for handling the boundary conditions
 !!
-!! Copyright (C) 2008-2010 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
 !!******************************************************************************
 !!
