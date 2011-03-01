@@ -330,8 +330,11 @@ module forcing
 
 ! local variables
 !
-    integer :: i, j, k, p
-    real    :: fx, fy, fz, kr, cs, sn
+    integer :: i, j, k, p, kmn, kmx
+    real    :: fx, fy, fz
+    real    :: kx, ky, kz
+    real    :: snx, sny, snz, snp, sn
+    real    :: csx, csy, csz, csp, cs
 
 ! local arrays
 !
@@ -340,6 +343,8 @@ module forcing
 #if NDIMS == 3
     real, dimension(km) :: z
 #endif /* NDIMS == 3 */
+    real, dimension(:,:), allocatable :: asnx, asny, asnz
+    real, dimension(:,:), allocatable :: acsx, acsy, acsz
 
 !-------------------------------------------------------------------------------
 !
@@ -351,39 +356,107 @@ module forcing
     z(:) = dpi * (zmn + az(l,:))
 #endif /* NDIMS == 3 */
 
-! perform inverse Fourier transform
+! allocate arrays for directional sinuses and cosinuses
+!
+    kmn = minval(ktab(:,:))
+    kmx = maxval(ktab(:,:))
+
+    allocate(asnx(kmn:kmx,im))
+    allocate(acsx(kmn:kmx,im))
+    allocate(asny(kmn:kmx,jm))
+    allocate(acsy(kmn:kmx,jm))
+#if NDIMS == 3
+    allocate(asnz(kmn:kmx,km))
+    allocate(acsz(kmn:kmx,km))
+#endif /* NDIMS == 3 */
+
+! calculate directional sinuses and cosinuses for each mode
+!
+    do p = kmn, kmx
+      do i = 1, im
+        kx        = p * x(i)
+        asnx(p,i) = sin(kx)
+        acsx(p,i) = cos(kx)
+      end do
+      do j = 1, jm
+        ky        = p * y(j)
+        asny(p,j) = sin(ky)
+        acsy(p,j) = cos(ky)
+      end do
+#if NDIMS == 3
+      do k = 1, km
+        kz        = p * z(k)
+        asnz(p,k) = sin(kz)
+        acsz(p,k) = cos(kz)
+      end do
+#endif /* NDIMS == 3 */
+    end do
+
+! perform the inverse Fourier transform
 !
     do k = 1, km
       do j = 1, jm
         do i = 1, im
+
           fx = 0.0d0
           fy = 0.0d0
           fz = 0.0d0
 
           do p = 1, nf
-#if NDIMS == 2
-            kr = ktab(p,1) * x(i) + ktab(p,2) * y(j)
-#endif /* NDIMS == 2 */
+
+! obtain directional sinuses and cosinuses for each mode
+!
+            snx = asnx(ktab(p,1),i)
+            csx = acsx(ktab(p,1),i)
+            sny = asny(ktab(p,2),j)
+            csy = acsy(ktab(p,2),j)
 #if NDIMS == 3
-            kr = ktab(p,1) * x(i) + ktab(p,2) * y(j) + ktab(p,3) * z(k)
+            snz = asnz(ktab(p,3),k)
+            csz = acsz(ktab(p,3),k)
 #endif /* NDIMS == 3 */
 
-            cs = cos(kr)
-            sn = sin(kr)
+! calculate total sinus and cosinus
+!
+#if NDIMS == 2
+            sn  = snx * csy + csx * sny
+            cs  = csx * csy - snx * sny
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            snp = snx * csy + csx * sny
+            csp = csx * csy - snx * sny
 
+            sn  = snp * csz + csp * snz
+            cs  = csp * csz - snp * snz
+#endif /* NDIMS == 3 */
+
+! update the real value
+!
             fx = fx + real(ftab(p,1)) * cs + aimag(ftab(p,1)) * sn
             fy = fy + real(ftab(p,2)) * cs + aimag(ftab(p,2)) * sn
             fz = fz + real(ftab(p,3)) * cs + aimag(ftab(p,3)) * sn
+
           end do
 
-! update coefficients
+! update the local value
 !
           f(1,i,j,k) = fx
           f(2,i,j,k) = fy
           f(3,i,j,k) = fz
+
         end do
       end do
     end do
+
+! deallocate local arrays
+!
+    deallocate(asnx)
+    deallocate(acsx)
+    deallocate(asny)
+    deallocate(acsy)
+#if NDIMS == 3
+    deallocate(asnz)
+    deallocate(acsz)
+#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
