@@ -53,6 +53,7 @@ module forcing
 
 #ifdef FORCE
     use config, only : fpow, fani, fdt, kf, kl, ku, kc, kd
+    use timer , only : start_timer, stop_timer
 #endif /* FORCE */
 
     implicit none
@@ -67,6 +68,10 @@ module forcing
 !-------------------------------------------------------------------------------
 !
 #ifdef FORCE
+! start the timer for forcing
+!
+    call start_timer(6)
+
 ! initialize the number of drived components, normalization factor, and
 ! maximum wave number
 !
@@ -207,6 +212,10 @@ module forcing
       end do
     end do
 #endif /* NDIMS == 3 */
+
+! stop the timer
+!
+    call stop_timer(6)
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -221,15 +230,29 @@ module forcing
 !
   subroutine clear_forcing()
 
+#ifdef FORCE
+    use timer , only : start_timer, stop_timer
+
+#endif /* FORCE */
     implicit none
 
 !-------------------------------------------------------------------------------
 !
 #ifdef FORCE
+! start the timer for forcing
+!
+    call start_timer(6)
+
+! deallocate all module arrays
+!
     if (allocated(ktab)) deallocate(ktab)
     if (allocated(ftab)) deallocate(ftab)
     if (allocated(e1))   deallocate(e1)
     if (allocated(e2))   deallocate(e2)
+
+! stop the timer
+!
+    call stop_timer(6)
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -248,6 +271,7 @@ module forcing
     use config   , only : fdt
     use constants, only : dpi
     use random   , only : randomu
+    use timer    , only : start_timer, stop_timer
 
     implicit none
 
@@ -263,6 +287,10 @@ module forcing
 
 !-------------------------------------------------------------------------------
 !
+! start the timer for forcing
+!
+    call start_timer(6)
+
 ! calculate the number of forcing integration iteration for the current timestep
 !
     ni = int(dt / fdt)
@@ -302,6 +330,10 @@ module forcing
 ! normalize the forcing terms by the time step
 !
     ftab(:,:) = ftab(:,:) / dt
+
+! stop the timer
+!
+    call stop_timer(6)
 !
 !-------------------------------------------------------------------------------
 !
@@ -319,6 +351,7 @@ module forcing
     use config   , only : im, jm, km
     use constants, only : dpi
     use mesh     , only : ax, ay, az
+    use timer    , only : start_timer, stop_timer
 
     implicit none
 
@@ -348,6 +381,10 @@ module forcing
 
 !-------------------------------------------------------------------------------
 !
+! start the timer for forcing
+!
+    call start_timer(6)
+
 ! prepare local block coordinates
 !
     x(:) = dpi * (xmn + ax(l,:))
@@ -457,6 +494,10 @@ module forcing
     deallocate(asnz)
     deallocate(acsz)
 #endif /* NDIMS == 3 */
+
+! stop the timer
+!
+    call stop_timer(6)
 !
 !-------------------------------------------------------------------------------
 !

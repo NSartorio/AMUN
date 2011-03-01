@@ -230,6 +230,9 @@ program godunov
     write (*,fmt) "Time for data output    : ", get_timer(3), per * get_timer(3)
     write (*,fmt) "Time for boundary update: ", get_timer(4), per * get_timer(4)
     write (*,fmt) "Time for mesh update    : ", get_timer(5), per * get_timer(5)
+#ifdef FORCE
+    write (*,fmt) "Time for forcing        : ", get_timer(6), per * get_timer(6)
+#endif /* FORCE */
     write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
   end if
 
