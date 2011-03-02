@@ -37,6 +37,7 @@ program godunov
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
 #endif /* FORCE */
+  use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
@@ -114,6 +115,10 @@ program godunov
   call init_forcing()
 
 #endif /* FORCE */
+! initialize the integrals module
+!
+  call init_integrals()
+
 ! update the maximum speed in the system
 !
   call start_timer(2)
@@ -162,6 +167,10 @@ program godunov
     call evolve()
     call stop_timer(2)
 
+! store integrals
+!
+    call store_integrals()
+
 ! store data
 !
     call start_timer(3)
@@ -206,6 +215,10 @@ program godunov
   call clear_forcing()
 
 #endif /* FORCE */
+! clear up the integrals module
+!
+  call clear_integrals()
+
 ! deallocate and reset mesh
 !
   call start_timer(1)
