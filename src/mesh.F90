@@ -37,6 +37,7 @@ module mesh
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
   real, dimension(:  ), allocatable, save :: adx , ady , adz
   real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
+  real, dimension(:  ), allocatable, save :: advol
 
   contains
 !
@@ -345,27 +346,29 @@ module mesh
 
 ! allocating space for coordinate variables
 !
-    allocate(ax  (maxlev, im))
-    allocate(ay  (maxlev, jm))
-    allocate(az  (maxlev, km))
-    allocate(adx (maxlev))
-    allocate(ady (maxlev))
-    allocate(adz (maxlev))
-    allocate(adxi(maxlev))
-    allocate(adyi(maxlev))
-    allocate(adzi(maxlev))
+    allocate(ax   (maxlev, im))
+    allocate(ay   (maxlev, jm))
+    allocate(az   (maxlev, km))
+    allocate(adx  (maxlev))
+    allocate(ady  (maxlev))
+    allocate(adz  (maxlev))
+    allocate(adxi (maxlev))
+    allocate(adyi (maxlev))
+    allocate(adzi (maxlev))
+    allocate(advol(maxlev))
 
 ! reset the coordinate variables
 !
-    ax  (:,:) = 0.0d0
-    ay  (:,:) = 0.0d0
-    az  (:,:) = 0.0d0
-    adx (:)   = 1.0d0
-    ady (:)   = 1.0d0
-    adz (:)   = 1.0d0
-    adxi(:)   = 1.0d0
-    adyi(:)   = 1.0d0
-    adzi(:)   = 1.0d0
+    ax(:,:)  = 0.0d0
+    ay(:,:)  = 0.0d0
+    az(:,:)  = 0.0d0
+    adx(:)   = 1.0d0
+    ady(:)   = 1.0d0
+    adz(:)   = 1.0d0
+    adxi(:)  = 1.0d0
+    adyi(:)  = 1.0d0
+    adzi(:)  = 1.0d0
+    advol(:) = 1.0d0
 
 ! generating coordinates for all levels
 !
@@ -389,6 +392,8 @@ module mesh
 #if NDIMS == 3
       adzi(l) = 1.0d0 / adz(l)
 #endif /* NDIMS == 3 */
+
+      advol(l) = adx(l) * ady(l) * adz(l)
     end do
 
 ! get the minimum grid step
@@ -1148,15 +1153,16 @@ module mesh
 
 ! deallocating coordinate variables
 !
-    if (allocated(ax))   deallocate(ax)
-    if (allocated(ay))   deallocate(ay)
-    if (allocated(az))   deallocate(az)
-    if (allocated(adx))  deallocate(adx)
-    if (allocated(ady))  deallocate(ady)
-    if (allocated(adz))  deallocate(adz)
-    if (allocated(adxi)) deallocate(adxi)
-    if (allocated(adyi)) deallocate(adyi)
-    if (allocated(adzi)) deallocate(adzi)
+    if (allocated(ax)   ) deallocate(ax)
+    if (allocated(ay)   ) deallocate(ay)
+    if (allocated(az)   ) deallocate(az)
+    if (allocated(adx)  ) deallocate(adx)
+    if (allocated(ady)  ) deallocate(ady)
+    if (allocated(adz)  ) deallocate(adz)
+    if (allocated(adxi) ) deallocate(adxi)
+    if (allocated(adyi) ) deallocate(adyi)
+    if (allocated(adzi) ) deallocate(adzi)
+    if (allocated(advol)) deallocate(advol)
 
 !-------------------------------------------------------------------------------
 !
