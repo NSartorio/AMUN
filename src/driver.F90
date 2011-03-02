@@ -109,6 +109,10 @@ program godunov
 !
   dt  = fdt * floor(dt / fdt)
 
+! initialize forcing module
+!
+  call init_forcing()
+
 #endif /* FORCE */
 ! update the maximum speed in the system
 !
