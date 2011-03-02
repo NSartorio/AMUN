@@ -84,6 +84,13 @@ program godunov
 !
   call init_generator()
 
+! initialize our adaptive mesh, refine that mesh to the desired level
+! according to the initialized problem
+!
+  call start_timer(1)
+  call init_mesh()
+  call stop_timer(1)
+
 ! reset number of iterations and time, etc.
 !
   n    = 0
@@ -92,6 +99,7 @@ program godunov
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+
 #ifdef FORCE
 ! if the forcing time step is larger than the initial time step decrease it
 !
@@ -100,21 +108,8 @@ program godunov
 ! round the initial time step to the integer number of forcing time steps
 !
   dt  = fdt * floor(dt / fdt)
+
 #endif /* FORCE */
-
-#ifdef FORCE
-! initialize forcing module
-!
-  call init_forcing()
-#endif /* FORCE */
-
-! initialize our adaptive mesh, refine that mesh to the desired level
-! according to the initialized problem
-!
-  call start_timer(1)
-  call init_mesh()
-  call stop_timer(1)
-
 ! update the maximum speed in the system
 !
   call start_timer(2)
@@ -201,17 +196,17 @@ program godunov
   call write_data(ftype, no, ncpu)
   call stop_timer(3)
 
+#ifdef FORCE
+! finalize forcing module
+!
+  call clear_forcing()
+
+#endif /* FORCE */
 ! deallocate and reset mesh
 !
   call start_timer(1)
   call clear_mesh()
   call stop_timer(1)
-
-#ifdef FORCE
-! finalize forcing module
-!
-  call clear_forcing()
-#endif /* FORCE */
 
 ! get total time
 !
