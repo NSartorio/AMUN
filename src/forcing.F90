@@ -670,9 +670,9 @@ module forcing
 
 ! update the real value
 !
-            fx = fx + real(ftab(p,1)) * cs + aimag(ftab(p,1)) * sn
-            fy = fy + real(ftab(p,2)) * cs + aimag(ftab(p,2)) * sn
-            fz = fz + real(ftab(p,3)) * cs + aimag(ftab(p,3)) * sn
+            fx = fx + real(ftab(p,1)) * cs - aimag(ftab(p,1)) * sn
+            fy = fy + real(ftab(p,2)) * cs - aimag(ftab(p,2)) * sn
+            fz = fz + real(ftab(p,3)) * cs - aimag(ftab(p,3)) * sn
 
           end do
 
