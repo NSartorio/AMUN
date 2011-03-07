@@ -356,6 +356,41 @@ module mpitools
 !
 !===============================================================================
 !
+! mallreducesumc: subroutine sums complex array from all processors
+!
+!===============================================================================
+!
+  subroutine mallreducesumc(n, m, buf)
+
+#ifdef MPI
+    use mpi, only : mpi_real8, mpi_sum
+#endif /* MPI */
+
+! arguments
+!
+    integer                        , intent(in)    :: n, m
+    complex(kind=8), dimension(n,m), intent(inout) :: buf
+
+#ifdef MPI
+! local variables
+!
+    real(kind=8), dimension(n,m) :: rbuf, ibuf
+    integer                      :: err
+!
+!-------------------------------------------------------------------------------
+!
+    err = 0
+    call mpi_allreduce( real(buf), rbuf, n*m, mpi_real8, mpi_sum, comm3d, err)
+    call mpi_allreduce(aimag(buf), ibuf, n*m, mpi_real8, mpi_sum, comm3d, err)
+    buf(1:n,1:m) = cmplx(rbuf(1:n,1:m),ibuf(1:n,1:m))
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mallreducesumc
+!
+!===============================================================================
+!
 ! mallreducesuml: subroutine adds values over all proceeses
 !
 !===============================================================================

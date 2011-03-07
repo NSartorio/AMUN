@@ -275,6 +275,9 @@ module forcing
 
     use config   , only : fdt
     use constants, only : dpi
+#ifdef MPI
+    use mpitools , only : mallreducesumc
+#endif /* MPI */
     use random   , only : randomu
     use timer    , only : start_timer, stop_timer
 
@@ -296,6 +299,12 @@ module forcing
 !
     call start_timer(6)
 
+#ifdef MPI
+! reduce velocity fourier components from all processors
+!
+    call mallreducesumc(nf, 3, vtab(:,:))
+
+#endif /* MPI */
 ! calculate the number of forcing integration iteration for the current timestep
 !
     ni = int(dt / fdt)
