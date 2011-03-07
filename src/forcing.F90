@@ -37,6 +37,7 @@ module forcing
 !
   integer, dimension(:,:), allocatable, save :: ktab
   complex, dimension(:,:), allocatable, save :: ftab
+  real   , dimension(:  ), allocatable, save :: famp
   real   , dimension(:,:), allocatable, save :: e1, e2
 #endif /* FORCE */
 
@@ -52,8 +53,9 @@ module forcing
   subroutine init_forcing()
 
 #ifdef FORCE
-    use config, only : fpow, fani, fdt, kf, kl, ku, kc, kd
-    use timer , only : start_timer, stop_timer
+    use config   , only : fpow, fani, fdt, kf, kl, ku, kc, kd
+    use constants, only : dpi
+    use timer    , only : start_timer, stop_timer
 #endif /* FORCE */
 
     implicit none
@@ -62,7 +64,7 @@ module forcing
 ! local variables
 !
     integer :: kmx, i, j, k, l
-    real    :: rk, kr, fnor, famp, fa, kx, ky, kz, kxy, kyz
+    real    :: rk, kr, fnor, fa, kx, ky, kz, kxy, kyz
 #endif /* FORCE */
 
 !-------------------------------------------------------------------------------
@@ -110,12 +112,13 @@ module forcing
 
 ! calculate the maximum driving amplitude
 !
-    famp = sqrt(fpow * fdt / fnor)
+    fa = sqrt(4.0 / 3.0 * dpi * fpow * fdt / fnor)
 
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
     allocate(ktab(nf,3))
     allocate(ftab(nf,3))
+    allocate(famp(nf)  )
     allocate(e1  (nf,3))
     allocate(e2  (nf,3))
 
@@ -137,8 +140,8 @@ module forcing
 
 ! compute its amplitude
 !
-          kr  = (rk - kf) / kc
-          fa  = famp * exp(-0.5d0 * kr * kr)
+          kr      = (rk - kf) / kc
+          famp(l) = fa * exp(-0.5d0 * kr * kr)
 
 ! prepare the unit vectors
 !
@@ -153,9 +156,6 @@ module forcing
           e2(l,1) = 0.0d0
           e2(l,2) = 0.0d0
           e2(l,3) = 1.0d0
-
-          e1(l,:) = fa * e1(l,:)
-          e2(l,:) = fa * e2(l,:)
         end if
       end do
     end do
@@ -176,8 +176,8 @@ module forcing
 
 ! compute its amplitude
 !
-            kr = (rk - kf) / kc
-            fa = famp * exp(-0.5d0 * kr * kr)
+            kr      = (rk - kf) / kc
+            famp(l) = fa * exp(-0.5d0 * kr * kr)
 
 ! prepare the unit vectors
 !
@@ -204,9 +204,6 @@ module forcing
               e2(l,2) =   ky * kx / (rk * kyz)
               e2(l,3) =   kz * kx / (rk * kyz)
             end if
-
-            e1(l,:) = fa * e1(l,:)
-            e2(l,:) = fa * e2(l,:)
           end if
         end do
       end do
@@ -247,6 +244,7 @@ module forcing
 !
     if (allocated(ktab)) deallocate(ktab)
     if (allocated(ftab)) deallocate(ftab)
+    if (allocated(famp)) deallocate(famp)
     if (allocated(e1))   deallocate(e1)
     if (allocated(e2))   deallocate(e2)
 
@@ -323,7 +321,7 @@ module forcing
 
 ! update the Fourier coefficients for the current k-vector
 !
-      ftab(l,:) = aran * e1(l,:) + bran * e2(l,:)
+      ftab(l,:) = famp(l) * (aran * e1(l,:) + bran * e2(l,:))
 
     end do
 
