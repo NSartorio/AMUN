@@ -250,19 +250,17 @@ module evolution
 !
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
-#endif /* FORCE */
 
+! update momenta due to the forcing terms
+!
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+
+#endif /* FORCE */
 ! 1st step of integration
 !
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -366,14 +364,14 @@ module evolution
 !
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
-#endif /* FORCE */
 
-#if defined MHD && defined GLM
-! calculate c_h^2
+! update momenta due to the forcing terms
 !
-    ch2 = cmax * cmax
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
-#endif /* MHD & GLM */
+#endif /* FORCE */
 !! 1st step of integration
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
@@ -402,6 +400,10 @@ module evolution
     u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
 
 #ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
 ! update the solution for the scalar potential Psi
 !
     u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
@@ -525,25 +527,17 @@ module evolution
 !
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
-#endif /* FORCE */
 
-#if defined MHD && defined GLM
-! calculate c_h^2
+! update momenta due to the forcing terms
 !
-    ch2 = cmax * cmax
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
-#endif /* MHD & GLM */
+#endif /* FORCE */
 !! 1st step of integration
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -561,6 +555,10 @@ module evolution
     u1(ibx:ibz,:,:,:) = pblock%u(ibx:ibz,:,:,:) + dt * du(ibx:ibz,:,:,:)
 
 #ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
 ! update the solution for the scalar potential Psi
 !
     u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
@@ -570,14 +568,6 @@ module evolution
 !! 2nd step of integration
 !!
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + u1(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + u1(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + u1(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
@@ -607,14 +597,6 @@ module evolution
 !! 3rd step of integration
 !!
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + u1(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + u1(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + u1(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape

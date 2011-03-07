@@ -327,10 +327,6 @@ module forcing
 
     end do
 
-! normalize the forcing terms by the time step
-!
-    ftab(:,:) = ftab(:,:) / dt
-
 ! stop the timer
 !
     call stop_timer(6)
