@@ -190,7 +190,7 @@ evolution.o     : evolution.F90 blocks.o boundaries.o config.o forcing.o       \
                   interpolation.o mesh.o mpitools.o problem.o scheme.o timer.o \
                   variables.o
 forcing.o       : forcing.F90 config.o constants.o mesh.o mpitools.o random.o  \
-                  timer.o
+                  timer.o variables.o
 integrals.o     : integrals.F90 blocks.o config.o evolution.o mesh.o           \
                   mpitools.o variables.o
 interpolation.o : interpolation.F90 blocks.o config.o variables.o

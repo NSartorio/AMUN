@@ -36,6 +36,7 @@ module forcing
 ! array of k vectors, mode amplitudes, and unit vectors
 !
   integer, dimension(:,:), allocatable, save :: ktab
+  complex, dimension(:,:), allocatable, save :: vtab
   complex, dimension(:,:), allocatable, save :: ftab
   real   , dimension(:  ), allocatable, save :: famp
   real   , dimension(:,:), allocatable, save :: e1, e2
@@ -117,10 +118,15 @@ module forcing
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
     allocate(ktab(nf,3))
+    allocate(vtab(nf,3))
     allocate(ftab(nf,3))
     allocate(famp(nf)  )
     allocate(e1  (nf,3))
     allocate(e2  (nf,3))
+
+! initialize the velocity fourier components
+!
+    vtab(:,:) = 0.0d0
 
 ! prepare k vector, amplitude and unit vectors for each node
 !
@@ -243,6 +249,7 @@ module forcing
 ! deallocate all module arrays
 !
     if (allocated(ktab)) deallocate(ktab)
+    if (allocated(vtab)) deallocate(vtab)
     if (allocated(ftab)) deallocate(ftab)
     if (allocated(famp)) deallocate(famp)
     if (allocated(e1))   deallocate(e1)
@@ -325,6 +332,10 @@ module forcing
 
     end do
 
+! reset the velocity fourier components
+!
+    vtab(:,:) = cmplx(0.0, 0.0)
+
 ! stop the timer
 !
     call stop_timer(6)
@@ -332,6 +343,173 @@ module forcing
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_forcing
+!
+!===============================================================================
+!
+! fourier_transform: subroutine transforms the velocity to the Fourier space;
+!                    only components corresponding to forcing are calculated;
+!
+!===============================================================================
+!
+  subroutine fourier_transform(l, xmn, ymn, zmn, u)
+
+    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
+    use constants, only : dpi
+    use mesh     , only : ax, ay, az, advol
+    use timer    , only : start_timer, stop_timer
+    use variables, only : idn, imx, imy, imz
+
+    implicit none
+
+! input/output arguments
+!
+    integer                    , intent(in)    :: l
+    real                       , intent(in)    :: xmn, ymn, zmn
+    real, dimension(4,im,jm,km), intent(inout) :: u
+
+! local variables
+!
+    integer :: i, j, k, p, kmn, kmx
+    real    :: kx, ky, kz
+    real    :: vx, vy, vz
+    real    :: snx, sny, snz, snp, sn
+    real    :: csx, csy, csz, csp, cs
+
+! local arrays
+!
+    real, dimension(im) :: x
+    real, dimension(jm) :: y
+#if NDIMS == 3
+    real, dimension(km) :: z
+#endif /* NDIMS == 3 */
+    real, dimension(:,:), allocatable :: asnx, asny, asnz
+    real, dimension(:,:), allocatable :: acsx, acsy, acsz
+
+!-------------------------------------------------------------------------------
+!
+! start the timer for forcing
+!
+    call start_timer(6)
+
+! prepare local block coordinates
+!
+    x(:) = dpi * (xmn + ax(l,:))
+    y(:) = dpi * (ymn + ay(l,:))
+#if NDIMS == 3
+    z(:) = dpi * (zmn + az(l,:))
+#endif /* NDIMS == 3 */
+
+! allocate arrays for directional sinuses and cosinuses
+!
+    kmn = minval(ktab(:,:))
+    kmx = maxval(ktab(:,:))
+
+    allocate(asnx(kmn:kmx,im))
+    allocate(acsx(kmn:kmx,im))
+    allocate(asny(kmn:kmx,jm))
+    allocate(acsy(kmn:kmx,jm))
+#if NDIMS == 3
+    allocate(asnz(kmn:kmx,km))
+    allocate(acsz(kmn:kmx,km))
+#endif /* NDIMS == 3 */
+
+! calculate directional sinuses and cosinuses for each mode
+!
+    do p = kmn, kmx
+      do i = 1, im
+        kx        = p * x(i)
+        asnx(p,i) = sin(kx)
+        acsx(p,i) = cos(kx)
+      end do
+      do j = 1, jm
+        ky        = p * y(j)
+        asny(p,j) = sin(ky)
+        acsy(p,j) = cos(ky)
+      end do
+#if NDIMS == 3
+      do k = 1, km
+        kz        = p * z(k)
+        asnz(p,k) = sin(kz)
+        acsz(p,k) = cos(kz)
+      end do
+#endif /* NDIMS == 3 */
+    end do
+
+! perform the inverse Fourier transform
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! prepare velocity components at the current position
+!
+          vx = u(imx,i,j,k) / u(idn,i,j,k)
+          vy = u(imy,i,j,k) / u(idn,i,j,k)
+          vz = u(imz,i,j,k) / u(idn,i,j,k)
+
+! iterate over all forcing components
+!
+          do p = 1, nf
+
+! obtain directional sinuses and cosinuses for each mode
+!
+            snx = asnx(ktab(p,1),i)
+            csx = acsx(ktab(p,1),i)
+            sny = asny(ktab(p,2),j)
+            csy = acsy(ktab(p,2),j)
+#if NDIMS == 3
+            snz = asnz(ktab(p,3),k)
+            csz = acsz(ktab(p,3),k)
+#endif /* NDIMS == 3 */
+
+! calculate total sinus and cosinus
+!
+#if NDIMS == 2
+            sn  = snx * csy + csx * sny
+            cs  = csx * csy - snx * sny
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            snp = snx * csy + csx * sny
+            csp = csx * csy - snx * sny
+
+            sn  = snp * csz + csp * snz
+            cs  = csp * csz - snp * snz
+#endif /* NDIMS == 3 */
+
+! update the Fourier coefficient
+!
+            vtab(p,1) = vtab(p,1) + cmplx(vx * cs, vx * sn)
+            vtab(p,2) = vtab(p,2) + cmplx(vy * cs, vy * sn)
+            vtab(p,3) = vtab(p,3) + cmplx(vz * cs, vz * sn)
+
+          end do
+
+        end do
+      end do
+    end do
+
+! normalize coefficients
+!
+    vtab(:,:) = vtab(:,:) * advol(l)
+
+! deallocate local arrays
+!
+    deallocate(asnx)
+    deallocate(acsx)
+    deallocate(asny)
+    deallocate(acsy)
+#if NDIMS == 3
+    deallocate(asnz)
+    deallocate(acsz)
+#endif /* NDIMS == 3 */
+
+! stop the timer
+!
+    call stop_timer(6)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine fourier_transform
 !
 !===============================================================================
 !

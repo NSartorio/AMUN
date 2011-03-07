@@ -48,12 +48,13 @@ module evolution
     use config    , only : ueta
 #endif /* MHD & RESIS */
 #ifdef FORCE
-    use forcing   , only : evolve_forcing
+    use forcing   , only : fourier_transform, evolve_forcing
 #endif /* FORCE */
     use mesh      , only : update_mesh
     use mesh      , only : dx_min
     use scheme    , only : cmax
     use timer     , only : start_timer, stop_timer
+    use variables , only : idn, imz
 
     implicit none
 
@@ -65,6 +66,20 @@ module evolution
 !-------------------------------------------------------------------------------
 !
 #ifdef FORCE
+! perform the Fourier transform of the velocity field
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+      if (pblock%meta%leaf)                                                    &
+        call fourier_transform(pblock%meta%level                               &
+                       , pblock%meta%xmin, pblock%meta%ymin, pblock%meta%zmin  &
+                       , pblock%u(idn:imz,:,:,:))
+
+      pblock => pblock%next ! assign pointer to the next block
+
+    end do
+
 ! evolve the forcing source terms by the time interval dt
 !
     call evolve_forcing(dt)
