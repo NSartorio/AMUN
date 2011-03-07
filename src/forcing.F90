@@ -290,8 +290,8 @@ module forcing
 ! local variables
 !
     integer :: l, n, ni
-    complex :: aran, bran
-    real    :: phi, th1, th2
+    complex :: aran, bran, xi1, xi2
+    real    :: phi, psi, th1, th2, div, tanth1
 
 !-------------------------------------------------------------------------------
 !
@@ -313,6 +313,11 @@ module forcing
 !
     do l = 1, nf
 
+! project velocity vector onto the vectors e1 and e2
+!
+      xi1 = dot_product(vtab(l,:), e1(l,:))
+      xi2 = dot_product(vtab(l,:), e2(l,:))
+
 ! reset complex wave coefficient
 !
       aran = cmplx(0.0d0, 0.0d0)
@@ -322,11 +327,27 @@ module forcing
 !
       do n = 1, ni
 
-! obtain random phases phi, th1, and th2
+! obtain random phases phi and psi
 !
         phi = dpi * randomu(0)
-        th1 = dpi * randomu(0)
-        th2 = dpi * randomu(0)
+        psi = dpi * randomu(0)
+
+! obtain phases th1 and th2 from the condition for minimizing
+! the velocity-force correlation
+!
+        div    = - sin(phi) * aimag(xi1)                                       &
+                 + cos(phi) * (sin(psi) * real(xi2) - cos(psi) * aimag(xi2))
+
+        if (div .ne. 0.0) then
+          tanth1 = (sin(phi) * real(xi1)                                       &
+                  + cos(phi) * (sin(psi) * aimag(xi2) + cos(psi) * real(xi2))) &
+                 / div
+        else
+          tanth1 = 0.0
+        end if
+
+        th1 = atan(tanth1)
+        th2 = psi + th1
 
 ! update coefficients for the current k-vector
 !
