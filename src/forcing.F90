@@ -126,7 +126,7 @@ module forcing
 
 ! initialize the velocity fourier components
 !
-    vtab(:,:) = 0.0d0
+    vtab(:,:) = cmplx(0.0d0, 0.0d0)
 
 ! prepare k vector, amplitude and unit vectors for each node
 !
@@ -495,15 +495,15 @@ module forcing
 ! calculate total sinus and cosinus
 !
 #if NDIMS == 2
-            sn  = snx * csy + csx * sny
-            cs  = csx * csy - snx * sny
+            sn  = (snx * csy + csx * sny) * advol(l)
+            cs  = (csx * csy - snx * sny) * advol(l)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
             snp = snx * csy + csx * sny
             csp = csx * csy - snx * sny
 
-            sn  = snp * csz + csp * snz
-            cs  = csp * csz - snp * snz
+            sn  = (snp * csz + csp * snz) * advol(l)
+            cs  = (csp * csz - snp * snz) * advol(l)
 #endif /* NDIMS == 3 */
 
 ! update the Fourier coefficient
@@ -517,10 +517,6 @@ module forcing
         end do
       end do
     end do
-
-! normalize coefficients
-!
-    vtab(:,:) = vtab(:,:) * advol(l)
 
 ! deallocate local arrays
 !
