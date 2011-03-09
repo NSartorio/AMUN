@@ -68,7 +68,7 @@ module forcing
 #ifdef FORCE
 ! local variables
 !
-    integer :: kmx, i, j, k, l
+    integer :: kmx, jbg, kbg, i, j, k, l
     real    :: rk, kr, fnor, fa, kx, ky, kz, kxy, kyz
 #endif /* FORCE */
 
@@ -91,36 +91,62 @@ module forcing
 ! calculate the number of drived components and normalization factor
 !
 #if NDIMS == 2
-    do j = - kmx, kmx, kd
-      do i = - kmx, kmx, kd
+    do i = 0, kmx, kd
+      if (i .eq. 0) then
+        jbg = 0
+      else
+        jbg = - kmx
+      end if
+      do j = jbg, kmx, kd
+
         rk = sqrt(real(i * i + j * j))
+
         if (rk .ge. kl .and. rk .le. ku) then
           nf   = nf + 1
           kr   = (rk - kf) / kc
           fnor = fnor + exp(-0.5d0 * kr * kr)
         end if
+
       end do
     end do
+
+! calculate the maximum driving amplitude
+!
+    fa = sqrt(pi * fpow * fdt / fnor / sqrt(0.0005))
+
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    do k = - kmx, kmx, kd
-      do j = - kmx, kmx, kd
-        do i = - kmx, kmx, kd
+    do i = 0, kmx, kd
+      if (i .eq. 0) then
+        jbg = 0
+      else
+        jbg = - kmx
+      end if
+      do j = jbg, kmx, kd
+        if (i .eq. 0 .and. j .eq. 0) then
+          kbg = 0
+        else
+          kbg = - kmx
+        end if
+        do k = kbg, kmx, kd
+
           rk = sqrt(real(i * i + j * j + k * k))
+
           if (rk .ge. kl .and. rk .le. ku) then
             nf   = nf + 1
             kr   = (rk - kf) / kc
             fnor = fnor + exp(-0.5d0 * kr * kr)
           end if
+
         end do
       end do
     end do
-#endif /* NDIMS == 3 */
 
 ! calculate the maximum driving amplitude
 !
     fa = sqrt(1.5 * pi * fpow * fdt / fnor)
 
+#endif /* NDIMS == 3 */
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
     allocate(ktab(nf,3))
@@ -138,9 +164,16 @@ module forcing
 !
     l = 0
 #if NDIMS == 2
-    do j = - kmx, kmx, kd
-      do i = - kmx, kmx, kd
+    do i = 0, kmx, kd
+      if (i .eq. 0) then
+        jbg = 0
+      else
+        jbg = - kmx
+      end if
+      do j = jbg, kmx, kd
+
         rk = sqrt(real(i * i + j * j))
+
         if (rk .ge. kl .and. rk .le. ku) then
           l    = l + 1
 
@@ -169,14 +202,27 @@ module forcing
           e2(l,2) = 0.0d0
           e2(l,3) = 1.0d0
         end if
+
       end do
     end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    do k = - kmx, kmx, kd
-      do j = - kmx, kmx, kd
-        do i = - kmx, kmx, kd
+    do i = 0, kmx, kd
+      if (i .eq. 0) then
+        jbg = 0
+      else
+        jbg = - kmx
+      end if
+      do j = jbg, kmx, kd
+        if (i .eq. 0 .and. j .eq. 0) then
+          kbg = 0
+        else
+          kbg = - kmx
+        end if
+        do k = kbg, kmx, kd
+
           rk = sqrt(real(i * i + j * j + k * k))
+
           if (rk .ge. kl .and. rk .le. ku) then
             l    = l + 1
 
@@ -217,6 +263,7 @@ module forcing
               e2(l,3) =   kz * kx / (rk * kyz)
             end if
           end if
+
         end do
       end do
     end do
