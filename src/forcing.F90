@@ -59,7 +59,7 @@ module forcing
 
 #ifdef FORCE
     use config   , only : fpow, fani, fdt, kf, kl, ku, kc, kd
-    use constants, only : dpi
+    use constants, only : pi
     use timer    , only : start_timer, stop_timer
 #endif /* FORCE */
 
@@ -119,7 +119,7 @@ module forcing
 
 ! calculate the maximum driving amplitude
 !
-    fa = sqrt(4.0 / 3.0 * dpi * fpow * fdt / fnor)
+    fa = sqrt(1.5 * pi * fpow * fdt / fnor)
 
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
