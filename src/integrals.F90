@@ -60,9 +60,10 @@ module integrals
 ! write the integral file header
 !
       write(funit,"('#')")
-      write(funit,"('#',a6,10(1x,a15))") 'step', 'time', 'dt', 'mass'          &
+      write(funit,"('#',a6,12(1x,a15))") 'step', 'time', 'dt', 'mass'          &
                                        , 'momx', 'momy', 'momz'                &
-                                       , 'ener', 'ekin', 'emag', 'eint'
+                                       , 'ener', 'ekin', 'emag', 'eint'        &
+                                       , 'fcor', 'finp'
       write(funit,"('#')")
 
     end if
@@ -107,6 +108,9 @@ module integrals
     use blocks   , only : dblocks, ndims
     use config   , only : ib, ie, jb, je, kb, ke
     use evolution, only : n, t, dt
+#ifdef FORCE
+    use forcing  , only : fcor, finp
+#endif /* FORCE */
     use mesh     , only : advol
     use mpitools , only : is_master, mallreducesumd
     use variables, only : idn, imx, imy, imz
@@ -121,7 +125,7 @@ module integrals
 
 ! local parameters
 !
-    integer, parameter :: narr = 18
+    integer, parameter :: narr = 16
 
 ! local variables
 !
@@ -168,6 +172,12 @@ module integrals
       pdata => pdata%next
     end do
 
+#ifdef FORCE
+! update the force-force correlation
+!
+    arr(9) = fcor
+
+#endif /* FORCE */
 #ifdef MPI
 ! sum the integrals from all processors
 !
@@ -180,10 +190,16 @@ module integrals
     arr(8) = arr(5) - arr(6) - arr(7)
 
 #endif /* ADI */
+#ifdef FORCE
+! update the force-force correlation
+!
+    arr(10) = finp
+
+#endif /* FORCE */
 ! close integrals.dat
 !
     if (is_master()) then
-      write(funit,"(i8,10(1x,1pe15.8))") n, t, dt, arr(1:8)
+      write(funit,"(i8,12(1x,1pe15.8))") n, t, dt, arr(1:10)
     end if
 !
 !-------------------------------------------------------------------------------

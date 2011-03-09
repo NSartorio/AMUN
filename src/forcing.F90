@@ -33,6 +33,10 @@ module forcing
 !
   integer                             , save :: nf
 
+! force-force correlation (energy injected) in real and Fourier spaces
+!
+  real(kind=8)                        , save :: fcor, finp
+
 ! array of k vectors, mode amplitudes, and unit vectors
 !
   integer, dimension(:,:), allocatable, save :: ktab
@@ -80,6 +84,8 @@ module forcing
 !
     nf   = 0
     fnor = 0.0d0
+    fcor = 0.0d0
+    finp = 0.0d0
     kmx  = int(ku + 1)
 
 ! calculate the number of drived components and normalization factor
@@ -366,6 +372,10 @@ module forcing
 !
     vtab(:,:) = cmplx(0.0, 0.0)
 
+! calculate the force-force correlation in Fourier space
+!
+    finp = finp + 0.25d0 * abs(sum(ftab(:,:) * conjg(ftab(:,:))))
+
 ! stop the timer
 !
     call stop_timer(6)
@@ -546,9 +556,9 @@ module forcing
 !
   subroutine real_forcing(l, xmn, ymn, zmn, f)
 
-    use config   , only : im, jm, km
+    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
-    use mesh     , only : ax, ay, az
+    use mesh     , only : ax, ay, az, advol
     use timer    , only : start_timer, stop_timer
 
     implicit none
@@ -681,6 +691,10 @@ module forcing
         end do
       end do
     end do
+
+! calculate the force-force correlation
+!
+    fcor = fcor + 0.5d0 * sum(f(:,ib:ie,jb:je,kb:ke)**2) * advol(l)
 
 ! deallocate local arrays
 !
