@@ -533,7 +533,7 @@ module forcing
 ! start the timer for forcing
 !
     call start_timer(10)
-    call start_timer(14)
+    call start_timer(13)
 
 ! prepare local block coordinates
 !
@@ -587,9 +587,9 @@ module forcing
 
 ! prepare velocity components at the current position
 !
-          vx = u(imx,i,j,k) / u(idn,i,j,k)
-          vy = u(imy,i,j,k) / u(idn,i,j,k)
-          vz = u(imz,i,j,k) / u(idn,i,j,k)
+          vx = u(imx,i,j,k) / u(idn,i,j,k) * advol(l)
+          vy = u(imy,i,j,k) / u(idn,i,j,k) * advol(l)
+          vz = u(imz,i,j,k) / u(idn,i,j,k) * advol(l)
 
 ! iterate over all forcing components
 !
@@ -609,15 +609,15 @@ module forcing
 ! calculate total sinus and cosinus
 !
 #if NDIMS == 2
-            sn  = (snx * csy + csx * sny) * advol(l)
-            cs  = (csx * csy - snx * sny) * advol(l)
+            sn  = (snx * csy + csx * sny)
+            cs  = (csx * csy - snx * sny)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
             snp = snx * csy + csx * sny
             csp = csx * csy - snx * sny
 
-            sn  = (snp * csz + csp * snz) * advol(l)
-            cs  = (csp * csz - snp * snz) * advol(l)
+            sn  = (snp * csz + csp * snz)
+            cs  = (csp * csz - snp * snz)
 #endif /* NDIMS == 3 */
 
 ! update the Fourier coefficient
@@ -645,7 +645,7 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(14)
+    call stop_timer(13)
     call stop_timer(10)
 !
 !-------------------------------------------------------------------------------
@@ -697,7 +697,7 @@ module forcing
 ! start the timer for forcing
 !
     call start_timer(10)
-    call start_timer(13)
+    call start_timer(14)
 
 ! prepare local block coordinates
 !
@@ -815,7 +815,7 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(13)
+    call stop_timer(14)
     call stop_timer(10)
 !
 !-------------------------------------------------------------------------------
