@@ -60,6 +60,7 @@ module forcing
 #ifdef FORCE
     use config   , only : fpow, fani, fdt, kf, kl, ku, kc, kd
     use constants, only : pi
+    use mpitools , only : is_master
     use timer    , only : start_timer, stop_timer
 #endif /* FORCE */
 
@@ -69,7 +70,10 @@ module forcing
 ! local variables
 !
     integer :: kmx, jbg, kbg, i, j, k, l
-    real    :: rk, kr, fnor, fa, kx, ky, kz, kxy, kyz
+    real    :: kl2, ku2, kc2
+    real    :: rk2, rk, kr2
+    real    :: fnor, fa
+    real    :: kx, ky, kz, kxy, kyz
 #endif /* FORCE */
 
 !-------------------------------------------------------------------------------
@@ -87,6 +91,9 @@ module forcing
     fcor = 0.0d0
     finp = 0.0d0
     kmx  = int(ku + 1)
+    kl2  = kl * kl
+    ku2  = ku * ku
+    kc2  = kc * kc
 
 ! calculate the number of drived components and normalization factor
 !
@@ -99,20 +106,24 @@ module forcing
       end if
       do j = jbg, kmx, kd
 
-        rk = sqrt(real(i * i + j * j))
+        rk2 = real(i * i + j * j)
 
-        if (rk .ge. kl .and. rk .le. ku) then
+        if (rk2 .ge. kl2 .and. rk2 .le. ku2) then
+
+! increase the number of forcing components
+!
           nf   = nf + 1
-          kr   = (rk - kf) / kc
-          fnor = fnor + exp(-0.5d0 * kr * kr)
+
+! update the normalization coefficient
+!
+          rk   = sqrt(rk2)
+          kr2  = (rk - kf)**2 / kc2
+          fnor = fnor + exp(- kr2)
+
         end if
 
       end do
     end do
-
-! calculate the maximum driving amplitude
-!
-    fa = sqrt(pi * fpow * fdt / fnor / sqrt(0.0005))
 
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
@@ -130,23 +141,47 @@ module forcing
         end if
         do k = kbg, kmx, kd
 
-          rk = sqrt(real(i * i + j * j + k * k))
+          rk2 = real(i * i + j * j + k * k)
 
-          if (rk .ge. kl .and. rk .le. ku) then
+          if (rk2 .ge. kl2 .and. rk2 .le. ku2) then
+
+! increase the number of forcing components
+!
             nf   = nf + 1
-            kr   = (rk - kf) / kc
-            fnor = fnor + exp(-0.5d0 * kr * kr)
+
+! update the normalization coefficient
+!
+            rk   = sqrt(rk2)
+            kr2  = (rk - kf)**2 / kc2
+            fnor = fnor + exp(- kr2)
+
           end if
 
         end do
       end do
     end do
 
+#endif /* NDIMS == 3 */
 ! calculate the maximum driving amplitude
 !
-    fa = sqrt(1.5 * pi * fpow * fdt / fnor)
+    fa = sqrt((4.0d0 / 3.0d0) * pi * fpow / fnor)
 
-#endif /* NDIMS == 3 */
+! print information about forcing
+!
+    if (is_master()) then
+      write (*,'(a)')       ''
+      write (*,'(a,a,a)'     ) 'INFO    : ', ' Forcing:'
+      write (*,'(a,a,1i7)'   ) 'INFO    : ', '    no. of components   : ', nf
+      write (*,'(a,a,1f12.6)') 'INFO    : ', '    normalization coeff.: ', fnor
+      write (*,'(a,a,1f12.6)') 'INFO    : ', '    power               : ', fpow
+      write (*,'(a,a,1f12.6)') 'INFO    : ', '    amplitude           : ', fa
+    endif
+
+! multiply aplitude by the square of forcing time step so we don't have to
+! multiply this at each step
+!
+    fa = fa * sqrt(fdt)
+
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
     allocate(ktab(nf,3))
@@ -172,10 +207,13 @@ module forcing
       end if
       do j = jbg, kmx, kd
 
-        rk = sqrt(real(i * i + j * j))
+        rk2 = real(i * i + j * j)
 
-        if (rk .ge. kl .and. rk .le. ku) then
-          l    = l + 1
+        if (rk2 .ge. kl2 .and. rk2 .le. ku2) then
+
+! increase the number of forcing component
+!
+          l = l + 1
 
 ! prepare k vector
 !
@@ -185,8 +223,9 @@ module forcing
 
 ! compute its amplitude
 !
-          kr      = (rk - kf) / kc
-          famp(l) = fa * exp(-0.5d0 * kr * kr)
+          rk      = sqrt(rk2)
+          kr2     = (rk - kf)**2 / kc2
+          famp(l) = fa * exp(- 0.5d0 * kr2)
 
 ! prepare the unit vectors
 !
@@ -221,10 +260,13 @@ module forcing
         end if
         do k = kbg, kmx, kd
 
-          rk = sqrt(real(i * i + j * j + k * k))
+          rk2 = real(i * i + j * j + k * k)
 
-          if (rk .ge. kl .and. rk .le. ku) then
-            l    = l + 1
+          if (rk2 .ge. kl2 .and. rk2 .le. ku2) then
+
+! increase the number of forcing component
+!
+            l = l + 1
 
 ! prepare k vector
 !
@@ -234,8 +276,9 @@ module forcing
 
 ! compute its amplitude
 !
-            kr      = (rk - kf) / kc
-            famp(l) = fa * exp(-0.5d0 * kr * kr)
+            rk      = sqrt(rk2)
+            kr2     = (rk - kf)**2 / kc2
+            famp(l) = fa * exp(- 0.5d0 * kr2)
 
 ! prepare the unit vectors
 !
@@ -326,7 +369,7 @@ module forcing
 !
   subroutine evolve_forcing(dt)
 
-    use config   , only : fdt
+    use config   , only : fpow, fdt
     use constants, only : dpi
 #ifdef MPI
     use mpitools , only : mallreducesumc
@@ -344,7 +387,7 @@ module forcing
 !
     integer :: l, n, ni
     complex :: aran, bran, xi1, xi2
-    real    :: phi, psi, th1, th2, div, tanth1
+    real    :: phi, psi, th1, th2, div, tanth1, fpw, fac
 
 !-------------------------------------------------------------------------------
 !
@@ -419,9 +462,16 @@ module forcing
 !
     vtab(:,:) = cmplx(0.0, 0.0)
 
+! normalize amplitudes to the correct input power
+!
+    fpw       = abs(sum(ftab(:,:) * conjg(ftab(:,:))))
+    fac       = sqrt(4.0d0 * dt * fpow / fpw)
+    ftab(:,:) = fac * ftab(:,:)
+
 ! calculate the force-force correlation in Fourier space
 !
-    finp = finp + 0.25d0 * abs(sum(ftab(:,:) * conjg(ftab(:,:))))
+    fpw  = 0.25d0 * abs(sum(ftab(:,:) * conjg(ftab(:,:))))
+    finp = finp + fpw
 
 ! stop the timer
 !
