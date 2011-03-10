@@ -60,6 +60,9 @@ FFLAGS  += -DNDIMS=${NDIMS}
 ifeq ($(SHAPE),Y)
 FFLAGS  += -DSHAPE
 endif
+ifeq ($(REFINE),Y)
+FFLAGS  += -DREFINE
+endif
 
 # check if reconstruction is TVD
 #

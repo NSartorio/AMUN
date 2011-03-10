@@ -115,6 +115,7 @@ module evolution
     call boundary_variables()
     call stop_timer(4)
 
+#ifdef REFINE
 ! check refinement and refine
 !
     call start_timer(5)
@@ -127,6 +128,7 @@ module evolution
     call boundary_variables()
     call stop_timer(4)
 
+#endif /* REFINE */
 ! update the maximum speed
 !
     call update_maximum_speed()
