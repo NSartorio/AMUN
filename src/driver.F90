@@ -243,7 +243,11 @@ program godunov
     write (*,fmt) "Time for boundary update: ", get_timer(4), per * get_timer(4)
     write (*,fmt) "Time for mesh update    : ", get_timer(5), per * get_timer(5)
 #ifdef FORCE
-    write (*,fmt) "Time for forcing        : ", get_timer(6), per * get_timer(6)
+    write (*,fmt) "Time for forcing        : ", get_timer(10), per * get_timer(10)
+    write (*,fmt) " - initialization       : ", get_timer(11), per * get_timer(11)
+    write (*,fmt) " - evolution            : ", get_timer(12), per * get_timer(12)
+    write (*,fmt) " - real to fourier      : ", get_timer(13), per * get_timer(13)
+    write (*,fmt) " - fourier to real      : ", get_timer(14), per * get_timer(14)
 #endif /* FORCE */
     write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
   end if

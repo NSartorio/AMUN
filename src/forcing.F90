@@ -81,7 +81,8 @@ module forcing
 #ifdef FORCE
 ! start the timer for forcing
 !
-    call start_timer(6)
+    call start_timer(10)
+    call start_timer(11)
 
 ! initialize the number of drived components, normalization factor, and
 ! maximum wave number
@@ -314,7 +315,8 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(6)
+    call stop_timer(11)
+    call stop_timer(10)
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -340,7 +342,8 @@ module forcing
 #ifdef FORCE
 ! start the timer for forcing
 !
-    call start_timer(6)
+    call start_timer(10)
+    call start_timer(11)
 
 ! deallocate all module arrays
 !
@@ -353,7 +356,8 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(6)
+    call stop_timer(11)
+    call stop_timer(10)
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -393,7 +397,8 @@ module forcing
 !
 ! start the timer for forcing
 !
-    call start_timer(6)
+    call start_timer(10)
+    call start_timer(12)
 
 #ifdef MPI
 ! reduce velocity fourier components from all processors
@@ -475,7 +480,8 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(6)
+    call stop_timer(12)
+    call stop_timer(10)
 !
 !-------------------------------------------------------------------------------
 !
@@ -526,7 +532,8 @@ module forcing
 !
 ! start the timer for forcing
 !
-    call start_timer(6)
+    call start_timer(10)
+    call start_timer(14)
 
 ! prepare local block coordinates
 !
@@ -638,7 +645,8 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(6)
+    call stop_timer(14)
+    call stop_timer(10)
 !
 !-------------------------------------------------------------------------------
 !
@@ -688,7 +696,8 @@ module forcing
 !
 ! start the timer for forcing
 !
-    call start_timer(6)
+    call start_timer(10)
+    call start_timer(13)
 
 ! prepare local block coordinates
 !
@@ -806,7 +815,8 @@ module forcing
 
 ! stop the timer
 !
-    call stop_timer(6)
+    call stop_timer(13)
+    call stop_timer(10)
 !
 !-------------------------------------------------------------------------------
 !
