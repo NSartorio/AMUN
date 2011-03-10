@@ -167,16 +167,16 @@ module forcing
 !
     fa = sqrt((4.0d0 / 3.0d0) * pi * fpow / fnor)
 
-! print information about forcing
+! print information about forcing parameters
 !
     if (is_master()) then
-      write (*,'(a)')       ''
-      write (*,'(a,a,a)'     ) 'INFO    : ', ' Forcing:'
-      write (*,'(a,a,1i7)'   ) 'INFO    : ', '    no. of components   : ', nf
-      write (*,'(a,a,1f12.6)') 'INFO    : ', '    normalization coeff.: ', fnor
-      write (*,'(a,a,1f12.6)') 'INFO    : ', '    power               : ', fpow
-      write (*,'(a,a,1f12.6)') 'INFO    : ', '    amplitude           : ', fa
-    endif
+      write(*,"(1x,a)"         ) "Forcing parameters:"
+      write(*,"(4x,a,1x,i6)"   ) "number of components   =", nf
+      write(*,"(4x,a,1x,f12.6)") "input power            =", fpow
+      write(*,"(4x,a,1x,f12.6)") "normalization coeff.   =", fnor
+      write(*,"(4x,a,1x,f12.6)") "maximum amplitude      =", fa
+      write(*,*                )
+    end if
 
 ! multiply aplitude by the square of forcing time step so we don't have to
 ! multiply this at each step

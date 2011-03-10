@@ -134,8 +134,7 @@ program godunov
 ! print information
 !
   if (is_master()) then
-    write(*,*)
-    write(*,"(1x,a)"   ) "Evolving system:"
+    write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
@@ -233,23 +232,25 @@ program godunov
 ! print info about execution times
 !
   if (is_master()) then
-    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 6            &
-             , ".4,' secs = ',f7.3,' %')"
+    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 5            &
+             , ".3,' secs = ',f6.2,' %')"
 
     write (*,*)
-    write (*,fmt) "Time for initialization : ", get_timer(1), per * get_timer(1)
-    write (*,fmt) "Time for evolution      : ", get_timer(2), per * get_timer(2)
-    write (*,fmt) "Time for data output    : ", get_timer(3), per * get_timer(3)
-    write (*,fmt) "Time for boundary update: ", get_timer(4), per * get_timer(4)
-    write (*,fmt) "Time for mesh update    : ", get_timer(5), per * get_timer(5)
+    write(*,"(1x,a)") "Job timings:"
+    write (*,fmt) "Initialization        : ", get_timer(1), per * get_timer(1)
+    write (*,fmt) "Evolution             : ", get_timer(2), per * get_timer(2)
+    write (*,fmt) "Data output           : ", get_timer(3), per * get_timer(3)
+    write (*,fmt) "Boundary update       : ", get_timer(4), per * get_timer(4)
+    write (*,fmt) "Mesh update           : ", get_timer(5), per * get_timer(5)
 #ifdef FORCE
-    write (*,fmt) "Time for forcing        : ", get_timer(10), per * get_timer(10)
-    write (*,fmt) " - initialization       : ", get_timer(11), per * get_timer(11)
-    write (*,fmt) " - evolution            : ", get_timer(12), per * get_timer(12)
-    write (*,fmt) " - real to fourier      : ", get_timer(13), per * get_timer(13)
-    write (*,fmt) " - fourier to real      : ", get_timer(14), per * get_timer(14)
+    write (*,fmt) "External forcing      : ", get_timer(10), per * get_timer(10)
+    write (*,fmt) " - initialization     : ", get_timer(11), per * get_timer(11)
+    write (*,fmt) " - evolution          : ", get_timer(12), per * get_timer(12)
+    write (*,fmt) " - real to fourier    : ", get_timer(13), per * get_timer(13)
+    write (*,fmt) " - fourier to real    : ", get_timer(14), per * get_timer(14)
 #endif /* FORCE */
-    write (*,fmt) "EXECUTION TIME          : ", tall        , 100.0
+    write (*,fmt) "EXECUTION TIME        : ", tall        , 100.0
+    write (*,*)
   end if
 
 ! close access to the MPI

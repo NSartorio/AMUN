@@ -342,6 +342,7 @@ module mesh
       write(*,*)
       write(*,fmt) "leafs    /cover blocks =", nleafs , k, (100.0 * nleafs ) / k
       write(*,fmt) "allocated/total blocks =", mblocks, n, (100.0 * mblocks) / n
+      write(*,*)
     end if
 
 ! allocating space for coordinate variables
