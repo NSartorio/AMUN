@@ -1,14 +1,32 @@
 #-------------------------------------------------------------------------------
 #
-# compilation options:
+# compilation, debugging and profiling flags:
 #
-#   PREC - arithmetic precision: 4 or 8 for single or double precision
+#   DEBUG      - enable or disable debugging
+#   STATIC     - enable or disable static linking
+#   PROFILE    - enable or disable profiling
 #
-PREC       = 4
+DEBUG        = N
+STATIC       = N
+PROFILE      = N
+
+# parallelization flags:
+#
+#   MPI        - enable or disable MPI parallelization
+#   OMP        - enable or disable OpenMP parallelization
+#
+MPI          = N
+OMP          = N
+
+# precision flag:
+#
+#   PREC       - arithmetic precision: 4 for single, 8 for double precision
+#
+PREC         = 4
 
 # output data format: HDF5
 #
-OUTPUT     = HDF5
+OUTPUT       = HDF5
 
 #-------------------------------------------------------------------------------
 #
@@ -18,9 +36,9 @@ OUTPUT     = HDF5
 #  REFINE      - if Y the mesh is adaptively refined
 #  SHAPE       - if set Y allows to define a fixed shape in the domain
 #
-NDIMS       = 2
-REFINE      = Y
-SHAPE       = N
+NDIMS        = 2
+REFINE       = Y
+SHAPE        = N
 
 # physics:
 #
@@ -28,16 +46,16 @@ SHAPE       = N
 #  EOS         - equation of state: ADI of ISO for adiabatic or isothermal,
 #                respectively
 #
-EQS         = HYDRO
-EOS         = ADI
+EQS          = HYDRO
+EOS          = ADI
 
 # source terms:
 #
 #  FORCING     - enables forcing terms, such as turbulence driving
 #  RESISTIVITY - enable resistivity terms
 #
-FORCING     = N
-RESISTIVITY = N
+FORCING      = N
+RESISTIVITY  = N
 
 # methods
 #
@@ -47,11 +65,11 @@ RESISTIVITY = N
 #  FLUX        - flux approximation: HLL, HLLC, HLLD
 #  FLUXEMF     - electromotive force approximation: GLM
 #
-SOLVER      = GODUNOV
-TIME        = RK2
-SPACE       = MINMOD
-FLUX        = HLL
-FLUXEMF     = GLM
+SOLVER       = GODUNOV
+TIME         = RK2
+SPACE        = MINMOD
+FLUX         = HLL
+FLUXEMF      = GLM
 
 #
 #-------------------------------------------------------------------------------

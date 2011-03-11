@@ -1,27 +1,10 @@
 #-------------------------------------------------------------------------------
 #
-# customize flags for MPI, OpenMP and with no parallelization
+# depending on the compilation flags choose the right compilers and options
 #
 #-------------------------------------------------------------------------------
 #
-# parallelization:
 #
-#   MPI = Y or N to enable or disable MPI parallelization
-#   OMP = Y or N to enable or disable OpenMP parallelization
-#
-MPI      = N
-OMP      = N
-
-# compilation options:
-#
-#   DEBUG   = Y or N to enable or disable debugging
-#   STATIC  = Y or N to enable or disable static linking
-#   PROFILE = Y or N to enable or disable profiling
-#
-DEBUG    = N
-STATIC   = N
-PROFILE  = N
-
 #-------------------------------------------------------------------------------
 #
 # compiler and linker setup
