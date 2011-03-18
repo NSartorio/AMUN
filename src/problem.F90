@@ -84,6 +84,8 @@ module problem
       call init_binaries(pb)
     case("reconnection")
       call init_reconnection(pb)
+    case("multi_current_sheet")
+      call init_multi_current_sheet(pb)
     case("turbulence")
       call init_turbulence(pb)
     end select
@@ -998,6 +1000,164 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_reconnection
+!
+!===============================================================================
+!
+! init_multi_current_sheet: subroutine initializes the set up for the multiple
+!                           current sheet problem
+!
+!===============================================================================
+!
+  subroutine init_multi_current_sheet(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : in, jn, kn, im, jm, km, ng                           &
+                        , xmin, xmax, dens, pres, bamp, vper, ydel
+#ifdef ISO
+    use config   , only : csnd2
+#endif /* ISO */
+    use constants, only : dpi
+    use mpitools , only : ncpu
+    use random   , only : randomn
+    use scheme   , only : prim2cons
+    use variables, only : nvr, nqt
+    use variables, only : idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables, only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: xlen, dx, dy, dz, yi, yt
+#ifdef MHD
+    real                          :: ptot, pmag
+#endif /* MHD */
+
+! local arrays
+!
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nvr,im) :: q, u
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the length of the box
+!
+    xlen = xmax - xmin
+
+#ifdef MHD
+! calculate the total pressure
+!
+    ptot = 0.5d0 * bamp * bamp
+#endif /* MHD */
+
+! calculate the cell sizes
+!
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+#if NDIMS == 3
+    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+#else /* NDIMS == 3 */
+    dz = 1.0
+#endif /* NDIMS == 3 */
+
+! generate the coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+#if NDIMS == 3
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+#else /* NDIMS == 3 */
+    z(1) = 0.0
+#endif /* NDIMS == 3 */
+
+! set variables
+!
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
+#ifdef MHD
+    q(ibx,:) = 0.0d0
+    q(iby,:) = 0.0d0
+    q(ibz,:) = 0.0d0
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+
+! set the initial profiles
+!
+    do k = 1, km
+      do j = 1, jm
+
+! calculate the exponent factor
+!
+        yi = y(j) - floor(y(j)) - 0.5d0
+        yt = yi - sign(0.25d0, yi)
+
+#ifdef MHD
+        do i = 1, im
+
+! initialize random velocity field
+!
+          q(ivx,i) = vper * randomn(ncpu)
+          q(ivy,i) = vper * randomn(ncpu)
+#if NDIMS == 3
+          q(ivz,i) = vper * randomn(ncpu)
+#endif /* NDIMS == 3 */
+
+! initialize the magnetic field components
+!
+          q(ibx,i) = - sign(1.0d0, yi) * bamp * tanh(yt / ydel)
+
+! calculate magnetic pressure
+!
+          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
+
+! initialize density or pressure depending on EOS, so the total pressure is
+! uniform
+!
+
+#ifdef ADI
+          q(ipr,i) = pres + (ptot - pmag)
+#endif /* ADI */
+#ifdef ISO
+          q(idn,i) = dens + (ptot - pmag) / csnd2
+#endif /* ISO */
+        end do
+#endif /* MHD */
+
+! convert primitive variables to conserved
+!
+        call prim2cons(im, q(:,:), u(:,:))
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_multi_current_sheet
 !
 !===============================================================================
 !

@@ -96,7 +96,7 @@ module config
   real               , save :: dnfac = 1.0, dnrat = 1.0
   real               , save :: v1ini = 0.0, v2ini = 2.0
   real               , save :: ratio = 1.0
-  real               , save :: bamp = 1.0, bper = 0.0
+  real               , save :: bamp = 1.0, bper = 0.0, vper = 0.0
   real               , save :: ydel = 0.1, ycut = 0.1
 
 ! boundary conditions
@@ -292,6 +292,8 @@ module config
       read(value,        *) bamp
     case("bper")
       read(value,        *) bper
+    case("vper")
+      read(value,        *) vper
     case("ydel")
       read(value,        *) ydel
     case("ycut")

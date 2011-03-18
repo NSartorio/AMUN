@@ -201,7 +201,8 @@ io.o            : io.F90 blocks.o error.o mesh.o mpitools.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90
-problem.o       : problem.F90 blocks.o constants.o scheme.o variables.o
+problem.o       : problem.F90 blocks.o constants.o mpitools.o random.o         \
+                  scheme.o variables.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
 random.o        : random.F90 mpitools.o
 timer.o         : timer.F90
