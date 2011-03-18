@@ -44,6 +44,9 @@ module evolution
 
     use blocks    , only : block_data, list_data
     use boundaries, only : boundary_variables
+#ifdef VISCOSITY
+    use config    , only : visc
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     use config    , only : ueta
 #endif /* MHD & RESIS */
@@ -136,6 +139,9 @@ module evolution
 ! get maximum time step
 !
     dtn = dx_min / max(cmax, 1.0d-16)
+#ifdef VISCOSITY
+    dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, visc))
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, ueta))
 #endif /* MHD & RESIS */

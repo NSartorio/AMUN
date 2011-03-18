@@ -122,6 +122,11 @@ module config
   real               , save :: kc    = 0.1d+0 ! the spectrum width
   integer            , save :: kd    = 1      ! the wave number increment
 #endif /* FORCE */
+#ifdef VISCOSITY
+! resistive terms parameters
+!
+  real               , save :: visc  = 1.0d-3 ! the uniform viscosity
+#endif /* VISCOSITY */
 #ifdef RESIS
 ! resistive terms parameters
 !
@@ -341,6 +346,10 @@ module config
     case("kd")
       read(value,*) kd
 #endif /* FORCE */
+#ifdef VISCOSITY
+    case("visc")
+      read(value,*) visc
+#endif /* VISCOSITY */
 #ifdef RESIS
     case("ueta")
       read(value,*) ueta

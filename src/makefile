@@ -127,6 +127,9 @@ endif
 ifeq ($(FORCING),Y)
 FFLAGS  += -DFORCE
 endif
+ifeq ($(VISCOSITY),Y)
+FFLAGS  += -DVISCOSITY
+endif
 ifeq ($(RESISTIVITY),Y)
 FFLAGS  += -DRESIS
 endif

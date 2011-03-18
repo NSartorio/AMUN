@@ -52,9 +52,11 @@ EOS          = ADI
 # source terms:
 #
 #  FORCING     - enables forcing terms, such as turbulence driving
+#  VISCOSITY   - enable fluid viscous terms
 #  RESISTIVITY - enable resistivity terms
 #
 FORCING      = N
+VISCOSITY    = N
 RESISTIVITY  = N
 
 # methods

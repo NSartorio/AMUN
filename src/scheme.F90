@@ -313,6 +313,9 @@ module scheme
 !
   subroutine hll(n, h, u, f)
 
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     use config       , only : ueta
 #endif /* MHD & RESIS */
@@ -342,6 +345,9 @@ module scheme
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real                   :: al, ar, ap, div
+#ifdef VISCOSITY
+    real                   :: dvx, dvy, dvz
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     real                   :: dbx, dby, dbz
 #endif /* MHD & RESIS */
@@ -418,6 +424,21 @@ module scheme
       end if
     end do
 
+#ifdef VISCOSITY
+! add viscous term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      fn(ivx,i  ) = fn(ivx,i  ) - dvx
+
+      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      fn(ivy,i  ) = fn(ivy,i  ) - dvy
+
+      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      fn(ivz,i  ) = fn(ivz,i  ) - dvz
+    end do
+
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
 ! add resistivity term to the left and right fluxes
 !
@@ -455,6 +476,9 @@ module scheme
 !
   subroutine hllc(n, h, u, f)
 
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -477,6 +501,9 @@ module scheme
     real                   :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm     &
                             , smvl, smvr, div, pt
     real, dimension(nvr)   :: q1l, q1r, u1l, u1r
+#ifdef VISCOSITY
+    real                   :: dvx, dvy, dvz
+#endif /* VISCOSITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -636,6 +663,21 @@ module scheme
 
     end do
 
+#ifdef VISCOSITY
+! add viscous term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      fn(ivx,i  ) = fn(ivx,i  ) - dvx
+
+      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      fn(ivy,i  ) = fn(ivy,i  ) - dvy
+
+      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      fn(ivz,i  ) = fn(ivz,i  ) - dvz
+    end do
+
+#endif /* VISCOSITY */
 ! calculate numerical flux
 !
     f(:,2:n) = - fn(:,2:n) + fn(:,1:n-1)
@@ -657,6 +699,9 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     use config       , only : ueta
 #endif /* MHD & RESIS */
@@ -686,6 +731,9 @@ module scheme
     real, dimension(nvr)   :: u1l, u1r, u2
     real                   :: sl, sr, srl, srml, sm, sml, smr
     real                   :: dnm, mxm, sqd, div, fac, bxs
+#ifdef VISCOSITY
+    real                   :: dvx, dvy, dvz
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     real                   :: dbx, dby, dbz
 #endif /* MHD & RESIS */
@@ -885,6 +933,21 @@ module scheme
 
     end do
 
+#ifdef VISCOSITY
+! add viscous term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      fn(ivx,i  ) = fn(ivx,i  ) - dvx
+
+      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      fn(ivy,i  ) = fn(ivy,i  ) - dvy
+
+      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      fn(ivz,i  ) = fn(ivz,i  ) - dvz
+    end do
+
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
 ! add resistivity term to the left and right fluxes
 !
@@ -921,6 +984,9 @@ module scheme
   subroutine hlld(n, h, u, f)
 
     use config       , only : gamma
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     use config       , only : ueta
 #endif /* MHD & RESIS */
@@ -951,6 +1017,9 @@ module scheme
     real                   :: sl, sr, slmv, srmv, slmm, srmm, sm, smvl, smvr   &
                             , sml, smr
     real                   :: ptl, ptr, pt, bx2, div, fac, bxs, dlsq, drsq
+#ifdef VISCOSITY
+    real                   :: dvx, dvy, dvz
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
     real                   :: dbx, dby, dbz
 #endif /* MHD & RESIS */
@@ -1244,6 +1313,21 @@ module scheme
 
     end do
 
+#ifdef VISCOSITY
+! add viscous term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      fn(ivx,i  ) = fn(ivx,i  ) - dvx
+
+      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      fn(ivy,i  ) = fn(ivy,i  ) - dvy
+
+      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      fn(ivz,i  ) = fn(ivz,i  ) - dvz
+    end do
+
+#endif /* VISCOSITY */
 #if defined MHD && defined RESIS
 ! add resistivity term to the left and right fluxes
 !
