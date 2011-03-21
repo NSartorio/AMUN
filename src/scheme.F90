@@ -1690,6 +1690,64 @@ module scheme
 !
   end subroutine eigensystem
 #endif /* ADI */
+#ifdef ISO
+  subroutine eigensystem(q, c, r, l)
+
+    use config   , only : csnd
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz
+
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(nqt)    , intent(in)    :: q
+    real, dimension(nqt)    , intent(inout) :: c
+    real, dimension(nqt,nqt), intent(inout) :: l, r
+!
+!-------------------------------------------------------------------------------
+!
+! prepare eigenvalues
+!
+    c(1) = q(ivx) - csnd
+    c(2) = q(ivx)
+    c(3) = q(ivx)
+    c(4) = q(ivx) + csnd
+
+! prepare the right eigenmatrix
+!
+    r(1,1) = 1.0d0
+    r(1,2) = q(ivx) - csnd
+    r(1,3) = q(ivy)
+    r(1,4) = q(ivz)
+
+    r(2,3) = 1.0d0
+
+    r(3,4) = 1.0d0
+
+    r(4,1) = 1.0d0
+    r(4,2) = q(ivx) + csnd
+    r(4,3) = q(ivy)
+    r(4,4) = q(ivz)
+
+! prepare the left eigenmatrix
+!
+    l(1,1) =   0.5d0 * (1.0d0 + q(ivx) * csnd)
+    l(2,1) = - 0.5d0 / csnd
+
+    l(1,2) = - q(ivy)
+    l(3,2) = 1.0d0
+
+    l(1,3) = - q(ivz)
+    l(4,3) = 1.0d0
+
+    l(1,4) =   0.5d0 * (1.0d0 - q(ivx) * csnd)
+    l(2,4) =   0.5d0 / csnd
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine eigensystem
+#endif /* ISO */
 #endif /* HYDRO */
 #endif /* ROE */
 !
