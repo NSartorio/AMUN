@@ -130,6 +130,9 @@ module scheme
 #ifdef HLLD
         call hlld(im, dx, ux(:,:), fx(:,:))
 #endif /* HLLD */
+#ifdef ROE
+        call roe (im, dx, ux(:,:), fx(:,:))
+#endif /* ROE */
 
 ! update the arrays of increments
 !
@@ -198,6 +201,9 @@ module scheme
 #ifdef HLLD
         call hlld(jm, dy, uy(:,:), fy(:,:))
 #endif /* HLLD */
+#ifdef ROE
+        call roe (jm, dy, uy(:,:), fy(:,:))
+#endif /* ROE */
 
 ! update the arrays of increments
 !
@@ -267,6 +273,9 @@ module scheme
 #ifdef HLLD
         call hlld(km, dz, uz(:,:), fz(:,:))
 #endif /* HLLD */
+#ifdef ROE
+        call roe (km, dz, uz(:,:), fz(:,:))
+#endif /* ROE */
 
 ! update the arrays of increments
 !
@@ -1354,6 +1363,335 @@ module scheme
 #endif /* ADI */
 #endif /* HLLD */
 #endif /* MHD */
+#ifdef ROE
+!
+!===============================================================================
+!
+! roe: subroutine computes the approximated flux using the ROE method
+!
+! references:
+!
+!   - Roe, P. L., 1981, Journal of Computational Physics, 43, 357
+!
+!===============================================================================
+!
+  subroutine roe(n, h, u, f)
+
+    use config       , only : gamma
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
+#if defined MHD && defined RESIS
+    use config       , only : ueta
+#endif /* MHD & RESIS */
+    use interpolation, only : reconstruct
+    use variables    , only : nvr, nfl, nqt
+    use variables    , only : idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables    , only : ien, ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables    , only : ibx, iby, ibz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+    implicit none
+
+! input/output arguments
+!
+    integer               , intent(in)  :: n
+    real                  , intent(in)  :: h
+    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nqt,n), intent(out) :: f
+
+! local variables
+!
+    integer                  :: p, i
+    real, dimension(nvr,n)   :: q, ql, qr, ul, ur
+    real, dimension(nqt,n)   :: fl, fr, fn
+    real, dimension(n)       :: cl, cr
+    real, dimension(nqt)     :: qi, ci, et
+    real, dimension(nqt,nqt) :: li, ri
+    real                     :: al, ar, ap, div
+    real                     :: sdl, sdr, sds
+#ifdef VISCOSITY
+    real                     :: dvx, dvy, dvz
+#endif /* VISCOSITY */
+#if defined MHD && defined RESIS
+    real                     :: dbx, dby, dbz
+#endif /* MHD & RESIS */
+!
+!-------------------------------------------------------------------------------
+!
+! reset eigensystem values
+!
+    ci(:)   = 0.0d0
+    li(:,:) = 0.0d0
+    ri(:,:) = 0.0d0
+
+! calculate the primitive variables
+!
+    call cons2prim(n, u(:,:), q(:,:))
+
+! reconstruct the left and right states of the primitive variables
+!
+    do p = 1, nfl
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+#ifdef MHD
+! reconstruct the left and right states of the magnetic field components
+!
+    do p = ibx, ibz
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+#ifdef GLM
+! reconstruct the left and right states of the scalar potential
+!
+    call reconstruct(n, h, q(iph,:), ql(iph,:), qr(iph,:))
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    cl(:) = 0.5d0 * ((qr(ibx,:) + ql(ibx,:)) - (qr(iph,:) - ql(iph,:)) / cmax)
+    cr(:) = 0.5d0 * ((qr(iph,:) + ql(iph,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    ql(ibx,:) = cl(:)
+    qr(ibx,:) = cl(:)
+    ql(iph,:) = cr(:)
+    qr(iph,:) = cr(:)
+#endif /* GLM */
+#endif /* MHD */
+
+! calculate conservative variables at states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate fluxes and speeds
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+
+! iterate over all points
+!
+    do i = 1, n
+
+! calculate Roe variables for the eigenproblem solution
+!
+      sdl = sqrt(ql(idn,i))
+      sdr = sqrt(qr(idn,i))
+      sds = sdl + sdr
+      qi(idn) = sdl * sdr
+      qi(ivx) = (sdl * ql(ivx,i) + sdr * qr(ivx,i)) / sds
+      qi(ivy) = (sdl * ql(ivy,i) + sdr * qr(ivy,i)) / sds
+      qi(ivz) = (sdl * ql(ivz,i) + sdr * qr(ivz,i)) / sds
+#ifdef ADI
+      qi(ipr) = ((ul(ien,i) + ql(ipr,i)) / sdl                                 &
+               + (ur(ien,i) + qr(ipr,i)) / sdr) / sds
+#endif /* ADI */
+
+! check if density and pressure are positive
+!
+#ifdef ADI
+      if (qi(idn) .gt. 0.0d0 .and. qi(ipr) .gt. 0.0d0) then
+#else /* ADI */
+      if (qi(idn) .gt. 0.0d0) then
+#endif /* ADI */
+
+! obtain eigenvalues and eigenvectors
+!
+        call eigensystem(qi(:), ci(:), ri(:,:), li(:,:))
+
+! calculate vector (Ur - Ul).L
+!
+        et(:) = 0.0d0
+        do p = 1, nqt
+          et(:) = et(:) + (ur(p,i) - ul(p,i)) * li(p,:)
+        end do
+
+! calculate numerical flux
+!
+        fn(:,i) = 0.5d0 * (fl(:,i) + fr(:,i))
+
+! add term abs(lambda) R.(Ur - Ul).L
+!
+        do p = 1, nqt
+          fn(:,i) = fn(:,i) - 0.5d0 * abs(ci(p)) * et(p) * ri(p,:)
+        end do
+
+      else ! in the case when density or pressure of the intermediate state
+           ! are negative, use the simplest and most robust HLL flux
+
+! calculate min and max speeds
+!
+        al = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
+        ar = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+
+! calculate the HLL flux
+!
+        if (al .ge. 0.0d0) then
+          fn(:,i) = fl(:,i)
+        else if (ar .le. 0.0d0) then
+          fn(:,i) = fr(:,i)
+        else
+          ap  = ar * al
+          div = 1.0d0 / (ar - al)
+
+          fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
+        end if
+
+      end if
+
+    end do
+
+#ifdef VISCOSITY
+! add viscous term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      fn(ivx,i  ) = fn(ivx,i  ) - dvx
+
+      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      fn(ivy,i  ) = fn(ivy,i  ) - dvy
+
+      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      fn(ivz,i  ) = fn(ivz,i  ) - dvz
+    end do
+
+#endif /* VISCOSITY */
+#if defined MHD && defined RESIS
+! add resistivity term to the left and right fluxes
+!
+    do i = 1, n - 1
+      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
+      fn(iby,i  ) = fn(iby,i  ) - dby
+
+      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
+      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+    end do
+
+#endif /* MHD & RESIS */
+! calculate numerical flux
+!
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
+#ifdef MHD
+#ifdef GLM
+    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
+#endif /* GLM */
+#endif /* MHD */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine roe
+!
+!===============================================================================
+!
+! eigensystem: subroutine computes eigenvalues and eigenmatrices for a given
+!              set of equations and input variables
+!
+!===============================================================================
+!
+#ifdef HYDRO
+#ifdef ADI
+  subroutine eigensystem(q, c, r, l)
+
+    use config   , only : gamma
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz
+    use variables, only : ien
+
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(nqt)    , intent(in)    :: q
+    real, dimension(nqt)    , intent(inout) :: c
+    real, dimension(nqt,nqt), intent(inout) :: l, r
+
+! local variables
+!
+    real :: ek, fc, fh, gm
+    real :: cc
+!
+!-------------------------------------------------------------------------------
+!
+! calculate characteristic speeds and useful variables
+!
+    gm = gamma - 1.0d0
+    ek = 0.5d0 * sum(q(ivx:ivz)**2)
+    cc = sqrt(gm * (q(ien) - ek))
+    fc = 1.0d0 / (cc * cc)
+    fh = 0.5d0 * fc
+
+! prepare eigenvalues
+!
+    c(1) = q(ivx) - cc
+    c(2) = q(ivx)
+    c(3) = q(ivx)
+    c(4) = q(ivx)
+    c(5) = q(ivx) + cc
+
+! prepare the right eigenmatrix
+!
+    r(1,1) = 1.0d0
+    r(1,2) = q(ivx) - cc
+    r(1,3) = q(ivy)
+    r(1,4) = q(ivz)
+    r(1,5) = q(ien) - q(ivx) * cc
+
+    r(2,3) = 1.0d0
+    r(2,5) = q(ivy)
+
+    r(3,4) = 1.0d0
+    r(3,5) = q(ivz)
+
+    r(4,1) = 1.0d0
+    r(4,2) = q(ivx)
+    r(4,3) = q(ivy)
+    r(4,4) = q(ivz)
+    r(4,5) = ek
+
+    r(5,1) = 1.0d0
+    r(5,2) = q(ivx) + cc
+    r(5,3) = q(ivy)
+    r(5,4) = q(ivz)
+    r(5,5) = q(ien) + q(ivx) * cc
+
+! prepare the left eigenmatrix
+!
+    l(1,1) =   fh * (gm * ek + q(ivx) * cc)
+    l(2,1) = - fh * (gm * q(ivx) + cc)
+    l(3,1) = - fh *  gm * q(ivy)
+    l(4,1) = - fh *  gm * q(ivz)
+    l(5,1) =   fh *  gm
+
+    l(1,2) = - q(ivy)
+    l(3,2) = 1.0d0
+
+    l(1,3) = - q(ivz)
+    l(4,3) = 1.0d0
+
+    l(1,4) = 1.0d0 - fc * gm * ek
+    l(2,4) =   fc * gm * q(ivx)
+    l(3,4) =   fc * gm * q(ivy)
+    l(4,4) =   fc * gm * q(ivz)
+    l(5,4) = - fc * gm
+
+    l(1,5) =   fh * (gm * ek - q(ivx) * cc)
+    l(2,5) = - fh * (gm * q(ivx) - cc)
+    l(3,5) = - fh *  gm * q(ivy)
+    l(4,5) = - fh *  gm * q(ivz)
+    l(5,5) =   fh *  gm
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine eigensystem
+#endif /* ADI */
+#endif /* HYDRO */
+#endif /* ROE */
 !
 !===============================================================================
 !
