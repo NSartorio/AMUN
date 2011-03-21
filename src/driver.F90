@@ -64,12 +64,30 @@ program godunov
   if (is_master()) then
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
-    write (*,"(1x,16('='),4x,a,4x,16('='))") 'Copyright (C) 2008-2011 Grzegorz Kowal'
+    write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
+                                        'Copyright (C) 2008-2011 Grzegorz Kowal'
 #ifdef MPI
     write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus   &
             , ' processors'
 #endif /* MPI */
     write (*,"(1x,78('-'))")
+    write (*,*)
+    write (*,"(1x,a)"         ) "Physics:"
+    write (*,"(4x,a,1x,a)"    ) "equations              =",                    &
+#ifdef HYDRO
+    "HD"
+#endif /* HYDRO */
+#ifdef MHD
+    "MHD"
+#endif /* MHD */
+    write (*,"(4x,a,1x,a)"    ) "equation of state      =",                    &
+#ifdef ADI
+    "adiabalic"
+#endif /* ADI */
+#ifdef ISO
+    "isothermal"
+#endif /* ISO */
+
     write (*,*)
   end if
 
