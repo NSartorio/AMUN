@@ -325,9 +325,9 @@ module scheme
 #ifdef VISCOSITY
     use config       , only : visc
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     use config       , only : ueta
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx
@@ -357,9 +357,9 @@ module scheme
 #ifdef VISCOSITY
     real                   :: dvx, dvy, dvz
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     real                   :: dbx, dby, dbz
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -448,7 +448,7 @@ module scheme
     end do
 
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, nm1
@@ -458,7 +458,7 @@ module scheme
       dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
       fn(ibz,i  ) = fn(ibz,i  ) - dbz
     end do
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 
 ! calculate numerical flux
 !
@@ -711,9 +711,9 @@ module scheme
 #ifdef VISCOSITY
     use config       , only : visc
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     use config       , only : ueta
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
@@ -743,9 +743,9 @@ module scheme
 #ifdef VISCOSITY
     real                   :: dvx, dvy, dvz
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     real                   :: dbx, dby, dbz
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -957,7 +957,7 @@ module scheme
     end do
 
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
@@ -967,7 +967,7 @@ module scheme
       dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
       fn(ibz,i  ) = fn(ibz,i  ) - dbz
     end do
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 
 ! calculate numerical flux
 !
@@ -996,9 +996,9 @@ module scheme
 #ifdef VISCOSITY
     use config       , only : visc
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     use config       , only : ueta
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -1029,9 +1029,9 @@ module scheme
 #ifdef VISCOSITY
     real                   :: dvx, dvy, dvz
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     real                   :: dbx, dby, dbz
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1337,7 +1337,7 @@ module scheme
     end do
 
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
@@ -1347,7 +1347,7 @@ module scheme
       dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
       fn(ibz,i  ) = fn(ibz,i  ) - dbz
     end do
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 
 ! calculate the numerical flux derivative
 !
@@ -1381,9 +1381,9 @@ module scheme
 #ifdef VISCOSITY
     use config       , only : visc
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     use config       , only : ueta
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, ivx, ivy, ivz
@@ -1422,9 +1422,9 @@ module scheme
 #ifdef VISCOSITY
     real                     :: dvx, dvy, dvz
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     real                     :: dbx, dby, dbz
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1592,7 +1592,7 @@ module scheme
     end do
 
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
@@ -1603,7 +1603,7 @@ module scheme
       fn(ibz,i  ) = fn(ibz,i  ) - dbz
     end do
 
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)

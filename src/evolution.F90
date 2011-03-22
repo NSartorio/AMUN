@@ -47,9 +47,9 @@ module evolution
 #ifdef VISCOSITY
     use config    , only : visc
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     use config    , only : ueta
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 #ifdef FORCE
     use forcing   , only : fourier_transform, evolve_forcing
 #endif /* FORCE */
@@ -142,9 +142,9 @@ module evolution
 #ifdef VISCOSITY
     dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, visc))
 #endif /* VISCOSITY */
-#if defined MHD && defined RESIS
+#if defined MHD && defined RESISTIVITY
     dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, ueta))
-#endif /* MHD & RESIS */
+#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !

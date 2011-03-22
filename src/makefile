@@ -130,8 +130,10 @@ endif
 ifeq ($(VISCOSITY),Y)
 FFLAGS  += -DVISCOSITY
 endif
+ifeq ($(EQS),MHD)
 ifeq ($(RESISTIVITY),Y)
-FFLAGS  += -DRESIS
+FFLAGS  += -DRESISTIVITY
+endif
 endif
 
 #-------------------------------------------------------------------------------

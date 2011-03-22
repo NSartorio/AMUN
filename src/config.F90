@@ -123,20 +123,22 @@ module config
   integer            , save :: kd    = 1      ! the wave number increment
 #endif /* FORCE */
 #ifdef VISCOSITY
-! resistive terms parameters
+! viscous terms parameters
 !
   real               , save :: visc  = 1.0d-3 ! the uniform viscosity
 #endif /* VISCOSITY */
-#ifdef RESIS
+#ifdef MHD
+#ifdef RESISTIVITY
 ! resistive terms parameters
 !
   real               , save :: ueta  = 1.0d-3 ! the uniform resistivity
-#endif /* RESIS */
-#if defined MHD && defined GLM
+#endif /* RESISTIVITY */
+#ifdef GLM
 ! coefficient controlling the decay of scalar potential Psi
 !
   real               , save :: alpha_p = 0.5d0
-#endif /* MHD & GLM */
+#endif /* GLM */
+#endif /* MHD */
 #ifdef LIMO3
 
 ! parameters for the LIMO3 reconstruction
@@ -350,14 +352,16 @@ module config
     case("visc")
       read(value,*) visc
 #endif /* VISCOSITY */
-#ifdef RESIS
+#ifdef MHD
+#ifdef RESISTIVITY
     case("ueta")
       read(value,*) ueta
-#endif /* RESIS */
-#if defined MHD && defined GLM
+#endif /* RESISTIVITY */
+#ifdef GLM
     case("alpha_p")
       read(value,        *) alpha_p
-#endif /* MHD & GLM */
+#endif /* GLM */
+#endif /* MHD */
 #ifdef LIMO3
     case("eps")
       read(value,        *) eps
