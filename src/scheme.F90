@@ -1412,10 +1412,13 @@ module scheme
     real, dimension(nvr,n)   :: q, ql, qr, ul, ur
     real, dimension(nqt,n)   :: fl, fr, fn
     real, dimension(n)       :: cl, cr
-    real, dimension(nqt)     :: qi, ci, et
+    real, dimension(nqt)     :: qi, ci, et, du
     real, dimension(nqt,nqt) :: li, ri
     real                     :: al, ar, ap, div
-    real                     :: sdl, sdr, sds
+    real                     :: sdl, sdr, sds, sfl, sfr
+#ifdef MHD
+    real                     :: pbl, pbr, xfc, yfc
+#endif /* MHD */
 #ifdef VISCOSITY
     real                     :: dvx, dvy, dvz
 #endif /* VISCOSITY */
@@ -1478,19 +1481,41 @@ module scheme
 !
     do i = 1, n
 
+! calculate conserved states difference
+!
+      du(:) = ur(:,i) - ul(:,i)
+
 ! calculate Roe variables for the eigenproblem solution
 !
       sdl = sqrt(ql(idn,i))
       sdr = sqrt(qr(idn,i))
       sds = sdl + sdr
+      sfl     = sdl / sds
+      sfr     = sdr / sds
+
       qi(idn) = sdl * sdr
-      qi(ivx) = (sdl * ql(ivx,i) + sdr * qr(ivx,i)) / sds
-      qi(ivy) = (sdl * ql(ivy,i) + sdr * qr(ivy,i)) / sds
-      qi(ivz) = (sdl * ql(ivz,i) + sdr * qr(ivz,i)) / sds
+      qi(ivx) = sfl * ql(ivx,i) + sfr * qr(ivx,i)
+      qi(ivy) = sfl * ql(ivy,i) + sfr * qr(ivy,i)
+      qi(ivz) = sfl * ql(ivz,i) + sfr * qr(ivz,i)
+#ifdef HYDRO
 #ifdef ADI
-      qi(ipr) = ((ul(ien,i) + ql(ipr,i)) / sdl                                 &
-               + (ur(ien,i) + qr(ipr,i)) / sdr) / sds
+      qi(ipr) = sfl * (ul(ien,i) + ql(ipr,i)) / ql(idn,i)                      &
+              + sfr * (ur(ien,i) + qr(ipr,i)) / qr(idn,i)
 #endif /* ADI */
+#endif /* HYDRO */
+#ifdef MHD
+      qi(ibx) = ql(ibx,i)
+      qi(iby) = sfl * ql(iby,i) + sfr * qr(iby,i)
+      qi(ibz) = sfl * ql(ibz,i) + sfr * qr(ibz,i)
+#ifdef ADI
+      pbl     = 0.5d0 * sum(ql(ibx:ibz,i)**2)
+      pbr     = 0.5d0 * sum(qr(ibx:ibz,i)**2)
+      qi(ipr) = sfl * (ul(ien,i) + ql(ipr,i) + pbl) / ql(idn,i)                &
+              + sfr * (ur(ien,i) + qr(ipr,i) + pbr) / qr(idn,i)
+#endif /* ADI */
+      xfc     = 0.5d0 * sum(du(iby:ibz)**2) / sds**2
+      yfc     = 0.5d0 * (ql(idn,i) + qr(idn,i)) / qi(idn)
+#endif /* MHD */
 
 ! check if density and pressure are positive
 !
@@ -1502,13 +1527,18 @@ module scheme
 
 ! obtain eigenvalues and eigenvectors
 !
+#ifdef HYDRO
         call eigensystem(qi(:), ci(:), ri(:,:), li(:,:))
+#endif /* HYDRO */
+#ifdef MHD
+        call eigensystem(qi(:), ci(:), ri(:,:), li(:,:), xfc, yfc)
+#endif /* MHD */
 
 ! calculate vector (Ur - Ul).L
 !
         et(:) = 0.0d0
         do p = 1, nqt
-          et(:) = et(:) + (ur(p,i) - ul(p,i)) * li(p,:)
+          et(:) = et(:) + du(p) * li(p,:)
         end do
 
 ! calculate numerical flux
@@ -1539,7 +1569,8 @@ module scheme
           ap  = ar * al
           div = 1.0d0 / (ar - al)
 
-          fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
+          fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i)                         &
+                                                   + ap * (ur(:,i) - ul(:,i)))
         end if
 
       end if
@@ -1613,18 +1644,24 @@ module scheme
 
 ! local variables
 !
-    real :: ek, fc, fh, gm
-    real :: cc
+    real :: gm, vv, vh, c2, na, cc, vc, ng, nd, nv, nh, nc
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate characteristic speeds and useful variables
 !
     gm = gamma - 1.0d0
-    ek = 0.5d0 * sum(q(ivx:ivz)**2)
-    cc = sqrt(gm * (q(ien) - ek))
-    fc = 1.0d0 / (cc * cc)
-    fh = 0.5d0 * fc
+    vv = sum(q(ivx:ivz)**2)
+    vh = 0.5d0 * vv
+    c2 = gm * (q(ien) - vh)
+    na = 0.5d0 / c2
+    cc = sqrt(c2)
+    vc = q(ivx) * cc
+    ng = na * gm
+    nd = 2.0 * ng
+    nv = na * vc
+    nh = na * gm * vh
+    nc = na * cc
 
 ! prepare eigenvalues
 !
@@ -1636,55 +1673,55 @@ module scheme
 
 ! prepare the right eigenmatrix
 !
-    r(1,1) = 1.0d0
-    r(1,2) = q(ivx) - cc
-    r(1,3) = q(ivy)
-    r(1,4) = q(ivz)
-    r(1,5) = q(ien) - q(ivx) * cc
+    r(1,idn) = 1.0d0
+    r(1,ivx) = q(ivx) - cc
+    r(1,ivy) = q(ivy)
+    r(1,ivz) = q(ivz)
+    r(1,ien) = q(ien) - vc
 
-    r(2,3) = 1.0d0
-    r(2,5) = q(ivy)
+    r(2,ivy) = 1.0d0
+    r(2,ien) = q(ivy)
 
-    r(3,4) = 1.0d0
-    r(3,5) = q(ivz)
+    r(3,ivz) = 1.0d0
+    r(3,ien) = q(ivz)
 
-    r(4,1) = 1.0d0
-    r(4,2) = q(ivx)
-    r(4,3) = q(ivy)
-    r(4,4) = q(ivz)
-    r(4,5) = ek
+    r(4,idn) = 1.0d0
+    r(4,ivx) = q(ivx)
+    r(4,ivy) = q(ivy)
+    r(4,ivz) = q(ivz)
+    r(4,ien) = vh
 
-    r(5,1) = 1.0d0
-    r(5,2) = q(ivx) + cc
-    r(5,3) = q(ivy)
-    r(5,4) = q(ivz)
-    r(5,5) = q(ien) + q(ivx) * cc
+    r(5,idn) = 1.0d0
+    r(5,ivx) = q(ivx) + cc
+    r(5,ivy) = q(ivy)
+    r(5,ivz) = q(ivz)
+    r(5,ien) = q(ien) + vc
 
 ! prepare the left eigenmatrix
 !
-    l(1,1) =   fh * (gm * ek + q(ivx) * cc)
-    l(2,1) = - fh * (gm * q(ivx) + cc)
-    l(3,1) = - fh *  gm * q(ivy)
-    l(4,1) = - fh *  gm * q(ivz)
-    l(5,1) =   fh *  gm
+    l(idn,1) =   nh + nv
+    l(ivx,1) = - ng * q(ivx) - nc
+    l(ivy,1) = - ng * q(ivy)
+    l(ivz,1) = - ng * q(ivz)
+    l(ien,1) =   ng
 
-    l(1,2) = - q(ivy)
-    l(3,2) = 1.0d0
+    l(idn,2) = - q(ivy)
+    l(ivy,2) = 1.0d0
 
-    l(1,3) = - q(ivz)
-    l(4,3) = 1.0d0
+    l(idn,3) = - q(ivz)
+    l(ivz,3) = 1.0d0
 
-    l(1,4) = 1.0d0 - fc * gm * ek
-    l(2,4) =   fc * gm * q(ivx)
-    l(3,4) =   fc * gm * q(ivy)
-    l(4,4) =   fc * gm * q(ivz)
-    l(5,4) = - fc * gm
+    l(idn,4) = 1.0d0 - ng * vv
+    l(ivx,4) =   nd * q(ivx)
+    l(ivy,4) =   nd * q(ivy)
+    l(ivz,4) =   nd * q(ivz)
+    l(ien,4) = - nd
 
-    l(1,5) =   fh * (gm * ek - q(ivx) * cc)
-    l(2,5) = - fh * (gm * q(ivx) - cc)
-    l(3,5) = - fh *  gm * q(ivy)
-    l(4,5) = - fh *  gm * q(ivz)
-    l(5,5) =   fh *  gm
+    l(idn,5) =   nh - nv
+    l(ivx,5) = - ng * q(ivx) + nc
+    l(ivy,5) = - ng * q(ivy)
+    l(ivz,5) = - ng * q(ivz)
+    l(ien,5) =   ng
 
 !-------------------------------------------------------------------------------
 !
@@ -1704,9 +1741,18 @@ module scheme
     real, dimension(nqt)    , intent(in)    :: q
     real, dimension(nqt)    , intent(inout) :: c
     real, dimension(nqt,nqt), intent(inout) :: l, r
+
+! local variables
+!
+    real :: ch, vc
 !
 !-------------------------------------------------------------------------------
 !
+! calculate useful variables
+!
+    ch = 0.5d0 / csnd
+    vc = ch * q(ivx)
+
 ! prepare eigenvalues
 !
     c(1) = q(ivx) - csnd
@@ -1716,39 +1762,155 @@ module scheme
 
 ! prepare the right eigenmatrix
 !
-    r(1,1) = 1.0d0
-    r(1,2) = q(ivx) - csnd
-    r(1,3) = q(ivy)
-    r(1,4) = q(ivz)
+    r(1,idn) = 1.0d0
+    r(1,ivx) = q(ivx) - csnd
+    r(1,ivy) = q(ivy)
+    r(1,ivz) = q(ivz)
 
-    r(2,3) = 1.0d0
+    r(2,ivy) = 1.0d0
 
-    r(3,4) = 1.0d0
+    r(3,ivz) = 1.0d0
 
-    r(4,1) = 1.0d0
-    r(4,2) = q(ivx) + csnd
-    r(4,3) = q(ivy)
-    r(4,4) = q(ivz)
+    r(4,idn) = 1.0d0
+    r(4,ivx) = q(ivx) + csnd
+    r(4,ivy) = q(ivy)
+    r(4,ivz) = q(ivz)
 
 ! prepare the left eigenmatrix
 !
-    l(1,1) =   0.5d0 * (1.0d0 + q(ivx) * csnd)
-    l(2,1) = - 0.5d0 / csnd
+    l(idn,1) = 0.5d0 + vc
+    l(ivx,1) = - ch
 
-    l(1,2) = - q(ivy)
-    l(3,2) = 1.0d0
+    l(idn,2) = - q(ivy)
+    l(ivy,2) = 1.0d0
 
-    l(1,3) = - q(ivz)
-    l(4,3) = 1.0d0
+    l(idn,3) = - q(ivz)
+    l(ivz,3) = 1.0d0
 
-    l(1,4) =   0.5d0 * (1.0d0 - q(ivx) * csnd)
-    l(2,4) =   0.5d0 / csnd
+    l(idn,4) = 0.5d0 - vc
+    l(ivx,4) =   ch
 
 !-------------------------------------------------------------------------------
 !
   end subroutine eigensystem
 #endif /* ISO */
 #endif /* HYDRO */
+#ifdef MHD
+#ifdef ADI
+  subroutine eigensystem(q, c, r, l, x, y)
+
+    use config   , only : gamma
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz, ibx, iby, ibz, ien
+
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(nqt)    , intent(in)    :: q
+    real, dimension(nqt)    , intent(inout) :: c
+    real, dimension(nqt,nqt), intent(inout) :: l, r
+    real                    , intent(in)    :: x, y
+
+! local variables
+!
+    real :: gm1, gm2, v2, b2
+    real :: ah2, bt2, aa2, cb2, cx2, ct2, ca2, cs2, cf2
+    real :: cx , ct , cs, ca, cf
+!
+!-------------------------------------------------------------------------------
+!
+! calculate characteristic speeds
+!
+    gm1 = gamma - 1.0d0
+    gm2 = gamma - 2.0d0
+    v2  = sum(q(ivx:ivz)**2)
+    b2  = sum(q(ibx:ibz)**2)
+    ah2 = gm1 * (q(ien) - 0.5d0 * v2 - b2 / q(idn)) - gm2 * x
+    bt2 = (gm1 - gm2 * y) * sum(q(iby:ibz)**2)
+    cx2 = q(ibx) * q(ibx) / q(idn)
+    ct2 = bt2 / q(idn)
+    ca2 = cx2 + ct2
+    aa2 = ah2 + ca2
+    cb2 = sqrt(max(0.0d0, aa2 * aa2 - 4.0d0 * ah2 * cx2))
+    cs2 = 0.5d0 * (aa2 - cb2)
+    cf2 = 0.5d0 * (aa2 + cb2)
+    af2 = (ah2  - cs2) / (cf2 - cs2)
+    cx  = sqrt(cx2)
+    ca  = sqrt(ca2)
+    cs  = sqrt(cs2)
+    cf  = sqrt(cf2)
+    af  = sqrt(af2)
+
+! prepare eigenvalues
+!
+    c(1) = q(ivx) - cf
+    c(2) = q(ivx) - cx
+    c(3) = q(ivx) - cs
+    c(4) = q(ivx)
+    c(5) = q(ivx) + cs
+    c(6) = q(ivx) + cx
+    c(7) = q(ivx) + cf
+
+! prepare the right eigenmatrix
+!
+    r(1,idn) = af
+    r(1,ivx) = af * (q(ivx) - cf)
+
+! prepare the left eigenmatrix
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine eigensystem
+#endif /* ADI */
+#ifdef ISO
+  subroutine eigensystem(q, c, r, l, x, y)
+
+    use config   , only : csnd
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz, ibx, iby, ibz
+
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(nqt)    , intent(in)    :: q
+    real, dimension(nqt)    , intent(inout) :: c
+    real, dimension(nqt,nqt), intent(inout) :: l, r
+    real                    , intent(in)    :: x, y
+
+! local variables
+!
+    real :: cs, ca, cx, cf
+!
+!-------------------------------------------------------------------------------
+!
+! calculate characteristic speeds
+!
+    ca = sqrt(sum(q(ibx:ibz)**2) / q(idn))
+    cx = abs(q(ibx)) / sqrt(q(idn))
+
+! prepare eigenvalues
+!
+    c(1) = q(ivx) - cf
+    c(2) = q(ivx) - ca
+    c(3) = q(ivx) - cs
+    c(4) = q(ivx) + cs
+    c(5) = q(ivx) + ca
+    c(6) = q(ivx) + cf
+
+! prepare the right eigenmatrix
+!
+
+! prepare the left eigenmatrix
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine eigensystem
+#endif /* ISO */
+#endif /* MHD */
 #endif /* ROE */
 !
 !===============================================================================

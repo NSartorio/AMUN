@@ -82,7 +82,7 @@ program godunov
 #endif /* MHD */
     write (*,"(4x,a,1x,a)"    ) "equation of state      =",                    &
 #ifdef ADI
-    "adiabalic"
+    "adiabatic"
 #endif /* ADI */
 #ifdef ISO
     "isothermal"
