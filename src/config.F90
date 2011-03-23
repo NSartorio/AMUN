@@ -150,6 +150,7 @@ module config
 
 ! parameters for the monitonicity preserving reconstruction
 !
+  real               , save :: eps   = 1.0d-10
   real               , save :: alpha = 4.0d0
 #endif /* MP */
 
@@ -369,6 +370,8 @@ module config
       read(value,        *) rad
 #endif /* LIMO3 */
 #ifdef MP
+    case("eps")
+      read(value,        *) eps
     case("alpha")
       read(value,        *) alpha
 #endif /* MP */

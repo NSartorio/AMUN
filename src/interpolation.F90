@@ -43,7 +43,7 @@ module interpolation
     use config, only : eps, rad
 #endif /* LIMO3 */
 #ifdef MP
-    use config, only : alpha
+    use config, only : eps, alpha
 #endif /* MP */
 
     implicit none
@@ -72,7 +72,29 @@ module interpolation
     integer            :: im4, ip4
 #endif /* MP9 */
     real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
-    real, dimension(n) :: df2, dm4, dp4
+    real               :: dl, dr, dm1, dc0, dp1, dml, dmr
+
+! parameters
+!
+    real, parameter    :: ac =   4.0d0 / 3.0d0
+#ifdef MP5
+    real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
+                        , a3 =   47.0d0 / 60.0d0, a4 =   27.0d0 / 60.0d0       &
+                        , a5 = -  3.0d0 / 60.0d0
+#endif /* MP5 */
+#ifdef MP7
+    real, parameter    :: a1 = -  3.0d0 / 42.0d1, a2 =   25.0d0 / 42.0d1       &
+                        , a3 = - 10.1d1 / 42.0d1, a4 =   31.9d1 / 42.0d1       &
+                        , a5 =   21.4d1 / 42.0d1, a6 = - 38.0d0 / 42.0d1       &
+                        , a7 =    4.0d0 / 42.0d1
+#endif /* MP7 */
+#ifdef MP9
+    real, parameter    :: a1 =    4.0d0 / 25.2d2, a2 = - 41.0d0 / 25.2d2       &
+                        , a3 =   19.9d1 / 25.2d2, a4 = - 64.1d1 / 25.2d2       &
+                        , a5 =  187.9d1 / 25.2d2, a6 =  137.5d1 / 25.2d2       &
+                        , a7 = - 30.5d1 / 25.2d2, a8 =   55.0d0 / 25.2d2       &
+                        , a9 = -  5.0d0 / 25.2d2
+#endif /* MP9 */
 #endif /* MP */
 !
 !-------------------------------------------------------------------------------
@@ -196,38 +218,6 @@ module interpolation
 #ifdef MP
 !! fifth or higher order monotonicity preserving interpolation
 !!
-
-! calculate the left and right derivatives
-!
-    do i = 1, n - 1
-      dfr(i  ) = f(i+1) - f(i)
-      dfl(i+1) = dfr(i)
-    end do
-    dfl(1) = dfr(1)
-    dfr(n) = dfl(n)
-
-! calculate the cell centered second derivative
-!
-    do i = 1, n
-      df2(i) = dfr(i) - dfl(i)
-    end do
-
-! calculate the smoothness indicator for values at i+1/2
-!
-    do i = 1, n - 1
-      dm4(i) = sign(1.0d0, df2(i)) * min(abs(df2(i)), abs(df2(i+1)),           &
-               abs(4.0d0 * df2(i) - df2(i+1)), abs(4.0d0 * df2(i+1) - df2(i)))
-    end do
-    dm4(n) = dm4(n-1)
-
-! calculate the smoothness indicator for values at i-1/2
-!
-    do i = 2, n
-      dp4(i) = sign(1.0d0, df2(i)) * min(abs(df2(i)), abs(df2(i-1)),           &
-               abs(4.0d0 * df2(i) - df2(i-1)), abs(4.0d0 * df2(i-1) - df2(i)))
-    end do
-    dp4(1) = dp4(2)
-
 ! iterate over all positions
 !
     do i = 1, n
@@ -251,29 +241,35 @@ module interpolation
 ! calculate values at i+1/2
 !
 #ifdef MP5
-      fh = (2.0d0 * f(im2) - 13.0d0 * f(im1) + 47.0d0 * f(i)                   &
-                           + 27.0d0 * f(ip1) -  3.0d0 * f(ip2)) / 60.0d0
+      fh = a1 * f(im2) + a2 * f(im1) + a3 * f(i  ) + a4 * f(ip1) + a5 * f(ip2)
 #endif /* MP5 */
 #ifdef MP7
-      fh = (-3.0d0 * f(im3) +  25.0d0 * f(im2) - 101.0d0 * f(im1)              &
-                            + 319.0d0 * f(i)   + 214.0d0 * f(ip1)              &
-                            -  38.0d0 * f(ip2) +   4.0d0 * f(ip3)) / 420.0d0
+      fh = a1 * f(im3) + a2 * f(im2) + a3 * f(im1) + a4 * f(i  ) + a5 * f(ip1) &
+         + a5 * f(ip2) + a5 * f(ip3)
 #endif /* MP7 */
 #ifdef MP9
-      fh = (  4.0d0 * f(im4) -   41.0d0 * f(im3) +  199.0d0 * f(im2)           &
-          - 641.0d0 * f(im1) + 1879.0d0 * f(i)   + 1375.0d0 * f(ip1)           &
-          - 305.0d0 * f(ip2) +   55.0d0 * f(ip3) -    5.0d0 * f(ip4)) / 2520.0d0
+      fh = a1 * f(im4) + a2 * f(im3) + a3 * f(im2) + a4 * f(im1) + a5 * f(i  ) &
+         + a6 * f(ip1) + a7 * f(ip2) + a8 * f(ip3) + a9 * f(ip4)
 #endif /* MP9 */
 
-      fmp = f(i) + minmod(f(ip1) - f(i), alpha * (f(i) - f(im1)))
+      dl  = f(i  ) - f(im1)
+      dr  = f(ip1) - f(i  )
+      fmp = f(i) + minmod(dr, alpha * dl)
       ds = (fh - f(i)) * (fh - fmp)
-      if (ds .le. 1.0d-10) then
+      if (ds .le. eps) then
         fl(i) = fh
       else
-        ful = f(i) + alpha * (f(i) - f(im1))
+        dm1 = f(i) + f(im2) - 2.0d0 * f(im1)
+        dc0 = dr - dl
+        dp1 = f(i) + f(ip2) - 2.0d0 * f(ip1)
+
+        dml = sign(1.0d0, dm1) * min(abs(4.0d0 * dm1 - dc0), abs(4.0d0 * dc0 - dm1), abs(dm1), abs(dc0))
+        dmr = sign(1.0d0, dc0) * min(abs(4.0d0 * dc0 - dp1), abs(4.0d0 * dp1 - dc0), abs(dc0), abs(dp1))
+
+        ful = f(i) + alpha * dl
         fav = 0.5d0 * (f(i) + f(ip1))
-        fmd = fav - 0.5d0 * dm4(i)
-        flc = f(i) + 0.5d0 * (f(i) - f(im1)) + 4.0d0 / 3.0d0 * dm4(im1)
+        fmd = fav - 0.5d0 * dmr
+        flc = f(i) + 0.5d0 * dl + ac * dml
         fmn = max(min(f(i),f(ip1),fmd), min(f(i),ful,flc))
         fmx = min(max(f(i),f(ip1),fmd), max(f(i),ful,flc))
         fl(i) = median(fh, fmn, fmx)
@@ -282,29 +278,35 @@ module interpolation
 ! calculate values at i-1/2
 !
 #ifdef MP5
-      fh = (2.0d0 * f(ip2) - 13.0d0 * f(ip1) + 47.0d0 * f(i)                   &
-                           + 27.0d0 * f(im1) -  3.0d0 * f(im2)) / 60.0d0
+      fh = a1 * f(ip2) + a2 * f(ip1) + a3 * f(i  ) + a4 * f(im1) + a5 * f(im2)
 #endif /* MP5 */
 #ifdef MP7
-      fh = (-3.0d0 * f(ip3) +  25.0d0 * f(ip2) - 101.0d0 * f(ip1)              &
-                            + 319.0d0 * f(i)   + 214.0d0 * f(im1)              &
-                            -  38.0d0 * f(im2) +   4.0d0 * f(im3)) / 420.0d0
+      fh = a1 * f(ip3) + a2 * f(ip2) + a3 * f(ip1) + a4 * f(i  ) + a5 * f(im1) &
+         + a5 * f(im2) + a5 * f(im3)
 #endif /* MP7 */
 #ifdef MP9
-      fh = (  4.0d0 * f(ip4) -   41.0d0 * f(ip3) +  199.0d0 * f(ip2)           &
-          - 641.0d0 * f(ip1) + 1879.0d0 * f(i)   + 1375.0d0 * f(im1)           &
-          - 305.0d0 * f(im2) +   55.0d0 * f(im3) -    5.0d0 * f(im4)) / 2520.0d0
+      fh = a1 * f(ip4) + a2 * f(ip3) + a3 * f(ip2) + a4 * f(ip1) + a5 * f(i  ) &
+         + a6 * f(im1) + a7 * f(im2) + a8 * f(im3) + a9 * f(im4)
 #endif /* MP9 */
 
-      fmp = f(i) + minmod(f(im1) - f(i), alpha * (f(i) - f(ip1)))
+      dl  = f(i  ) - f(ip1)
+      dr  = f(im1) - f(i  )
+      fmp = f(i) + minmod(dr, alpha * dl)
       ds = (fh - f(i)) * (fh - fmp)
-      if (ds .le. 1.0d-10) then
+      if (ds .le. eps) then
         fr(i) = fh
       else
-        ful = f(i) + alpha * (f(i) - f(ip1))
+        dm1 = f(i) + f(ip2) - 2.0d0 * f(ip1)
+        dc0 = dr - dl
+        dp1 = f(i) + f(im2) - 2.0d0 * f(im1)
+
+        dml = sign(1.0d0, dm1) * min(abs(4.0d0 * dm1 - dc0), abs(4.0d0 * dc0 - dm1), abs(dm1), abs(dc0))
+        dmr = sign(1.0d0, dc0) * min(abs(4.0d0 * dc0 - dp1), abs(4.0d0 * dp1 - dc0), abs(dc0), abs(dp1))
+
+        ful = f(i) + alpha * dl
         fav = 0.5d0 * (f(i) + f(im1))
-        fmd = fav - 0.5d0 * dp4(i)
-        flc = f(i) + 0.5d0 * (f(i) - f(ip1)) + 4.0d0 / 3.0d0 * dp4(ip1)
+        fmd = fav - 0.5d0 * dmr
+        flc = f(i) + 0.5d0 * dl + ac * dml
         fmn = max(min(f(i),f(im1),fmd), min(f(i),ful,flc))
         fmx = min(max(f(i),f(im1),fmd), max(f(i),ful,flc))
         fr(i) = median(fh, fmn, fmx)
