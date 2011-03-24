@@ -12,7 +12,7 @@
 ifeq ($(MPI),Y)
 FC       = mpif90
 else
-FC       = f90
+FC       = gfortran
 endif
 LD       = $(FC)
 
@@ -21,7 +21,7 @@ LD       = $(FC)
 ifeq ($(DEBUG),Y)
 FFLAGS   = -g -O2 -DDEBUG
 else
-FFLAGS   = -O2 -i4
+FFLAGS   = -O2
 endif
 
 LDFLAGS  = $(FFLAGS)
@@ -37,7 +37,7 @@ LDFLAGS += -static
 endif
 
 ifeq ($(PREC),8)
-FFLAGS  += -r${PREC}
+FFLAGS  += -default-real-${PREC} -default-double-${PREC}
 endif
 
 ifeq ($(MPI),Y)
@@ -45,8 +45,8 @@ FFLAGS  += -DMPI
 endif
 
 ifeq ($(OUTPUT),HDF5)
-FFLAGS  += -I${HDF5DIR}/lib
-LIBS    += -L${HDF5DIR}/lib -lhdf5_fortran -lhdf5 -lz
+FFLAGS  += -I/usr/include
+LIBS    += -lhdf5_fortran -lhdf5 -lz
 endif
 #
 #-------------------------------------------------------------------------------
