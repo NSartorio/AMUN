@@ -47,9 +47,6 @@ endif
 ifeq ($(OUTPUT),HDF5)
 FFLAGS  += -I${HDF5DIR}/lib
 LIBS    += -L${HDF5DIR}/lib -lhdf5_fortran -lhdf5 -lz
-else
-FFLAGS  += -I${HDF4DIR}/include
-LIBS    += -L${HDF4DIR}/lib -lmfhdf -ldf -ljpeg -lz
 endif
 #
 #-------------------------------------------------------------------------------
