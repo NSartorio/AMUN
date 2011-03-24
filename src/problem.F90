@@ -88,6 +88,8 @@ module problem
       call init_multi_current_sheet(pb)
     case("turbulence")
       call init_turbulence(pb)
+    case("orszag_tang")
+      call init_orszag_tang(pb)
     end select
 
     nullify(pb)
@@ -1236,6 +1238,119 @@ module problem
 !-------------------------------------------------------------------------------
 !
   end subroutine init_turbulence
+!
+!===============================================================================
+!
+! init_orszag_tang: subroutine initializes the setup for Orszag-Tang problems
+!
+!===============================================================================
+!
+  subroutine init_orszag_tang(pblock)
+
+    use constants, only : dpi, qpi
+    use blocks   , only : block_data
+    use config   , only : im, jm, km, in, jn, kn, ng
+    use config   , only : dens, bamp
+#ifdef ADI
+    use config   , only : gamma, pres
+#endif /* ADI */
+#ifdef ISO
+    use config   , only : csnd
+#endif /* ISO */
+    use scheme   , only : prim2cons
+    use variables, only : nvr, nqt
+    use variables, only : idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables, only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pblock
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: dx, dy
+
+! local arrays
+!
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(nvr,im) :: q
+    real, dimension(nqt,im) :: u
+!
+!-------------------------------------------------------------------------------
+!
+! calculate constants
+!
+#ifdef ADI
+    bamp = 1.0d0 / sqrt(qpi)
+    pres = gamma / qpi
+    dens = gamma**2 / qpi
+#endif /* ADI */
+#ifdef ISO
+    bamp = csnd * (5.0d0 / 3.0d0) / qpi
+#endif /* ISO */
+
+! calculate the cell sizes
+!
+    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
+    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+
+! generate the coordinates
+!
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pblock%meta%ymin
+
+! set variables
+!
+    q(idn,:) = dens
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
+#ifdef MHD
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+
+! set the initial profiles
+!
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+          q(ivx,i) = - sin(dpi * y(j))
+          q(ivy,i) =   sin(dpi * x(i))
+          q(ivz,i) = 0.0d0
+#ifdef MHD
+          q(ibx,i) = - bamp * sin(dpi * y(j))
+          q(iby,i) =   bamp * sin(qpi * x(i))
+          q(ibz,i) = 0.0d0
+#endif /* MHD */
+        end do
+
+! convert primitive variables to conserved
+!
+        call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_orszag_tang
 #ifdef SHAPE
 !
 !===============================================================================
