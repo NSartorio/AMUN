@@ -263,8 +263,8 @@ module interpolation
         dc0 = dr - dl
         dp1 = f(i) + f(ip2) - 2.0d0 * f(ip1)
 
-        dml = sign(1.0d0, dm1) * min(abs(4.0d0 * dm1 - dc0), abs(4.0d0 * dc0 - dm1), abs(dm1), abs(dc0))
-        dmr = sign(1.0d0, dc0) * min(abs(4.0d0 * dc0 - dp1), abs(4.0d0 * dp1 - dc0), abs(dc0), abs(dp1))
+        dml = minmod4(4.0d0 * dm1 - dc0, 4.0d0 * dc0 - dm1, dm1, dc0)
+        dmr = minmod4(4.0d0 * dc0 - dp1, 4.0d0 * dp1 - dc0, dc0, dp1)
 
         ful = f(i) + alpha * dl
         fav = 0.5d0 * (f(i) + f(ip1))
@@ -300,8 +300,8 @@ module interpolation
         dc0 = dr - dl
         dp1 = f(i) + f(im2) - 2.0d0 * f(im1)
 
-        dml = sign(1.0d0, dm1) * min(abs(4.0d0 * dm1 - dc0), abs(4.0d0 * dc0 - dm1), abs(dm1), abs(dc0))
-        dmr = sign(1.0d0, dc0) * min(abs(4.0d0 * dc0 - dp1), abs(4.0d0 * dp1 - dc0), abs(dc0), abs(dp1))
+        dml = minmod4(4.0d0 * dm1 - dc0, 4.0d0 * dc0 - dm1, dm1, dc0)
+        dmr = minmod4(4.0d0 * dc0 - dp1, 4.0d0 * dp1 - dc0, dc0, dp1)
 
         ful = f(i) + alpha * dl
         fav = 0.5d0 * (f(i) + f(im1))
@@ -344,6 +344,34 @@ module interpolation
     minmod = (sign(0.5d0, a) + sign(0.5d0, b)) * min(abs(a), abs(b))
     return
   end function minmod
+!
+!===============================================================================
+!
+! minmod4: function returns the minimum module value among four arguments
+!
+!===============================================================================
+!
+  real function minmod4(a, b, c, d)
+
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: a, b, c, d
+
+! local variables
+!
+    real :: sb, sc, sd, s
+!
+!-------------------------------------------------------------------------------
+!
+    sb      = sign(1.0d0, a) + sign(1.0d0, b)
+    sc      = sign(1.0d0, a) + sign(1.0d0, c)
+    sd      = sign(1.0d0, a) + sign(1.0d0, d)
+    s       = 0.125d0 * sb * abs(sc * sd)
+    minmod4 = s * min(abs(a), abs(b), abs(c), abs(d))
+    return
+  end function minmod4
 !
 !===============================================================================
 !
