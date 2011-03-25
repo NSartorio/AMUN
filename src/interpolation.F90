@@ -59,9 +59,12 @@ module interpolation
 !
     integer            :: i
     real               :: df, ds
+#ifdef TVD
     real, dimension(n) :: dfl, dfr
+#endif /* TVD */
 #ifdef LIMO3
-    real               :: rdx, th, et, f0, f1, f2, ft
+    integer            :: im1, ip1
+    real               :: rdx, rdx2, dfr, dfl, th, et, f0, f1, f2, ft, xi
 #endif /* LIMO3 */
 #ifdef MP
     integer            :: im2, im1, ip1, ip2
@@ -144,75 +147,69 @@ module interpolation
 !!
 ! prepare parameters
 !
-    rdx = rad * h
-    rdx = rdx * rdx
+    rdx  = rad * h
+    rdx2 = rdx * rdx
 
-! calculate the left and right derivatives
+    do i = 1, n
+
+! prepare indices
 !
-    do i = 1, n - 1
-      dfr(i  ) = f(i+1) - f(i)
-      dfl(i+1) = dfr(i)
-    end do
-    dfl(1) = dfr(1)
-    dfr(n) = dfl(n)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+! prepare differences
+!
+      dfr = f(ip1) - f(i  )
+      dfl = f(i  ) - f(im1)
+
+      et = (dfl * dfl + dfr * dfr) / rdx2
+      xi = max(0.0d0, min(1.0d0, 0.5d0 + 0.5d0 * (et - 1.0d0) / eps))
 
 ! calculate values at i+1/2
 !
-    do i = 1, n
-      if (dfr(i) .eq. 0.0d0) then
-        fl(i) = f(i)
+      if (dfr .ne. 0.0d0) then
+        th = dfl / dfr
       else
-        th = dfl(i) / dfr(i)
-
-        et = (dfl(i) * dfl(i) + dfr(i) * dfr(i)) / rdx
-
-        f1 = (2.0d0 + th) / 3.0d0
-
-        if (et .le. (1.0d0 - eps)) then
-          f0 = f1
-        else if (et .ge. (1.0d0 + eps)) then
-          f0 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
-        else
-          ft = (et - 1.0d0) / eps
-          f2 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
-          f0 = 0.5d0 * ((1.0d0 - ft) * f1 + (1.0d0 + ft) * f2)
-        end if
-
-        fl(i) = f(i) + 0.5d0 * dfr(i) * f0
+        th = dfl / eps
       end if
-    end do
+
+      f1 = (2.0d0 + th) / 3.0d0
+
+      if (th .ge. 0.0d0) then
+        f2 = max(0.0d0, min(f1, 2.0d0 * th, 1.6d0))
+      else
+        f2 = max(0.0d0, min(f1, - 0.5d0 * th))
+      end if
+
+      f0 = f1 + xi * (f2 - f1)
+
+      fl(i) = f(i) + 0.5d0 * dfr * f0
 
 ! calculate values at i-1/2
 !
-    do i = 1, n
-      if (dfl(i) .eq. 0.0d0) then
-        fr(i) = f(i)
+      if (dfl .ne. 0.0d0) then
+        th = dfr / dfl
       else
-        th = dfr(i) / dfl(i)
-
-        et = (dfl(i) * dfl(i) + dfr(i) * dfr(i)) / rdx
-
-        f1 = (2.0d0 + th) / 3.0d0
-
-        if (et .le. (1.0d0 - eps)) then
-          f0 = f1
-        else if (et .ge. (1.0d0 + eps)) then
-          f0 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
-        else
-          ft = (et - 1.0d0) / eps
-          f2 = max(0.0d0, min(f1, max(-0.5d0 * th, min(2.0d0 * th, f1, 1.6d0))))
-          f0 = 0.5d0 * ((1.0d0 - ft) * f1 + (1.0d0 + ft) * f2)
-        end if
-
-        fr(i) = f(i) - 0.5d0 * dfl(i) * f0
+        th = dfr / eps
       end if
+
+      f1 = (2.0d0 + th) / 3.0d0
+
+      if (th .ge. 0.0d0) then
+        f2 = max(0.0d0, min(f1, 2.0d0 * th, 1.6d0))
+      else
+        f2 = max(0.0d0, min(f1, - 0.5d0 * th))
+      end if
+
+      f0 = f1 + xi * (f2 - f1)
+
+      fr(im1) = f(i) - 0.5d0 * dfl * f0
+
     end do
 
-! shift i-1/2 to the left
+! update boundaries
 !
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
+    fl(1) = f(1)
     fr(n) = f(n)
 #endif /* LIMO3 */
 #ifdef MP
