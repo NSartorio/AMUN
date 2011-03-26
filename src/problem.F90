@@ -1468,8 +1468,8 @@ module problem
   function check_ref(pblock)
 
     use blocks   , only : block_data
-    use config   , only : im, jm, km, ibl, ieu, jbl, jeu, kbl, keu             &
-                        , crefmin, crefmax
+    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke                   &
+                        , crefmin, crefmax, epsref
     use scheme   , only : cons2prim
     use variables, only : nvr, nqt
     use variables, only : idn
@@ -1490,18 +1490,8 @@ module problem
 
 ! local variables
 !
-    integer :: i, j, k
-    real    :: dpmax
-    real    :: dnl, dnr, ddndx, ddndy, ddndz, ddn
-#ifdef ADI
-    real    :: prl, prr, dprdx, dprdy, dprdz, dpr
-#endif /* ADI */
-#ifdef MHD
-    real    :: bxl, bxr, dbxdx, dbxdy, dbxdz, dbx
-    real    :: byl, byr, dbydx, dbydy, dbydz, dby
-    real    :: bzl, bzr, dbzdx, dbzdy, dbzdz, dbz
-    real    :: bbl, bbr
-#endif /* MHD */
+    integer :: i, j, k, im2, jm2, km2, ip2, jp2, kp2
+    real    :: cref, fl, fr, fc, fx, fy, fz
 
 ! local arrays
 !
@@ -1511,8 +1501,9 @@ module problem
     real, dimension(im,jm,km) :: pr
 #endif /* ADI */
 #ifdef MHD
-    real, dimension(im,jm,km) :: bx, by, bz, bb
+    real, dimension(im,jm,km) :: bx, by, bz
 #endif /* MHD */
+    real, parameter           :: cf  = 1.0d0 / NDIMS
 !
 !-------------------------------------------------------------------------------
 !
@@ -1532,169 +1523,137 @@ module problem
         bx(1:im,j,k) = pblock%u(ibx,1:im,j,k)
         by(1:im,j,k) = pblock%u(iby,1:im,j,k)
         bz(1:im,j,k) = pblock%u(ibz,1:im,j,k)
-#if NDIMS == 2
-        bb(1:im,j,k) = sqrt(bx(1:im,j,k)**2 + by(1:im,j,k)**2)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        bb(1:im,j,k) = sqrt(bx(1:im,j,k)**2 + by(1:im,j,k)**2 + bz(1:im,j,k)**2)
-#endif /* NDIMS == 3 */
 #endif /* MHD */
       end do
     end do
 
 ! reset indicators
 !
-    dpmax = 0.0d0
-    ddn   = 0.0d0
-#ifdef ADI
-    dpr   = 0.0d0
-#endif /* ADI */
-#ifdef MHD
-    dbx   = 0.0d0
-    dby   = 0.0d0
-    dbz   = 0.0d0
-#endif /* MHD */
+    cref = 0.0d0
 
-! check gradients of selected variables
+! find the maximum smoothness indicator over all cells
 !
-    do k = kbl, keu
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do k = kb, ke
+#if NDIMS == 3
+      km2 = k - 2
+      kp2 = k + 2
+#endif /* NDIMS == 3 */
+      do j = jb, je
+        jm2 = j - 2
+        jp2 = j + 2
+        do i = ib, ie
+          im2 = i - 2
+          ip2 = i + 2
 
 ! density
 !
-          dnl = dn(i-1,j,k)
-          dnr = dn(i+1,j,k)
-          ddndx = abs(dnr - dnl) / (dnr + dnl)
-          dnl = dn(i,j-1,k)
-          dnr = dn(i,j+1,k)
-          ddndy = abs(dnr - dnl) / (dnr + dnl)
+          fr   = dn(ip2,j,k) - dn(i,j,k)
+          fl   = dn(im2,j,k) - dn(i,j,k)
+          fc   = dn(ip2,j,k) + dn(im2,j,k) + 2.0d0 * dn(i,j,k)
+          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+          fr   = dn(i,jp2,k) - dn(i,j,k)
+          fl   = dn(i,jm2,k) - dn(i,j,k)
+          fc   = dn(i,jp2,k) + dn(i,jm2,k) + 2.0d0 * dn(i,j,k)
+          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-
-          ddn = sqrt(ddndx**2 + ddndy**2)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          dnl = dn(i,j,k-1)
-          dnr = dn(i,j,k+1)
-          ddndz = abs(dnr - dnl) / (dnr + dnl)
-
-          ddn = sqrt(ddndx**2 + ddndy**2 + ddndz**2)
+          fr   = dn(i,j,kp2) - dn(i,j,k)
+          fl   = dn(i,j,km2) - dn(i,j,k)
+          fc   = dn(i,j,kp2) + dn(i,j,km2) + 2.0d0 * dn(i,j,k)
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
-
-! update the indicator
-!
-          dpmax = max(dpmax, ddn)
 
 #ifdef ADI
 ! pressure
 !
-          prl = pr(i-1,j,k)
-          prr = pr(i+1,j,k)
-          dprdx = abs(prr - prl) / (prr + prl)
-          prl = pr(i,j-1,k)
-          prr = pr(i,j+1,k)
-          dprdy = abs(prr - prl) / (prr + prl)
+          fr   = pr(ip2,j,k) - pr(i,j,k)
+          fl   = pr(im2,j,k) - pr(i,j,k)
+          fc   = pr(ip2,j,k) + pr(im2,j,k) + 2.0d0 * pr(i,j,k)
+          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+          fr   = pr(i,jp2,k) - pr(i,j,k)
+          fl   = pr(i,jm2,k) - pr(i,j,k)
+          fc   = pr(i,jp2,k) + pr(i,jm2,k) + 2.0d0 * pr(i,j,k)
+          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-
-          dpr = sqrt(dprdx**2 + dprdy**2)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          prl = pr(i,j,k-1)
-          prr = pr(i,j,k+1)
-          dprdz = abs(prr - prl) / (prr + prl)
-
-          dpr = sqrt(dprdx**2 + dprdy**2 + dprdz**2)
+          fr   = pr(i,j,kp2) - pr(i,j,k)
+          fl   = pr(i,j,km2) - pr(i,j,k)
+          fc   = pr(i,j,kp2) + pr(i,j,km2) + 2.0d0 * pr(i,j,k)
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
-! update the indicator
-!
-          dpmax = max(dpmax, dpr)
 #endif /* ADI */
-
 #ifdef MHD
 ! X magnetic component
 !
-          bxl = bx(i-1,j,k)
-          bxr = bx(i+1,j,k)
-          bbl = bb(i-1,j,k)
-          bbr = bb(i+1,j,k)
-          dbxdx = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
-          bxl = bx(i,j-1,k)
-          bxr = bx(i,j+1,k)
-          bbl = bb(i,j-1,k)
-          bbr = bb(i,j+1,k)
-          dbxdy = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
+          fr   = bx(ip2,j,k) - bx(i,j,k)
+          fl   = bx(im2,j,k) - bx(i,j,k)
+          fc   = abs(bx(ip2,j,k)) + abs(bx(im2,j,k)) + 2.0d0 * abs(bx(i,j,k))
+          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
+          fr   = bx(i,jp2,k) - bx(i,j,k)
+          fl   = bx(i,jm2,k) - bx(i,j,k)
+          fc   = abs(bx(i,jp2,k)) + abs(bx(i,jm2,k)) + 2.0d0 * abs(bx(i,j,k))
+          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
 #if NDIMS == 2
-
-          dbx = sqrt(dbxdx**2 + dbxdy**2)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          bxl = bx(i,j,k-1)
-          bxr = bx(i,j,k+1)
-          bbl = bb(i,j,k-1)
-          bbr = bb(i,j,k+1)
-          dbxdz = abs(bxr - bxl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
-
-          dbx = sqrt(dbxdx**2 + dbxdy**2 + dbxdz**2)
+          fr   = bx(i,j,kp2) - bx(i,j,k)
+          fl   = bx(i,j,km2) - bx(i,j,k)
+          fc   = abs(bx(i,j,kp2)) + abs(bx(i,j,km2)) + 2.0d0 * abs(bx(i,j,k))
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
 ! Y magnetic component
 !
-          byl = by(i-1,j,k)
-          byr = by(i+1,j,k)
-          bbl = bb(i-1,j,k)
-          bbr = bb(i+1,j,k)
-          dbydx = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
-          byl = by(i,j-1,k)
-          byr = by(i,j+1,k)
-          bbl = bb(i,j-1,k)
-          bbr = bb(i,j+1,k)
-          dbydy = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
+          fr   = by(ip2,j,k) - by(i,j,k)
+          fl   = by(im2,j,k) - by(i,j,k)
+          fc   = abs(by(ip2,j,k)) + abs(by(im2,j,k)) + 2.0d0 * abs(by(i,j,k))
+          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
+          fr   = by(i,jp2,k) - by(i,j,k)
+          fl   = by(i,jm2,k) - by(i,j,k)
+          fc   = abs(by(i,jp2,k)) + abs(by(i,jm2,k)) + 2.0d0 * abs(by(i,j,k))
+          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
 #if NDIMS == 2
-
-          dby = sqrt(dbydx**2 + dbydy**2)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          byl = by(i,j,k-1)
-          byr = by(i,j,k+1)
-          bbl = bb(i,j,k-1)
-          bbr = bb(i,j,k+1)
-          dbydz = abs(byr - byl) / max(1.0d-16, 0.5d0 * (bbr + bbl))
-
-          dby = sqrt(dbydx**2 + dbydy**2 + dbydz**2)
+          fr   = by(i,j,kp2) - by(i,j,k)
+          fl   = by(i,j,km2) - by(i,j,k)
+          fc   = abs(by(i,j,kp2)) + abs(by(i,j,km2)) + 2.0d0 * abs(by(i,j,k))
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
 ! Z magnetic component
 !
-          bzl = bz(i-1,j,k)
-          bzr = bz(i+1,j,k)
-          bbl = bb(i-1,j,k)
-          bbr = bb(i+1,j,k)
-          dbzdx = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
-          bzl = bz(i,j-1,k)
-          bzr = bz(i,j+1,k)
-          bbl = bb(i,j-1,k)
-          bbr = bb(i,j+1,k)
-          dbzdy = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
+          fr   = bz(ip2,j,k) - bz(i,j,k)
+          fl   = bz(im2,j,k) - bz(i,j,k)
+          fc   = abs(bz(ip2,j,k)) + abs(bz(im2,j,k)) + 2.0d0 * abs(bz(i,j,k))
+          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
+          fr   = bz(i,jp2,k) - bz(i,j,k)
+          fl   = bz(i,jm2,k) - bz(i,j,k)
+          fc   = abs(bz(i,jp2,k)) + abs(bz(i,jm2,k)) + 2.0d0 * abs(bz(i,j,k))
+          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
 #if NDIMS == 2
-
-          dbz = sqrt(dbzdx**2 + dbzdy**2)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          bzl = bz(i,j,k-1)
-          bzr = bz(i,j,k+1)
-          bbl = bb(i,j,k-1)
-          bbr = bb(i,j,k+1)
-          dbzdz = abs(bzr - bzl) /  max(1.0d-16, 0.5d0 * (bbr + bbl))
-
-          dbz = sqrt(dbzdx**2 + dbzdy**2 + dbzdz**2)
+          fr   = bz(i,j,kp2) - bz(i,j,k)
+          fl   = bz(i,j,km2) - bz(i,j,k)
+          fc   = abs(bz(i,j,kp2)) + abs(bz(i,j,km2)) + 2.0d0 * abs(bz(i,j,k))
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
-! update the indicator
-!
-          dpmax = max(dpmax, dbx, dby, dbz)
 #endif /* MHD */
-
         end do
       end do
     end do
@@ -1703,10 +1662,10 @@ module problem
 !
     check_ref = 0
 
-    if (dpmax .ge. crefmax) then
+    if (cref .ge. crefmax) then
       check_ref =  1
     end if
-    if (dpmax .le. crefmin) then
+    if (cref .le. crefmin) then
       check_ref = -1
     end if
 

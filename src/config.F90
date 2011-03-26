@@ -50,8 +50,9 @@ module config
 ! mesh refinement control
 !
   integer(kind=4), save :: maxlev  = 2
-  real           , save :: crefmin = 0.1
-  real           , save :: crefmax = 0.2
+  real           , save :: crefmin = 0.2
+  real           , save :: crefmax = 0.5
+  real           , save :: epsref  = 0.01
 
 ! the maximum number of iterations
 !
@@ -310,6 +311,8 @@ module config
       read(value,        *) crefmin
     case("crefmax")
       read(value,        *) crefmax
+    case("epsref")
+      read(value,        *) epsref
     case ('problem')
       l = len_trim(value)
       write(problem  , "(a)") value(2:l-1)
