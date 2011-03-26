@@ -1793,10 +1793,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -1813,9 +1820,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1827,7 +1834,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -1861,7 +1868,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -1889,15 +1902,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
@@ -1990,10 +2003,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -2010,9 +2030,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2024,7 +2044,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -2058,7 +2078,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -2086,15 +2112,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
@@ -2312,10 +2338,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -2332,9 +2365,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2346,7 +2379,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -2380,7 +2413,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -2408,15 +2447,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
@@ -2509,10 +2548,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -2529,9 +2575,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2543,7 +2589,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -2577,7 +2623,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -2605,15 +2657,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
@@ -2706,10 +2758,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -2726,9 +2785,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2740,7 +2799,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -2774,7 +2833,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -2802,15 +2867,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
@@ -2903,10 +2968,17 @@ module io
     use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
     use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
                     , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef DEFLATE
+#ifdef COMPRESS
     use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pset_deflate_f, h5pclose_f
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
 #endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
 ! declare variables
 !
@@ -2923,9 +2995,9 @@ module io
 !
     integer(hid_t) :: sid, pid, did
     integer        :: err
-#ifdef DEFLATE
+#ifdef COMPRESS
     logical        :: compress = .false.
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2937,7 +3009,7 @@ module io
 !
     if (err .ge. 0) then
 
-#ifdef DEFLATE
+#ifdef COMPRESS
 ! prepare compression
 !
       call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
@@ -2971,7 +3043,13 @@ module io
 
 ! set the compression algorithm
 !
+#ifdef DEFLATE
         call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+        if (product(dm) .ge. 32)                                               &
+          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
@@ -2999,15 +3077,15 @@ module io
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
 
       else
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! create the dataset
 !
         call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
 
-#ifdef DEFLATE
+#ifdef COMPRESS
       end if
-#endif /* DEFLATE */
+#endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !

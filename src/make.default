@@ -24,9 +24,14 @@ OMP          = N
 #
 PREC         = 4
 
-# output data format: HDF5
+# output data format
+#
+#   OUTPUT     - the format of output data; so far only HDF5
+#   COMPRESS   - the compression algorithm of the output data; DEFLATE or SZIP
+#                in the case of HDF5 or NONE for uncompressed data
 #
 OUTPUT       = HDF5
+COMPRESS     = NONE
 
 #-------------------------------------------------------------------------------
 #

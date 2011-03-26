@@ -88,8 +88,8 @@ FFLAGS  += -D${OUTPUT}
 
 # compression
 #
-ifeq ($(COMPRESS),Y)
-FFLAGS  += -DDEFLATE
+ifneq ($(COMPRESS),NONE)
+FFLAGS  += -DCOMPRESS -D${COMPRESS}
 endif
 
 # precision
