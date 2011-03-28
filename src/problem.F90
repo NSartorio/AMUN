@@ -1607,7 +1607,7 @@ module problem
           fr   = bx(i,j,kp2) - bx(i,j,k)
           fl   = bx(i,j,km2) - bx(i,j,k)
           fc   = abs(bx(i,j,kp2)) + abs(bx(i,j,km2)) + 2.0d0 * abs(bx(i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
           cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
@@ -1628,7 +1628,7 @@ module problem
           fr   = by(i,j,kp2) - by(i,j,k)
           fl   = by(i,j,km2) - by(i,j,k)
           fc   = abs(by(i,j,kp2)) + abs(by(i,j,km2)) + 2.0d0 * abs(by(i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
           cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
@@ -1649,7 +1649,7 @@ module problem
           fr   = bz(i,j,kp2) - bz(i,j,k)
           fl   = bz(i,j,km2) - bz(i,j,k)
           fc   = abs(bz(i,j,kp2)) + abs(bz(i,j,km2)) + 2.0d0 * abs(bz(i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8)
+          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
           cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
