@@ -330,7 +330,10 @@ module scheme
 #endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
-    use variables    , only : ivx
+    use variables    , only : ivx, ivy, ivz
+#ifdef ADI
+    use variables    , only : ien
+#endif /* ADI */
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
@@ -349,23 +352,28 @@ module scheme
 
 ! local variables
 !
-    integer                :: p, i, nm1
+    integer                :: p, i, ip1
     real, dimension(nvr,n) :: q, ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real                   :: al, ar, ap, div
 #ifdef VISCOSITY
-    real                   :: dvx, dvy, dvz
+    real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
 #if defined MHD && defined RESISTIVITY
-    real                   :: dbx, dby, dbz
+    real                   :: dbx, dby, dbz, ueh
 #endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
 ! usefull parameters
 !
-    nm1 = n - 1
+#ifdef VISCOSITY
+    vih = visc / h
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    ueh = ueta / h
+#endif /* RESISTIVITY */
 
 ! calculate the primitive variables
 !
@@ -437,36 +445,49 @@ module scheme
 ! add viscous term to the left and right fluxes
 !
     do i = 1, n - 1
-      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      ip1 = i + 1
+
+      dvx = vih * (q(ivx,ip1) - q(ivx,i))
       fn(ivx,i  ) = fn(ivx,i  ) - dvx
 
-      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      dvy = vih * (q(ivy,ip1) - q(ivy,i))
       fn(ivy,i  ) = fn(ivy,i  ) - dvy
 
-      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
+#endif /* ADI */
     end do
 
 #endif /* VISCOSITY */
 #if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
-    do i = 1, nm1
-      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
-      fn(iby,i  ) = fn(iby,i  ) - dby
+    do i = 1, n - 1
+      ip1 = i + 1
 
-      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
-      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
+      fn(ibx,i) = fn(ibx,i) - dbx
+
+      dby = ueh * (q(iby,ip1) - q(iby,i))
+      fn(iby,i) = fn(iby,i) - dby
+
+      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
+      fn(ibz,i) = fn(ibz,i) - dbz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
+#endif /* ADI */
     end do
-#endif /* MHD & RESISTIVITY */
 
+#endif /* MHD & RESISTIVITY */
 ! calculate numerical flux
 !
-    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:nm1)
+    f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
 #ifdef MHD
 #ifdef GLM
-    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:nm1)
-    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:nm1)
+    f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+    f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -503,7 +524,7 @@ module scheme
 
 ! local variables
 !
-    integer                :: p, i
+    integer                :: p, i, ip1
     real, dimension(nvr,n) :: ql, qr, q, ul, ur
     real, dimension(nfl,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr, cm
@@ -511,11 +532,17 @@ module scheme
                             , smvl, smvr, div, pt
     real, dimension(nvr)   :: q1l, q1r, u1l, u1r
 #ifdef VISCOSITY
-    real                   :: dvx, dvy, dvz
+    real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef VISCOSITY
+! usefull parameters
+!
+    vih = visc / h
+
+#endif /* VISCOSITY */
 ! obtain the primitive variables
 !
     call cons2prim(n, u(:,:), q(:,:))
@@ -676,14 +703,19 @@ module scheme
 ! add viscous term to the left and right fluxes
 !
     do i = 1, n - 1
-      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      ip1 = i + 1
+
+      dvx = vih * (q(ivx,ip1) - q(ivx,i))
       fn(ivx,i  ) = fn(ivx,i  ) - dvx
 
-      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      dvy = vih * (q(ivy,ip1) - q(ivy,i))
       fn(ivy,i  ) = fn(ivy,i  ) - dvy
 
-      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
+#endif /* ADI */
     end do
 
 #endif /* VISCOSITY */
@@ -733,7 +765,7 @@ module scheme
 
 ! local variables
 !
-    integer                :: p, i
+    integer                :: p, i, ip1
     real, dimension(nvr,n) :: q, ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
@@ -741,14 +773,23 @@ module scheme
     real                   :: sl, sr, srl, srml, sm, sml, smr
     real                   :: dnm, mxm, sqd, div, fac, bxs
 #ifdef VISCOSITY
-    real                   :: dvx, dvy, dvz
+    real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
 #if defined MHD && defined RESISTIVITY
-    real                   :: dbx, dby, dbz
+    real                   :: dbx, dby, dbz, ueh
 #endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
+! usefull parameters
+!
+#ifdef VISCOSITY
+    vih = visc / h
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    ueh = ueta / h
+#endif /* RESISTIVITY */
+
 ! calculate the primitive variables
 !
     call cons2prim(n, u, q)
@@ -946,13 +987,15 @@ module scheme
 ! add viscous term to the left and right fluxes
 !
     do i = 1, n - 1
-      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      ip1 = i + 1
+
+      dvx = vih * (q(ivx,ip1) - q(ivx,i))
       fn(ivx,i  ) = fn(ivx,i  ) - dvx
 
-      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      dvy = vih * (q(ivy,ip1) - q(ivy,i))
       fn(ivy,i  ) = fn(ivy,i  ) - dvy
 
-      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
     end do
 
@@ -961,14 +1004,19 @@ module scheme
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
-      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
-      fn(iby,i  ) = fn(iby,i  ) - dby
+      ip1 = i + 1
 
-      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
-      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
+      fn(ibx,i) = fn(ibx,i) - dbx
+
+      dby = ueh * (q(iby,ip1) - q(iby,i))
+      fn(iby,i) = fn(iby,i) - dby
+
+      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
+      fn(ibz,i) = fn(ibz,i) - dbz
     end do
-#endif /* MHD & RESISTIVITY */
 
+#endif /* MHD & RESISTIVITY */
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
@@ -1018,7 +1066,7 @@ module scheme
 
 ! local variables
 !
-    integer                :: p, i
+    integer                :: p, i, ip1
     real, dimension(nvr,n) :: q, ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
@@ -1027,14 +1075,23 @@ module scheme
                             , sml, smr
     real                   :: ptl, ptr, pt, bx2, div, fac, bxs, dlsq, drsq
 #ifdef VISCOSITY
-    real                   :: dvx, dvy, dvz
+    real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
 #if defined MHD && defined RESISTIVITY
-    real                   :: dbx, dby, dbz
+    real                   :: dbx, dby, dbz, ueh
 #endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
+! usefull parameters
+!
+#ifdef VISCOSITY
+    vih = visc / h
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    ueh = ueta / h
+#endif /* RESISTIVITY */
+
 ! calculate the primitive variables
 !
     call cons2prim(n, u, q)
@@ -1326,14 +1383,19 @@ module scheme
 ! add viscous term to the left and right fluxes
 !
     do i = 1, n - 1
-      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      ip1 = i + 1
+
+      dvx = vih * (q(ivx,ip1) - q(ivx,i))
       fn(ivx,i  ) = fn(ivx,i  ) - dvx
 
-      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      dvy = vih * (q(ivy,ip1) - q(ivy,i))
       fn(ivy,i  ) = fn(ivy,i  ) - dvy
 
-      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
+#endif /* ADI */
     end do
 
 #endif /* VISCOSITY */
@@ -1341,14 +1403,22 @@ module scheme
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
-      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
-      fn(iby,i  ) = fn(iby,i  ) - dby
+      ip1 = i + 1
 
-      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
-      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
+      fn(ibx,i) = fn(ibx,i) - dbx
+
+      dby = ueh * (q(iby,ip1) - q(iby,i))
+      fn(iby,i) = fn(iby,i) - dby
+
+      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
+      fn(ibz,i) = fn(ibz,i) - dbz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
+#endif /* ADI */
     end do
-#endif /* MHD & RESISTIVITY */
 
+#endif /* MHD & RESISTIVITY */
 ! calculate the numerical flux derivative
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
@@ -1408,7 +1478,7 @@ module scheme
 
 ! local variables
 !
-    integer                  :: p, i
+    integer                  :: p, i, ip1
     real, dimension(nvr,n)   :: q, ql, qr, ul, ur
     real, dimension(nqt,n)   :: fl, fr, fn
     real, dimension(n)       :: cl, cr
@@ -1420,14 +1490,23 @@ module scheme
     real                     :: pbl, pbr, xfc, yfc
 #endif /* MHD */
 #ifdef VISCOSITY
-    real                     :: dvx, dvy, dvz
+    real                     :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
 #if defined MHD && defined RESISTIVITY
-    real                     :: dbx, dby, dbz
+    real                     :: dbx, dby, dbz, ueh
 #endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
+! usefull parameters
+!
+#ifdef VISCOSITY
+    vih = visc / h
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    ueh = ueta / h
+#endif /* RESISTIVITY */
+
 ! reset eigensystem values
 !
     ci(:)   = 0.0d0
@@ -1581,14 +1660,19 @@ module scheme
 ! add viscous term to the left and right fluxes
 !
     do i = 1, n - 1
-      dvx = visc * (q(ivx,i+1) - q(ivx,i)) / h
+      ip1 = i + 1
+
+      dvx = vih * (q(ivx,ip1) - q(ivx,i))
       fn(ivx,i  ) = fn(ivx,i  ) - dvx
 
-      dvy = visc * (q(ivy,i+1) - q(ivy,i)) / h
+      dvy = vih * (q(ivy,ip1) - q(ivy,i))
       fn(ivy,i  ) = fn(ivy,i  ) - dvy
 
-      dvz = visc * (q(ivz,i+1) - q(ivz,i)) / h
+      dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
+#endif /* ADI */
     end do
 
 #endif /* VISCOSITY */
@@ -1596,11 +1680,19 @@ module scheme
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
-      dby = ueta * (q(iby,i+1) - q(iby,i)) / h
-      fn(iby,i  ) = fn(iby,i  ) - dby
+      ip1 = i + 1
 
-      dbz = ueta * (q(ibz,i+1) - q(ibz,i)) / h
-      fn(ibz,i  ) = fn(ibz,i  ) - dbz
+      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
+      fn(ibx,i) = fn(ibx,i) - dbx
+
+      dby = ueh * (q(iby,ip1) - q(iby,i))
+      fn(iby,i) = fn(iby,i) - dby
+
+      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
+      fn(ibz,i) = fn(ibz,i) - dbz
+#ifdef ADI
+      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
+#endif /* ADI */
     end do
 
 #endif /* MHD & RESISTIVITY */
