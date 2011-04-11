@@ -68,6 +68,41 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_data
+!
+!===============================================================================
+!
+! restart_job: wrapper subroutine for the job restart from a data file
+!
+! info: subroutine selects the restoring subroutine from supported output
+!       formats depending on the compilation time options, e.g. at this moment
+!       only the HDF5 format is supported;
+!
+! arguments:
+!   nfile - integer variable counting the number of file for a given snapshots;
+!   nproc - integer variable specifying the current processor number; the output
+!           is divided into seperate files, one file per processor;
+!
+!===============================================================================
+!
+  subroutine restart_job(nfile, nproc)
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer  , intent(in) :: nfile, nproc
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef HDF5
+    call read_data_h5(nfile, nproc)
+#endif /* HDF5 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine restart_job
 #ifdef HDF5
 !
 !===============================================================================
@@ -220,6 +255,85 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_data_h5
+!
+!===============================================================================
+!
+! read_data_h5: wrapper subroutine for job restart from a HDF5 format
+!
+! info: subroutine reads and restores the meta and data block structures from
+!       an HDF5 file
+!
+! arguments: same as in restart_job()
+!
+!===============================================================================
+!
+  subroutine read_data_h5(nfile, nproc)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t
+    use hdf5 , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer  , intent(in) :: nfile, nproc
+
+! local variables
+!
+    character(len=64) :: fl
+    integer(hid_t)    :: fid
+    integer           :: err
+!
+!-------------------------------------------------------------------------------
+!
+! initialize the FORTRAN interface
+!
+    call h5open_f(err)
+
+! check if the interface has been initialized successfuly
+!
+    if (err .ge. 0) then
+
+! prepare the filename
+!
+      write (fl,'("r",i6.6,"_",i5.5,a3)') nfile, nproc, '.h5'
+
+! check if the HDF5 file exists
+!
+
+! close the FORTRAN interface
+!
+      call h5close_f(err)
+
+! check if the interface has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the HDF5 Fortran interface
+!
+        call print_error("io::read_data_h5"  &
+                                   , "Cannot close the HDF5 Fortran interface!")
+
+      end if
+
+    else
+
+! print the error about the problem with initialization of the HDF5 Fortran
+! interface
+!
+      call print_error("io::read_data_h5"  &
+                              , "Cannot initialize the HDF5 Fortran interface!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_data_h5
 !
 !===============================================================================
 !

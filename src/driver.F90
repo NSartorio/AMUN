@@ -29,7 +29,7 @@ program godunov
 ! modules
 !
   use blocks   , only : nleafs
-  use config   , only : read_config, nmax, tmax, dtini, dtout, ftype, cfl
+  use config   , only : read_config, nres, nmax, tmax, dtini, dtout, ftype, cfl
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
@@ -38,7 +38,7 @@ program godunov
   use forcing  , only : init_forcing, clear_forcing
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
-  use io       , only : write_data
+  use io       , only : write_data, restart_job
   use mesh     , only : init_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use random   , only : init_generator
@@ -103,13 +103,6 @@ program godunov
 !
   call init_generator()
 
-! initialize our adaptive mesh, refine that mesh to the desired level
-! according to the initialized problem
-!
-  call start_timer(1)
-  call init_mesh()
-  call stop_timer(1)
-
 ! reset number of iterations and time, etc.
 !
   n    = 0
@@ -118,6 +111,27 @@ program godunov
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+
+! check if we initiate new problem or restart previous job
+!
+  if (nres .lt. 0) then
+
+! initialize our adaptive mesh, refine that mesh to the desired level
+! according to the initialized problem
+!
+    call start_timer(1)
+    call init_mesh()
+    call stop_timer(1)
+
+  else
+
+! reconstruct the meta and data block structures from a given restart file
+!
+    call start_timer(1)
+    call restart_job(nres, ncpu)
+    call stop_timer(1)
+
+  end if
 
 #ifdef FORCE
 ! if the forcing time step is larger than the initial time step decrease it
