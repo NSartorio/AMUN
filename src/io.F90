@@ -273,7 +273,7 @@ module io
 !
     use error, only : print_error
     use hdf5 , only : hid_t
-    use hdf5 , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use hdf5 , only : h5open_f, h5close_f, h5fis_hdf5_f
 
 ! declare variables
 !
@@ -288,6 +288,7 @@ module io
     character(len=64) :: fl
     integer(hid_t)    :: fid
     integer           :: err
+    logical           :: info
 !
 !-------------------------------------------------------------------------------
 !
@@ -305,6 +306,41 @@ module io
 
 ! check if the HDF5 file exists
 !
+      inquire(file = fl, exist = info)
+
+      if (info) then
+
+! check if this is an HDF5 file
+!
+        call h5fis_hdf5_f(fl, info, err)
+
+        if (err .ge. 0) then
+
+          if (info) then
+
+          else
+
+! print error about the wrong file format
+!
+            call print_error("io::read_data_h5", "File " // trim(fl)           &
+                                                     // " is not an HDF5 file!")
+          end if
+
+        else
+
+! print error about the problem with checking the file format
+!
+          call print_error("io::read_data_h5", "Cannot check the file format!")
+
+        end if
+
+      else
+
+! print error since files does not exist
+!
+        call print_error("io::read_data_h5", "File " // trim(fl)               &
+                                                     // " does not exist!")
+      end if
 
 ! close the FORTRAN interface
 !
