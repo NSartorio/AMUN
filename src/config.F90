@@ -71,6 +71,7 @@ module config
 ! data file type
 !
   character      , save :: ftype = 'r'
+  integer(kind=4), save :: nres  = -1
 
 ! data storing time increment
 !
@@ -249,6 +250,8 @@ module config
     case("ftype")
       l = len_trim(value)
       write(ftype, "(a1)") value(2:l-1)
+    case("nres")
+      read(value, "(i9.9)") nres
     case("nmax")
       read(value, "(i9.9)") nmax
     case("tmax")
