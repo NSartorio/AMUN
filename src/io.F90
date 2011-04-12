@@ -273,7 +273,8 @@ module io
 !
     use error, only : print_error
     use hdf5 , only : hid_t
-    use hdf5 , only : h5open_f, h5close_f, h5fis_hdf5_f
+    use hdf5 , only : H5F_ACC_RDONLY_F
+    use hdf5 , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f, h5fclose_f
 
 ! declare variables
 !
@@ -317,6 +318,38 @@ module io
         if (err .ge. 0) then
 
           if (info) then
+
+! opent the current HDF5 file
+!
+            call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! check if the file has been opened successfuly
+!
+            if (err .ge. 0) then
+
+! terminate access to the current file
+!
+              call h5fclose_f(fid, err)
+
+! check if the file has been closed successfully
+!
+              if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+                call print_error("io::read_data_h5"                            &
+                                            , "Cannot close file: " // trim(fl))
+
+              end if
+
+            else
+
+! print error about the problem with opening the HDF5 file
+!
+              call print_error("io::read_data_h5"  &
+                                             , "Cannot open file: " // trim(fl))
+
+            end if
 
           else
 
