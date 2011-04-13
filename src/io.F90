@@ -327,6 +327,10 @@ module io
 !
             if (err .ge. 0) then
 
+! read global attributes
+!
+              call read_attributes_h5(fid)
+
 ! terminate access to the current file
 !
               call h5fclose_f(fid, err)
@@ -507,6 +511,153 @@ module io
 !
 !===============================================================================
 !
+! read_attributes_h5: subroutine restores attributes from an HDF5 file linked
+!                     to the HDF5 file identificator
+!
+! info: this subroutine restores only the global attributes
+!
+! arguments:
+!   fid - the HDF5 file identificator
+!
+!===============================================================================
+!
+  subroutine read_attributes_h5(fid)
+
+! references to other modules
+!
+    use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
+    use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
+    use config  , only : in, jn, kn, rdims
+    use error   , only : print_error
+    use hdf5    , only : hid_t, hsize_t
+    use hdf5    , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f             &
+                       , h5aopen_idx_f, h5aclose_f, h5aget_name_f
+    use mpitools, only : ncpus, ncpu
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t), intent(in) :: fid
+
+! local variables
+!
+    character(len=16) :: aname
+    integer(hid_t)    :: gid, aid
+    integer(hsize_t)  :: alen = 16
+    integer(kind=4)   :: dm(3)
+    integer           :: err, nattrs, n, ival
+!
+!-------------------------------------------------------------------------------
+!
+! open the global attributes group
+!
+    call h5gopen_f(fid, 'attributes', gid, err)
+
+! check if the group has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read the number of global attributes
+!
+      call h5aget_num_attrs_f(gid, nattrs, err)
+
+! check if the number of attributes has been read successfuly
+!
+      if (err .ge. 0) then
+
+! iterate over all attributes
+!
+        do n = 0, nattrs - 1
+
+! open the current attribute
+!
+          call h5aopen_idx_f(gid, n, aid, err)
+
+! check if the attribute has been opened successfuly
+!
+          if (err .ge. 0) then
+
+! obtain the attribute name
+!
+            call h5aget_name_f(aid, alen, aname, err)
+
+! depending on the attribute name use proper subroutine to read its value
+!
+            select case(trim(aname))
+            case('ndims')
+              call read_attribute_integer_h5(aid, aname, ival)
+
+! check if the restart file and compiled program have the same number of
+! dimensions
+!
+              if (ival .ne. NDIMS) then
+                call print_error("io::read_attributes_h5"                      &
+                              , "File and program dimensions are incompatible!")
+              end if
+            case('last_id')
+              call read_attribute_integer_h5(aid, aname, ival)
+              last_id = ival
+            case('nghost')
+              call read_attribute_integer_h5(aid, aname, ival)
+              nghost = ival
+            case default
+            end select
+
+! close the current attribute
+!
+            call h5aclose_f(aid, err)
+
+          else
+
+! print error about the problem with obtaining the number of attributes
+!
+            call print_error("io::read_attributes_h5",                         &
+                                           "Cannot open the current attribute!")
+
+          end if
+
+        end do
+
+      else
+
+! print error about the problem with obtaining the number of attributes
+!
+        call print_error("io::read_attributes_h5",                             &
+                                  "Cannot get the number of global attributes!")
+
+      end if
+
+! close the group
+!
+      call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the group
+!
+        call print_error("io::read_attributes_h5", "Cannot close the group!")
+
+      end if
+
+    else
+
+! print error about the problem with creating the group
+!
+      call print_error("io::read_attributes_h5", "Cannot open the group!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attributes_h5
+!
+!===============================================================================
+!
 ! write_attribute_integer_h5: subroutine writes an attribute with the integer
 !                             value in a group given by its indentificator
 !
@@ -626,6 +777,61 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_attribute_integer_h5
+!
+!===============================================================================
+!
+! read_attribute_integer_h5: subroutine read an integer value from an attribute
+!                            given by the identificator
+!
+! arguments:
+!   aid   - the HDF5 attribute identificator
+!   value - the attribute value
+!
+!===============================================================================
+!
+  subroutine read_attribute_integer_h5(aid, name, value)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5 , only : h5aread_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)  , intent(in)    :: aid
+    character(len=*), intent(in)    :: name
+    integer         , intent(inout) :: value
+
+! local variables
+!
+    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
+    integer                         :: err
+!
+!-------------------------------------------------------------------------------
+!
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, value, am(:), err)
+
+! check if the attribute has been read successfuly
+!
+    if (err .gt. 0) then
+
+! print error about the problem with reading the attribute
+!
+      call print_error("io::read_attribute_integer_h5"                         &
+                          , "Cannot read attribute :" // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_integer_h5
 !
 !===============================================================================
 !
