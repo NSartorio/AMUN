@@ -90,7 +90,7 @@ module mesh
 
 ! allocate the initial structure of blocks according to the problem
 !
-    call init_domain
+    call init_domain()
 
 ! print general information about resolutions
 !

@@ -525,6 +525,8 @@ module io
 
 ! references to other modules
 !
+    use blocks  , only : block_meta
+    use blocks  , only : append_metablock
     use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
     use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use config  , only : in, jn, kn, rdims
@@ -548,7 +550,12 @@ module io
     integer(hid_t)    :: gid, aid
     integer(hsize_t)  :: alen = 16
     integer(kind=4)   :: dm(3)
-    integer           :: err, nattrs, n, ival
+    integer           :: err, n, l
+    integer           :: nattrs, lndims, llast_id, lmblocks, lnghost
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
@@ -588,21 +595,21 @@ module io
 !
             select case(trim(aname))
             case('ndims')
-              call read_attribute_integer_h5(aid, aname, ival)
+              call read_attribute_integer_h5(aid, aname, lndims)
 
 ! check if the restart file and compiled program have the same number of
 ! dimensions
 !
-              if (ival .ne. NDIMS) then
+              if (lndims .ne. NDIMS) then
                 call print_error("io::read_attributes_h5"                      &
                               , "File and program dimensions are incompatible!")
               end if
             case('last_id')
-              call read_attribute_integer_h5(aid, aname, ival)
-              last_id = ival
+              call read_attribute_integer_h5(aid, aname, llast_id)
+            case('mblocks')
+              call read_attribute_integer_h5(aid, aname, lmblocks)
             case('nghost')
-              call read_attribute_integer_h5(aid, aname, ival)
-              nghost = ival
+              call read_attribute_integer_h5(aid, aname, lnghost)
             case default
             end select
 
@@ -620,6 +627,20 @@ module io
           end if
 
         end do
+
+! allocate all metablocks
+!
+        do l = 1, lmblocks
+          call append_metablock(pmeta)
+        end do
+
+! check if the number of created metablocks is equal to the read number of
+! metablocks
+!
+        if (lmblocks .ne. mblocks) then
+          call print_error("io::read_attributes_h5"                            &
+                                        , "Number of metablocks doesn't match!")
+        end if
 
       else
 
