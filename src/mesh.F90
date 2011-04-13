@@ -52,10 +52,10 @@ module mesh
 
     use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
                        , ncells, maxlev, rdims, ng
-    use blocks  , only : block_meta, block_data, list_meta, list_data          &
-                       , init_blocks, refine_block               &
-                       , deallocate_datablock, mblocks, nleafs, dblocks        &
-                       , nchild, ndims, nsides, nfaces, res
+    use blocks  , only : block_meta, block_data, list_meta, list_data
+    use blocks  , only : refine_block, deallocate_datablock
+    use blocks  , only : mblocks, nleafs, dblocks, nchild, ndims, nsides       &
+                       , nfaces, res
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -78,10 +78,6 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! initialize blocks
-!
-    call init_blocks()
-
 ! allocate the effective resolution array
 !
     allocate(res(maxlev))

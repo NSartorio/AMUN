@@ -29,6 +29,7 @@ program godunov
 ! modules
 !
   use blocks   , only : nleafs
+  use blocks   , only : init_blocks
   use config   , only : read_config, nres, nmax, tmax, dtini, dtout, ftype, cfl
 #ifdef FORCE
   use config   , only : fdt
@@ -95,14 +96,6 @@ program godunov
 !
   call read_config()
 
-! initialize timers
-!
-  call init_timers()
-
-! initialize random number generator
-!
-  call init_generator()
-
 ! reset number of iterations and time, etc.
 !
   n    = 0
@@ -111,6 +104,20 @@ program godunov
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+
+! initialize timers
+!
+  call init_timers()
+
+! initialize random number generator
+!
+  call init_generator()
+
+! initialize block module
+!
+  call start_timer(1)
+  call init_blocks()
+  call stop_timer(1)
 
 ! check if we initiate new problem or restart previous job
 !
