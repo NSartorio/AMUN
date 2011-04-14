@@ -247,6 +247,12 @@ program godunov
   call write_data(ftype, no, ncpu)
   call stop_timer(3)
 
+! write down the restart dump
+!
+  call start_timer(3)
+  call write_data('r', no, ncpu)
+  call stop_timer(3)
+
 #ifdef FORCE
 ! finalize forcing module
 !
