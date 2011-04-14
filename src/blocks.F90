@@ -552,8 +552,6 @@ module blocks
     if (associated(last_data)) then
       pdata%prev => last_data
       last_data%next => pdata
-    else
-      list_data => pdata
     end if
 
 ! set the pointer to the last block in the list

@@ -525,8 +525,8 @@ module io
 
 ! references to other modules
 !
-    use blocks  , only : block_meta
-    use blocks  , only : append_metablock
+    use blocks  , only : block_meta, block_data
+    use blocks  , only : append_metablock, append_datablock
     use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
     use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
     use config  , only : in, jn, kn, rdims
@@ -551,11 +551,12 @@ module io
     integer(hsize_t)  :: alen = 16
     integer(kind=4)   :: dm(3)
     integer           :: err, n, l
-    integer           :: nattrs, lndims, llast_id, lmblocks, lnghost
+    integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks, lnghost
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
@@ -608,6 +609,8 @@ module io
               call read_attribute_integer_h5(aid, aname, llast_id)
             case('mblocks')
               call read_attribute_integer_h5(aid, aname, lmblocks)
+            case('dblocks')
+              call read_attribute_integer_h5(aid, aname, ldblocks)
             case('nghost')
               call read_attribute_integer_h5(aid, aname, lnghost)
             case default
@@ -634,12 +637,24 @@ module io
           call append_metablock(pmeta)
         end do
 
-! check if the number of created metablocks is equal to the read number of
-! metablocks
+! check if the number of created metablocks is equal to lbmcloks
 !
         if (lmblocks .ne. mblocks) then
           call print_error("io::read_attributes_h5"                            &
                                         , "Number of metablocks doesn't match!")
+        end if
+
+! allocate all datablocks
+!
+        do l = 1, ldblocks
+          call append_datablock(pdata)
+        end do
+
+! check if the number of created datablocks is equal to the ldblocks
+!
+        if (ldblocks .ne. dblocks) then
+          call print_error("io::read_attributes_h5"                            &
+                                        , "Number of datablocks doesn't match!")
         end if
 
       else
