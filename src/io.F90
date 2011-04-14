@@ -442,14 +442,15 @@ module io
 
 ! references to other modules
 !
-    use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
-    use config  , only : ncells, nghost
-    use config  , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use config  , only : in, jn, kn, rdims, maxlev
-    use error   , only : print_error
-    use hdf5    , only : hid_t
-    use hdf5    , only : h5gcreate_f, h5gclose_f
-    use mpitools, only : ncpus, ncpu
+    use blocks   , only : ndims, last_id, mblocks, dblocks, nleafs
+    use config   , only : ncells, nghost
+    use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use config   , only : in, jn, kn, rdims, maxlev
+    use error    , only : print_error
+    use evolution, only : n, t, dt, dtn
+    use hdf5     , only : hid_t
+    use hdf5     , only : h5gcreate_f, h5gclose_f
+    use mpitools , only : ncpus, ncpu
 
 ! declare variables
 !
@@ -487,6 +488,7 @@ module io
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'ncpus'  , ncpus)
       call write_attribute_integer_h5(gid, 'ncpu'   , ncpu)
+      call write_attribute_integer_h5(gid, 'iter'   , n)
 
 ! store the real attributes
 !
@@ -496,6 +498,9 @@ module io
       call write_attribute_double_h5(gid, 'ymax', ymax)
       call write_attribute_double_h5(gid, 'zmin', zmin)
       call write_attribute_double_h5(gid, 'zmax', zmax)
+      call write_attribute_double_h5(gid, 'time', t   )
+      call write_attribute_double_h5(gid, 'dt'  , dt  )
+      call write_attribute_double_h5(gid, 'dtn' , dtn )
 
 ! store the vector attributes
 !
@@ -545,17 +550,18 @@ module io
 
 ! references to other modules
 !
-    use blocks  , only : block_meta, block_data
-    use blocks  , only : append_metablock, append_datablock
-    use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
-    use config  , only : ncells, nghost
-    use config  , only : in, jn, kn, rdims, maxlev
-    use config  , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error   , only : print_error
-    use hdf5    , only : hid_t, hsize_t
-    use hdf5    , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f             &
-                       , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use mpitools, only : ncpus, ncpu
+    use blocks   , only : block_meta, block_data
+    use blocks   , only : append_metablock, append_datablock
+    use blocks   , only : ndims, last_id, mblocks, dblocks, nleafs
+    use config   , only : ncells, nghost
+    use config   , only : in, jn, kn, rdims, maxlev
+    use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use error    , only : print_error
+    use evolution, only : n, t, dt, dtn
+    use hdf5     , only : hid_t, hsize_t
+    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
+                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
+    use mpitools , only : ncpus, ncpu
 
 ! declare variables
 !
@@ -571,7 +577,7 @@ module io
     integer(hid_t)    :: gid, aid
     integer(hsize_t)  :: alen = 16
     integer(kind=4)   :: dm(3)
-    integer           :: err, n, l
+    integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
                        , lncells, lnghost
 
@@ -600,11 +606,11 @@ module io
 
 ! iterate over all attributes
 !
-        do n = 0, nattrs - 1
+        do i = 0, nattrs - 1
 
 ! open the current attribute
 !
-          call h5aopen_idx_f(gid, n, aid, err)
+          call h5aopen_idx_f(gid, i, aid, err)
 
 ! check if the attribute has been opened successfuly
 !
@@ -653,6 +659,26 @@ module io
                 call print_error("io::read_attributes_h5"                      &
                       , "File and program block ghost layers are incompatible!")
               end if
+            case('iter')
+              call read_attribute_integer_h5(aid, aname, n)
+            case('time')
+              call read_attribute_double_h5(aid, aname, t)
+            case('dt')
+              call read_attribute_double_h5(aid, aname, dt)
+            case('dtn')
+              call read_attribute_double_h5(aid, aname, dtn)
+            case('xmin')
+              call read_attribute_double_h5(aid, aname, xmin)
+            case('xmax')
+              call read_attribute_double_h5(aid, aname, xmax)
+            case('ymin')
+              call read_attribute_double_h5(aid, aname, ymin)
+            case('ymax')
+              call read_attribute_double_h5(aid, aname, ymax)
+            case('zmin')
+              call read_attribute_double_h5(aid, aname, zmin)
+            case('zmax')
+              call read_attribute_double_h5(aid, aname, zmax)
             case default
             end select
 
@@ -700,6 +726,7 @@ module io
 ! allocate an array of pointers with the size llast_id
 !
         allocate(block_array(llast_id))
+        last_id = llast_id
 
       else
 
@@ -1165,6 +1192,60 @@ module io
 !
 !===============================================================================
 !
+! read_attribute_double_h5: subroutine reads a double precision attribute
+!
+! arguments:
+!   aid   - the HDF5 attribute identificator
+!   value - the attribute value
+!
+!===============================================================================
+!
+  subroutine read_attribute_double_h5(aid, name, value)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5 , only : h5aread_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)  , intent(in)    :: aid
+    character(len=*), intent(in)    :: name
+    real(kind=8)    , intent(inout) :: value
+
+! local variables
+!
+    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
+    integer                         :: err
+!
+!-------------------------------------------------------------------------------
+!
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_DOUBLE, value, am(:), err)
+
+! check if the attribute has been read successfuly
+!
+    if (err .gt. 0) then
+
+! print error about the problem with reading the attribute
+!
+      call print_error("io::read_attribute_double_h5"                          &
+                                      , "Cannot read attribute :" // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_double_h5
+!
+!===============================================================================
+!
 ! write_metablocks_h5: subroutine writes metablocks in the HDF5 format connected
 !                      to the provided identificator
 !
@@ -1509,6 +1590,7 @@ module io
 
         block_array(id(l))%ptr => pmeta
 
+        pmeta%id       = id(l)
         pmeta%cpu      = cpu(l)
         pmeta%level    = lev(l)
         pmeta%config   = cfg(l)
