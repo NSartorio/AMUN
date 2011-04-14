@@ -337,6 +337,10 @@ module io
 !
               call read_attributes_h5(fid)
 
+! read data blocks
+!
+              call read_datablocks_h5(fid)
+
 ! deallocate the array of block pointers
 !
               if (allocated(block_array)) deallocate(block_array)
@@ -1511,6 +1515,127 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_datablocks_h5
+!
+!===============================================================================
+!
+! read_datablocks_h5: subroutine restored datablocks from the HDF5 restart file
+!
+! info: this subroutine restores only the datablocks
+!
+! arguments:
+!   fid - the HDF5 file identificator
+!
+!===============================================================================
+!
+  subroutine read_datablocks_h5(fid)
+
+! references to other modules
+!
+    use blocks   , only : block_meta, block_data, list_data
+    use blocks   , only : dblocks, ndims
+    use config   , only : im, jm, km
+    use error    , only : print_error
+    use hdf5     , only : hid_t, hsize_t
+    use hdf5     , only : h5gopen_f, h5gclose_f
+    use variables, only : nqt
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t), intent(in) :: fid
+
+! local variables
+!
+    integer(hid_t)                 :: gid
+    integer(kind=4)                :: l
+    integer                        :: err
+    integer(hsize_t), dimension(5) :: dm
+
+! local allocatable arrays
+!
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: u
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! open the datablock group
+!
+    call h5gopen_f(fid, 'datablocks', gid, err)
+
+! check if the datablock group has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! restore all data blocks
+!
+      if (dblocks .gt. 0) then
+
+! prepate dimensions
+!
+        dm(1) = dblocks
+        dm(2) = nqt
+        dm(3) = im
+        dm(4) = jm
+        dm(5) = km
+
+! allocate array to restore datablocks data
+!
+        allocate(u(dm(1),dm(2),dm(3),dm(4),dm(5)))
+
+! read datablocks from the HDF5 file
+!
+        call read_array5_double_h5 (gid, 'u', dm(:), u(:,:,:,:,:))
+
+! iterate over all data blocks and fill their U arrays
+!
+        l = 1
+        pdata => list_data
+        do while(associated(pdata))
+
+          pdata%u(:,:,:,:) = u(l,:,:,:,:)
+
+          l = l + 1
+          pdata => pdata%next
+        end do
+
+! deallocate allocatable arrays
+!
+        if (allocated(u)) deallocate(u)
+
+      end if ! dblocks > 0
+
+! close the group
+!
+      call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the group
+!
+        call print_error("io::read_datablocks_h5"                              &
+                                              , "Cannot close datablock group!")
+
+      end if
+
+    else
+
+! print error about the problem with opening the group
+!
+      call print_error("io::read_datablocks_h5", "Cannot open datablock group!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_datablocks_h5
 !
 !===============================================================================
 !
@@ -3406,6 +3531,80 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_array5_double_h5
+!
+!===============================================================================
+!
+! read_array5_double_h5: subroutine reads a 5D double precision array
+!
+! arguments:
+!   gid   - the HDF5 group identificator
+!   name  - the string name representing the dataset
+!   dm    - the data dimensions
+!   value - the data
+!
+!===============================================================================
+!
+  subroutine read_array5_double_h5(gid, name, dm, var)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                        , intent(in)    :: gid
+    character(len=*)                      , intent(in)    :: name
+    integer(hsize_t), dimension(5)        , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, err)
+
+! check if the dataset has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read dataset
+!
+      call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(:), err)
+
+! check if the dataset has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the dataset
+!
+        call print_error("io::read_array5_double_h5"  &
+                                        , "Cannot read dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with opening the dataset
+!
+      call print_error("io::read_array5_double_h5"  &
+                                        , "Cannot open dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_array5_double_h5
 !
 !===============================================================================
 !
