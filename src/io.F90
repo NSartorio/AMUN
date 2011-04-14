@@ -27,7 +27,13 @@
 !
 module io
 
+  use blocks, only : pointer_meta
+
   implicit none
+
+! array of pointer used during job restart
+!
+  type(pointer_meta), dimension(:), allocatable, save :: block_array
 
   contains
 !
@@ -330,6 +336,10 @@ module io
 ! read global attributes
 !
               call read_attributes_h5(fid)
+
+! deallocate the array of block pointers
+!
+              if (allocated(block_array)) deallocate(block_array)
 
 ! terminate access to the current file
 !
@@ -677,11 +687,9 @@ module io
                                         , "Number of datablocks doesn't match!")
         end if
 
-! set last_id to the value obtained from the restart file
+! allocate an array of pointers with the size llast_id
 !
-        if (llast_id .ne. last_id) then
-          last_id = llast_id
-        end if
+        allocate(block_array(llast_id))
 
       else
 
