@@ -337,6 +337,10 @@ module io
 !
               call read_attributes_h5(fid)
 
+! read meta blocks
+!
+              call read_metablocks_h5(fid)
+
 ! read data blocks
 !
               call read_datablocks_h5(fid)
@@ -629,6 +633,8 @@ module io
               call read_attribute_integer_h5(aid, aname, lmblocks)
             case('dblocks')
               call read_attribute_integer_h5(aid, aname, ldblocks)
+            case('nleafs')
+              call read_attribute_integer_h5(aid, aname, nleafs)
             case('ncells')
               call read_attribute_integer_h5(aid, aname, lncells)
 
@@ -1376,6 +1382,232 @@ module io
 !
 !===============================================================================
 !
+! read_metablocks_h5: subroutine reads metablocks from the restart HDF5 file
+!                     and restores all their structure fields
+!
+! info: this subroutine restores metablocks only
+!
+! arguments:
+!   fid - the HDF5 file identificator
+!
+!===============================================================================
+!
+  subroutine read_metablocks_h5(fid)
+
+! references to other modules
+!
+    use blocks  , only : block_meta, list_meta
+    use blocks  , only : last_id, mblocks, nchild, ndims, nsides, nfaces
+    use error   , only : print_error
+    use hdf5    , only : hid_t, hsize_t
+    use hdf5    , only : h5gopen_f, h5gclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t), intent(in) :: fid
+
+! local variables
+!
+    integer(hid_t)                 :: gid
+    integer(kind=4)                :: l, p, i, j, k
+    integer                        :: err
+    integer(hsize_t), dimension(1) :: am
+    integer(hsize_t), dimension(2) :: dm, pm
+    integer(hsize_t), dimension(4) :: qm
+
+! local allocatable arrays
+!
+    integer(kind=4), dimension(:)  , allocatable :: idx
+    integer(kind=4), dimension(:)  , allocatable :: par, dat
+    integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
+    real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
+    integer(kind=4), dimension(:,:), allocatable :: chl, cor
+    integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! open metablock group
+!
+    call h5gopen_f(fid, 'metablocks', gid, err)
+
+! check if the group has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! prepate dimensions
+!
+      am(1) = mblocks
+      dm(1) = mblocks
+      dm(2) = nchild
+      pm(1) = mblocks
+      pm(2) = ndims
+      qm(1) = mblocks
+      qm(2) = ndims
+      qm(3) = nsides
+      qm(4) = nfaces
+
+! allocate arrays to store metablocks data
+!
+      allocate(id (am(1)))
+      allocate(cpu(am(1)))
+      allocate(lev(am(1)))
+      allocate(par(am(1)))
+      allocate(dat(am(1)))
+      allocate(cfg(am(1)))
+      allocate(ref(am(1)))
+      allocate(lea(am(1)))
+      allocate(xmn(am(1)))
+      allocate(xmx(am(1)))
+      allocate(ymn(am(1)))
+      allocate(ymx(am(1)))
+      allocate(zmn(am(1)))
+      allocate(zmx(am(1)))
+      allocate(chl(dm(1),dm(2)))
+      allocate(cor(pm(1),pm(2)))
+      allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+
+! reset vectors
+!
+      par(:)       = -1
+      dat(:)       = -1
+      lea(:)       = -1
+      chl(:,:)     = -1
+      ngh(:,:,:,:) = -1
+
+! read metablock fields from the HDF5 file
+!
+      call read_vector_integer_h5(gid, 'id'     , am(:), id (:))
+      call read_vector_integer_h5(gid, 'cpu'    , am(:), cpu(:))
+      call read_vector_integer_h5(gid, 'level'  , am(:), lev(:))
+      call read_vector_integer_h5(gid, 'config' , am(:), cfg(:))
+      call read_vector_integer_h5(gid, 'refine' , am(:), ref(:))
+      call read_vector_integer_h5(gid, 'leaf'   , am(:), lea(:))
+      call read_vector_integer_h5(gid, 'parent' , am(:), par(:))
+      call read_vector_double_h5 (gid, 'xmin'   , am(:), xmn(:))
+      call read_vector_double_h5 (gid, 'xmax'   , am(:), xmx(:))
+      call read_vector_double_h5 (gid, 'ymin'   , am(:), ymn(:))
+      call read_vector_double_h5 (gid, 'ymax'   , am(:), ymx(:))
+      call read_vector_double_h5 (gid, 'zmin'   , am(:), zmn(:))
+      call read_vector_double_h5 (gid, 'zmax'   , am(:), zmx(:))
+      call read_array2_integer_h5(gid, 'coord'  , pm(:), cor(:,:))
+      call read_array2_integer_h5(gid, 'child'  , dm(:), chl(:,:))
+      call read_array4_integer_h5(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+
+! prepare the array of pointers to metablocks
+!
+      l = 1
+      pmeta => list_meta
+      do while(associated(pmeta))
+
+        block_array(id(l))%ptr => pmeta
+
+        pmeta%cpu      = cpu(l)
+        pmeta%level    = lev(l)
+        pmeta%config   = cfg(l)
+        pmeta%refine   = ref(l)
+        pmeta%xmin     = xmn(l)
+        pmeta%xmax     = xmx(l)
+        pmeta%ymin     = ymn(l)
+        pmeta%ymax     = ymx(l)
+        pmeta%zmin     = zmn(l)
+        pmeta%zmax     = zmx(l)
+        pmeta%coord(:) = cor(l,:)
+
+        if (lea(l) .eq. 1) then
+          pmeta%leaf = .true.
+        else
+          pmeta%leaf = .false.
+        end if
+
+        l = l + 1
+        pmeta => pmeta%next
+      end do
+
+! iterate over all metablocks and restore pointers
+!
+      l = 1
+      pmeta => list_meta
+      do while(associated(pmeta))
+
+        pmeta%parent => block_array(par(l))%ptr
+
+        do p = 1, nchild
+          if (chl(l,p) .gt. 0) then
+            pmeta%child(p)%ptr => block_array(chl(l,p))%ptr
+          end if
+        end do
+
+        do i = 1, ndims
+          do j = 1, nsides
+            do k = 1, nfaces
+              if (ngh(l,i,j,k) .gt. 0) then
+                pmeta%neigh(i,j,k)%ptr => block_array(ngh(l,i,j,k))%ptr
+              end if
+            end do
+          end do
+        end do
+
+        l = l + 1
+        pmeta => pmeta%next
+      end do
+
+! deallocate allocatable arrays
+!
+      if (allocated(id) ) deallocate(id )
+      if (allocated(par)) deallocate(par)
+      if (allocated(dat)) deallocate(dat)
+      if (allocated(cpu)) deallocate(cpu)
+      if (allocated(lev)) deallocate(lev)
+      if (allocated(cfg)) deallocate(cfg)
+      if (allocated(ref)) deallocate(ref)
+      if (allocated(lea)) deallocate(lea)
+      if (allocated(xmn)) deallocate(xmn)
+      if (allocated(xmx)) deallocate(xmx)
+      if (allocated(ymn)) deallocate(ymn)
+      if (allocated(ymx)) deallocate(ymx)
+      if (allocated(zmn)) deallocate(zmn)
+      if (allocated(zmx)) deallocate(zmx)
+      if (allocated(chl)) deallocate(chl)
+      if (allocated(cor)) deallocate(cor)
+      if (allocated(ngh)) deallocate(ngh)
+
+! close the group
+!
+      call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the group
+!
+        call print_error("io::read_metablocks_h5"                              &
+                                              , "Cannot close metablock group!")
+
+      end if
+
+    else
+
+! print error about the problem with opening the group
+!
+      call print_error("io::read_metablocks_h5", "Cannot open metablock group!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_metablocks_h5
+!
+!===============================================================================
+!
 ! write_datablocks_h5: subroutine writes datablocks in the HDF5 format connected
 !                      to the provided identificator
 !
@@ -1532,6 +1764,7 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data, list_data
+    use blocks   , only : associate_blocks
     use blocks   , only : dblocks, ndims
     use config   , only : im, jm, km
     use error    , only : print_error
@@ -1552,11 +1785,13 @@ module io
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
     integer                        :: err
+    integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
 !
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: u
+    integer(kind=4), dimension(:)        , allocatable :: m
+    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: u
 
 ! local pointers
 !
@@ -1578,6 +1813,7 @@ module io
 
 ! prepate dimensions
 !
+        am(1) = dblocks
         dm(1) = dblocks
         dm(2) = nqt
         dm(3) = im
@@ -1586,17 +1822,21 @@ module io
 
 ! allocate array to restore datablocks data
 !
+        allocate(m(am(1)))
         allocate(u(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
 ! read datablocks from the HDF5 file
 !
-        call read_array5_double_h5 (gid, 'u', dm(:), u(:,:,:,:,:))
+        call read_vector_integer_h5(gid, 'meta', am(:), m(:))
+        call read_array5_double_h5 (gid, 'u'   , dm(:), u(:,:,:,:,:))
 
 ! iterate over all data blocks and fill their U arrays
 !
         l = 1
         pdata => list_data
         do while(associated(pdata))
+
+          call associate_blocks(block_array(m(l))%ptr, pdata)
 
           pdata%u(:,:,:,:) = u(l,:,:,:,:)
 
@@ -1606,6 +1846,7 @@ module io
 
 ! deallocate allocatable arrays
 !
+        if (allocated(m)) deallocate(m)
         if (allocated(u)) deallocate(u)
 
       end if ! dblocks > 0
@@ -2359,6 +2600,95 @@ module io
 !
 !===============================================================================
 !
+! read_vector_integer_h5: subroutine reads a 1D integer vector
+!
+! arguments:
+!   gid    - the HDF5 group identificator
+!   name   - the string name representing the dataset
+!   length - the vector length
+!   value  - the data
+!
+!===============================================================================
+!
+  subroutine read_vector_integer_h5(gid, name, dm, data)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: name
+    integer(hsize_t), dimension(1), intent(inout) :: dm
+    integer(kind=4) , dimension(:), intent(inout) :: data
+
+! local variables
+!
+    integer(hid_t)                 :: did
+    integer                        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, err)
+
+! check if the dataset has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read the dataset data
+!
+      call h5dread_f(did, H5T_NATIVE_INTEGER, data(:), dm(:), err)
+
+! check if the dataset has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the dataset
+!
+        call print_error("io::read_vector_integer_h5"                          &
+                                        , "Cannot read dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, err)
+
+! check if the dataset has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error("io::read_vector_integer_h5"                          &
+                                       , "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with opening the dataset
+!
+      call print_error("io::read_vector_integer_h5"                            &
+                                        , "Cannot open dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_vector_integer_h5
+!
+!===============================================================================
+!
 ! write_array2_integer_h5: subroutine stores a 2D integer array in a group
 !
 ! arguments:
@@ -2566,6 +2896,95 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_array2_integer_h5
+!
+!===============================================================================
+!
+! read_array2_integer_h5: subroutine reads a 2D integer array
+!
+! arguments:
+!   gid - the HDF5 group identificator
+!   name  - the string name representing the dataset
+!   dm    - the data dimensions
+!   value - the data
+!
+!===============================================================================
+!
+  subroutine read_array2_integer_h5(gid, name, dm, var)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                  , intent(in)    :: gid
+    character(len=*)                , intent(in)    :: name
+    integer(hsize_t), dimension(2)  , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, err)
+
+! check if the dataset has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read dataset data
+!
+      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(:), err)
+
+! check if the dataset has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the dataset
+!
+        call print_error("io::read_array2_integer_h5"                          &
+                                       , "Cannot read dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, err)
+
+! check if the dataset has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error("io::read_array2_integer_h5"                          &
+                                       , "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with opening the dataset
+!
+      call print_error("io::read_array2_integer_h5"                            &
+                                        , "Cannot open dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_array2_integer_h5
 !
 !===============================================================================
 !
@@ -2779,6 +3198,95 @@ module io
 !
 !===============================================================================
 !
+! read_array4_integer_h5: subroutine reads a 4D integer array
+!
+! arguments:
+!   gid - the HDF5 group identificator
+!   name  - the string name representing the dataset
+!   dm    - the data dimensions
+!   value - the data
+!
+!===============================================================================
+!
+  subroutine read_array4_integer_h5(gid, name, dm, var)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                      , intent(in)    :: gid
+    character(len=*)                    , intent(in)    :: name
+    integer(hsize_t), dimension(4)      , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, err)
+
+! check if the dataset has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read dataset data
+!
+      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(:), err)
+
+! check if the dataset has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the dataset
+!
+        call print_error("io::read_array4_integer_h5"                          &
+                                       , "Cannot read dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, err)
+
+! check if the dataset has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error("io::read_array4_integer_h5"                          &
+                                       , "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with opening the dataset
+!
+      call print_error("io::read_array4_integer_h5"                            &
+                                        , "Cannot open dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_array4_integer_h5
+!
+!===============================================================================
+!
 ! write_vector_double_h5: subroutine stores a 1D double precision vector in
 !                         a group
 !
@@ -2901,6 +3409,95 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_vector_double_h5
+!
+!===============================================================================
+!
+! read_vector_double_h5: subroutine reads a 1D double precision vector
+!
+! arguments:
+!   gid    - the HDF5 group identificator
+!   name   - the string name representing the dataset
+!   dm     - the vector dimensions
+!   value  - the data
+!
+!===============================================================================
+!
+  subroutine read_vector_double_h5(gid, name, dm, data)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: name
+    integer(hsize_t), dimension(1), intent(inout) :: dm
+    real(kind=8)    , dimension(:), intent(inout) :: data
+
+! local variables
+!
+    integer(hid_t)                 :: did
+    integer                        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, err)
+
+! check if the dataset has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read the dataset data
+!
+      call h5dread_f(did, H5T_NATIVE_DOUBLE, data(:), dm(:), err)
+
+! check if the dataset has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the dataset
+!
+        call print_error("io::read_vector_double_h5"                           &
+                                        , "Cannot read dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, err)
+
+! check if the dataset has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error("io::read_vector_double_h5"                           &
+                                       , "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with opening the dataset
+!
+      call print_error("io::read_vector_double_h5"                             &
+                                        , "Cannot open dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_vector_double_h5
 !
 !===============================================================================
 !
@@ -3588,8 +4185,23 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-        call print_error("io::read_array5_double_h5"  &
+        call print_error("io::read_array5_double_h5"                           &
                                         , "Cannot read dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, err)
+
+! check if the dataset has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error("io::read_array5_double_h5"                           &
+                                       , "Cannot close dataset: " // trim(name))
 
       end if
 
@@ -3597,7 +4209,7 @@ module io
 
 ! print error about the problem with opening the dataset
 !
-      call print_error("io::read_array5_double_h5"  &
+      call print_error("io::read_array5_double_h5"                             &
                                         , "Cannot open dataset: " // trim(name))
 
     end if
