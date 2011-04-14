@@ -425,8 +425,9 @@ module io
 ! references to other modules
 !
     use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
-    use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
-    use config  , only : in, jn, kn, rdims
+    use config  , only : ncells, nghost
+    use config  , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use config  , only : in, jn, kn, rdims, maxlev
     use error   , only : print_error
     use hdf5    , only : hid_t
     use hdf5    , only : h5gcreate_f, h5gclose_f
@@ -463,6 +464,7 @@ module io
       call write_attribute_integer_h5(gid, 'mblocks', mblocks)
       call write_attribute_integer_h5(gid, 'dblocks', dblocks)
       call write_attribute_integer_h5(gid, 'nleafs' , nleafs)
+      call write_attribute_integer_h5(gid, 'ncells' , ncells)
       call write_attribute_integer_h5(gid, 'nghost' , nghost)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'ncpus'  , ncpus)
@@ -528,8 +530,9 @@ module io
     use blocks  , only : block_meta, block_data
     use blocks  , only : append_metablock, append_datablock
     use blocks  , only : ndims, last_id, mblocks, dblocks, nleafs
-    use config  , only : nghost, maxlev, xmin, xmax, ymin, ymax, zmin, zmax
-    use config  , only : in, jn, kn, rdims
+    use config  , only : ncells, nghost
+    use config  , only : in, jn, kn, rdims, maxlev
+    use config  , only : xmin, xmax, ymin, ymax, zmin, zmax
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f             &
@@ -551,7 +554,8 @@ module io
     integer(hsize_t)  :: alen = 16
     integer(kind=4)   :: dm(3)
     integer           :: err, n, l
-    integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks, lnghost
+    integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
+                       , lncells, lnghost
 
 ! local pointers
 !
@@ -611,8 +615,24 @@ module io
               call read_attribute_integer_h5(aid, aname, lmblocks)
             case('dblocks')
               call read_attribute_integer_h5(aid, aname, ldblocks)
+            case('ncells')
+              call read_attribute_integer_h5(aid, aname, lncells)
+
+! check if the block dimensions are compatible
+!
+              if (lncells .ne. ncells) then
+                call print_error("io::read_attributes_h5"                      &
+                        , "File and program block dimensions are incompatible!")
+              end if
             case('nghost')
               call read_attribute_integer_h5(aid, aname, lnghost)
+
+! check if the ghost layers are compatible
+!
+              if (lnghost .ne. nghost) then
+                call print_error("io::read_attributes_h5"                      &
+                      , "File and program block ghost layers are incompatible!")
+              end if
             case default
             end select
 
@@ -655,6 +675,12 @@ module io
         if (ldblocks .ne. dblocks) then
           call print_error("io::read_attributes_h5"                            &
                                         , "Number of datablocks doesn't match!")
+        end if
+
+! set last_id to the value obtained from the restart file
+!
+        if (llast_id .ne. last_id) then
+          last_id = llast_id
         end if
 
       else
