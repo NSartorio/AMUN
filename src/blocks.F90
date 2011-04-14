@@ -147,6 +147,8 @@ module blocks
 !
     nullify(list_meta)
     nullify(list_data)
+    nullify(last_meta)
+    nullify(last_data)
 
 ! reset the number of meta and data blocks, and leafs
 !
@@ -516,6 +518,8 @@ module blocks
     if (associated(last_meta)) then
       pmeta%prev => last_meta
       last_meta%next => pmeta
+    else
+      list_meta => pmeta
     end if
 
 ! set the pointer to the last block in the list
@@ -552,6 +556,8 @@ module blocks
     if (associated(last_data)) then
       pdata%prev => last_data
       last_data%next => pdata
+    else
+      list_data => pdata
     end if
 
 ! set the pointer to the last block in the list
