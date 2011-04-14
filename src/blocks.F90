@@ -137,9 +137,14 @@ module blocks
 !
   subroutine init_blocks()
 
-    use error, only : print_warning
+    use config, only : maxlev, ncells
+    use error , only : print_warning
 
     implicit none
+
+! local variables
+!
+    integer(kind=4)      :: l
 !
 !-------------------------------------------------------------------------------
 !
@@ -159,6 +164,17 @@ module blocks
 ! reset ID
 !
     last_id = 0
+
+! allocate the effective resolution array
+!
+    allocate(res(maxlev))
+
+! calculate the effective resolution at each level
+!
+    do l = 1, maxlev
+      res(l) = ncells * 2**(maxlev - l)
+    end do
+
 !
 !-------------------------------------------------------------------------------
 !

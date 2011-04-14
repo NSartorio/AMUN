@@ -78,16 +78,6 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! allocate the effective resolution array
-!
-    allocate(res(maxlev))
-
-! calculate the effective resolution at each level
-!
-    do l = 1, maxlev
-      res(l) = ncells * 2**(maxlev - l)
-    end do
-
 ! allocate the initial structure of blocks according to the problem
 !
     call init_domain()
