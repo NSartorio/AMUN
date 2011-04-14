@@ -40,7 +40,7 @@ program godunov
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data, restart_job
-  use mesh     , only : init_mesh, clear_mesh
+  use mesh     , only : init_mesh, clear_mesh, init_coords
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -117,6 +117,12 @@ program godunov
 !
   call start_timer(1)
   call init_blocks()
+  call stop_timer(1)
+
+! initialize coordinate variables
+!
+  call start_timer(1)
+  call init_coords()
   call stop_timer(1)
 
 ! check if we initiate new problem or restart previous job

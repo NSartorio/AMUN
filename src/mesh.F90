@@ -50,12 +50,10 @@ module mesh
 !
   subroutine init_mesh()
 
-    use config  , only : im, jm, km, xmin, xmax, ymin, ymax, zmin, zmax        &
-                       , ncells, maxlev, rdims, ng
+    use config  , only : maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data
     use blocks  , only : refine_block, deallocate_datablock
-    use blocks  , only : mblocks, nleafs, dblocks, nchild, ndims, nsides       &
-                       , nfaces, res
+    use blocks  , only : mblocks, nleafs, dblocks, nchild, nsides, nfaces
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -81,16 +79,6 @@ module mesh
 ! allocate the initial structure of blocks according to the problem
 !
     call init_domain()
-
-! print general information about resolutions
-!
-    if (is_master()) then
-      write(*,"(1x,a)"         ) "Generating the initial mesh:"
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:ndims)
-      write(*,"(4x,a,3(1x,i6))") "base resolution        =", rdims(1:ndims) * ncells
-      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rdims(1:ndims) * res(1)
-      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
-    end if
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
@@ -170,7 +158,7 @@ module mesh
 
 ! iterate over all neighbors
 !
-                  do i = 1, ndims
+                  do i = 1, NDIMS
                     do j = 1, nsides
                       do k = 1, nfaces
 
@@ -314,7 +302,7 @@ module mesh
     if (is_master()) then
       n = 0
       do l = 0, maxlev - 1
-        k = 2**(ndims * l)
+        k = 2**(NDIMS * l)
         n = n + k
       end do
       n = n * rdims(1) * rdims(2) * rdims(3)
@@ -331,6 +319,31 @@ module mesh
       write(*,*)
     end if
 
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_mesh
+!
+!===============================================================================
+!
+! init_coords: subroutine initializes coordinate variables
+!
+!===============================================================================
+!
+  subroutine init_coords()
+
+    use blocks  , only : res
+    use config  , only : maxlev, im, jm, km, ncells, rdims, ng                 &
+                       , xmin, xmax, ymin, ymax, zmin, zmax
+    use mpitools, only : is_master
+
+    implicit none
+
+! local variables
+!
+    integer(kind=4)      :: i, j, k, l, n
+
+!-------------------------------------------------------------------------------
+!
 ! allocating space for coordinate variables
 !
     allocate(ax   (maxlev, im))
@@ -387,9 +400,21 @@ module mesh
 !
     dx_min = 0.5 * min(adx(maxlev), ady(maxlev), adz(maxlev))
 
+! print general information about resolutions
+!
+    if (is_master()) then
+      write(*,"(1x,a)"         ) "Generating the initial mesh:"
+      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "base resolution        ="                    &
+                                                       , rdims(1:NDIMS) * ncells
+      write(*,"(4x,a,3(1x,i6))") "effective resolution   ="                    &
+                                                       , rdims(1:NDIMS) * res(1)
+      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
+    end if
+
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_mesh
+  end subroutine init_coords
 !
 !===============================================================================
 !
