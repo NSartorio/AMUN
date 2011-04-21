@@ -1191,24 +1191,21 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine check_mesh(str)
+  subroutine check_mesh(string)
 
     use blocks, only : block_meta, list_meta
     use blocks, only : last_id, nchild, ndims, nsides, nfaces
+    use blocks, only : check_metablock
 
     implicit none
 
 ! input arguments
 !
-    character(len=*), intent(in) :: str
-
-! local variables
-!
-    integer :: p, i, j, k
+    character(len=*), intent(in) :: string
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta, ptemp
+    type(block_meta), pointer :: pmeta
 
 !-------------------------------------------------------------------------------
 !
@@ -1217,92 +1214,12 @@ module mesh
     pmeta => list_meta
     do while(associated(pmeta))
 
-! check block ID
+! check the current block
 !
-      if (pmeta%id .le. 0 .or. pmeta%id .gt. last_id) then
-        print *, ''
-        print *, ''
-        print *, trim(str)
-        print *, 'wrong meta block id = ', pmeta%id
-        stop
-      end if
-
-! check prev ID
-!
-      ptemp => pmeta%prev
-      if (associated(ptemp)) then
-        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
-          print *, ''
-          print *, ''
-          print *, trim(str)
-          print *, 'wrong previous block id = ', ptemp%id, pmeta%id
-          stop
-        end if
-      end if
-
-! check next ID
-!
-      ptemp => pmeta%next
-      if (associated(ptemp)) then
-        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
-          print *, ''
-          print *, ''
-          print *, trim(str)
-          print *, 'wrong next block id = ', ptemp%id, pmeta%id
-          stop
-        end if
-      end if
-
-! check parent ID
-!
-      ptemp => pmeta%parent
-      if (associated(ptemp)) then
-        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
-          print *, ''
-          print *, ''
-          print *, trim(str)
-          print *, 'wrong parent block id = ', ptemp%id, pmeta%id
-          stop
-        end if
-      end if
-
-! check children IDs
-!
-      do p = 1, nchild
-        ptemp => pmeta%child(p)%ptr
-        if (associated(ptemp)) then
-          if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
-            print *, ''
-            print *, ''
-            print *, trim(str)
-            print *, 'wrong child block id = ', ptemp%id, pmeta%id, p
-            stop
-          end if
-        end if
-      end do
-
-! check neighbors IDs
-!
-      do i = 1, ndims
-        do j = 1, nsides
-          do k = 1, nfaces
-            ptemp => pmeta%neigh(i,j,k)%ptr
-            if (associated(ptemp)) then
-              if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
-                print *, ''
-                print *, ''
-                print *, trim(str)
-                print *, 'wrong neighbor id = ', ptemp%id, pmeta%id, i, j, k
-                stop
-              end if
-            end if
-          end do
-        end do
-      end do
+      call check_metablock(pmeta, string)
 
       pmeta => pmeta%next
     end do
-
 
 !-------------------------------------------------------------------------------
 !
