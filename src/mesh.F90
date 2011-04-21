@@ -420,7 +420,7 @@ module mesh
                         , nleafs, dblocks, nchild, ndims, nsides, nfaces       &
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
-    use error    , only : print_info
+    use error    , only : print_info, print_error
 #ifdef MPI
     use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
 #endif /* MPI */
@@ -459,6 +459,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef DEBUG
+! check mesh
+!
+    call check_mesh('before update_mesh')
+
+#endif /* DEBUG */
 ! check the refinement criterion for all leafs
 !
     pdata => list_data
@@ -710,6 +716,9 @@ module mesh
 
                 call derefine_block(pparent)
                 pmeta => pparent
+              else
+                call print_error("mesh::update_mesh"                           &
+                               , "Parent of derefined block is not associated!")
               end if
             end if
           end if
@@ -837,6 +846,12 @@ module mesh
     end do
 #endif /* MPI */
 
+#ifdef DEBUG
+! check mesh
+!
+    call check_mesh('after update_mesh')
+
+#endif /* DEBUG */
 !-------------------------------------------------------------------------------
 !
   end subroutine update_mesh
@@ -1168,6 +1183,131 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_mesh
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! check_mesh: subroutine checks if the block structure is correct
+!
+!===============================================================================
+!
+  subroutine check_mesh(str)
+
+    use blocks, only : block_meta, list_meta
+    use blocks, only : last_id, nchild, ndims, nsides, nfaces
+
+    implicit none
+
+! input arguments
+!
+    character(len=*), intent(in) :: str
+
+! local variables
+!
+    integer :: p, i, j, k
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, ptemp
+
+!-------------------------------------------------------------------------------
+!
+! check meta blocks
+!
+    pmeta => list_meta
+    do while(associated(pmeta))
+
+! check block ID
+!
+      if (pmeta%id .le. 0 .or. pmeta%id .gt. last_id) then
+        print *, ''
+        print *, ''
+        print *, trim(str)
+        print *, 'wrong meta block id = ', pmeta%id
+        stop
+      end if
+
+! check prev ID
+!
+      ptemp => pmeta%prev
+      if (associated(ptemp)) then
+        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+          print *, ''
+          print *, ''
+          print *, trim(str)
+          print *, 'wrong previous block id = ', ptemp%id, pmeta%id
+          stop
+        end if
+      end if
+
+! check next ID
+!
+      ptemp => pmeta%next
+      if (associated(ptemp)) then
+        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+          print *, ''
+          print *, ''
+          print *, trim(str)
+          print *, 'wrong next block id = ', ptemp%id, pmeta%id
+          stop
+        end if
+      end if
+
+! check parent ID
+!
+      ptemp => pmeta%parent
+      if (associated(ptemp)) then
+        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+          print *, ''
+          print *, ''
+          print *, trim(str)
+          print *, 'wrong parent block id = ', ptemp%id, pmeta%id
+          stop
+        end if
+      end if
+
+! check children IDs
+!
+      do p = 1, nchild
+        ptemp => pmeta%child(p)%ptr
+        if (associated(ptemp)) then
+          if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+            print *, ''
+            print *, ''
+            print *, trim(str)
+            print *, 'wrong child block id = ', ptemp%id, pmeta%id, p
+            stop
+          end if
+        end if
+      end do
+
+! check neighbors IDs
+!
+      do i = 1, ndims
+        do j = 1, nsides
+          do k = 1, nfaces
+            ptemp => pmeta%neigh(i,j,k)%ptr
+            if (associated(ptemp)) then
+              if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+                print *, ''
+                print *, ''
+                print *, trim(str)
+                print *, 'wrong neighbor id = ', ptemp%id, pmeta%id, i, j, k
+                stop
+              end if
+            end if
+          end do
+        end do
+      end do
+
+      pmeta => pmeta%next
+    end do
+
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_mesh
+#endif /* DEBUG */
 
 !===============================================================================
 !
