@@ -1098,7 +1098,7 @@ module io
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)    , allocatable :: lev
+    integer(kind=4), dimension(:)    , allocatable :: lev, ref
     integer(kind=4), dimension(:,:)  , allocatable :: cor
     real   (kind=8), dimension(:,:,:), allocatable :: bnd
 
@@ -1132,6 +1132,7 @@ module io
 ! allocate arrays to store coordinates
 !
         allocate(lev(cm(1)))
+        allocate(ref(cm(1)))
         allocate(cor(cm(1),cm(2)))
         allocate(bnd(dm(1),dm(2),dm(3)))
 
@@ -1144,6 +1145,10 @@ module io
 ! fill in the level array
 !
           lev(l)     = pdata%meta%level
+
+! fill in the refinement flag
+!
+          ref(l)     = pdata%meta%refine
 
 ! fill in the coordinate array
 !
@@ -1168,6 +1173,7 @@ module io
 !
         call write_vector_integer_h5(gid, 'blkres', am(1), res)
         call write_vector_integer_h5(gid, 'levels', cm(1), lev)
+        call write_vector_integer_h5(gid, 'refine', cm(1), ref)
         call write_array2_integer_h5(gid, 'coords', cm(:), cor)
         call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
         call write_vector_double_h5 (gid, 'dx'    , am(1), adx)
@@ -1177,6 +1183,7 @@ module io
 ! deallocate temporary arrays
 !
         if (allocated(lev)) deallocate(lev)
+        if (allocated(ref)) deallocate(ref)
         if (allocated(cor)) deallocate(cor)
         if (allocated(bnd)) deallocate(bnd)
 
