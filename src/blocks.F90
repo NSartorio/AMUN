@@ -1001,6 +1001,7 @@ module blocks
         do j = 1, nsides
           do k = 1, nfaces
             pneigh => pblock%neigh(i,j,k)%ptr
+            pchild => pblock%child(set(i,j,k))%ptr
 
             if (associated(pneigh)) then
               if (pneigh%id .ne. pblock%id) then
@@ -1008,20 +1009,20 @@ module blocks
 ! point to the right neighbor
 !
                 do p = 1, nfaces
-                  pblock%child(set(i,j,k))%ptr%neigh(i,j,p)%ptr => pneigh
+                  pchild%neigh(i,j,p)%ptr => pneigh
                 end do
 
 ! neighbor level is the same as the refined block
 !
                 if (pneigh%level .eq. pblock%level) then
-                  pneigh%neigh(i,3-j,k)%ptr => pblock%child(set(i,j,k))%ptr
+                  pneigh%neigh(i,3-j,k)%ptr => pchild
                 end if
 
 ! neighbor level is the same as the child block
 !
                 if (pneigh%level .gt. pblock%level) then
                   do p = 1, nfaces
-                    pneigh%neigh(i,3-j,p)%ptr => pblock%child(set(i,j,k))%ptr
+                    pneigh%neigh(i,3-j,p)%ptr => pchild
                   end do
                 end if
 
