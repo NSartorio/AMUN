@@ -435,21 +435,21 @@ module mesh
     integer(kind=4) :: i, j, k, l, n, p
 
 #ifdef MPI
-! tag for data exchange
+! tag for the MPI data exchange
 !
-    integer(kind=4)                         :: itag
+    integer(kind=4)                            :: itag
 
-! array for the update of the refinement flag on all processors
+! array for storing the refinement flags
 !
-    integer(kind=4), dimension(nleafs)      :: ibuf
+    integer(kind=4), dimension(:), allocatable :: ibuf
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:ncpus-1) :: lb
+    integer(kind=4), dimension(0:ncpus-1)      :: lb
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nqt,im,jm,km) :: rbuf
+    real(kind=8)   , dimension(nqt,im,jm,km)   :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -465,26 +465,50 @@ module mesh
     call check_mesh('before update_mesh')
 
 #endif /* DEBUG */
-! check the refinement criterion for all leafs
+! iterate over elements of the data block list
 !
     pdata => list_data
     do while (associated(pdata))
+
+! assign a pointer to the meta block associated with the current data block
+!
       pmeta => pdata%meta
 
-      if (pmeta%leaf) then
-        pmeta%refine = check_ref(pdata)
+! if the current data block has a meta block associated
+!
+      if (associated(pmeta)) then
 
-        if (pmeta%level .eq. maxlev) &
-          pmeta%refine = min(0, pmeta%refine)
+! if the associated meta block is a leaf
+!
+        if (pmeta%leaf) then
 
-        if (pmeta%level .eq. 1) &
-          pmeta%refine = max(0, pmeta%refine)
-      end if
+! check the refinement criterion for the current data block
+!
+          pmeta%refine = check_ref(pdata)
 
+! correct the refinement of the block for the base and top levels
+!
+          if (pmeta%level .eq. 1)      pmeta%refine = max(0, pmeta%refine)
+          if (pmeta%level .eq. maxlev) pmeta%refine = min(0, pmeta%refine)
+
+        end if ! pmeta is a leaf
+      end if ! pmeta associated
+
+! assign a pointer to the next data block
+!
       pdata => pdata%next
-    end do
+
+   end do
 
 #ifdef MPI
+! allocate buffer for the refinement field values
+!
+    allocate(ibuf(nleafs))
+
+! reset the buffer
+!
+    ibuf(:) = 0
+
 ! store refinement flags for all blocks for exchange between processors
 !
     l = 1
@@ -492,14 +516,15 @@ module mesh
     do while (associated(pmeta))
       if (pmeta%leaf) then
         ibuf(l) = pmeta%refine
+
         l = l + 1
       end if
       pmeta => pmeta%next
     end do
 
-! update information across all processors
+! update refinement flags across all processors
 !
-    call mallreducesuml(nleafs, ibuf)
+    call mallreducesuml(nleafs, ibuf(1:nleafs))
 
 ! update non-local block refinement flags
 !
@@ -507,106 +532,186 @@ module mesh
     pmeta => list_meta
     do while (associated(pmeta))
       if (pmeta%leaf) then
-        if (pmeta%cpu .ne. ncpu) &
-          pmeta%refine = ibuf(l)
+        pmeta%refine = ibuf(l)
+
         l = l + 1
       end if
       pmeta => pmeta%next
     end do
-#endif /* MPI */
 
-! walk down from the highest level and select neighbors for refinement if they
-! are at lower levels
+! deallocate the buffer
+!
+    if (allocated(ibuf)) deallocate(ibuf)
+
+#endif /* MPI */
+! iterate over all levels starting from top and correct the refinement of blocks
 !
     do l = maxlev, 1, -1
 
-! iterate over all blocks at the current level and if the current block is
-! selected for refinement set the neighbor at lower level to be refined too
+! iterate over all meta blocks
 !
       pmeta => list_meta
       do while (associated(pmeta))
 
-        if (pmeta%level .eq. l .and. pmeta%leaf) then
-          if (pmeta%refine .eq. 1) then
-
-            do i = 1, ndims
-              do j = 1, nsides
-                do k = 1, nfaces
-                  pneigh => pmeta%neigh(i,j,k)%ptr
-                  if (associated(pneigh)) then
-                    if (pneigh%level .lt. pmeta%level) &
-                      pneigh%refine = 1
-
-                    if (pneigh%level .eq. pmeta%level .and. pneigh%refine .eq. -1) &
-                      pneigh%refine = 0
-                  end if
-                end do
-              end do
-            end do
-
-          end if
-        end if
-
-        pmeta => pmeta%next
-      end do
-
-! check if all children are selected for derefinement; if this condition is not
-! fullfiled deselect all children from derefinement
+! check only leafs at the current level
 !
-      pmeta => list_meta
-      do while (associated(pmeta))
+        if (pmeta%leaf .and. pmeta%level .eq. l) then
 
-        if (pmeta%level .eq. (l - 1) .and. .not. pmeta%leaf) then
-          flag = .true.
-          do p = 1, nchild
-            pchild => pmeta%child(p)%ptr
+! iterte over all neighbors of the current leaf
+!
+          do i = 1, ndims
+            do j = 1, nsides
+              do k = 1, nfaces
 
-            flag = flag .and. (pchild%refine .eq. -1)
+! assign a pointer to the current neighbor
+!
+                pneigh => pmeta%neigh(i,j,k)%ptr
+
+! check if the pointer is associated with any block
+!
+                if (associated(pneigh)) then
+
+!= conditions for blocks which are selected to be refined
+!
+                  if (pmeta%refine .eq. 1) then
+
+! if the neighbor is set to be derefined, reset its flags (this applies to
+! blocks at the current and lower levels)
+!
+                    pneigh%refine = max(0, pneigh%refine)
+
+! if the neighbor is at lower level, always set it to be refined
+!
+                    if (pneigh%level .lt. pmeta%level) pneigh%refine = 1
+
+                  end if ! refine = 1
+
+!= conditions for blocks which stay at the same level
+!
+                  if (pmeta%refine .eq. 0) then
+
+! if the neighbor lays at lower level and is set to be derefined, cancel its
+! derefinement
+!
+                    if (pneigh%level .lt. pmeta%level)                         &
+                                         pneigh%refine = max(0, pneigh%refine)
+
+                  end if ! refine = 0
+
+!= conditions for blocks which are selected to be derefined
+!
+                  if (pmeta%refine .eq. -1) then
+
+! if the neighbor is at lower level and is set to be derefined, cancel its
+! derefinement
+!
+                    if (pneigh%level .lt. pmeta%level)                         &
+                                         pneigh%refine = max(0, pneigh%refine)
+
+! if the neighbor is set to be refined, cancel derefinement of the current block
+!
+                    if (pneigh%refine .eq. 1) pmeta%refine = 0
+
+                  end if ! refine = -1
+
+                end if ! associated(pneigh)
+
+               end do
+             end do
           end do
-          if (.not. flag) then
-            do p = 1, nchild
-              pchild => pmeta%child(p)%ptr
-              if (pchild%leaf) &
-                pchild%refine = max(0, pchild%refine)
-            end do
-          end if
-        end if
 
-        pmeta => pmeta%next
-      end do
+        end if ! leafs at level l
 
-! deselect neighbors from derefinement if the current block is set for
-! refinement or it is at higher level and not selected for derefinement
+! assign a pointer to the next block
 !
-      pmeta => list_meta
-      do while (associated(pmeta))
-
-        if (pmeta%level .eq. l .and. pmeta%leaf) then
-
-          if (pmeta%refine .ne. -1) then
-
-            do i = 1, ndims
-              do j = 1, nsides
-                do k = 1, nfaces
-                  pneigh => pmeta%neigh(i,j,k)%ptr
-                  if (associated(pneigh)) then
-                    if (pneigh%refine .eq. -1) then
-                      if (pneigh%level .lt. pmeta%level) &
-                        pneigh%refine = 0
-                    end if
-                  end if
-                end do
-              end do
-            end do
-
-          end if
-
-        end if
-
         pmeta => pmeta%next
-      end do
 
-    end do
+      end do ! meta blocks
+
+!= now check all derefined block if their siblings are set for derefinement too
+!  and are at the same level; check ony levels >= 2
+!
+      if (l .ge. 2) then
+
+! iterate over all blocks
+!
+        pmeta => list_meta
+        do while (associated(pmeta))
+
+! check only leafs at the current level
+!
+          if (pmeta%leaf .and. pmeta%level .eq. l) then
+
+! check blocks which are selected to be derefined
+!
+            if (pmeta%refine .eq. -1) then
+
+! assign a pointer to the parent of the current block
+!
+              pparent => pmeta%parent
+
+! check if parent is associated with any block
+!
+              if (associated(pparent)) then
+
+! reset derefinement flag
+!
+                flag = .true.
+
+! iterate over all children
+!
+                do p = 1, nchild
+
+! assign a pointer to the current child
+!
+                  pchild => pparent%child(p)%ptr
+
+! check if the current child is a leaf
+!
+                  flag = flag .and. (pchild%leaf)
+
+! check if the current child is set to be derefined
+!
+                  flag = flag .and. (pchild%refine .eq. -1)
+
+                end do ! over all children
+
+! if not all children are proper for derefinement, cancel derefinement of all
+! children
+!
+                if (.not. flag) then
+
+! iterate over all children
+!
+                  do p = 1, nchild
+
+! assign a pointer to the current child
+!
+                    pchild => pparent%child(p)%ptr
+
+! reset derefinement of the current child
+!
+                    pchild%refine = max(0, pchild%refine)
+
+                  end do ! children
+
+                end if ! ~flag
+
+              end if ! pparent is associated
+
+            end if ! refine = -1
+
+          end if ! leafs at level l
+
+! assign a pointer to the next block
+!
+          pmeta => pmeta%next
+
+        end do ! meta blocks
+
+      end if ! l >= 2
+
+    end do ! levels
 
 #ifdef MPI
 ! find all sibling blocks which are spread over different processors
