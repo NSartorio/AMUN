@@ -1034,6 +1034,16 @@ module blocks
         end do
       end do
 
+! reset neighbor pointers of the parent block
+!
+      do i = 1, ndims
+        do j = 1, nsides
+          do k = 1, nfaces
+            nullify(pblock%neigh(i,j,k)%ptr)
+          end do
+        end do
+      end do
+
 ! set corresponding configuration of the new blocks
 !
       select case(pblock%config)
