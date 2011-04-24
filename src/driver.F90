@@ -180,7 +180,7 @@ program godunov
 
 ! set the number of next file to number of the current restart file
 !
-    no = nres - 1
+    no = nres
 
   end if
 
@@ -253,13 +253,6 @@ program godunov
 ! add one empty line
 !
   if (is_master()) write(*,*)
-
-! write down the final state
-!
-  call start_timer(3)
-  no = no + 1
-  call write_data(ftype, no, ncpu)
-  call stop_timer(3)
 
 ! write down the restart dump
 !
