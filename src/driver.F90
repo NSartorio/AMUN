@@ -129,27 +129,6 @@ program godunov
   call init_coords()
   call stop_timer(1)
 
-! check if we initiate new problem or restart previous job
-!
-  if (nres .lt. 0) then
-
-! initialize our adaptive mesh, refine that mesh to the desired level
-! according to the initialized problem
-!
-    call start_timer(1)
-    call init_mesh()
-    call stop_timer(1)
-
-  else
-
-! reconstruct the meta and data block structures from a given restart file
-!
-    call start_timer(1)
-    call restart_job(nres, ncpu)
-    call stop_timer(1)
-
-  end if
-
 #ifdef FORCE
 ! if the forcing time step is larger than the initial time step decrease it
 !
@@ -168,17 +147,42 @@ program godunov
 !
   call init_integrals()
 
+! check if we initiate new problem or restart previous job
+!
+  if (nres .lt. 0) then
+
+! initialize our adaptive mesh, refine that mesh to the desired level
+! according to the initialized problem
+!
+    call start_timer(1)
+    call init_mesh()
+    call stop_timer(1)
+
+! write down the initial state
+!
+    call start_timer(3)
+    call write_data(ftype, no, ncpu)
+    call stop_timer(3)
+
+  else
+
+! reconstruct the meta and data block structures from a given restart file
+!
+    call start_timer(1)
+    call restart_job(nres, ncpu)
+    call stop_timer(1)
+
+! set the number of next file to number of the current restart file
+!
+    no = nres
+
+  end if
+
 ! update the maximum speed in the system
 !
   call start_timer(2)
   call update_maximum_speed()
   call stop_timer(2)
-
-! write down the initial state
-!
-  call start_timer(3)
-  call write_data(ftype, no, ncpu)
-  call stop_timer(3)
 
 ! print information
 !
