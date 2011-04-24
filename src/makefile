@@ -39,9 +39,9 @@ endif
 ifeq ($(EQS),HYDRO)
 ifeq ($(FLUX),HLLD)
 FLUX = HLLC
+endif
 ifeq ($(EOS),ISO)
 FLUX = HLL
-endif
 endif
 endif
 ifeq ($(EQS),MHD)
