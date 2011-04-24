@@ -134,25 +134,47 @@ module random
 !
 !===============================================================================
 !
-! get seeds: subroutine returns the generator seeds
+! get_seeds: subroutine returns the generator seeds
 !
 !===============================================================================
 !
   subroutine get_seeds(seed)
 
-    integer(kind=4), dimension(0:nseeds-1), intent(out) :: seed
+    implicit none
 
-    integer  :: k
+! subroutine arguments
+!
+    integer(kind=4), dimension(0:nseeds-1), intent(out) :: seed
 !
 !-------------------------------------------------------------------------------
 !
-    do k = 0, nseeds - 1
-      seed(k) = seeds(k)
-    end do
+    seed(:) = seeds(:)
 !
 !-------------------------------------------------------------------------------
 !
   end subroutine get_seeds
+!
+!===============================================================================
+!
+! set_seeds: subroutine sets the generator seeds
+!
+!===============================================================================
+!
+  subroutine set_seeds(seed)
+
+    implicit none
+
+! subroutine arguments
+!
+    integer(kind=4), dimension(0:nseeds-1), intent(in) :: seed
+!
+!-------------------------------------------------------------------------------
+!
+    seeds(:) = seed(:)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_seeds
 !
 !===============================================================================
 !
