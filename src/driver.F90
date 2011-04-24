@@ -95,6 +95,19 @@ program godunov
 !
   call read_config()
 
+! reset number of iterations and time, etc.
+!
+  n    = 0
+  t    = 0.0
+  dt   = cfl * dtini
+  dtn  = dtini
+  no   = 0
+  tbeg = 0.0
+  ed   = 9999
+  eh   = 23
+  em   = 59
+  es   = 59
+
 ! initialize timers
 !
   call init_timers()
@@ -109,19 +122,6 @@ program godunov
   call start_timer(1)
   call init_mesh()
   call stop_timer(1)
-
-! reset number of iterations and time, etc.
-!
-  n    = 0
-  t    = 0.0
-  dt   = cfl * dtini
-  dtn  = dtini
-  no   = 0
-  tbeg = 0.0
-  ed   = 9999
-  eh   = 23
-  em   = 59
-  es   = 59
 
 #ifdef FORCE
 ! if the forcing time step is larger than the initial time step decrease it
