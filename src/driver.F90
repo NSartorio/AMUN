@@ -174,7 +174,7 @@ program godunov
 
 ! set the number of next file to number of the current restart file
 !
-    no = nres
+    no = nres - 1
 
   end if
 
