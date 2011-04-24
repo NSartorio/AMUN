@@ -203,7 +203,7 @@ integrals.o     : integrals.F90 blocks.o config.o evolution.o mesh.o           \
                   mpitools.o variables.o
 interpolation.o : interpolation.F90 blocks.o config.o variables.o
 io.o            : io.F90 blocks.o error.o evolution.o mesh.o mpitools.o        \
-                  scheme.o variables.o
+                  random.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o error.o interpolation.o           \
                   mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90

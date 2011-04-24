@@ -451,6 +451,7 @@ module io
     use hdf5     , only : hid_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
     use mpitools , only : ncpus, ncpu
+    use random   , only : nseeds, get_seeds
 
 ! declare variables
 !
@@ -465,6 +466,10 @@ module io
     integer(hid_t)  :: gid
     integer(kind=4) :: dm(3)
     integer         :: err
+
+! allocatable arrays
+!
+    integer(kind=4), dimension(:), allocatable :: seeds
 !
 !-------------------------------------------------------------------------------
 !
@@ -488,6 +493,7 @@ module io
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'ncpus'  , ncpus)
       call write_attribute_integer_h5(gid, 'ncpu'   , ncpu)
+      call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'iter'   , n)
 
 ! store the real attributes
@@ -507,6 +513,28 @@ module io
       dm(:) = (/ in, jn, kn /)
       call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
       call write_attribute_vector_integer_h5(gid, 'rdims', 3, rdims(:))
+
+! store random number generator seed values
+!
+      if (nseeds .gt. 0) then
+
+! allocate space for seeds
+!
+        allocate(seeds(nseeds))
+
+! get the seed values
+!
+        call get_seeds(seeds)
+
+! store them in the current group
+!
+        call write_attribute_vector_integer_h5(gid, 'seeds', nseeds, seeds(:))
+
+! deallocate seed array
+!
+        deallocate(seeds)
+
+      end if ! nseeds > 0
 
 ! close the group
 !
