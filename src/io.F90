@@ -1289,7 +1289,7 @@ module io
     integer(kind=4), dimension(:)  , allocatable :: par, dat
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
-    integer(kind=4), dimension(:,:), allocatable :: chl, cor
+    integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
     integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
 
 ! local pointers
@@ -1337,6 +1337,7 @@ module io
       allocate(zmn(am(1)))
       allocate(zmx(am(1)))
       allocate(chl(dm(1),dm(2)))
+      allocate(pos(pm(1),pm(2)))
       allocate(cor(pm(1),pm(2)))
       allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 
@@ -1365,6 +1366,7 @@ module io
         lev(l)   = pmeta%level
         cfg(l)   = pmeta%config
         ref(l)   = pmeta%refine
+        pos(l,:) = pmeta%pos(:)
         cor(l,:) = pmeta%coord(:)
 
         if (pmeta%leaf) lea(l) = 1
@@ -1411,6 +1413,7 @@ module io
       call write_vector_double_h5 (gid, 'zmin'   , am(1), zmn)
       call write_vector_double_h5 (gid, 'zmax'   , am(1), zmx)
       call write_array2_integer_h5(gid, 'child'  , dm(:), chl)
+      call write_array2_integer_h5(gid, 'pos'    , pm(:), pos)
       call write_array2_integer_h5(gid, 'coord'  , pm(:), cor)
       call write_array4_integer_h5(gid, 'neigh'  , qm(:), ngh)
 
@@ -1506,7 +1509,7 @@ module io
     integer(kind=4), dimension(:)  , allocatable :: par, dat
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
-    integer(kind=4), dimension(:,:), allocatable :: chl, cor
+    integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
     integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
 
 ! local pointers
@@ -1552,6 +1555,7 @@ module io
       allocate(zmn(am(1)))
       allocate(zmx(am(1)))
       allocate(chl(dm(1),dm(2)))
+      allocate(pos(pm(1),pm(2)))
       allocate(cor(pm(1),pm(2)))
       allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 
@@ -1578,6 +1582,7 @@ module io
       call read_vector_double_h5 (gid, 'ymax'   , am(:), ymx(:))
       call read_vector_double_h5 (gid, 'zmin'   , am(:), zmn(:))
       call read_vector_double_h5 (gid, 'zmax'   , am(:), zmx(:))
+      call read_array2_integer_h5(gid, 'pos'    , pm(:), pos(:,:))
       call read_array2_integer_h5(gid, 'coord'  , pm(:), cor(:,:))
       call read_array2_integer_h5(gid, 'child'  , dm(:), chl(:,:))
       call read_array4_integer_h5(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
@@ -1601,6 +1606,7 @@ module io
         pmeta%ymax     = ymx(l)
         pmeta%zmin     = zmn(l)
         pmeta%zmax     = zmx(l)
+        pmeta%pos(:)   = pos(l,:)
         pmeta%coord(:) = cor(l,:)
 
         if (lea(l) .eq. 1) then
