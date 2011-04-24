@@ -158,6 +158,12 @@ program godunov
     call init_mesh()
     call stop_timer(1)
 
+! update the maximum speed in the system
+!
+    call start_timer(2)
+    call update_maximum_speed()
+    call stop_timer(2)
+
 ! write down the initial state
 !
     call start_timer(3)
@@ -177,12 +183,6 @@ program godunov
     no = nres - 1
 
   end if
-
-! update the maximum speed in the system
-!
-  call start_timer(2)
-  call update_maximum_speed()
-  call stop_timer(2)
 
 ! print information
 !
