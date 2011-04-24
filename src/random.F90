@@ -40,7 +40,8 @@ module random
   integer(kind=4), dimension(128)           , save :: kn
   real   (kind=4), dimension(128)           , save :: fn, wn
 
-  public :: init_generator, nseeds, get_seeds, randomu, randomz, randomn
+  public :: init_generator, nseeds, get_seeds, set_seeds                       &
+          , randomu, randomz, randomn
 
   contains
 !

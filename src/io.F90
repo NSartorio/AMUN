@@ -590,6 +590,7 @@ module io
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
     use mpitools , only : ncpus, ncpu
+    use random   , only : nseeds, set_seeds
 
 ! declare variables
 !
@@ -607,12 +608,16 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
-                       , lncells, lnghost
+                       , lncells, lnghost, lnseeds
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
     type(block_data), pointer :: pdata
+
+! allocatable arrays
+!
+    integer(kind=4), dimension(:), allocatable :: seeds
 !
 !-------------------------------------------------------------------------------
 !
@@ -707,6 +712,39 @@ module io
               call read_attribute_double_h5(aid, aname, zmin)
             case('zmax')
               call read_attribute_double_h5(aid, aname, zmax)
+            case('nseeds')
+              call read_attribute_integer_h5(aid, aname, lnseeds)
+
+! check if the numbers of seeds are compatible
+!
+              if (lnseeds .ne. nseeds) then
+                call print_error("io::read_attributes_h5"                      &
+                , "The number of seeds from file and program are incompatible!")
+              end if
+            case('seeds')
+
+! check if the numbers of seeds are compatible
+!
+              if (lnseeds .eq. nseeds) then
+
+! allocate space for seeds
+!
+                allocate(seeds(nseeds))
+
+! store them in the current group
+!
+                call read_attribute_vector_integer_h5(aid, aname, nseeds       &
+                                                                   , seeds(:))
+
+! set the seed values
+!
+                call set_seeds(seeds(:))
+
+! deallocate seed array
+!
+                deallocate(seeds)
+
+              end if
             case default
             end select
 
@@ -1095,6 +1133,81 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_attribute_vector_integer_h5
+!
+!===============================================================================
+!
+! read_attribute_vector_integer_h5: subroutine reads a vector of integer values
+!                                   from an attribute given by the identificator
+!
+! arguments:
+!   aid    - the HDF5 attribute identificator
+!   name   - the attribute name
+!   length - the vector length
+!   value  - the attribute value
+!
+!===============================================================================
+!
+  subroutine read_attribute_vector_integer_h5(aid, name, length, value)
+
+! references to other modules
+!
+    use error, only : print_error
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5 , only : h5aread_f
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)  , intent(in)         :: aid
+    character(len=*), intent(in)         :: name
+    integer         , intent(in)         :: length
+    integer, dimension(:), intent(inout) :: value
+
+! local variables
+!
+    integer(hsize_t), dimension(1)  :: am
+    integer                         :: err
+!
+!-------------------------------------------------------------------------------
+!
+! check if the length is larger than 0
+!
+    if (length .gt. 0) then
+
+! prepare dimension array
+!
+      am(1) = length
+
+! read attribute value
+!
+      call h5aread_f(aid, H5T_NATIVE_INTEGER, value(:), am(:), err)
+
+! check if the attribute has been read successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with reading the attribute
+!
+        call print_error("io::read_attribute_vector_integer_h5"                &
+                                    , "Cannot read attribute :" // trim(name))
+
+      end if
+
+    else ! length > 0
+
+! print error about the wrong vector size
+!
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                                   , "Wrong length of vector")
+
+    end if ! length > 0
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_vector_integer_h5
 !
 !===============================================================================
 !
