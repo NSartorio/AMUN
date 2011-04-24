@@ -31,6 +31,10 @@ module io
 
   implicit none
 
+! the maximum level stored in the restart file
+!
+  integer(kind=4), save :: fcor = 1
+
 ! array of pointer used during job restart
 !
   type(pointer_meta), dimension(:), allocatable, save :: block_array
@@ -584,7 +588,7 @@ module io
     use config   , only : ncells, nghost
     use config   , only : in, jn, kn, rdims, maxlev
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error
+    use error    , only : print_error, print_warning
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
@@ -608,7 +612,7 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
-                       , lncells, lnghost, lnseeds
+                       , lncells, lnghost, lnseeds, lmaxlev
 
 ! local pointers
 !
@@ -665,6 +669,14 @@ module io
               if (lndims .ne. NDIMS) then
                 call print_error("io::read_attributes_h5"                      &
                               , "File and program dimensions are incompatible!")
+              end if
+            case('maxlev')
+              call read_attribute_integer_h5(aid, aname, lmaxlev)
+              if (lmaxlev .gt. maxlev) then
+                call print_warning("io::read_attributes_h5"                    &
+                         , "The maximum refinement level has been decreased!")
+              else
+                fcor = 2**(maxlev - lmaxlev)
               end if
             case('last_id')
               call read_attribute_integer_h5(aid, aname, llast_id)
@@ -1727,6 +1739,12 @@ module io
       call read_array2_integer_h5(gid, 'coord'  , pm(:), cor(:,:))
       call read_array2_integer_h5(gid, 'child'  , dm(:), chl(:,:))
       call read_array4_integer_h5(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+
+! check if the maximum level has been changed, is so, rescale block coordinates
+!
+      if (fcor .gt. 1) then
+        cor(:,:) = cor(:,:) * fcor
+      end if
 
 ! prepare the array of pointers to metablocks
 !
