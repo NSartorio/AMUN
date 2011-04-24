@@ -68,10 +68,6 @@ module random
     real(kind=8), parameter :: m1 = 2.14748364800000d+09
     real(kind=8), parameter :: vn = 9.91256303526217d-03
 
-! OpenMP variables
-!
-    integer, save :: npar = 1
-
 ! OpenMP functions
 !
 !$  integer :: omp_get_num_threads, omp_get_thread_num
@@ -80,20 +76,21 @@ module random
 !
 ! initialize the seeds required by all subroutines
 !
+    nseeds = 1
 !$omp parallel
-!$  npar = omp_get_num_threads()
+!$  nseeds = omp_get_num_threads()
 !$omp end parallel
 
 ! allocate array for seeds
 !
-    allocate(seeds(0:npar-1))
+    allocate(seeds(0:nseeds-1))
 
 ! fill seeds with random numbers
 !
 #ifdef MPI
     if (is_master()) then
 #endif /* MPI */
-      do i = 0, npar - 1
+      do i = 0, nseeds - 1
         call random_number(q)
         seeds(i) = 123456789 * q
       end do
@@ -104,7 +101,7 @@ module random
 #ifdef MPI
 ! redistribute seeds
 !
-    call mbcasti(npar, seeds)
+    call mbcasti(nseeds, seeds)
 #endif /* MPI */
 
 ! prepare the arrays used by nonunifor distribution generators
