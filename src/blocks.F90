@@ -1019,6 +1019,7 @@ module blocks
         do j = 1, nsides
           do k = 1, nfaces
             pneigh => pblock%neigh(i,j,k)%ptr
+            pchild => pblock%child(set(i,j,k))%ptr
 
             if (associated(pneigh)) then
               if (pneigh%id .ne. pblock%id) then
@@ -1026,20 +1027,20 @@ module blocks
 ! point to the right neighbor
 !
                 do p = 1, nfaces
-                  pblock%child(set(i,j,k))%ptr%neigh(i,j,p)%ptr => pneigh
+                  pchild%neigh(i,j,p)%ptr => pneigh
                 end do
 
 ! neighbor level is the same as the refined block
 !
                 if (pneigh%level .eq. pblock%level) then
-                  pneigh%neigh(i,3-j,k)%ptr => pblock%child(set(i,j,k))%ptr
+                  pneigh%neigh(i,3-j,k)%ptr => pchild
                 end if
 
 ! neighbor level is the same as the child block
 !
                 if (pneigh%level .gt. pblock%level) then
                   do p = 1, nfaces
-                    pneigh%neigh(i,3-j,p)%ptr => pblock%child(set(i,j,k))%ptr
+                    pneigh%neigh(i,3-j,p)%ptr => pchild
                   end do
                 end if
 
@@ -1047,6 +1048,16 @@ module blocks
 
             end if
 
+          end do
+        end do
+      end do
+
+! reset neighbor pointers of the parent block
+!
+      do i = 1, ndims
+        do j = 1, nsides
+          do k = 1, nfaces
+            nullify(pblock%neigh(i,j,k)%ptr)
           end do
         end do
       end do
@@ -1390,6 +1401,121 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine derefine_block
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! check_metablock: subroutine checks if the meta block has proper structure
+!
+!===============================================================================
+!
+  subroutine check_metablock(pblock, string)
+
+    implicit none
+
+! input parameters
+!
+    type(block_meta), pointer, intent(in) :: pblock
+    character(len=*)         , intent(in) :: string
+
+! local variables
+!
+    integer :: p, i, j, k
+
+! local pointers
+!
+    type(block_meta), pointer :: ptemp
+!
+!-------------------------------------------------------------------------------
+!
+! check block ID
+!
+    ptemp => pblock
+    if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+      print *, ''
+      print *, ''
+      print *, trim(string)
+      print *, 'wrong meta block id = ', ptemp%id
+      stop
+    end if
+
+! check prev ID
+!
+    ptemp => pblock%prev
+    if (associated(ptemp)) then
+      if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+        print *, ''
+        print *, ''
+        print *, trim(string)
+        print *, 'wrong previous block id = ', ptemp%id, pblock%id
+        stop
+      end if
+    end if
+
+! check next ID
+!
+    ptemp => pblock%next
+    if (associated(ptemp)) then
+      if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+        print *, ''
+        print *, ''
+        print *, trim(string)
+        print *, 'wrong next block id = ', ptemp%id, pblock%id
+        stop
+      end if
+    end if
+
+! check parent ID
+!
+    ptemp => pblock%parent
+    if (associated(ptemp)) then
+      if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+        print *, ''
+        print *, ''
+        print *, trim(string)
+        print *, 'wrong parent block id = ', ptemp%id, pblock%id
+        stop
+      end if
+    end if
+
+! check children IDs
+!
+    do p = 1, nchild
+      ptemp => pblock%child(p)%ptr
+      if (associated(ptemp)) then
+        if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+          print *, ''
+          print *, ''
+          print *, trim(string)
+          print *, 'wrong child block id = ', ptemp%id, pblock%id, p
+          stop
+        end if
+      end if
+    end do
+
+! check neighbors IDs
+!
+    do i = 1, ndims
+      do j = 1, nsides
+        do k = 1, nfaces
+          ptemp => pblock%neigh(i,j,k)%ptr
+          if (associated(ptemp)) then
+            if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then
+              print *, ''
+              print *, ''
+              print *, trim(string)
+              print *, 'wrong neighbor id = ', ptemp%id, pblock%id, i, j, k
+              stop
+            end if
+          end if
+        end do
+      end do
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_metablock
+#endif /* DEBUG */
 
 !===============================================================================
 !

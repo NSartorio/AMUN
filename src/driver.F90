@@ -104,6 +104,10 @@ program godunov
   dtn  = dtini
   no   = 0
   tbeg = 0.0
+  ed   = 9999
+  eh   = 23
+  em   = 59
+  es   = 59
 
 ! initialize timers
 !
@@ -227,7 +231,7 @@ program godunov
 ! get current time in seconds
 !
     tcur = get_timer_total()
-    ec   = int((tmax - t)/(t - tbeg)*tcur, kind=4)
+    ec   = int((tmax - t) / (t - tbeg) * tcur, kind=4)
     es   = max(0, int(mod(ec,60)))
     em   = int(mod(ec/60,60))
     eh   = int(ec/3600)
