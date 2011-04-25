@@ -1,19 +1,19 @@
 !!******************************************************************************
 !!
-!! program: Godunov-AMR
+!! program: AMUN
 !!
 !! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of Godunov-AMR.
+!!  This file is part of AMUN.
 !!
-!!  Godunov-AMR is free software; you can redistribute it and/or modify
+!!  AMUN is free software; you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
 !!  the Free Software Foundation; either version 3 of the License, or
 !!  (at your option) any later version.
 !!
-!!  Godunov-AMR is distributed in the hope that it will be useful,
+!!  AMUN is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !!  GNU General Public License for more details.
@@ -24,7 +24,7 @@
 !!******************************************************************************
 !!
 !
-program godunov
+program amun
 
 ! modules
 !
@@ -64,7 +64,7 @@ program godunov
 !
   if (is_master()) then
     write (*,"(1x,78('-'))")
-    write (*,"(1x,18('='),4x,a,4x,19('='))") '      Godunov-AMR algorithm      '
+    write (*,"(1x,18('='),4x,a,4x,19('='))") '             A M U N             '
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
                                         'Copyright (C) 2008-2011 Grzegorz Kowal'
 #ifdef MPI
