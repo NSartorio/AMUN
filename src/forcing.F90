@@ -170,12 +170,12 @@ module forcing
 ! print information about forcing parameters
 !
     if (is_master()) then
+      write(*,*                )
       write(*,"(1x,a)"         ) "Forcing parameters:"
       write(*,"(4x,a,1x,i6)"   ) "number of components   =", nf
       write(*,"(4x,a,1x,f12.6)") "input power            =", fpow
       write(*,"(4x,a,1x,f12.6)") "normalization coeff.   =", fnor
       write(*,"(4x,a,1x,f12.6)") "maximum amplitude      =", fa
-      write(*,*                )
     end if
 
 ! multiply aplitude by the square of forcing time step so we don't have to

@@ -84,8 +84,11 @@ module mesh
 ! according to the defined geometry is already created; no refinement
 ! is done yet; we fill out the coarse blocks with the initial condition
 !
-    if (is_master()) &
+    if (is_master()) then
+      write(*,*)
+      write(*,"(1x,a)"  ) "Generating the initial mesh:"
       write(*,"(4x,a,$)") "generating level       =    "
+    end if
 
     l = 1
     do while (l .le. maxlev)
@@ -403,7 +406,8 @@ module mesh
 ! print general information about resolutions
 !
     if (is_master()) then
-      write(*,"(1x,a)"         ) "Generating the initial mesh:"
+      write(*,*)
+      write(*,"(1x,a)"         ) "Geometry:"
       write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "base resolution        ="                    &
                                                        , rdims(1:NDIMS) * ncells

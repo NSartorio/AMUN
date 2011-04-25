@@ -88,8 +88,8 @@ program godunov
 #ifdef ISO
     "isothermal"
 #endif /* ISO */
-
-    write (*,*)
+    write (*,"(4x,a,1x,a)"    ) "geometry               =",                    &
+    "rectangular"
   end if
 
 ! read configuration file
