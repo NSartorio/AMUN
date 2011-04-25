@@ -345,6 +345,10 @@ module mesh
 !
     integer(kind=4)      :: i, j, k, l, n
 
+! local arrays
+!
+    integer(kind=4), dimension(3) :: bm, rm, dm
+!
 !-------------------------------------------------------------------------------
 !
 ! allocating space for coordinate variables
@@ -406,14 +410,22 @@ module mesh
 ! print general information about resolutions
 !
     if (is_master()) then
+      bm( :     ) = 1
+      rm( :     ) = 1
+      dm( :     ) = 1
+
+      bm(1:NDIMS) = rdims(1:NDIMS) * ncells
+      rm(1:NDIMS) = rdims(1:NDIMS) * res(1)
+      dm(1:NDIMS) = rm(1:NDIMS) / ncells
+
       write(*,*)
       write(*,"(1x,a)"         ) "Geometry:"
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "base resolution        ="                    &
-                                                       , rdims(1:NDIMS) * ncells
-      write(*,"(4x,a,3(1x,i6))") "effective resolution   ="                    &
-                                                       , rdims(1:NDIMS) * res(1)
       write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
+      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
+      write(*,"(4x,a,  1x,i6)" ) "total cover blocks     =", product(dm(:))
+      write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
     end if
 
 !-------------------------------------------------------------------------------
