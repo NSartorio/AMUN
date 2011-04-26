@@ -90,6 +90,10 @@ module integrals
 !
         open(unit=funit, file=fname, form='formatted', position='append')
 
+! write a marker that the job has been restarted from here
+!
+        write(funit,"('#',1x,a)") "job restarted from this point"
+
       end if
 
     end if
