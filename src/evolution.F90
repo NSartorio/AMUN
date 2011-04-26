@@ -268,19 +268,6 @@ module evolution
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
 
-#ifdef FORCE
-! obtain the forcing terms in real space
-!
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
-                                       , pblock%meta%zmin, f(:,:,:,:))
-
-! update momenta due to the forcing terms
-!
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-
-#endif /* FORCE */
 ! 1st step of integration
 !
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
@@ -315,6 +302,19 @@ module evolution
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
+#ifdef FORCE
+! obtain the forcing terms in real space
+!
+    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+                                       , pblock%meta%zmin, f(:,:,:,:))
+
+! update momenta due to the forcing terms
+!
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
@@ -382,19 +382,6 @@ module evolution
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
 
-#ifdef FORCE
-! obtain the forcing terms in real space
-!
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
-                                       , pblock%meta%zmin, f(:,:,:,:))
-
-! update momenta due to the forcing terms
-!
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-
-#endif /* FORCE */
 !! 1st step of integration
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
@@ -474,6 +461,19 @@ module evolution
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
+#ifdef FORCE
+! obtain the forcing terms in real space
+!
+    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+                                       , pblock%meta%zmin, f(:,:,:,:))
+
+! update momenta due to the forcing terms
+!
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
@@ -545,19 +545,6 @@ module evolution
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
 
-#ifdef FORCE
-! obtain the forcing terms in real space
-!
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
-                                       , pblock%meta%zmin, f(:,:,:,:))
-
-! update momenta due to the forcing terms
-!
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-
-#endif /* FORCE */
 !! 1st step of integration
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
@@ -650,6 +637,19 @@ module evolution
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
+#ifdef FORCE
+! obtain the forcing terms in real space
+!
+    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+                                       , pblock%meta%zmin, f(:,:,:,:))
+
+! update momenta due to the forcing terms
+!
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
