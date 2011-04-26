@@ -187,6 +187,7 @@ program amun
 ! print information
 !
   if (is_master()) then
+    write(*,*          )
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
