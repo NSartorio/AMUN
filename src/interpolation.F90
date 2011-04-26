@@ -308,6 +308,22 @@ module interpolation
         fmx = min(max(f(i),f(im1),fmd), max(f(i),ful,flc))
         fr(i) = median(fh, fmn, fmx)
       end if
+
+! if the left state creates a local extremum, limit both states to the zeroth
+! interpolation
+!
+      if ((f(ip1) - fl(i)) * (fl(i) - f(i)) .lt. 0.0d0) then
+        fl(i) = f(i)
+        fr(i) = f(i)
+      end if
+
+! if the right state creates a local extremum, limit both states to the zeroth
+! interpolation
+!
+      if ((f(i) - fr(i)) * (fr(i) - f(im1)) .lt. 0.0d0) then
+        fl(i) = f(i)
+        fr(i) = f(i)
+      end if
     end do
 
 ! shift i-1/2 to the left
