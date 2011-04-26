@@ -44,6 +44,9 @@ module evolution
 
     use blocks    , only : block_data, list_data
     use boundaries, only : boundary_variables
+#ifdef REFINE
+    use config    , only : maxlev
+#endif /* REFINE */
 #ifdef VISCOSITY
     use config    , only : visc
 #endif /* VISCOSITY */
@@ -119,17 +122,23 @@ module evolution
     call stop_timer(4)
 
 #ifdef REFINE
+! chec if we need to perform the refinement step
+!
+    if (maxlev .gt. 1) then
+
 ! check refinement and refine
 !
-    call start_timer(5)
-    call update_mesh()
-    call stop_timer(5)
+      call start_timer(5)
+      call update_mesh()
+      call stop_timer(5)
 
 ! update boundaries
 !
-    call start_timer(4)
-    call boundary_variables()
-    call stop_timer(4)
+      call start_timer(4)
+      call boundary_variables()
+      call stop_timer(4)
+
+    end if ! maxlev > 1
 
 #endif /* REFINE */
 ! update the maximum speed
