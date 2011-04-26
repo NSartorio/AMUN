@@ -41,11 +41,19 @@ module integrals
 !
 !===============================================================================
 !
-  subroutine init_integrals()
+  subroutine init_integrals(flag)
 
     use mpitools , only : is_master
 
     implicit none
+
+! input arguments
+!
+    logical, intent(in) :: flag
+
+! local arguments
+!
+    logical :: info
 !
 !-------------------------------------------------------------------------------
 !
@@ -53,18 +61,36 @@ module integrals
 !
     if (is_master()) then
 
-! create a new integrals.dat file
+! check if the integrals file exists
 !
-      open(unit=funit, file=fname, form='formatted', status='replace')
+      inquire(file = fname, exist = info)
+
+! if flag is set to .true. or the original integrals file does not exist, create
+! a new one and write the header in it, otherwise open the original file and
+! move the writing position to the end to allow for appending
+!
+      if (flag .or. .not. info) then
+
+! create a new integrals file
+!
+        open(unit=funit, file=fname, form='formatted', status='replace')
 
 ! write the integral file header
 !
-      write(funit,"('#')")
-      write(funit,"('#',a6,12(1x,a15))") 'step', 'time', 'dt', 'mass'          &
-                                       , 'momx', 'momy', 'momz'                &
-                                       , 'ener', 'ekin', 'emag', 'eint'        &
-                                       , 'fcor', 'finp'
-      write(funit,"('#')")
+        write(funit,"('#')")
+        write(funit,"('#',a6,12(1x,a15))") 'step', 'time', 'dt', 'mass'        &
+                                         , 'momx', 'momy', 'momz'              &
+                                         , 'ener', 'ekin', 'emag', 'eint'      &
+                                         , 'fcor', 'finp'
+        write(funit,"('#')")
+
+      else
+
+! open the integrals file and set the position at the end of file
+!
+        open(unit=funit, file=fname, form='formatted', position='append')
+
+      end if
 
     end if
 !

@@ -143,13 +143,13 @@ program amun
   call init_forcing()
 
 #endif /* FORCE */
-! initialize the integrals module
-!
-  call init_integrals()
-
 ! check if we initiate new problem or restart previous job
 !
   if (nres .lt. 0) then
+
+! initialize the integrals module
+!
+    call init_integrals(.true.)
 
 ! initialize our adaptive mesh, refine that mesh to the desired level
 ! according to the initialized problem
@@ -171,6 +171,10 @@ program amun
     call stop_timer(3)
 
   else
+
+! initialize the integrals module
+!
+    call init_integrals(.false.)
 
 ! reconstruct the meta and data block structures from a given restart file
 !
