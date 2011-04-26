@@ -423,7 +423,7 @@ module mesh
       write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
       write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
-      write(*,"(4x,a,  1x,i6)" ) "total cover blocks     =", product(dm(:))
+      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))
       write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
     end if
