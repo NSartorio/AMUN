@@ -386,20 +386,12 @@ module evolution
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
-
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
     call update_shapes(pblock, du(:,:,:,:))
-#endif /* SHAPE */
 
+#endif /* SHAPE */
 ! update the solution for the fluid variables
 !
     u1(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
@@ -417,27 +409,19 @@ module evolution
 ! update the solution for the scalar potential Psi
 !
     u1(iph,:,:,:) = pblock%u(iph,:,:,:) + ch2 * dt * du(iph,:,:,:)
+
 #endif /* GLM */
 #endif /* MHD */
-
 ! 2nd step of integration
 !
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef FORCE
-! update du due to forcing terms
-!
-    du(imx,:,:,:) = du(imx,:,:,:) + u1(idn,:,:,:) * f(1,:,:,:)
-    du(imy,:,:,:) = du(imy,:,:,:) + u1(idn,:,:,:) * f(2,:,:,:)
-    du(imz,:,:,:) = du(imz,:,:,:) + u1(idn,:,:,:) * f(3,:,:,:)
-#endif /* FORCE */
 
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
     call update_shapes(pblock, du(:,:,:,:))
-#endif /* SHAPE */
 
+#endif /* SHAPE */
 ! update the solution for the fluid variables
 !
     pblock%u(1:nfl,:,:,:) = 0.5d0 * (pblock%u(1:nfl,:,:,:)                     &
@@ -459,6 +443,7 @@ module evolution
 !
     decay = exp(- alpha_p * cmax * dt / dx_min)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
+
 #endif /* GLM */
 #endif /* MHD */
 #ifdef FORCE
