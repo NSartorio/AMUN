@@ -164,6 +164,10 @@ program amun
     call update_maximum_speed()
     call stop_timer(2)
 
+! store integrals
+!
+    call store_integrals()
+
 ! write down the initial state
 !
     call start_timer(3)
