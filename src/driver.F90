@@ -40,7 +40,7 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data, restart_job
-  use mesh     , only : init_mesh, generate_mesh, clear_mesh
+  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -123,29 +123,15 @@ program amun
   call init_blocks()
   call stop_timer(1)
 
-! initialize coordinate variables
-!
-  call start_timer(1)
-  call init_mesh()
-  call stop_timer(1)
-
-#ifdef FORCE
-! if the forcing time step is larger than the initial time step decrease it
-!
-  fdt = min(fdt, 0.1d0 * dtini)
-
-! round the initial time step to the integer number of forcing time steps
-!
-  dt  = fdt * floor(dt / fdt)
-
-! initialize forcing module
-!
-  call init_forcing()
-
-#endif /* FORCE */
 ! check if we initiate new problem or restart previous job
 !
   if (nres .lt. 0) then
+
+! initialize the mesh module
+!
+    call start_timer(1)
+    call init_mesh(.true.)
+    call stop_timer(1)
 
 ! initialize the integrals module
 !
@@ -157,6 +143,10 @@ program amun
     call start_timer(1)
     call generate_mesh()
     call stop_timer(1)
+
+! store mesh statistics
+!
+    call store_mesh_stats(n, t)
 
 ! update the maximum speed in the system
 !
@@ -176,6 +166,12 @@ program amun
 
   else
 
+! initialize the mesh module
+!
+    call start_timer(1)
+    call init_mesh(.false.)
+    call stop_timer(1)
+
 ! initialize the integrals module
 !
     call init_integrals(.false.)
@@ -192,6 +188,20 @@ program amun
 
   end if
 
+#ifdef FORCE
+! if the forcing time step is larger than the initial time step decrease it
+!
+  fdt = min(fdt, 0.1d0 * dtini)
+
+! round the initial time step to the integer number of forcing time steps
+!
+  dt  = fdt * floor(dt / fdt)
+
+! initialize forcing module
+!
+  call init_forcing()
+
+#endif /* FORCE */
 ! print information
 !
   if (is_master()) then
@@ -227,6 +237,10 @@ program amun
     call start_timer(2)
     call evolve()
     call stop_timer(2)
+
+! store mesh statistics
+!
+    call store_mesh_stats(n, t)
 
 ! store integrals
 !

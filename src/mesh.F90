@@ -39,6 +39,16 @@ module mesh
   real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
   real, dimension(:  ), allocatable, save :: advol
 
+! maximum number of covering blocks
+!
+  integer                 , save :: tblocks = 1
+  integer,dimension(NDIMS), save :: effres  = 1
+
+! log file for the mesh statistics
+!
+  character(len=32), save :: fname = "mesh.log"
+  integer          , save :: funit = 11
+
   contains
 !
 !===============================================================================
@@ -47,18 +57,23 @@ module mesh
 !
 !===============================================================================
 !
-  subroutine init_mesh()
+  subroutine init_mesh(flag)
 
     use blocks  , only : res
     use config  , only : maxlev, im, jm, km, ncells, rdims, ng                 &
                        , xmin, xmax, ymin, ymax, zmin, zmax
-    use mpitools, only : is_master
+    use mpitools, only : is_master, ncpus
 
     implicit none
 
+! input arguments
+!
+    logical, intent(in) :: flag
+
 ! local variables
 !
-    integer(kind=4)      :: i, j, k, l, n
+    integer(kind=4) :: i, j, k, l, n
+    logical         :: info
 
 ! local arrays
 !
@@ -134,16 +149,68 @@ module mesh
       rm(1:NDIMS) = rdims(1:NDIMS) * res(1)
       dm(1:NDIMS) = rm(1:NDIMS) / ncells
 
+      effres(1:NDIMS) = rm(1:NDIMS)
+      tblocks         = product(dm(:))
+
       write(*,*)
       write(*,"(1x,a)"         ) "Geometry:"
       write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
       write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
-      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))
+      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", tblocks
       write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
 
-    end if
+! prepare the file for logging mesh statistics; only the master process handles
+! this part
+!
+! check if the mesh statistics file exists
+!
+      inquire(file = fname, exist = info)
+
+! if flag is set to .true. or the original mesh statistics file does not exist,
+! create a new one and write the header in it, otherwise open the original file
+! and move the writing position to the end to allow for appending
+!
+      if (flag .or. .not. info) then
+
+! create a new mesh statistics file
+!
+        open(unit=funit, file=fname, form='formatted', status='replace')
+
+! write the mesh statistics file header
+!
+        write(funit,"('#')")
+        write(funit,"('#',4x,'step',5x,'time',11x,'leaf',4x,'meta'" //         &
+                           "6x,'coverage',8x,'AMR',11x,'block distribution')")
+        write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'" //         &
+                                                        ",6x,'efficiency',$)")
+        write(funit,"(1x,a12,$)") 'level = 1'
+        do l = 2, maxlev
+          write(funit,"(2x,i6,$)") l
+        end do
+#ifdef MPI
+        write(funit,"(1x,a10,$)") 'cpu = 1'
+        do n = 2, ncpus
+          write(funit,"(2x,i6,$)") n
+        end do
+#endif /* MPI */
+        write(funit,"('' )")
+        write(funit,"('#')")
+
+      else
+
+! open the mesh statistics file and set the position at the end of file
+!
+        open(unit=funit, file=fname, form='formatted', position='append')
+
+! write a marker that the job has been restarted from here
+!
+        write(funit,"('#',1x,a)") "job restarted from this point"
+
+      end if
+
+    end if ! master
 !
 !-------------------------------------------------------------------------------
 !
@@ -1290,8 +1357,9 @@ module mesh
 !
   subroutine clear_mesh()
 
-    use blocks, only : clear_blocks
-    use error , only : print_info
+    use blocks  , only : clear_blocks
+    use error   , only : print_info
+    use mpitools, only : is_master
 
     implicit none
 
@@ -1314,9 +1382,100 @@ module mesh
     if (allocated(adzi) ) deallocate(adzi)
     if (allocated(advol)) deallocate(advol)
 
+! close the handler of the mesh statistics file
+!
+    if (is_master()) close(funit)
+
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_mesh
+!
+!===============================================================================
+!
+! store_mesh_stats: subroutine stores mesh statistics
+!
+!===============================================================================
+!
+  subroutine store_mesh_stats(n, t)
+
+    use blocks  , only : mblocks, nleafs
+    use blocks  , only : block_meta, list_meta
+    use config  , only : ncells, nghost, maxlev
+    use mpitools, only : is_master, ncpus
+
+    implicit none
+
+! arguments
+!
+    integer     , intent(in) :: n
+    real(kind=8), intent(in) :: t
+
+! local variables
+!
+    integer(kind=4) :: l
+    real(kind=4)    :: cov, eff
+
+! local arrays
+!
+    integer(kind=4), dimension(maxlev) :: ldist
+#ifdef MPI
+    integer(kind=4), dimension(ncpus)  :: cdist
+#endif /* MPI */
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+
+!-------------------------------------------------------------------------------
+!
+! store the statistics about mesh
+!
+    if (is_master()) then
+
+! calculate the coverage
+!
+      cov = (1.0 * nleafs) / tblocks
+      eff = (1.0 * nleafs * (ncells + 2 * nghost)**NDIMS)                      &
+                                       / product(effres(1:NDIMS) + 2 * nghost)
+
+! get the block level distribution
+!
+      ldist(:) = 0
+#ifdef MPI
+      cdist(:) = 0
+#endif /* MPI */
+      pmeta => list_meta
+      do while(associated(pmeta))
+        if (pmeta%leaf) then
+          ldist(pmeta%level) = ldist(pmeta%level) + 1
+#ifdef MPI
+          cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
+#endif /* MPI */
+        end if
+        pmeta => pmeta%next
+      end do
+
+! write down the statistics
+!
+      write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8),$)")               &
+                                              n, t, nleafs, mblocks, cov, eff
+      write(funit,"('   ',$)")
+      do l = 1, maxlev
+        write(funit,"(2x,i6,$)") ldist(l)
+      end do
+#ifdef MPI
+      write(funit,"('   ',$)")
+      do l = 1, ncpus
+        write(funit,"(2x,i6,$)") cdist(l)
+      end do
+#endif /* MPI */
+      write(funit,"('')")
+
+    end if
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine store_mesh_stats
 #ifdef DEBUG
 !
 !===============================================================================

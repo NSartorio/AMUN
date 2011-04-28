@@ -174,6 +174,9 @@ clean-data:
 clean-exec:
 	rm -rf *.x
 
+clean-logs:
+	rm -rf *.log
+
 clean-modules:
 	rm -rf *.mod
 
@@ -182,7 +185,8 @@ clean-objects:
 
 clean: clean-bak clean-modules clean-objects
 
-clean-all: clean-bak clean-data clean-exec clean-modules clean-objects
+clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
+           clean-objects
 
 #-------------------------------------------------------------------------------
 
