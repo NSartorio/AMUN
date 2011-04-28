@@ -43,12 +43,13 @@ module mesh
 !
 !===============================================================================
 !
-! init_mesh: subroutine initializes mesh by creating blocks according
-!            to the geometry, initial problem and refinement criterium
+! generate_mesh: subroutine generate the initial block structure by creating
+!                blocks according to the geometry, initial problem and
+!                refinement criterium
 !
 !===============================================================================
 !
-  subroutine init_mesh()
+  subroutine generate_mesh()
 
     use config  , only : maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data
@@ -323,7 +324,7 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_mesh
+  end subroutine generate_mesh
 !
 !===============================================================================
 !

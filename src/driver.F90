@@ -40,7 +40,7 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data, restart_job
-  use mesh     , only : init_mesh, clear_mesh, init_coords
+  use mesh     , only : generate_mesh, clear_mesh, init_coords
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -151,11 +151,11 @@ program amun
 !
     call init_integrals(.true.)
 
-! initialize our adaptive mesh, refine that mesh to the desired level
-! according to the initialized problem
+! generate the initial mesh, refine that mesh to the desired level according to
+! the initialized problem
 !
     call start_timer(1)
-    call init_mesh()
+    call generate_mesh()
     call stop_timer(1)
 
 ! update the maximum speed in the system
