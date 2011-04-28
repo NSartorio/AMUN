@@ -243,9 +243,7 @@ module mesh
 
 ! local variables
 !
-    integer(kind=4)      :: i, j, k, l, n
-    character(len=64)    :: fmt
-    character(len=32)    :: bstr, tstr
+    integer(kind=4)                       :: i, j, k, l, n
 #ifdef MPI
     integer(kind=4), dimension(0:ncpus-1) :: lb
 #endif /* MPI */
@@ -476,25 +474,10 @@ module mesh
     end do
 #endif /* MPI */
 
-! print information about the generated geometry
+! go to a new line after generating levels
 !
     if (is_master()) then
-      n = 0
-      do l = 0, maxlev - 1
-        k = 2**(NDIMS * l)
-        n = n + k
-      end do
-      n = n * rdims(1) * rdims(2) * rdims(3)
-      k = k * rdims(1) * rdims(2) * rdims(3)
-
-      i = nint(alog10(1.0*mblocks + 1)) + 1
-      j = nint(alog10(1.0*n + 1)) + 1
-
-      write(fmt, "(a,i1,a,i1,a)") "(4x,a,1x,i", i, ",' / ',i", j, ",' = ',f8.4,' %')"
-
       write(*,*)
-      write(*,fmt) "leafs    /cover blocks =", nleafs , k, (100.0 * nleafs ) / k
-      write(*,fmt) "allocated/total blocks =", mblocks, n, (100.0 * mblocks) / n
     end if
 
 !-------------------------------------------------------------------------------
