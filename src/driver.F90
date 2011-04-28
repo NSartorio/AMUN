@@ -40,7 +40,7 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data, restart_job
-  use mesh     , only : generate_mesh, clear_mesh, init_coords
+  use mesh     , only : init_mesh, generate_mesh, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -126,7 +126,7 @@ program amun
 ! initialize coordinate variables
 !
   call start_timer(1)
-  call init_coords()
+  call init_mesh()
   call stop_timer(1)
 
 #ifdef FORCE

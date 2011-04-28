@@ -43,6 +43,114 @@ module mesh
 !
 !===============================================================================
 !
+! init_mesh: subroutine initializes mesh module and coordinate variables
+!
+!===============================================================================
+!
+  subroutine init_mesh()
+
+    use blocks  , only : res
+    use config  , only : maxlev, im, jm, km, ncells, rdims, ng                 &
+                       , xmin, xmax, ymin, ymax, zmin, zmax
+    use mpitools, only : is_master
+
+    implicit none
+
+! local variables
+!
+    integer(kind=4)      :: i, j, k, l, n
+
+! local arrays
+!
+    integer(kind=4), dimension(3) :: bm, rm, dm
+!
+!-------------------------------------------------------------------------------
+!
+! allocating space for coordinate variables
+!
+    allocate(ax   (maxlev, im))
+    allocate(ay   (maxlev, jm))
+    allocate(az   (maxlev, km))
+    allocate(adx  (maxlev))
+    allocate(ady  (maxlev))
+    allocate(adz  (maxlev))
+    allocate(adxi (maxlev))
+    allocate(adyi (maxlev))
+    allocate(adzi (maxlev))
+    allocate(advol(maxlev))
+
+! reset the coordinate variables
+!
+    ax(:,:)  = 0.0d0
+    ay(:,:)  = 0.0d0
+    az(:,:)  = 0.0d0
+    adx(:)   = 1.0d0
+    ady(:)   = 1.0d0
+    adz(:)   = 1.0d0
+    adxi(:)  = 1.0d0
+    adyi(:)  = 1.0d0
+    adzi(:)  = 1.0d0
+    advol(:) = 1.0d0
+
+! generating coordinates for all levels
+!
+    do l = 1, maxlev
+      n = ncells * 2**(l - 1)
+
+      adx (l) = (xmax - xmin) / (rdims(1) * n)
+      ady (l) = (ymax - ymin) / (rdims(2) * n)
+#if NDIMS == 3
+      adz (l) = (zmax - zmin) / (rdims(3) * n)
+#endif /* NDIMS == 3 */
+
+      ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
+      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
+#if NDIMS == 3
+      az(l,:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * adz(l)
+#endif /* NDIMS == 3 */
+
+      adxi(l) = 1.0d0 / adx(l)
+      adyi(l) = 1.0d0 / ady(l)
+#if NDIMS == 3
+      adzi(l) = 1.0d0 / adz(l)
+#endif /* NDIMS == 3 */
+
+      advol(l) = adx(l) * ady(l) * adz(l)
+    end do
+
+! get the minimum grid step
+!
+    dx_min = 0.5 * min(adx(maxlev), ady(maxlev), adz(maxlev))
+
+! print general information about resolutions
+!
+    if (is_master()) then
+
+      bm( :     ) = 1
+      rm( :     ) = 1
+      dm( :     ) = 1
+
+      bm(1:NDIMS) = rdims(1:NDIMS) * ncells
+      rm(1:NDIMS) = rdims(1:NDIMS) * res(1)
+      dm(1:NDIMS) = rm(1:NDIMS) / ncells
+
+      write(*,*)
+      write(*,"(1x,a)"         ) "Geometry:"
+      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
+      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
+      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))
+      write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
+
+    end if
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine init_mesh
+!
+!===============================================================================
+!
 ! generate_mesh: subroutine generate the initial block structure by creating
 !                blocks according to the geometry, initial problem and
 !                refinement criterium
@@ -325,112 +433,6 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine generate_mesh
-!
-!===============================================================================
-!
-! init_coords: subroutine initializes coordinate variables
-!
-!===============================================================================
-!
-  subroutine init_coords()
-
-    use blocks  , only : res
-    use config  , only : maxlev, im, jm, km, ncells, rdims, ng                 &
-                       , xmin, xmax, ymin, ymax, zmin, zmax
-    use mpitools, only : is_master
-
-    implicit none
-
-! local variables
-!
-    integer(kind=4)      :: i, j, k, l, n
-
-! local arrays
-!
-    integer(kind=4), dimension(3) :: bm, rm, dm
-!
-!-------------------------------------------------------------------------------
-!
-! allocating space for coordinate variables
-!
-    allocate(ax   (maxlev, im))
-    allocate(ay   (maxlev, jm))
-    allocate(az   (maxlev, km))
-    allocate(adx  (maxlev))
-    allocate(ady  (maxlev))
-    allocate(adz  (maxlev))
-    allocate(adxi (maxlev))
-    allocate(adyi (maxlev))
-    allocate(adzi (maxlev))
-    allocate(advol(maxlev))
-
-! reset the coordinate variables
-!
-    ax(:,:)  = 0.0d0
-    ay(:,:)  = 0.0d0
-    az(:,:)  = 0.0d0
-    adx(:)   = 1.0d0
-    ady(:)   = 1.0d0
-    adz(:)   = 1.0d0
-    adxi(:)  = 1.0d0
-    adyi(:)  = 1.0d0
-    adzi(:)  = 1.0d0
-    advol(:) = 1.0d0
-
-! generating coordinates for all levels
-!
-    do l = 1, maxlev
-      n = ncells * 2**(l - 1)
-
-      adx (l) = (xmax - xmin) / (rdims(1) * n)
-      ady (l) = (ymax - ymin) / (rdims(2) * n)
-#if NDIMS == 3
-      adz (l) = (zmax - zmin) / (rdims(3) * n)
-#endif /* NDIMS == 3 */
-
-      ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
-      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
-#if NDIMS == 3
-      az(l,:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * adz(l)
-#endif /* NDIMS == 3 */
-
-      adxi(l) = 1.0d0 / adx(l)
-      adyi(l) = 1.0d0 / ady(l)
-#if NDIMS == 3
-      adzi(l) = 1.0d0 / adz(l)
-#endif /* NDIMS == 3 */
-
-      advol(l) = adx(l) * ady(l) * adz(l)
-    end do
-
-! get the minimum grid step
-!
-    dx_min = 0.5 * min(adx(maxlev), ady(maxlev), adz(maxlev))
-
-! print general information about resolutions
-!
-    if (is_master()) then
-      bm( :     ) = 1
-      rm( :     ) = 1
-      dm( :     ) = 1
-
-      bm(1:NDIMS) = rdims(1:NDIMS) * ncells
-      rm(1:NDIMS) = rdims(1:NDIMS) * res(1)
-      dm(1:NDIMS) = rm(1:NDIMS) / ncells
-
-      write(*,*)
-      write(*,"(1x,a)"         ) "Geometry:"
-      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
-      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))
-      write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_coords
 !
 !===============================================================================
 !
