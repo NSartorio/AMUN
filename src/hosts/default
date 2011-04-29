@@ -36,6 +36,10 @@ ifeq ($(STATIC),Y)
 LDFLAGS += -static
 endif
 
+ifeq ($(SIGNALS),Y)
+FFLAGS += -DSIGNALS
+endif
+
 ifeq ($(PREC),8)
 FFLAGS  += -default-real-${PREC} -default-double-${PREC}
 endif
