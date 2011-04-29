@@ -41,7 +41,7 @@ program amun
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : write_data, restart_job
   use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
-  use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master
+  use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
                       , get_timer_total
@@ -51,11 +51,35 @@ program amun
 ! local variables
 !
   character(len=60) :: fmt
+  integer(kind=4)   :: iterm = 0
   integer           :: no, ed, eh, em, es, ec
   real              :: tall, tbeg, tcur, per
+#ifdef SIGNALS
+
+! commons required to share iterm flag
+!
+  common /signals/ iterm
+
+! references to functions handling signals
+!
+  intrinsic signal
+  external  terminate
+
+! signal definitions
+!
+  integer, parameter :: SIGINT = 2, SIGABRT = 6, SIGTERM = 15
+#endif /* SIGNALS */
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef SIGNALS
+! assign function terminate with signals
+!
+  call signal(SIGINT , terminate)
+  call signal(SIGABRT, terminate)
+  call signal(SIGTERM, terminate)
+
+#endif /* SIGNALS */
 ! initialize MPI
 !
   call init_mpi()
@@ -215,7 +239,7 @@ program amun
 
 ! main loop
 !
-  do while((n .lt. nmax) .and. (t .le. tmax))
+  do while((n .lt. nmax) .and. (t .le. tmax) .and. (iterm .eq. 0))
 
 ! compute new time step
 !
@@ -271,6 +295,13 @@ program amun
     if (is_master())                                                           &
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",a1,$)') n, t, dt, nleafs, ed, eh, em, es, char(13)
+
+#if defined SIGNALS && defined MPI
+! reduce termination flag over all processors
+!
+    call mfindmaxi(iterm)
+
+#endif /* SIGNALS & MPI */
   end do
 
 ! add one empty line
@@ -304,6 +335,18 @@ program amun
   tall = get_timer_total()
   per  = 100.0 / tall
 
+#ifdef SIGNALS
+! print info about termination due to a signal
+!
+  if (is_master()) then
+    if (iterm .eq. 1) then
+      write(*,*)
+      write(*,"(1x,a)") "Program terminated due to received signal."
+      write(*,"(1x,a)") "Restart files have been successfully written."
+    end if
+  end if
+
+#endif /* SIGNALS */
 ! print info about execution times
 !
   if (is_master()) then
@@ -335,3 +378,39 @@ program amun
 !-------------------------------------------------------------------------------
 !
 end program
+#ifdef SIGNALS
+!
+!===============================================================================
+!
+! terminate: function handles properly the signals sent to the program
+!
+!===============================================================================
+!
+function terminate(snum)
+
+  implicit none
+
+! input arguments
+!
+  integer(4), intent(in) :: snum
+
+! local and shared variables
+!
+  integer(4)             :: terminate, iterm
+
+! commons to declate shared variables
+!
+  common /signals/ iterm
+!
+!-------------------------------------------------------------------------------
+!
+  iterm     = 1
+  terminate = 1
+
+!-------------------------------------------------------------------------------
+!
+end
+#endif /* SIGNALS */
+
+!===============================================================================
+!

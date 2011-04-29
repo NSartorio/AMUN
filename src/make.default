@@ -2,13 +2,17 @@
 #
 # compilation, debugging and profiling flags:
 #
+#   COMPILER   - compiler brand; it is passed to the host file
 #   DEBUG      - enable or disable debugging
-#   STATIC     - enable or disable static linking
 #   PROFILE    - enable or disable profiling
+#   STATIC     - enable or disable static linking
+#   SIGNALS    - support for signals for proper shutdown with restart file
 #
-DEBUG        = N
-STATIC       = N
+COMPILER     = GNU
+DEBUG        = Y
 PROFILE      = N
+STATIC       = N
+SIGNALS      = N
 
 # parallelization flags:
 #
