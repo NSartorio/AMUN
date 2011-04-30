@@ -99,6 +99,8 @@ module evolution
 
 ! check if this block is a leaf
 !
+#ifdef CONSERVATIVE
+#else /* CONSERVATIVE */
       if (pblock%meta%leaf) &
 #ifdef EULER
         call evolve_euler(pblock)
@@ -109,6 +111,7 @@ module evolution
 #ifdef RK3
         call evolve_rk3(pblock)
 #endif /* RK3 */
+#endif /* CONSERVATIVE */
 
 ! assign pointer to the next block
 !
@@ -217,6 +220,8 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_maximum_speed
+#ifdef CONSERVATIVE
+#else /* CONSERVATIVE */
 #ifdef EULER
 !
 !===============================================================================
@@ -650,6 +655,7 @@ module evolution
 !
   end subroutine evolve_rk3
 #endif /* RK3 */
+#endif /* CONSERVATIVE */
 !
 !===============================================================================
 !
