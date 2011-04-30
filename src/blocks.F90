@@ -95,7 +95,10 @@ module blocks
 
     type(block_meta), pointer :: meta             ! pointer to the metadata block
 
-    real, dimension(:,:,:,:)  , allocatable :: u  ! the array of the conserved variables
+    real, dimension(:,:,:,:)  , allocatable :: u  ! conserved variables
+#ifdef CONSERVATIVE
+    real, dimension(:,:,:,:,:), allocatable :: f  ! numerical fluxes
+#endif /* CONSERVATIVE */
   end type block_data
 
 ! define block_info structure for boundary exchange
@@ -357,6 +360,12 @@ module blocks
 !
     allocate(pdata%u(      nqt,im,jm,km))
 
+#ifdef CONSERVATIVE
+! allocate space for the numerical fluxes
+!
+    allocate(pdata%f(NDIMS,nqt,im,jm,km))
+
+#endif /* CONSERVATIVE */
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
@@ -488,6 +497,12 @@ module blocks
 !
       deallocate(pdata%u)
 
+#ifdef CONSERVATIVE
+! deallocate numerical fluxes
+!
+      deallocate(pdata%f)
+
+#endif /* CONSERVATIVE */
 ! nullify pointers
 !
       nullify(pdata%next)
