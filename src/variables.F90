@@ -30,6 +30,7 @@ module variables
 
 ! parameters
 !
+  integer(kind=4), parameter :: inx =  1, iny =  2, inz =  3
   integer(kind=4), parameter :: idn =  1, imx =  2, imy =  3, imz =  4 &
                                         , ivx =  2, ivy =  3, ivz =  4
 #ifdef HYDRO
