@@ -100,6 +100,10 @@ module evolution
 ! check if this block is a leaf
 !
 #ifdef CONSERVATIVE
+      if (pblock%meta%leaf) &
+#ifdef EULER
+        call flux_euler(pblock)
+#endif /* EULER */
 #else /* CONSERVATIVE */
       if (pblock%meta%leaf) &
 #ifdef EULER
@@ -221,6 +225,47 @@ module evolution
 !
   end subroutine update_maximum_speed
 #ifdef CONSERVATIVE
+#ifdef EULER
+!
+!===============================================================================
+!
+! flux_euler: subroutine performs the first order integration of the numerical
+!             flux
+!
+!===============================================================================
+!
+  subroutine flux_euler(pblock)
+
+    use blocks   , only : block_data
+    use mesh     , only : adxi, adyi, adzi
+    use scheme   , only : update_flux
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    real    :: dxi, dyi, dzi
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
+! 1st step of integration
+!
+    call update_flux(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine flux_euler
+#endif /* EULER */
 #else /* CONSERVATIVE */
 #ifdef EULER
 !
