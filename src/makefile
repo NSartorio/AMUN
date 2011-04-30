@@ -112,6 +112,12 @@ FFLAGS  += -D${EQS}
 #
 FFLAGS  += -D${EOS}
 
+# fully conservative scheme
+#
+ifeq ($(CONSERVATIVE),Y)
+FFLAGS  += -DCONSERVATIVE
+endif
+
 # flux approximation method
 #
 FFLAGS  += -D${FLUX}

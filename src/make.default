@@ -2,11 +2,11 @@
 #
 # compilation, debugging and profiling flags:
 #
-#   COMPILER   - compiler brand; it is passed to the host file
-#   DEBUG      - enable or disable debugging
-#   PROFILE    - enable or disable profiling
-#   STATIC     - enable or disable static linking
-#   SIGNALS    - support for signals for proper shutdown with restart file
+#   COMPILER     - compiler brand; it is passed to the host file
+#   DEBUG        - enable or disable debugging
+#   PROFILE      - enable or disable profiling
+#   STATIC       - enable or disable static linking
+#   SIGNALS      - support for signals for proper shutdown with restart file
 #
 COMPILER     = GNU
 DEBUG        = Y
@@ -16,23 +16,23 @@ SIGNALS      = N
 
 # parallelization flags:
 #
-#   MPI        - enable or disable MPI parallelization
-#   OMP        - enable or disable OpenMP parallelization
+#   MPI          - enable or disable MPI parallelization
+#   OMP          - enable or disable OpenMP parallelization
 #
 MPI          = N
 OMP          = N
 
 # precision flag:
 #
-#   PREC       - arithmetic precision: 4 for single, 8 for double precision
+#   PREC         - arithmetic precision: 4 for single, 8 for double precision
 #
 PREC         = 4
 
 # output data format
 #
-#   OUTPUT     - the format of output data; so far only HDF5
-#   COMPRESS   - the compression algorithm of the output data; DEFLATE or SZIP
-#                in the case of HDF5 or NONE for uncompressed data
+#   OUTPUT       - the format of output data; so far only HDF5
+#   COMPRESS     - the compression algorithm of the output data; DEFLATE or SZIP
+#                  in the case of HDF5 or NONE for uncompressed data
 #
 OUTPUT       = HDF5
 COMPRESS     = NONE
@@ -41,9 +41,9 @@ COMPRESS     = NONE
 #
 # geometry:
 #
-#  NDIMS       - number of dimensions, currently 2 or 3 are supported
-#  REFINE      - if Y the mesh is adaptively refined
-#  SHAPE       - if set Y allows to define a fixed shape in the domain
+#  NDIMS         - number of dimensions, currently 2 or 3 are supported
+#  REFINE        - if Y the mesh is adaptively refined
+#  SHAPE         - if set Y allows to define a fixed shape in the domain
 #
 NDIMS        = 2
 REFINE       = Y
@@ -51,18 +51,23 @@ SHAPE        = N
 
 # physics:
 #
-#  EQS         - set of equations to solve: HYDRO or MHD
-#  EOS         - equation of state: ADI of ISO for adiabatic or isothermal,
-#                respectively
+#  EQS           - set of equations to solve: HYDRO or MHD
+#  EOS           - equation of state: ADI of ISO for adiabatic or isothermal,
+#                  respectively
+#  CONSERVATIVE  - build fully conservative adaptive mesh scheme, otherwise
+#                  build a bit faster and significantly less memory consuming
+#                  non-conservative scheme; in the case of uniform mesh, both
+#                  schemes should be fully conservative
 #
 EQS          = HYDRO
 EOS          = ADI
+CONSERVATIVE = Y
 
 # source terms:
 #
-#  FORCING     - enables forcing terms, such as turbulence driving
-#  VISCOSITY   - enable fluid viscous terms
-#  RESISTIVITY - enable resistivity terms
+#  FORCING       - enables forcing terms, such as turbulence driving
+#  VISCOSITY     - enable fluid viscous terms
+#  RESISTIVITY   - enable resistivity terms
 #
 FORCING      = N
 VISCOSITY    = N
@@ -70,11 +75,11 @@ RESISTIVITY  = N
 
 # methods
 #
-#  SOLVER      - family of solvers: GODUNOV
-#  TIME        - time integration: EULER, RK2, RK3
-#  SPACE       - spacial reconstruction: MINMOD, LF, LIMO3, MP5, MP7, MP9
-#  FLUX        - flux approximation: HLL, HLLC, HLLD, ROE
-#  FLUXEMF     - electromotive force approximation: GLM
+#  SOLVER        - family of solvers: GODUNOV
+#  TIME          - time integration: EULER, RK2, RK3
+#  SPACE         - spacial reconstruction: MINMOD, LF, LIMO3, MP5, MP7, MP9
+#  FLUX          - flux approximation: HLL, HLLC, HLLD, ROE
+#  FLUXEMF       - electromotive force approximation: GLM
 #
 SOLVER       = GODUNOV
 TIME         = RK2
