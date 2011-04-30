@@ -854,6 +854,279 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine boundary_variables
+#ifdef CONSERVATIVE
+!
+!===============================================================================
+!
+! boundary_correct_fluxes: subroutine sweeps over all leaf blocks and if it
+!                          finds that two neighbors lay at different levels, it
+!                          corrects the numerical fluxes of block at lower level
+!                          copying the flux from higher level neighbor
+!
+!===============================================================================
+!
+  subroutine boundary_correct_fluxes()
+
+    use blocks   , only : block_meta, block_data, list_meta
+    use blocks   , only : nsides, nfaces
+
+    implicit none
+
+! local variables
+!
+    integer :: idir, iside, iface
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh
+!
+!-------------------------------------------------------------------------------
+!
+! scan all meta blocks in the list
+!
+    pmeta => list_meta
+    do while(associated(pmeta))
+
+! check if the meta block is a leaf
+!
+      if (pmeta%leaf) then
+
+! iterate over all neighbors
+!
+        do idir = 1, NDIMS
+          do iside = 1, nsides
+            do iface = 1, nfaces
+
+! associate pneigh with the current neighbor
+!
+              pneigh => pmeta%neigh(idir,iside,iface)%ptr
+
+! check if the neighbor is associated
+!
+              if (associated(pneigh)) then
+
+! check if the current block lays at lower level than its neighbor
+!
+                if (pmeta%level .lt. pneigh%level) then
+
+! update directional flux from the neighbor
+!
+                  call correct_flux(pmeta%data, pneigh%data%f                  &
+                                                         , idir, iside, iface)
+
+                end if ! pmeta level < pneigh level
+
+              end if ! pneigh associated
+
+            end do ! iface
+          end do ! iside
+        end do ! idir
+
+      end if ! leaf
+
+      pmeta => pmeta%next ! assign pointer to the next meta block in the list
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_correct_fluxes
+!
+!===============================================================================
+!
+! correct_flux: subroutine copies the boundary flux from the neighbor at higher
+!               level and updates its own
+!
+!===============================================================================
+!
+  subroutine correct_flux(pdata, f, idir, iside, iface)
+
+    use blocks   , only : block_data
+    use config   , only : ng, in, jn, kn, ib, ie, ibl, jb, je, jbl, kb, ke, kbl
+
+    implicit none
+
+! local variables
+!
+    integer :: i, ip, is, it, ih, il, iu, i1, i2
+    integer :: j, jp, js, jt, jh, jl, ju, j1, j2
+#if NDIMS == 3
+    integer :: k, kp, ks, kt, kh, kl, ku, k1, k2
+#endif /* NDIMS == 3 */
+
+! arguments
+!
+    type(block_data), pointer             , intent(inout) :: pdata
+    real            , dimension(:,:,:,:,:), intent(in)    :: f
+    integer                               , intent(in)    :: idir, iside, iface
+!
+!-------------------------------------------------------------------------------
+!
+    select case(idir)
+
+! X direction
+!
+    case(1)
+
+! index of the slice which will be updated
+!
+      if (iside .eq. 1) then ! left side
+        is = ie
+        it = ibl
+      else ! right side
+        is = ibl
+        it = ie
+      end if
+
+! convert face number to index
+!
+      jp = mod(iface - 1, 2)
+#if NDIMS == 3
+      kp = (iface - 1) / 2
+#endif /* NDIMS == 3 */
+
+! bounds for the perpendicular update
+!
+      jh = jn / 2
+      jl = jb + jh * jp
+      ju = jl + jh - 1
+#if NDIMS == 3
+      kh = kn / 2
+      kl = kb + kh * kp
+      ku = kl + kh - 1
+#endif /* NDIMS == 3 */
+
+! iterate over perpendicular direction
+!
+#if NDIMS == 2
+      do j = jl, ju
+        j1 = 2 * (j - jl) + jb
+        j2 = j1 + 1
+
+        pdata%f(idir,:,it,j,:) = 0.5d0 * (f(idir,:,is,j1,:) + f(idir,:,is,j2,:))
+      end do
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do j = jl, ju
+        j1 = 2 * (j - jl) + jb
+        j2 = j1 + 1
+        do k = kl, ku
+          k1 = 2 * (k - kl) + kb
+          k2 = k1 + 1
+
+          pdata%f(idir,:,it,j,k) = (f(idir,:,is,j1,k1) + f(idir,:,is,j2,k1)    &
+                           + f(idir,:,is,j1,k2) + f(idir,:,is,j2,k2)) / 0.25d0
+        end do
+      end do
+#endif /* NDIMS == 3 */
+
+! Y direction
+!
+    case(2)
+
+! index of the slice which will be updated
+!
+      if (iside .eq. 1) then ! left side
+        js = je
+        jt = jbl
+      else ! right side
+        js = jbl
+        jt = je
+      end if
+
+! convert face number to index
+!
+      ip = mod(iface - 1, 2)
+#if NDIMS == 3
+      kp = (iface - 1) / 2
+#endif /* NDIMS == 3 */
+
+! bounds for the perpendicular update
+!
+      ih = in / 2
+      il = ib + ih * ip
+      iu = il + ih - 1
+#if NDIMS == 3
+      kh = kn / 2
+      kl = kb + kh * kp
+      ku = kl + kh - 1
+#endif /* NDIMS == 3 */
+
+! iterate over perpendicular direction
+!
+#if NDIMS == 2
+      do i = il, iu
+        i1 = 2 * (i - il) + ib
+        i2 = i1 + 1
+
+        pdata%f(idir,:,i,jt,:) = 0.5d0 * (f(idir,:,i1,js,:) + f(idir,:,i2,js,:))
+      end do
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do i = il, iu
+        i1 = 2 * (i - il) + ib
+        i2 = i1 + 1
+
+        do k = kl, ku
+          k1 = 2 * (k - kl) + kb
+          k2 = k1 + 1
+
+          pdata%f(idir,:,i,jt,k) = (f(idir,:,i1,js,k1) + f(idir,:,i2,js,k1)    &
+                           + f(idir,:,i1,js,k2) + f(idir,:,i2,js,k2)) * 0.25d0
+        end do
+      end do
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+! Z direction
+!
+    case(3)
+
+! index of the slice which will be updated
+!
+      if (iside .eq. 1) then ! left side
+        ks = ke
+        kt = kbl
+      else ! right side
+        ks = kbl
+        kt = ke
+      end if
+
+! convert face number to index
+!
+      ip = mod(iface - 1, 2)
+      jp = (iface - 1) / 2
+
+! bounds for the perpendicular update
+!
+      ih = in / 2
+      il = ib + ih * ip
+      iu = il + ih - 1
+      jh = jn / 2
+      jl = jb + jh * jp
+      ju = jl + jh - 1
+
+! iterate over perpendicular direction
+!
+      do i = il, iu
+        i1 = 2 * (i - il) + ib
+        i2 = i1 + 1
+
+        do j = jl, ju
+          j1 = 2 * (j - jl) + jb
+          j2 = j1 + 1
+
+          pdata%f(idir,:,i,j,kt) = (f(idir,:,i1,j1,ks) + f(idir,:,i2,j1,ks)    &
+                           + f(idir,:,i1,j2,ks) + f(idir,:,i2,j2,ks)) * 0.25d0
+        end do
+      end do
+
+#endif /* NDIMS == 3 */
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine correct_flux
+#endif /* CONSERVTIVE */
 !
 !===============================================================================
 !

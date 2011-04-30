@@ -45,6 +45,9 @@ module evolution
 
     use blocks    , only : block_data, list_data
     use boundaries, only : boundary_variables
+#ifdef CONSERVATIVE
+    use boundaries, only : boundary_correct_fluxes
+#endif /* CONSERVATIVE */
 #ifdef REFINE
     use config    , only : maxlev
 #endif /* REFINE */
@@ -124,6 +127,13 @@ module evolution
     end do
 
 #ifdef CONSERVATIVE
+! correct the numerical fluxes between neighboring blocks which are at different
+! levels
+!
+    call start_timer(4)
+    call boundary_correct_fluxes()
+    call stop_timer(4)
+
 ! update solution using numerical fluxes stored in data blocks
 !
     pblock => list_data
