@@ -764,6 +764,11 @@ module scheme
 #endif /* ADI */
     end do
 
+#ifdef CONSERVATIVE
+! return numerica flux at i+1/2
+!
+    f(   :   , : ) =   fn(   :   , : )
+#else /* CONSERVATIVE */
 #endif /* MHD & RESISTIVITY */
 ! calculate numerical flux
 !
@@ -774,6 +779,7 @@ module scheme
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
+#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1003,9 +1009,15 @@ module scheme
     end do
 
 #endif /* VISCOSITY */
+#ifdef CONSERVATIVE
+! return numerica flux at i+1/2
+!
+    f(:, : ) =   fn(:, : )
+#else /* CONSERVATIVE */
 ! calculate numerical flux
 !
     f(:,2:n) = - fn(:,2:n) + fn(:,1:n-1)
+#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1301,6 +1313,11 @@ module scheme
     end do
 
 #endif /* MHD & RESISTIVITY */
+#ifdef CONSERVATIVE
+! return numerica flux at i+1/2
+!
+    f(   :   , : ) =   fn(   :   , : )
+#else /* CONSERVATIVE */
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(   1:nfl,1:n-1)
@@ -1308,6 +1325,7 @@ module scheme
 #ifdef GLM
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
+#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1703,6 +1721,11 @@ module scheme
     end do
 
 #endif /* MHD & RESISTIVITY */
+#ifdef CONSERVATIVE
+! return numerica flux at i+1/2
+!
+    f(   :   , : ) =   fn(   :   , : )
+#else /* CONSERVATIVE */
 ! calculate the numerical flux derivative
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
@@ -1710,6 +1733,7 @@ module scheme
 #ifdef GLM
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
+#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1980,6 +2004,11 @@ module scheme
     end do
 
 #endif /* MHD & RESISTIVITY */
+#ifdef CONSERVATIVE
+! return numerica flux at i+1/2
+!
+    f(   :   , : ) =   fn(   :   , : )
+#else /* CONSERVATIVE */
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
@@ -1989,6 +2018,7 @@ module scheme
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
+#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
