@@ -123,6 +123,24 @@ module evolution
 
     end do
 
+#ifdef CONSERVATIVE
+! update solution using numerical fluxes stored in data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! check if this block is a  leaf and update its conserved variables using
+! corrected numerical fluxes
+!
+      if (pblock%meta%leaf) call update_solution(pblock)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+#endif /* CONSERVATIVE */
 ! update boundaries
 !
     call start_timer(4)
@@ -225,6 +243,75 @@ module evolution
 !
   end subroutine update_maximum_speed
 #ifdef CONSERVATIVE
+!
+!===============================================================================
+!
+! update_solution: subroutine performs an one step update of the conserved
+!                  variables for the given data block using the integrated
+!                  numerical fluxes stored in the same data block
+!
+!===============================================================================
+!
+  subroutine update_solution(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
+    use variables, only : inx, iny, inz
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    integer :: i, j, k, im1, jm1, km1
+    real    :: dhx, dhy, dhz
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dhx = dt * adxi(pblock%meta%level)
+    dhy = dt * adyi(pblock%meta%level)
+#if NDIMS == 3
+    dhz = dt * adzi(pblock%meta%level)
+#endif /* NDIMS == 3 */
+
+! perform update along the X direction
+!
+    do i = 1, im
+      im1 = max(1, i - 1)
+
+      pblock%u(:,i,:,:) = pblock%u(:,i,:,:)                                    &
+                     + dhx * (pblock%f(inx,:,im1,:,:) - pblock%f(inx,:,i,:,:))
+    end do
+
+! perform update along the Y direction
+!
+    do j = 1, jm
+      jm1 = max(1, j - 1)
+
+      pblock%u(:,:,j,:) = pblock%u(:,:,j,:)                                    &
+                     + dhy * (pblock%f(iny,:,:,jm1,:) - pblock%f(iny,:,:,j,:))
+    end do
+#if NDIMS == 3
+
+! perform update along the Z direction
+!
+    do k = 1, km
+      km1 = max(1, k - 1)
+
+      pblock%u(:,:,:,k) = pblock%u(:,:,:,k)                                    &
+                     + dhz * (pblock%f(inz,:,:,:,km1) - pblock%f(inz,:,:,:,k))
+    end do
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_solution
 #ifdef EULER
 !
 !===============================================================================
