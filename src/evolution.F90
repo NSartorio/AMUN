@@ -110,6 +110,9 @@ module evolution
 #ifdef RK2
         call flux_rk2(pblock)
 #endif /* RK2 */
+#ifdef RK3
+        call flux_rk3(pblock)
+#endif /* RK3 */
 #else /* CONSERVATIVE */
       if (pblock%meta%leaf) &
 #ifdef EULER
@@ -551,6 +554,87 @@ module evolution
 !
   end subroutine flux_rk2
 #endif /* RK2 */
+#ifdef RK3
+!
+!===============================================================================
+!
+! flux_rk3: subroutine performs integration of the numerical flux using
+!           the third order Runge-Kutta method
+!
+!===============================================================================
+!
+  subroutine flux_rk3(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
+    use scheme   , only : update_flux
+    use variables, only : nqt
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    real    :: dxi, dyi, dzi
+
+! local arrays
+!
+    real, dimension(      nqt,im,jm,km) :: u
+    real, dimension(NDIMS,nqt,im,jm,km) :: f0, f1, f2
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
+! copy the initial state to the local array u
+!
+    u(:,:,:,:) = pblock%u(:,:,:,:)
+
+! calculate fluxes at the moment t
+!
+    call update_flux(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+
+! advance the solution to (t + dt) using computed fluxes in this substep
+!
+    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+
+! calculate fluxes at the moment (t + dt)
+!
+    call update_flux(u(:,:,:,:), f1(:,:,:,:,:), dxi, dyi, dzi)
+
+! copy the initial state to the local array u
+!
+    u(:,:,:,:) = pblock%u(:,:,:,:)
+
+! average fluxes from t and t + dt and prepare for half step update
+!
+    f2(:,:,:,:,:) = 0.25d0 * (f0(:,:,:,:,:) + f1(:,:,:,:,:))
+
+! advance the solution to (t + dt/2) using computed flux
+!
+    call advance_solution(u(:,:,:,:), f2(:,:,:,:,:), dxi, dyi, dzi)
+
+! calculate fluxes at the moment (t + dt/2)
+!
+    call update_flux(u(:,:,:,:), f2(:,:,:,:,:), dxi, dyi, dzi)
+
+! calculate the time averaged flux using Gauss formula
+!
+    pblock%f(:,:,:,:,:) = (f0(:,:,:,:,:) + f1(:,:,:,:,:)                       &
+                                              + 4.0d0 * f2(:,:,:,:,:)) / 6.0d0
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine flux_rk3
+#endif /* RK3 */
 #else /* CONSERVATIVE */
 #ifdef EULER
 !
