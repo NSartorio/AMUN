@@ -269,7 +269,14 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+#ifdef FORCE
+    use forcing  , only : real_forcing
+#endif /* FORCE */
     use mesh     , only : adxi, adyi, adzi
+#ifdef FORCE
+    use variables, only : inx, iny, inz
+    use variables, only : idn, imx, imy, imz
+#endif /* FORCE */
 
     implicit none
 
@@ -280,6 +287,12 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi
+#ifdef FORCE
+
+! local arrays
+!
+    real, dimension(  3,im,jm,km) :: f
+#endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
 !
@@ -294,6 +307,22 @@ module evolution
 ! perform update of conserved variables of the given block using its fluxes
 !
     call advance_solution(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+#ifdef FORCE
+
+! obtain the forcing terms in real space
+!
+    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+                                       , pblock%meta%zmin, f(:,:,:,:))
+
+! update momenta due to the forcing terms
+!
+    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                  &
+                                          + pblock%u(idn,:,:,:) * f(inx,:,:,:)
+    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                  &
+                                          + pblock%u(idn,:,:,:) * f(iny,:,:,:)
+    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                  &
+                                          + pblock%u(idn,:,:,:) * f(inz,:,:,:)
+#endif /* FORCE */
 
 !-------------------------------------------------------------------------------
 !
