@@ -107,6 +107,9 @@ module evolution
 #ifdef EULER
         call flux_euler(pblock)
 #endif /* EULER */
+#ifdef RK2
+        call flux_rk2(pblock)
+#endif /* RK2 */
 #else /* CONSERVATIVE */
       if (pblock%meta%leaf) &
 #ifdef EULER
@@ -267,13 +270,55 @@ module evolution
     use blocks   , only : block_data
     use config   , only : im, jm, km
     use mesh     , only : adxi, adyi, adzi
-    use variables, only : inx, iny, inz
 
     implicit none
 
 ! input arguments
 !
     type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    real    :: dxi, dyi, dzi
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+#if NDIMS == 3
+    dzi = adzi(pblock%meta%level)
+#endif /* NDIMS == 3 */
+
+! perform update of conserved variables of the given block using its fluxes
+!
+    call advance_solution(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_solution
+!
+!===============================================================================
+!
+! advance_solution: subroutine performs an one step update of the conserved
+!                   variables array using the numerical fluxes passed as an
+!                   argument
+!
+!===============================================================================
+!
+  subroutine advance_solution(u, f, dxi, dyi, dzi)
+
+    use config   , only : im, jm, km
+    use variables, only : nqt, inx, iny, inz
+
+    implicit none
+
+! input arguments
+!
+    real, dimension(      nqt,im,jm,km), intent(inout) :: u
+    real, dimension(NDIMS,nqt,im,jm,km), intent(in)    :: f
+    real                                               :: dxi, dyi, dzi
 
 ! local variables
 !
@@ -284,10 +329,10 @@ module evolution
 !
 ! prepare dxi, dyi, and dzi
 !
-    dhx = dt * adxi(pblock%meta%level)
-    dhy = dt * adyi(pblock%meta%level)
+    dhx = dt * dxi
+    dhy = dt * dyi
 #if NDIMS == 3
-    dhz = dt * adzi(pblock%meta%level)
+    dhz = dt * dzi
 #endif /* NDIMS == 3 */
 
 ! perform update along the X direction
@@ -295,8 +340,7 @@ module evolution
     do i = 1, im
       im1 = max(1, i - 1)
 
-      pblock%u(:,i,:,:) = pblock%u(:,i,:,:)                                    &
-                     + dhx * (pblock%f(inx,:,im1,:,:) - pblock%f(inx,:,i,:,:))
+      u(:,i,:,:) = u(:,i,:,:) + dhx * (f(inx,:,im1,:,:) - f(inx,:,i,:,:))
     end do
 
 ! perform update along the Y direction
@@ -304,8 +348,7 @@ module evolution
     do j = 1, jm
       jm1 = max(1, j - 1)
 
-      pblock%u(:,:,j,:) = pblock%u(:,:,j,:)                                    &
-                     + dhy * (pblock%f(iny,:,:,jm1,:) - pblock%f(iny,:,:,j,:))
+      u(:,:,j,:) = u(:,:,j,:) + dhy * (f(iny,:,:,jm1,:) - f(iny,:,:,j,:))
     end do
 #if NDIMS == 3
 
@@ -314,14 +357,13 @@ module evolution
     do k = 1, km
       km1 = max(1, k - 1)
 
-      pblock%u(:,:,:,k) = pblock%u(:,:,:,k)                                    &
-                     + dhz * (pblock%f(inz,:,:,:,km1) - pblock%f(inz,:,:,:,k))
+      u(:,:,:,k) = u(:,:,:,k) + dhz * (f(inz,:,:,:,km1) - f(inz,:,:,:,k))
     end do
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine update_solution
+  end subroutine advance_solution
 #ifdef EULER
 !
 !===============================================================================
@@ -363,6 +405,70 @@ module evolution
 !
   end subroutine flux_euler
 #endif /* EULER */
+#ifdef RK2
+!
+!===============================================================================
+!
+! flux_rk2: subroutine performs integration of the numerical flux using
+!           the second order Runge-Kutta method
+!
+!===============================================================================
+!
+  subroutine flux_rk2(pblock)
+
+    use blocks   , only : block_data
+    use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
+    use scheme   , only : update_flux
+    use variables, only : nqt
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), intent(inout) :: pblock
+
+! local variables
+!
+    real    :: dxi, dyi, dzi
+
+! local arrays
+!
+    real, dimension(      nqt,im,jm,km) :: u
+    real, dimension(NDIMS,nqt,im,jm,km) :: f0, f1
+!
+!-------------------------------------------------------------------------------
+!
+! prepare dxi, dyi, and dzi
+!
+    dxi = adxi(pblock%meta%level)
+    dyi = adyi(pblock%meta%level)
+    dzi = adzi(pblock%meta%level)
+
+! copy the initial state to the local array u
+!
+    u(:,:,:,:) = pblock%u(:,:,:,:)
+
+! calculate fluxes at the moment t
+!
+    call update_flux(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+
+! advance the solution to (t + dt) using computed fluxes in this substep
+!
+    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+
+! calculate fluxes at the moment (t + dt)
+!
+    call update_flux(u(:,:,:,:), f1(:,:,:,:,:), dxi, dyi, dzi)
+
+! calculate the time averaged flux
+!
+    pblock%f(:,:,:,:,:) = 0.5d0 * (f0(:,:,:,:,:) + f1(:,:,:,:,:))
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine flux_rk2
+#endif /* RK2 */
 #else /* CONSERVATIVE */
 #ifdef EULER
 !
