@@ -869,6 +869,7 @@ module boundaries
 
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
+    use config   , only : maxlev
 
     implicit none
 
@@ -882,6 +883,10 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! do not correct fluxes if we do not use adaptive mesh
+!
+    if (maxlev .eq. 1) return
+
 ! scan all meta blocks in the list
 !
     pmeta => list_meta

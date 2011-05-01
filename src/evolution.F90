@@ -137,7 +137,7 @@ module evolution
 ! levels
 !
     call start_timer(4)
-    if (maxlev .gt. 1) call boundary_correct_fluxes()
+    call boundary_correct_fluxes()
     call stop_timer(4)
 
 ! update solution using numerical fluxes stored in data blocks
