@@ -269,11 +269,15 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
+    use mesh     , only : adxi, adyi, adzi
+#if defined MHD && defined GLM
+    use config   , only : alpha_p
+    use mesh     , only : dx_min
+    use scheme   , only : cmax
+    use variables, only : iph
+#endif /* MHD & GLM */
 #ifdef FORCE
     use forcing  , only : real_forcing
-#endif /* FORCE */
-    use mesh     , only : adxi, adyi, adzi
-#ifdef FORCE
     use variables, only : inx, iny, inz
     use variables, only : idn, imx, imy, imz
 #endif /* FORCE */
@@ -287,6 +291,9 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi
+#if defined MHD && defined GLM
+    real    :: decay
+#endif /* MHD & GLM */
 #ifdef FORCE
 
 ! local arrays
@@ -307,6 +314,13 @@ module evolution
 ! perform update of conserved variables of the given block using its fluxes
 !
     call advance_solution(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+#if defined MHD && defined GLM
+
+! evolve Psi due to the source term
+!
+    decay = exp(- alpha_p * cmax * dt / dx_min)
+    pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
+#endif /* MHD & GLM */
 #ifdef FORCE
 
 ! obtain the forcing terms in real space
@@ -339,7 +353,15 @@ module evolution
   subroutine advance_solution(u, f, dxi, dyi, dzi)
 
     use config   , only : im, jm, km
-    use variables, only : nqt, inx, iny, inz
+    use variables, only : nqt, nfl
+    use variables, only : inx, iny, inz
+#ifdef MHD
+    use variables, only : ibx, ibz
+#ifdef GLM
+    use scheme   , only : cmax
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
     implicit none
 
@@ -353,6 +375,13 @@ module evolution
 !
     integer :: i, j, k, im1, jm1, km1
     real    :: dhx, dhy, dhz
+#if defined MHD && defined GLM
+    real    :: ch2
+#endif /* MHD & GLM */
+
+! local arrays
+!
+    real, dimension(nqt,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -364,12 +393,16 @@ module evolution
     dhz = dt * dzi
 #endif /* NDIMS == 3 */
 
+! reset the increment array du
+!
+    du(:,:,:,:) = 0.0d0
+
 ! perform update along the X direction
 !
     do i = 1, im
       im1 = max(1, i - 1)
 
-      u(:,i,:,:) = u(:,i,:,:) + dhx * (f(inx,:,im1,:,:) - f(inx,:,i,:,:))
+      du(:,i,:,:) = du(:,i,:,:) + dhx * (f(inx,:,im1,:,:) - f(inx,:,i,:,:))
     end do
 
 ! perform update along the Y direction
@@ -377,7 +410,7 @@ module evolution
     do j = 1, jm
       jm1 = max(1, j - 1)
 
-      u(:,:,j,:) = u(:,:,j,:) + dhy * (f(iny,:,:,jm1,:) - f(iny,:,:,j,:))
+      du(:,:,j,:) = du(:,:,j,:) + dhy * (f(iny,:,:,jm1,:) - f(iny,:,:,j,:))
     end do
 #if NDIMS == 3
 
@@ -386,9 +419,29 @@ module evolution
     do k = 1, km
       km1 = max(1, k - 1)
 
-      u(:,:,:,k) = u(:,:,:,k) + dhz * (f(inz,:,:,:,km1) - f(inz,:,:,:,k))
+      du(:,:,:,k) = du(:,:,:,k) + dhz * (f(inz,:,:,:,km1) - f(inz,:,:,:,k))
     end do
 #endif /* NDIMS == 3 */
+
+! update the solution for the fluid variables
+!
+    u(  1:nfl,:,:,:) = u(  1:nfl,:,:,:) + du(  1:nfl,:,:,:)
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    u(ibx:ibz,:,:,:) = u(ibx:ibz,:,:,:) + du(ibx:ibz,:,:,:)
+
+#ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
+! update the solution for the scalar potential Psi
+!
+    u(iph,:,:,:) = u(iph,:,:,:) + ch2 * du(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
 
 !-------------------------------------------------------------------------------
 !
@@ -798,9 +851,9 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi, ch2
+    real    :: dxi, dyi, dzi
 #if defined MHD && defined GLM
-    real    :: decay
+    real    :: decay, ch2
 #endif /* MHD & GLM */
 
 ! local arrays
