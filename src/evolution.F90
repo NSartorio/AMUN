@@ -283,6 +283,9 @@ module evolution
     use forcing  , only : real_forcing
     use variables, only : inx, iny, inz
     use variables, only : idn, imx, imy, imz
+#ifdef ADI
+    use variables, only : ien
+#endif /* ADI */
 #endif /* FORCE */
 
     implicit none
@@ -302,6 +305,9 @@ module evolution
 ! local arrays
 !
     real, dimension(  3,im,jm,km) :: f
+#ifdef ADI
+    real, dimension(    im,jm,km) :: ek, dek
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -331,6 +337,13 @@ module evolution
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
+#ifdef ADI
+! calculate kinetic energy before adding the forcing term
+!
+    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+                               + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
+#endif /* ADI */
+
 ! update momenta due to the forcing terms
 !
     pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                  &
@@ -339,6 +352,17 @@ module evolution
                                           + pblock%u(idn,:,:,:) * f(iny,:,:,:)
     pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                  &
                                           + pblock%u(idn,:,:,:) * f(inz,:,:,:)
+
+#ifdef ADI
+! calculate kinetic energy after adding the forcing term
+!
+    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+                   + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
+
+! update total energy with the injected one
+!
+    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+#endif /* ADI */
 #endif /* FORCE */
 
 !-------------------------------------------------------------------------------
@@ -667,6 +691,9 @@ module evolution
 #endif /* MHD */
 #ifdef FORCE
     use variables, only : idn, imx, imy, imz
+#ifdef ADI
+    use variables, only : ien
+#endif /* ADI */
 #endif /* FORCE */
 
     implicit none
@@ -687,6 +714,9 @@ module evolution
     real, dimension(nqt,im,jm,km) :: du
 #ifdef FORCE
     real, dimension(  3,im,jm,km) :: f
+#ifdef ADI
+    real, dimension(    im,jm,km) :: ek, dek
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -737,12 +767,29 @@ module evolution
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
+#ifdef ADI
+! calculate kinetic energy before adding the forcing term
+!
+    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+                               + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
+#endif /* ADI */
+
 ! update momenta due to the forcing terms
 !
     pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
     pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
     pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
+#ifdef ADI
+! calculate kinetic energy after adding the forcing term
+!
+    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+                   + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
+
+! update total energy with the injected one
+!
+    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -781,6 +828,9 @@ module evolution
 #endif /* MHD */
 #ifdef FORCE
     use variables, only : idn, imx, imy, imz
+#ifdef ADI
+    use variables, only : ien
+#endif /* ADI */
 #endif /* FORCE */
 
     implicit none
@@ -801,6 +851,9 @@ module evolution
     real, dimension(nqt,im,jm,km) :: u1, du
 #ifdef FORCE
     real, dimension(  3,im,jm,km) :: f
+#ifdef ADI
+    real, dimension(    im,jm,km) :: ek, dek
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -881,12 +934,29 @@ module evolution
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
+#ifdef ADI
+! calculate kinetic energy before adding the forcing term
+!
+    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+                               + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
+#endif /* ADI */
+
 ! update momenta due to the forcing terms
 !
     pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
     pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
     pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
+#ifdef ADI
+! calculate kinetic energy after adding the forcing term
+!
+    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+                   + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
+
+! update total energy with the injected one
+!
+    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
@@ -925,6 +995,9 @@ module evolution
 #endif /* MHD */
 #ifdef FORCE
     use variables, only : idn, imx, imy, imz
+#ifdef ADI
+    use variables, only : ien
+#endif /* ADI */
 #endif /* FORCE */
 
     implicit none
@@ -945,6 +1018,9 @@ module evolution
     real, dimension(nqt,im,jm,km) :: u1, du
 #ifdef FORCE
     real, dimension(  3,im,jm,km) :: f
+#ifdef ADI
+    real, dimension(    im,jm,km) :: ek, dek
+#endif /* ADI */
 #endif /* FORCE */
 
 ! parameters
@@ -1051,11 +1127,19 @@ module evolution
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
+
 #ifdef FORCE
 ! obtain the forcing terms in real space
 !
     call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
                                        , pblock%meta%zmin, f(:,:,:,:))
+
+#ifdef ADI
+! calculate kinetic energy before adding the forcing term
+!
+    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+                               + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
+#endif /* ADI */
 
 ! update momenta due to the forcing terms
 !
@@ -1063,6 +1147,16 @@ module evolution
     pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
     pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
+#ifdef ADI
+! calculate kinetic energy after adding the forcing term
+!
+    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+                   + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
+
+! update total energy with the injected one
+!
+    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+#endif /* ADI */
 #endif /* FORCE */
 !
 !-------------------------------------------------------------------------------
