@@ -870,22 +870,57 @@ module boundaries
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
     use config   , only : maxlev
+#ifdef MPI
+    use blocks   , only : block_info, pointer_info
+    use config   , only : im, jm, km
+    use mpitools , only : ncpus, ncpu, msendf, mrecvf
+    use variables, only : nqt
+#endif /* MPI */
 
     implicit none
 
 ! local variables
 !
     integer :: idir, iside, iface
+#ifdef MPI
+    integer :: irecv, isend, nblocks, itag, l
+
+! local arrays
+!
+    integer     , dimension(0:ncpus-1,0:ncpus-1) :: block_counter
+    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: rbuf
+#endif /* MPI */
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+#ifdef MPI
+    type(block_info), pointer :: pinfo
+
+! local pointer arrays
+!
+    type(pointer_info), dimension(0:ncpus-1,0:ncpus-1) :: block_array
+#endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
 ! do not correct fluxes if we do not use adaptive mesh
 !
     if (maxlev .eq. 1) return
+
+#ifdef MPI
+! reset the block counter
+!
+    block_counter(:,:) = 0
+
+! nullify info pointers
+!
+    do irecv = 0, ncpus - 1
+      do isend = 0, ncpus - 1
+        nullify(block_array(irecv,isend)%ptr)
+      end do
+    end do
+#endif /* MPI */
 
 ! scan all meta blocks in the list
 !
@@ -914,10 +949,55 @@ module boundaries
 !
                 if (pmeta%level .lt. pneigh%level) then
 
+#ifdef MPI
+! check if the block and neighbor are on the local processors
+!
+                  if (pmeta%cpu .eq. ncpu .and. pneigh%cpu .eq. ncpu) then
+#endif /* MPI */
+
 ! update directional flux from the neighbor
 !
-                  call correct_flux(pmeta%data, pneigh%data%f                  &
+                    call correct_flux(pmeta%data, pneigh%data%f                &
                                                          , idir, iside, iface)
+#ifdef MPI
+                  else
+
+! increase the counter for number of blocks to exchange
+!
+                    block_counter(pmeta%cpu,pneigh%cpu) =                      &
+                                       block_counter(pmeta%cpu,pneigh%cpu) + 1
+
+! allocate new info object
+!
+                    allocate(pinfo)
+
+! fill out its fields
+!
+                    pinfo%block            => pmeta
+                    pinfo%neigh            => pneigh
+                    pinfo%direction        =  idir
+                    pinfo%side             =  iside
+                    pinfo%face             =  iface
+                    pinfo%level_difference =  pmeta%level - pneigh%level
+
+! nullify pointer fields
+!
+                    nullify(pinfo%prev)
+                    nullify(pinfo%next)
+
+! if the list is not emply append the created block
+!
+                    if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr)) then
+                      pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
+                      nullify(pinfo%next)
+                    end if
+
+! point the list to the last created block
+!
+                    block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+
+                  end if ! pmeta and pneigh on local cpu
+#endif /* MPI */
 
                 end if ! pmeta level < pneigh level
 
@@ -931,6 +1011,118 @@ module boundaries
 
       pmeta => pmeta%next ! assign pointer to the next meta block in the list
     end do ! meta blocks
+
+#ifdef MPI
+! iterate over sending and receiving processors
+!
+    do irecv = 0, ncpus - 1
+      do isend = 0, ncpus - 1
+
+! process only pairs which have boundaries to exchange
+!
+        if (block_counter(irecv,isend) .gt. 0) then
+
+! obtain the number of blocks to exchange
+!
+          nblocks = block_counter(irecv,isend)
+
+! prepare the tag for communication
+!
+          itag = irecv * ncpus + isend + ncpus + 1
+
+! allocate space for variables
+!
+          allocate(rbuf(nblocks,NDIMS,nqt,im,jm,km))
+
+! if isend == ncpu we are sending data
+!
+          if (isend .eq. ncpu) then
+
+! fill out the buffer with block data
+!
+            l = 1
+
+            pinfo => block_array(irecv,isend)%ptr
+            do while(associated(pinfo))
+
+              rbuf(l,:,:,:,:,:) = pinfo%neigh%data%f(:,:,:,:,:)
+
+              pinfo => pinfo%prev
+              l = l + 1
+            end do
+
+! send data buffer
+!
+            call msendf(size(rbuf(:,:,:,:,:,:)), irecv, itag, rbuf(:,:,:,:,:,:))
+
+          end if
+
+! if irecv == ncpu we are receiving data
+!
+          if (irecv .eq. ncpu) then
+
+! receive data
+!
+            call mrecvf(size(rbuf(:,:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:,:))
+
+! iterate over all received blocks and update boundaries
+!
+            l = 1
+
+            pinfo => block_array(irecv,isend)%ptr
+            do while(associated(pinfo))
+
+! set indices
+!
+              idir  = pinfo%direction
+              iside = pinfo%side
+              iface = pinfo%face
+
+! update boundaries
+!
+              if (pinfo%level_difference .eq. -1) then
+
+                pmeta  => pinfo%block
+                pneigh => pmeta%neigh(idir,iside,iface)%ptr
+
+! update directional flux from the neighbor
+!
+                call correct_flux(pmeta%data, rbuf(l,:,:,:,:,:)                &
+                                                         , idir, iside, iface)
+
+
+              end if
+
+              pinfo => pinfo%prev
+              l = l + 1
+            end do
+
+          end if
+
+! deallocate buffers
+!
+          deallocate(rbuf)
+
+! deallocate info blocks
+!
+          pinfo => block_array(irecv,isend)%ptr
+          do while(associated(pinfo))
+            block_array(irecv,isend)%ptr => pinfo%prev
+
+            nullify(pinfo%prev)
+            nullify(pinfo%next)
+            nullify(pinfo%block)
+            nullify(pinfo%neigh)
+
+            deallocate(pinfo)
+
+            pinfo => block_array(irecv,isend)%ptr
+          end do
+
+        end if ! if block_count > 0
+      end do ! isend
+    end do ! irecv
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
