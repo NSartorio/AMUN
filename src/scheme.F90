@@ -606,19 +606,19 @@ module scheme
 !
   subroutine hll(n, h, u, f)
 
-#ifdef VISCOSITY
-    use config       , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config       , only : ueta
-#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx, ivy, ivz
 #ifdef ADI
     use variables    , only : ien
 #endif /* ADI */
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 #ifdef MHD
+#ifdef RESISTIVITY
+    use config       , only : ueta
+#endif /* RESISTIVITY */
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
@@ -655,9 +655,9 @@ module scheme
 #ifdef VISCOSITY
     vih = visc / h
 #endif /* VISCOSITY */
-#ifdef RESISTIVITY
+#if defined MHD && defined RESISTIVITY
     ueh = ueta / h
-#endif /* RESISTIVITY */
+#endif /* MHD & RESISTIVITY */
 
 ! calculate the primitive variables
 !
@@ -743,8 +743,8 @@ module scheme
       fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
 #endif /* ADI */
     end do
-
 #endif /* VISCOSITY */
+
 #if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
@@ -763,19 +763,19 @@ module scheme
       fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
 #endif /* ADI */
     end do
+#endif /* MHD & RESISTIVITY */
 
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
     f(   :   , : ) =   fn(   :   , : )
 #else /* CONSERVATIVE */
-#endif /* MHD & RESISTIVITY */
 ! calculate numerical flux
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
 #ifdef MHD
-#ifdef GLM
     f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+#ifdef GLM
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
@@ -796,12 +796,12 @@ module scheme
 !
   subroutine hllc(n, h, u, f)
 
-#ifdef VISCOSITY
-    use config       , only : visc
-#endif /* VISCOSITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 
     implicit none
 
@@ -831,8 +831,8 @@ module scheme
 ! usefull parameters
 !
     vih = visc / h
-
 #endif /* VISCOSITY */
+
 ! obtain the primitive variables
 !
     call cons2prim(n, u(:,:), q(:,:))
@@ -1007,8 +1007,8 @@ module scheme
       fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
 #endif /* ADI */
     end do
-
 #endif /* VISCOSITY */
+
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -1036,16 +1036,16 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
-#ifdef VISCOSITY
-    use config       , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config       , only : ueta
-#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
     use variables    , only : ibx, iby, ibz
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    use config       , only : ueta
+#endif /* RESISTIVITY */
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1071,9 +1071,9 @@ module scheme
 #ifdef VISCOSITY
     real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
+#ifdef RESISTIVITY
     real                   :: dbx, dby, dbz, ueh
-#endif /* MHD & RESISTIVITY */
+#endif /* RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1294,9 +1294,9 @@ module scheme
       dvz = vih * (q(ivz,ip1) - q(ivz,i))
       fn(ivz,i  ) = fn(ivz,i  ) - dvz
     end do
-
 #endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
+
+#ifdef RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
@@ -1311,8 +1311,8 @@ module scheme
       dbz = ueh * (q(ibz,ip1) - q(ibz,i))
       fn(ibz,i) = fn(ibz,i) - dbz
     end do
+#endif /* RESISTIVITY */
 
-#endif /* MHD & RESISTIVITY */
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -1343,16 +1343,16 @@ module scheme
   subroutine hlld(n, h, u, f)
 
     use config       , only : gamma
-#ifdef VISCOSITY
-    use config       , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config       , only : ueta
-#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
     use variables    , only : ibx, iby, ibz
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
+#ifdef RESISTIVITY
+    use config       , only : ueta
+#endif /* RESISTIVITY */
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1379,9 +1379,9 @@ module scheme
 #ifdef VISCOSITY
     real                   :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
+#ifdef RESISTIVITY
     real                   :: dbx, dby, dbz, ueh
-#endif /* MHD & RESISTIVITY */
+#endif /* RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1699,9 +1699,9 @@ module scheme
       fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
 #endif /* ADI */
     end do
-
 #endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
+
+#ifdef RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
     do i = 1, n - 1
@@ -1719,8 +1719,8 @@ module scheme
       fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
 #endif /* ADI */
     end do
+#endif /* RESISTIVITY */
 
-#endif /* MHD & RESISTIVITY */
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -1756,23 +1756,23 @@ module scheme
   subroutine roe(n, h, u, f)
 
     use config       , only : gamma
-#ifdef VISCOSITY
-    use config       , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config       , only : ueta
-#endif /* MHD & RESISTIVITY */
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI
     use variables    , only : ien, ipr
 #endif /* ADI */
+#ifdef VISCOSITY
+    use config       , only : visc
+#endif /* VISCOSITY */
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
+#ifdef RESISTIVITY
+    use config       , only : ueta
+#endif /* RESISTIVITY */
 #endif /* MHD */
 
     implicit none
@@ -1794,15 +1794,15 @@ module scheme
     real, dimension(nqt,nqt) :: li, ri
     real                     :: al, ar, ap, div
     real                     :: sdl, sdr, sds, sfl, sfr
-#ifdef MHD
-    real                     :: pbl, pbr, xfc, yfc
-#endif /* MHD */
 #ifdef VISCOSITY
     real                     :: dvx, dvy, dvz, vih
 #endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
+#ifdef MHD
+    real                     :: pbl, pbr, xfc, yfc
+#ifdef RESISTIVITY
     real                     :: dbx, dby, dbz, ueh
-#endif /* MHD & RESISTIVITY */
+#endif /* RESISTIVITY */
+#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1982,8 +1982,8 @@ module scheme
       fn(ien,i) = fn(ien,i) - 0.5d0 * (ql(ivx,i) + qr(ivx,i)) * dvx
 #endif /* ADI */
     end do
-
 #endif /* VISCOSITY */
+
 #if defined MHD && defined RESISTIVITY
 ! add resistivity term to the left and right fluxes
 !
@@ -2002,8 +2002,8 @@ module scheme
       fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
 #endif /* ADI */
     end do
-
 #endif /* MHD & RESISTIVITY */
+
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -2013,8 +2013,8 @@ module scheme
 !
     f(  1:nfl,2:n) = - fn(  1:nfl,2:n) + fn(  1:nfl,1:n-1)
 #ifdef MHD
-#ifdef GLM
     f(ibx:ibz,2:n) = - fn(ibx:ibz,2:n) + fn(ibx:ibz,1:n-1)
+#ifdef GLM
     f(iph    ,2:n) = - fn(iph    ,2:n) + fn(iph    ,1:n-1)
 #endif /* GLM */
 #endif /* MHD */
