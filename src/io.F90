@@ -457,6 +457,7 @@ module io
     use hdf5     , only : h5gcreate_f, h5gclose_f
     use mpitools , only : ncpus, ncpu
     use random   , only : nseeds, get_seeds
+    use scheme   , only : cmax
 
 ! declare variables
 !
@@ -512,6 +513,7 @@ module io
       call write_attribute_double_h5(gid, 'time', t   )
       call write_attribute_double_h5(gid, 'dt'  , dt  )
       call write_attribute_double_h5(gid, 'dtn' , dtn )
+      call write_attribute_double_h5(gid, 'cmax', cmax)
 
 ! store the vector attributes
 !
@@ -596,6 +598,7 @@ module io
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
     use mpitools , only : ncpus, ncpu
     use random   , only : nseeds, set_seeds
+    use scheme   , only : cmax
 
 ! declare variables
 !
@@ -713,6 +716,8 @@ module io
               call read_attribute_double_h5(aid, aname, dt)
             case('dtn')
               call read_attribute_double_h5(aid, aname, dtn)
+            case('cmax')
+              call read_attribute_double_h5(aid, aname, cmax)
             case('xmin')
               call read_attribute_double_h5(aid, aname, xmin)
             case('xmax')
