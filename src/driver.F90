@@ -209,7 +209,11 @@ program amun
 
 ! set the number of next file to number of the current restart file
 !
-    no = nres
+    no   = nres
+
+! reset the start time for the execution time estimate
+!
+    tbeg = t
 
   end if
 
