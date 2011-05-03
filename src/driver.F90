@@ -137,15 +137,17 @@ program amun
 !
   call init_timers()
 
+! start the initialization timer
+!
+  call start_timer(1)
+
 ! initialize random number generator
 !
   call init_generator()
 
 ! initialize block module
 !
-  call start_timer(1)
   call init_blocks()
-  call stop_timer(1)
 
 ! check if we initiate new problem or restart previous job
 !
@@ -153,9 +155,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call start_timer(1)
     call init_mesh(.true.)
-    call stop_timer(1)
 
 ! initialize the integrals module
 !
@@ -164,9 +164,7 @@ program amun
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem
 !
-    call start_timer(1)
     call generate_mesh()
-    call stop_timer(1)
 
 ! store mesh statistics
 !
@@ -190,9 +188,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call start_timer(1)
     call init_mesh(.false.)
-    call stop_timer(1)
 
 ! initialize the integrals module
 !
@@ -220,8 +216,12 @@ program amun
 ! initialize forcing module
 !
   call init_forcing()
-
 #endif /* FORCE */
+
+! stop the initialization timer
+!
+  call stop_timer(1)
+
 ! print information
 !
   if (is_master()) then
@@ -305,6 +305,10 @@ program amun
 !
   call write_restart_data()
 
+! start the initialization timer
+!
+  call start_timer(1)
+
 #ifdef FORCE
 ! finalize forcing module
 !
@@ -317,9 +321,7 @@ program amun
 
 ! deallocate and reset mesh
 !
-  call start_timer(1)
   call clear_mesh()
-  call stop_timer(1)
 
 ! get total time
 !
@@ -336,8 +338,12 @@ program amun
       write(*,"(1x,a)") "Restart files have been successfully written."
     end if
   end if
-
 #endif /* SIGNALS */
+
+! stop the initialization timer
+!
+  call stop_timer(1)
+
 ! print info about execution times
 !
   if (is_master()) then
