@@ -63,7 +63,6 @@ module evolution
     use mesh      , only : update_mesh
     use mesh      , only : dx_min
     use scheme    , only : cmax
-    use timer     , only : start_timer, stop_timer
     use variables , only : idn, imz
 
     implicit none
@@ -166,9 +165,7 @@ module evolution
 
 ! check refinement and refine
 !
-      call start_timer(5)
       call update_mesh()
-      call stop_timer(5)
 
 ! update boundaries
 !
