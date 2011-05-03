@@ -172,9 +172,7 @@ program amun
 
 ! update the maximum speed in the system
 !
-    call start_timer(2)
     call update_maximum_speed()
-    call stop_timer(2)
 
 ! store integrals
 !
@@ -254,9 +252,7 @@ program amun
 
 ! performe one step evolution
 !
-    call start_timer(2)
     call evolve()
-    call stop_timer(2)
 
 ! store mesh statistics
 !
@@ -357,6 +353,7 @@ program amun
     write (*,fmt) "Data output           : ", get_timer(3), per * get_timer(3)
     write (*,fmt) "Boundary update       : ", get_timer(4), per * get_timer(4)
     write (*,fmt) "Mesh update           : ", get_timer(5), per * get_timer(5)
+    write (*,fmt) "Maximum speed estim.  : ", get_timer(6), per * get_timer(6)
 #ifdef FORCE
     write (*,fmt) "External forcing      : ", get_timer(10), per * get_timer(10)
     write (*,fmt) " - initialization     : ", get_timer(11), per * get_timer(11)

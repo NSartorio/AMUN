@@ -63,6 +63,7 @@ module evolution
     use mesh      , only : update_mesh
     use mesh      , only : dx_min
     use scheme    , only : cmax
+    use timer     , only : start_timer, stop_timer
     use variables , only : idn, imz
 
     implicit none
@@ -74,6 +75,10 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! start the evolution timer
+!
+    call start_timer(2)
+
 #ifdef FORCE
 ! perform the Fourier transform of the velocity field
 !
@@ -172,8 +177,8 @@ module evolution
       call boundary_variables()
 
     end if ! maxlev > 1
-
 #endif /* REFINE */
+
 ! update the maximum speed
 !
     call update_maximum_speed()
@@ -187,6 +192,10 @@ module evolution
 #if defined MHD && defined RESISTIVITY
     dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, ueta))
 #endif /* MHD & RESISTIVITY */
+
+! stop the evolution timer
+!
+    call stop_timer(2)
 !
 !-------------------------------------------------------------------------------
 !
@@ -206,6 +215,7 @@ module evolution
     use mpitools, only : mallreducemaxr
 #endif /* MPI */
     use scheme  , only : maxspeed, cmax
+    use timer   , only : start_timer, stop_timer
 
     implicit none
 
@@ -216,6 +226,10 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! start the evolution timer
+!
+    call start_timer(6)
+
 ! reset the maximum speed
 !
     cmax = 1.0d-16
@@ -245,6 +259,10 @@ module evolution
 !
     call mallreducemaxr(cmax)
 #endif /* MPI */
+
+! stop the evolution timer
+!
+    call stop_timer(6)
 !
 !-------------------------------------------------------------------------------
 !
