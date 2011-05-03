@@ -184,9 +184,7 @@ program amun
 
 ! write down the initial state
 !
-    call start_timer(3)
     call write_data()
-    call stop_timer(3)
 
   else
 
@@ -202,9 +200,7 @@ program amun
 
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call start_timer(1)
     call restart_job()
-    call stop_timer(1)
 
 ! reset the start time for the execution time estimate
 !
@@ -272,11 +268,9 @@ program amun
 
 ! store data
 !
-    call start_timer(3)
     if (dtout .gt. 0.0 .and. nfile .lt. (int(t/dtout))) then
       call write_data()
     end if
-    call stop_timer(3)
 
 ! get current time in seconds
 !
@@ -309,9 +303,7 @@ program amun
 
 ! write down the restart dump
 !
-  call start_timer(3)
   call write_restart_data()
-  call stop_timer(3)
 
 #ifdef FORCE
 ! finalize forcing module
