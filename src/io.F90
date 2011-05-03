@@ -32,7 +32,12 @@ module io
 
   implicit none
 
-! the maximum level stored in the restart file
+! counters for the stored data and restart files
+!
+  integer(kind=4), save :: nfile = 0, nrest = 0
+
+! the coefficient related to the difference between the maximum level stored in
+! the restart file and set through the configuration file
 !
   integer(kind=4), save :: fcor = 1
 
@@ -44,36 +49,30 @@ module io
 !
 !===============================================================================
 !
-! write_data: wrapper subroutine for storing the data
+! write_data: wrapper subroutine for storing data
 !
-! info: subroutine selects the writing subroutine from supported output formats
-!       depending on the compilation time options, e.g. at this moment only the
-!       HDF5 format is supported;
-!
-! arguments:
-!   ftype - character variable specifying the type of output file (i.e. restart
-!           file or only the primitive variables);
-!   nfile - integer variable counting the number of file for a given snapshots;
-!   nproc - integer variable specifying the current processor number; the output
-!           is divided into seperate files, one file per processor;
+! info: subroutine selects the writing subroutine from the supported output
+!       formats depending on the compilation time options, and stores a data
+!       file; at this moment only the HDF5 format is supported;
 !
 !===============================================================================
 !
-  subroutine write_data(ftype, nfile, nproc)
+  subroutine write_data()
 
-! declare variables
-!
+    use config, only : ftype
+
     implicit none
-
-! input variables
-!
-    character, intent(in) :: ftype
-    integer  , intent(in) :: nfile, nproc
 !
 !-------------------------------------------------------------------------------
 !
+! increase the file counter
+!
+    nfile = nfile + 1
+
 #ifdef HDF5
-    call write_data_h5(ftype, nfile, nproc)
+! store data file
+!
+    call write_data_h5(ftype)
 #endif /* HDF5 */
 
 !-------------------------------------------------------------------------------
@@ -82,33 +81,61 @@ module io
 !
 !===============================================================================
 !
-! restart_job: wrapper subroutine for the job restart from a data file
+! write_restart_data: wrapper subroutine for storing the restart data
 !
-! info: subroutine selects the restoring subroutine from supported output
-!       formats depending on the compilation time options, e.g. at this moment
-!       only the HDF5 format is supported;
-!
-! arguments:
-!   nfile - integer variable counting the number of file for a given snapshots;
-!   nproc - integer variable specifying the current processor number; the output
-!           is divided into seperate files, one file per processor;
+! info: subroutine selects the writing subroutine from the supported output
+!       formats depending on the compilation time options, and writes a restart
+!       file;
 !
 !===============================================================================
 !
-  subroutine restart_job(nfile, nproc)
+  subroutine write_restart_data()
 
-! declare variables
-!
     implicit none
-
-! input variables
-!
-    integer  , intent(in) :: nfile, nproc
 !
 !-------------------------------------------------------------------------------
 !
+! increase the file counter
+!
+    nrest = nrest + 1
+
 #ifdef HDF5
-    call read_data_h5(nfile, nproc)
+! store restart file
+!
+    call write_data_h5('r')
+#endif /* HDF5 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_restart_data
+!
+!===============================================================================
+!
+! restart_job: wrapper subroutine for the job restart from a data file
+!
+! info: subroutine selects the restoring subroutine from supported output
+!       formats depending on the compilation time options, and restored the
+!       meta and data block structures; at this moment only the HDF5 format is
+!       supported;
+!
+!===============================================================================
+!
+  subroutine restart_job()
+
+    use config, only : nres
+
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! set restart file number
+!
+    nrest = nres
+
+#ifdef HDF5
+! read HDF5 restart file and rebuild blocks structure
+!
+    call read_data_h5()
 #endif /* HDF5 */
 
 !-------------------------------------------------------------------------------
@@ -129,13 +156,14 @@ module io
 !
 !===============================================================================
 !
-  subroutine write_data_h5(ftype, nfile, nproc)
+  subroutine write_data_h5(ftype)
 
 ! references to other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, H5F_ACC_TRUNC_F
-    use hdf5 , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use error   , only : print_error
+    use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
+    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools, only : ncpu
 
 ! declare variables
 !
@@ -144,7 +172,6 @@ module io
 ! input variables
 !
     character, intent(in) :: ftype
-    integer  , intent(in) :: nfile, nproc
 
 ! local variables
 !
@@ -164,7 +191,11 @@ module io
 
 ! prepare the filename
 !
-      write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
+      if (ftype .eq. 'r') then
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, ncpu, '.h5'
+      else
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, ncpu, '.h5'
+      end if
 
 ! create the new HDF5 file
 !
@@ -274,26 +305,22 @@ module io
 ! info: subroutine reads and restores the meta and data block structures from
 !       an HDF5 file
 !
-! arguments: same as in restart_job()
-!
 !===============================================================================
 !
-  subroutine read_data_h5(nfile, nproc)
+  subroutine read_data_h5()
 
 ! references to other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t
-    use hdf5 , only : H5F_ACC_RDONLY_F
-    use hdf5 , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f, h5fclose_f
+    use error   , only : print_error
+    use hdf5    , only : hid_t
+    use hdf5    , only : H5F_ACC_RDONLY_F
+    use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
+                       , h5fclose_f
+    use mpitools, only : ncpu
 
 ! declare variables
 !
     implicit none
-
-! input variables
-!
-    integer  , intent(in) :: nfile, nproc
 
 ! local variables
 !
@@ -314,7 +341,7 @@ module io
 
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nfile, nproc, '.h5'
+      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, ncpu, '.h5'
 
 ! check if the HDF5 file exists
 !
@@ -501,6 +528,7 @@ module io
       call write_attribute_integer_h5(gid, 'ncpu'   , ncpu)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'iter'   , n)
+      call write_attribute_integer_h5(gid, 'nfile'  , nfile)
 
 ! store the real attributes
 !
@@ -710,6 +738,8 @@ module io
               end if
             case('iter')
               call read_attribute_integer_h5(aid, aname, n)
+            case('nfile')
+              call read_attribute_integer_h5(aid, aname, nfile)
             case('time')
               call read_attribute_double_h5(aid, aname, t)
             case('dt')

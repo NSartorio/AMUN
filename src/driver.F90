@@ -31,7 +31,7 @@ program amun
 !
   use blocks   , only : nleafs
   use blocks   , only : init_blocks
-  use config   , only : read_config, nres, nmax, tmax, dtini, dtout, ftype, cfl
+  use config   , only : read_config, nmax, tmax, dtini, dtout, cfl, nres
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
@@ -40,7 +40,7 @@ program amun
   use forcing  , only : init_forcing, clear_forcing
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
-  use io       , only : write_data, restart_job
+  use io       , only : nfile, write_data, write_restart_data, restart_job
   use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
@@ -53,7 +53,7 @@ program amun
 !
   character(len=60) :: fmt
   integer(kind=4)   :: iterm = 0
-  integer           :: no, ed, eh, em, es, ec
+  integer           :: ed, eh, em, es, ec
   real              :: tall, tbeg, tcur, per
 #ifdef SIGNALS
 
@@ -127,7 +127,6 @@ program amun
   t    = 0.0
   dt   = cfl * dtini
   dtn  = dtini
-  no   = 0
   tbeg = 0.0
   ed   = 9999
   eh   = 23
@@ -186,7 +185,7 @@ program amun
 ! write down the initial state
 !
     call start_timer(3)
-    call write_data(ftype, no, ncpu)
+    call write_data()
     call stop_timer(3)
 
   else
@@ -204,12 +203,8 @@ program amun
 ! reconstruct the meta and data block structures from a given restart file
 !
     call start_timer(1)
-    call restart_job(nres, ncpu)
+    call restart_job()
     call stop_timer(1)
-
-! set the number of next file to number of the current restart file
-!
-    no   = nres
 
 ! reset the start time for the execution time estimate
 !
@@ -278,9 +273,8 @@ program amun
 ! store data
 !
     call start_timer(3)
-    if (dtout .gt. 0.0 .and. no .lt. (int(t/dtout))) then
-      no = no + 1
-      call write_data(ftype, no, ncpu)
+    if (dtout .gt. 0.0 .and. nfile .lt. (int(t/dtout))) then
+      call write_data()
     end if
     call stop_timer(3)
 
@@ -316,7 +310,7 @@ program amun
 ! write down the restart dump
 !
   call start_timer(3)
-  call write_data('r', no, ncpu)
+  call write_restart_data()
   call stop_timer(3)
 
 #ifdef FORCE
