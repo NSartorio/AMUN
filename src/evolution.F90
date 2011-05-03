@@ -136,9 +136,7 @@ module evolution
 ! correct the numerical fluxes between neighboring blocks which are at different
 ! levels
 !
-    call start_timer(4)
     call boundary_correct_fluxes()
-    call stop_timer(4)
 
 ! update solution using numerical fluxes stored in data blocks
 !
@@ -159,9 +157,7 @@ module evolution
 #endif /* CONSERVATIVE */
 ! update boundaries
 !
-    call start_timer(4)
     call boundary_variables()
-    call stop_timer(4)
 
 #ifdef REFINE
 ! chec if we need to perform the refinement step
@@ -176,9 +172,7 @@ module evolution
 
 ! update boundaries
 !
-      call start_timer(4)
       call boundary_variables()
-      call stop_timer(4)
 
     end if ! maxlev > 1
 

@@ -46,6 +46,7 @@ module boundaries
                         , list_meta
     use blocks   , only : ndims, nsides, nfaces
     use config   , only : periodic
+    use timer    , only : start_timer, stop_timer
 #ifdef MPI
     use config   , only : im, jm, km
     use mpitools , only : ncpu, ncpus, is_master, msendf, mrecvf
@@ -79,6 +80,10 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! stop boundary timing counter
+!
+    call start_timer(4)
+
 ! update boundaries direction by direction
 !
     do idir = 1, ndims
@@ -850,7 +855,11 @@ module boundaries
 
 #endif /* MPI */
     end do ! directions
+
+! stop boundary timing counter
 !
+    call stop_timer(4)
+
 !-------------------------------------------------------------------------------
 !
   end subroutine boundary_variables
@@ -870,6 +879,7 @@ module boundaries
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
     use config   , only : maxlev
+    use timer    , only : start_timer, stop_timer
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
     use config   , only : im, jm, km
@@ -907,6 +917,10 @@ module boundaries
 ! do not correct fluxes if we do not use adaptive mesh
 !
     if (maxlev .eq. 1) return
+
+! stop boundary timing counter
+!
+    call start_timer(4)
 
 #ifdef MPI
 ! reset the block counter
@@ -1123,6 +1137,10 @@ module boundaries
       end do ! isend
     end do ! irecv
 #endif /* MPI */
+
+! stop boundary timing counter
+!
+    call stop_timer(4)
 
 !-------------------------------------------------------------------------------
 !
