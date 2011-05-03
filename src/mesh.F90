@@ -1371,11 +1371,16 @@ module mesh
     use blocks  , only : clear_blocks
     use error   , only : print_info
     use mpitools, only : is_master
+    use timer   , only : start_timer, stop_timer
 
     implicit none
 
 !-------------------------------------------------------------------------------
 !
+! start the mesh timer
+!
+    call start_timer(5)
+
 ! deallocate block structure
 !
     call clear_blocks
@@ -1396,6 +1401,10 @@ module mesh
 ! close the handler of the mesh statistics file
 !
     if (is_master()) close(funit)
+
+! stop the mesh timer
+!
+    call stop_timer(5)
 
 !-------------------------------------------------------------------------------
 !
