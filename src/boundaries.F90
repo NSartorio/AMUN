@@ -80,7 +80,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! stop boundary timing counter
+! start the boundary timer
 !
     call start_timer(4)
 
@@ -856,7 +856,7 @@ module boundaries
 #endif /* MPI */
     end do ! directions
 
-! stop boundary timing counter
+! stop the boundary timer
 !
     call stop_timer(4)
 
@@ -918,7 +918,7 @@ module boundaries
 !
     if (maxlev .eq. 1) return
 
-! stop boundary timing counter
+! start the boundary timer
 !
     call start_timer(4)
 
@@ -1138,7 +1138,7 @@ module boundaries
     end do ! irecv
 #endif /* MPI */
 
-! stop boundary timing counter
+! stop the boundary timer
 !
     call stop_timer(4)
 
