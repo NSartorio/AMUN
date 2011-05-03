@@ -34,7 +34,7 @@ module io
 
 ! counters for the stored data and restart files
 !
-  integer(kind=4), save :: nfile = 0, nrest = 0
+  integer(kind=4), save :: nfile = -1, nrest = 0
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
