@@ -196,7 +196,7 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 #-------------------------------------------------------------------------------
 
-blocks.o        : blocks.F90 config.o error.o mpitools.o variables.o
+blocks.o        : blocks.F90 config.o error.o variables.o
 boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
                   mpitools.o variables.o
 config.o        : config.F90 error.o
