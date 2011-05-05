@@ -143,8 +143,7 @@ module blocks
 !
   subroutine init_blocks()
 
-    use config, only : maxlev, ncells
-    use error , only : print_warning
+    use error, only : print_warning
 
     implicit none
 !
