@@ -1,12 +1,12 @@
 !!******************************************************************************
 !!
-!! module: timer - handling the timing of the program execution
+!! module: TIMER - handling the timing of the program execution
 !!
-!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of AMUN.
+!!  This file is part of the AMUN code.
 !!
 !!  This program is free software; you can redistribute it and/or
 !!  modify it under the terms of the GNU General Public License

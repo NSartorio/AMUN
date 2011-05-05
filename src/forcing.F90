@@ -1,12 +1,12 @@
 !!******************************************************************************
 !!
-!! module: forcing - handles turbulence driving
+!! module: FORCING - handles turbulence driving
 !!
-!! Copyright (C) 2007-2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2007-2011 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of AMUN.
+!!  This file is part of the AMUN code.
 !!
 !!  This program is free software; you can redistribute it and/or
 !!  modify it under the terms of the GNU General Public License

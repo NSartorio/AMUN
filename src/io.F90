@@ -1,13 +1,13 @@
 !!******************************************************************************
 !!
-!! module: io - handling the data input and output for storing the snapshots
+!! module: IO - handling the data input and output for storing the snapshots
 !!              and restarting the jobs
 !!
-!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of AMUN.
+!!  This file is part of the AMUN code.
 !!
 !!  This program is free software; you can redistribute it and/or
 !!  modify it under the terms of the GNU General Public License

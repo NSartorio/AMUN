@@ -1,6 +1,6 @@
 !!******************************************************************************
 !!
-!! module: random - handles random number generators by Marsaglia & Tsang
+!! module: RANDOM - handles random number generators by Marsaglia & Tsang
 !!
 !! references:
 !! Marsaglia, G. & Tsang, W.W. (2000) `The ziggurat method for generating
@@ -8,11 +8,11 @@
 !!
 !! Copyright (C) 2000 George Marsaglia, Wai Wan Tsang
 !! Copyright (C) 2008 John Burkardt
-!! Copyright (C) 2010,2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2010,2011 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of AMUN.
+!!  This file is part of the AMUN code.
 !!
 !!  This program is free software; you can redistribute it and/or
 !!  modify it under the terms of the GNU General Public License
