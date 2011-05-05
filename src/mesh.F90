@@ -45,6 +45,10 @@ module mesh
   integer                 , save :: tblocks = 1
   integer,dimension(NDIMS), save :: effres  = 1
 
+! the effective resolution for all levels
+!
+  integer(kind=4), dimension(:,:), allocatable, save :: res
+
 ! log file for the mesh statistics
 !
   character(len=32), save :: fname = "mesh.log"
@@ -60,9 +64,8 @@ module mesh
 !
   subroutine init_mesh(flag)
 
-    use blocks   , only : res
     use blocks   , only : set_datablock_dims
-    use config   , only : maxlev, im, jm, km, ncells, rdims, ng                &
+    use config   , only : maxlev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : is_master, ncpus
     use timer    , only : start_timer, stop_timer
@@ -105,6 +108,7 @@ module mesh
     allocate(adyi (maxlev))
     allocate(adzi (maxlev))
     allocate(advol(maxlev))
+    allocate(res  (maxlev, 3))
 
 ! reset the coordinate variables
 !
@@ -118,11 +122,21 @@ module mesh
     adyi(:)  = 1.0d0
     adzi(:)  = 1.0d0
     advol(:) = 1.0d0
+    res(:,:) = 1
 
 ! generating coordinates for all levels
 !
     do l = 1, maxlev
+
       n = ncells * 2**(l - 1)
+
+! calculate the effective resolution at each level
+!
+      res(l,1)  = in * 2**(maxlev - l)
+      res(l,2)  = jn * 2**(maxlev - l)
+#if NDIMS == 3
+      res(l,3)  = kn * 2**(maxlev - l)
+#endif /* NDIMS == 3 */
 
       adx (l) = (xmax - xmin) / (rdims(1) * n)
       ady (l) = (ymax - ymin) / (rdims(2) * n)
@@ -158,7 +172,7 @@ module mesh
       dm( :     ) = 1
 
       bm(1:NDIMS) = rdims(1:NDIMS) * ncells
-      rm(1:NDIMS) = rdims(1:NDIMS) * res(1)
+      rm(1:NDIMS) = rdims(1:NDIMS) * res(1,1:NDIMS)
       dm(1:NDIMS) = rm(1:NDIMS) / ncells
 
       effres(1:NDIMS) = rm(1:NDIMS)
@@ -273,7 +287,7 @@ module mesh
 
 ! allocate the initial structure of blocks according to the problem
 !
-    call init_domain()
+    call init_domain(res(1,:))
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
@@ -415,7 +429,7 @@ module mesh
 
 ! perform the refinement
 !
-              call refine_block(pmeta_block, .true.)
+              call refine_block(pmeta_block, res(pmeta_block%level + 1,:), .true.)
 
             end if
 
@@ -956,12 +970,12 @@ module mesh
 #ifdef MPI
               if (pmeta%cpu .eq. ncpu) then
 #endif /* MPI */
-                call refine_block(pmeta, .true.)
+                call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
                 call prolong_block(pparent)
                 call deallocate_datablock(pparent%data)
 #ifdef MPI
               else
-                call refine_block(pmeta, .false.)
+                call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
               end if
 #endif /* MPI */
             end if
@@ -1403,6 +1417,7 @@ module mesh
     if (allocated(adyi) ) deallocate(adyi)
     if (allocated(adzi) ) deallocate(adzi)
     if (allocated(advol)) deallocate(advol)
+    if (allocated(res)  ) deallocate(res)
 
 ! close the handler of the mesh statistics file
 !

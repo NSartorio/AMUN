@@ -133,10 +133,6 @@ module blocks
 !
   integer(kind=4)     , save :: nx, ny, nz
 
-! the effective resolution at all levels
-!
-  integer(kind=4), dimension(:), allocatable, save :: res
-
   contains
 !
 !===============================================================================
@@ -151,10 +147,6 @@ module blocks
     use error , only : print_warning
 
     implicit none
-
-! local variables
-!
-    integer(kind=4)      :: l
 !
 !-------------------------------------------------------------------------------
 !
@@ -186,17 +178,6 @@ module blocks
 !
     last_id = 0
 
-! allocate the effective resolution array
-!
-    allocate(res(maxlev))
-
-! calculate the effective resolution at each level
-!
-    do l = 1, maxlev
-      res(l) = ncells * 2**(maxlev - l)
-    end do
-
-!
 !-------------------------------------------------------------------------------
 !
   end subroutine init_blocks
@@ -225,10 +206,6 @@ module blocks
       pmeta => list_meta
     end do
 
-! deallocating coordinate variables
-!
-    if (allocated(res))  deallocate(res)
-!
 !-------------------------------------------------------------------------------
 !
   end subroutine clear_blocks
@@ -862,7 +839,7 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine refine_block(pblock, falloc_data)
+  subroutine refine_block(pblock, res, falloc_data)
 
     use error, only : print_error
 
@@ -870,8 +847,9 @@ module blocks
 
 ! input parameters
 !
-    type(block_meta), pointer, intent(inout) :: pblock
-    logical                  , intent(in)    :: falloc_data
+    type(block_meta), pointer    , intent(inout) :: pblock
+    integer(kind=4), dimension(3), intent(in)    :: res
+    logical                      , intent(in)    :: falloc_data
 
 ! pointers
 !
@@ -1275,10 +1253,10 @@ module blocks
 
 ! set the block coordinates
 !
-        ic  = pblock%coord(1) + i * res(pchild%level)
-        jc  = pblock%coord(2) + j * res(pchild%level)
+        ic  = pblock%coord(1) + i * res(1)
+        jc  = pblock%coord(2) + j * res(2)
 #if NDIMS == 3
-        kc  = pblock%coord(3) + k * res(pchild%level)
+        kc  = pblock%coord(3) + k * res(3)
 #endif /* NDIMS == 3 */
         call metablock_set_coord(pchild, ic, jc, kc)
 
@@ -1354,7 +1332,7 @@ module blocks
 
 ! terminate program if the pointer passed by argument is not associated
 !
-      call print_error("blocks::refine_blocks","Input pointer is not associated! Terminating!")
+      call print_error("blocks::refine_block","Input pointer is not associated! Terminating!")
     end if
 !
 !-------------------------------------------------------------------------------

@@ -37,15 +37,21 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_domain()
+  subroutine init_domain(res)
 
     use config, only : problem
+
+    implicit none
+
+! input arguments
+!
+    integer(kind=4), dimension(3), intent(in) :: res
 !
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
     case default
-      call domain_default()
+      call domain_default(res)
     end select
 
 !-------------------------------------------------------------------------------
@@ -145,17 +151,21 @@ module problem
 !
 !===============================================================================
 !
-  subroutine domain_default()
+  subroutine domain_default(res)
 
     use blocks, only : pointer_meta, block_meta, block_data, append_metablock  &
                      , append_datablock, associate_blocks, metablock_setleaf   &
                      , metablock_setconfig, metablock_setlevel                 &
                      , metablock_set_coord, metablock_setbounds                &
-                     , nsides, nfaces, res
+                     , nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax, rdims
 
     implicit none
+
+! input arguments
+!
+    integer(kind=4), dimension(3), intent(in) :: res
 
 ! local variables
 !
@@ -273,7 +283,7 @@ module problem
 
 ! claculate the block position along Z
 !
-      kl  = (k - 1) * res(1)
+      kl  = (k - 1) * res(3)
 
 ! calculate the Z bounds
 !
@@ -284,7 +294,7 @@ module problem
 
 ! claculate the block position along Y
 !
-        jl  = (j - 1) * res(1)
+        jl  = (j - 1) * res(2)
 
 ! calculate the Y bounds
 !

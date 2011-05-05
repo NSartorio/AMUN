@@ -2207,12 +2207,12 @@ module io
 ! references to other modules
 !
     use blocks, only : block_meta, block_data, list_data
-    use blocks, only : dblocks, ndims, nsides, res
+    use blocks, only : dblocks, ndims, nsides
     use config, only : maxlev
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
-    use mesh  , only : adx, ady, adz
+    use mesh  , only : adx, ady, adz, res
 
 ! declare variables
 !
@@ -2230,7 +2230,7 @@ module io
 !
     integer           :: err
     integer(kind=4)   :: l
-    integer(hsize_t)  :: am(1), cm(2), dm(3)
+    integer(hsize_t)  :: am(1), cm(2), rm(2), dm(3)
 
 ! local allocatable arrays
 !
@@ -2261,6 +2261,8 @@ module io
         am(1) = maxlev
         cm(1) = dblocks
         cm(2) = ndims
+        rm(1) = maxlev
+        rm(2) = ndims
         dm(1) = dblocks
         dm(2) = ndims
         dm(3) = nsides
@@ -2307,9 +2309,9 @@ module io
 
 ! write the arrays to the HDF5 file
 !
-        call write_vector_integer_h5(gid, 'blkres', am(1), res)
         call write_vector_integer_h5(gid, 'levels', cm(1), lev)
         call write_vector_integer_h5(gid, 'refine', cm(1), ref)
+        call write_array2_integer_h5(gid, 'blkres', rm(:), res(:,1:NDIMS))
         call write_array2_integer_h5(gid, 'coords', cm(:), cor)
         call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
         call write_vector_double_h5 (gid, 'dx'    , am(1), adx)
