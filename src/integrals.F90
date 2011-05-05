@@ -136,7 +136,6 @@ module integrals
   subroutine store_integrals()
 
     use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : dblocks, ndims
     use config   , only : ib, ie, jb, je, kb, ke
     use evolution, only : n, t, dt
 #ifdef FORCE

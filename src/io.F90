@@ -502,7 +502,8 @@ module io
 
 ! references to other modules
 !
-    use blocks   , only : ndims, last_id, mblocks, dblocks, nleafs
+    use blocks   , only : get_mblocks, get_dblocks, get_nleafs
+    use blocks   , only : get_last_id
     use config   , only : ncells, nghost
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
     use config   , only : in, jn, kn, rdims, maxlev
@@ -544,11 +545,11 @@ module io
 
 ! store the integer attributes
 !
-      call write_attribute_integer_h5(gid, 'ndims'  , ndims)
-      call write_attribute_integer_h5(gid, 'last_id', last_id)
-      call write_attribute_integer_h5(gid, 'mblocks', mblocks)
-      call write_attribute_integer_h5(gid, 'dblocks', dblocks)
-      call write_attribute_integer_h5(gid, 'nleafs' , nleafs)
+      call write_attribute_integer_h5(gid, 'ndims'  , NDIMS)
+      call write_attribute_integer_h5(gid, 'last_id', get_last_id())
+      call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
+      call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
+      call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs())
       call write_attribute_integer_h5(gid, 'ncells' , ncells)
       call write_attribute_integer_h5(gid, 'nghost' , nghost)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
@@ -643,7 +644,8 @@ module io
 !
     use blocks   , only : block_meta, block_data
     use blocks   , only : append_metablock, append_datablock
-    use blocks   , only : ndims, last_id, mblocks, dblocks, nleafs
+    use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
+                        , get_nleafs
     use config   , only : ncells, nghost
     use config   , only : in, jn, kn, rdims, maxlev
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
@@ -672,7 +674,7 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
-                       , lncells, lnghost, lnseeds, lmaxlev
+                       , lnleafs, lncells, lnghost, lnseeds, lmaxlev
 
 ! local pointers
 !
@@ -745,7 +747,7 @@ module io
             case('dblocks')
               call read_attribute_integer_h5(aid, aname, ldblocks)
             case('nleafs')
-              call read_attribute_integer_h5(aid, aname, nleafs)
+              call read_attribute_integer_h5(aid, aname, lnleafs)
             case('ncells')
               call read_attribute_integer_h5(aid, aname, lncells)
 
@@ -847,7 +849,7 @@ module io
 
 ! check if the number of created metablocks is equal to lbmcloks
 !
-        if (lmblocks .ne. mblocks) then
+        if (lmblocks .ne. get_mblocks()) then
           call print_error("io::read_attributes_h5"                            &
                                         , "Number of metablocks doesn't match!")
         end if
@@ -860,7 +862,7 @@ module io
 
 ! check if the number of created datablocks is equal to the ldblocks
 !
-        if (ldblocks .ne. dblocks) then
+        if (ldblocks .ne. get_dblocks()) then
           call print_error("io::read_attributes_h5"                            &
                                         , "Number of datablocks doesn't match!")
         end if
@@ -868,7 +870,7 @@ module io
 ! allocate an array of pointers with the size llast_id
 !
         allocate(block_array(llast_id))
-        last_id = llast_id
+        call set_last_id(llast_id)
 
       else
 
@@ -1478,7 +1480,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : last_id, mblocks, nchild, ndims, nsides, nfaces
+    use blocks  , only : get_last_id, get_mblocks, nchild, nsides, nfaces
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gcreate_f, h5gclose_f
@@ -1525,14 +1527,14 @@ module io
 
 ! prepate dimensions
 !
-      am(1) = mblocks
-      cm(1) = last_id
-      dm(1) = mblocks
+      am(1) = get_mblocks()
+      cm(1) = get_last_id()
+      dm(1) = get_mblocks()
       dm(2) = nchild
-      pm(1) = mblocks
-      pm(2) = ndims
-      qm(1) = mblocks
-      qm(2) = ndims
+      pm(1) = get_mblocks()
+      pm(2) = NDIMS
+      qm(1) = get_mblocks()
+      qm(2) = NDIMS
       qm(3) = nsides
       qm(4) = nfaces
 
@@ -1599,7 +1601,7 @@ module io
           if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
         end do
 
-        do i = 1, ndims
+        do i = 1, NDIMS
           do j = 1, nsides
             do k = 1, nfaces
               if (associated(pmeta%neigh(i,j,k)%ptr))  &
@@ -1698,7 +1700,8 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : last_id, mblocks, nchild, ndims, nsides, nfaces
+    use blocks  , only : nchild, nsides, nfaces
+    use blocks  , only : get_mblocks
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f
@@ -1745,13 +1748,13 @@ module io
 
 ! prepate dimensions
 !
-      am(1) = mblocks
-      dm(1) = mblocks
+      am(1) = get_mblocks()
+      dm(1) = get_mblocks()
       dm(2) = nchild
-      pm(1) = mblocks
-      pm(2) = ndims
-      qm(1) = mblocks
-      qm(2) = ndims
+      pm(1) = get_mblocks()
+      pm(2) = NDIMS
+      qm(1) = get_mblocks()
+      qm(2) = NDIMS
       qm(3) = nsides
       qm(4) = nfaces
 
@@ -1856,7 +1859,7 @@ module io
           end if
         end do
 
-        do i = 1, ndims
+        do i = 1, NDIMS
           do j = 1, nsides
             do k = 1, nfaces
               if (ngh(l,i,j,k) .gt. 0) then
@@ -1934,7 +1937,7 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : dblocks, ndims
+    use blocks   , only : get_dblocks
     use config   , only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
@@ -1980,19 +1983,19 @@ module io
 
 ! store data blocks only if there are some on the current processor
 !
-      if (dblocks .gt. 0) then
+      if (get_dblocks() .gt. 0) then
 
 ! prepate dimensions
 !
-        am(1) = dblocks
-        cm(1) = dblocks
-        dm(1) = dblocks
+        am(1) = get_dblocks()
+        cm(1) = get_dblocks()
+        dm(1) = get_dblocks()
         dm(2) = nqt
         dm(3) = im
         dm(4) = jm
         dm(5) = km
-        qm(1) = dblocks
-        qm(2) = ndims
+        qm(1) = get_dblocks()
+        qm(2) = NDIMS
         qm(3) = nqt
         qm(4) = im
         qm(5) = jm
@@ -2076,7 +2079,7 @@ module io
 !
     use blocks   , only : block_meta, block_data, list_data
     use blocks   , only : associate_blocks
-    use blocks   , only : dblocks, ndims
+    use blocks   , only : get_dblocks
     use config   , only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
@@ -2120,12 +2123,12 @@ module io
 
 ! restore all data blocks
 !
-      if (dblocks .gt. 0) then
+      if (get_dblocks() .gt. 0) then
 
 ! prepate dimensions
 !
-        am(1) = dblocks
-        dm(1) = dblocks
+        am(1) = get_dblocks()
+        dm(1) = get_dblocks()
         dm(2) = nqt
         dm(3) = im
         dm(4) = jm
@@ -2207,7 +2210,8 @@ module io
 ! references to other modules
 !
     use blocks, only : block_meta, block_data, list_data
-    use blocks, only : dblocks, ndims, nsides
+    use blocks, only : nsides
+    use blocks, only : get_dblocks
     use config, only : maxlev
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
@@ -2254,17 +2258,17 @@ module io
 
 ! store coordinates only if there are some data blocks on the current processor
 !
-      if (dblocks .gt. 0) then
+      if (get_dblocks() .gt. 0) then
 
 ! prepare dimensions
 !
         am(1) = maxlev
-        cm(1) = dblocks
-        cm(2) = ndims
+        cm(1) = get_dblocks()
+        cm(2) = NDIMS
         rm(1) = maxlev
-        rm(2) = ndims
-        dm(1) = dblocks
-        dm(2) = ndims
+        rm(2) = NDIMS
+        dm(1) = get_dblocks()
+        dm(2) = NDIMS
         dm(3) = nsides
 
 ! allocate arrays to store coordinates
@@ -2371,7 +2375,7 @@ module io
 ! references to other modules
 !
     use blocks       , only : block_data, list_data
-    use blocks       , only : dblocks
+    use blocks       , only : get_dblocks
     use config       , only : im, jm, km
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
@@ -2439,11 +2443,11 @@ module io
 
 ! store variables only if there are some data blocks on the current processor
 !
-      if (dblocks .gt. 0) then
+      if (get_dblocks() .gt. 0) then
 
 ! prepare dimensions
 !
-        dm(1) = dblocks
+        dm(1) = get_dblocks()
         dm(2) = im
         dm(3) = jm
         dm(4) = km
@@ -2609,7 +2613,7 @@ module io
 ! references to other modules
 !
     use blocks       , only : block_data, list_data
-    use blocks       , only : dblocks
+    use blocks       , only : get_dblocks
     use config       , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
@@ -2669,11 +2673,11 @@ module io
 
 ! store variables only if there are some data blocks on the current processor
 !
-      if (dblocks .gt. 0) then
+      if (get_dblocks() .gt. 0) then
 
 ! prepare dimensions
 !
-        dm(1) = dblocks
+        dm(1) = get_dblocks()
         dm(2) = in
         dm(3) = jn
         dm(4) = kn

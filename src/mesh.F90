@@ -64,7 +64,7 @@ module mesh
 !
   subroutine init_mesh(flag)
 
-    use blocks   , only : set_datablock_dims
+    use blocks   , only : datablock_set_dims
     use config   , only : maxlev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : is_master, ncpus
@@ -94,7 +94,7 @@ module mesh
 
 ! set data block dimensions
 !
-    call set_datablock_dims(nqt, nvr, im, jm, km)
+    call datablock_set_dims(nqt, nvr, im, jm, km)
 
 ! allocating space for coordinate variables
 !
@@ -259,7 +259,8 @@ module mesh
     use config  , only : maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data
     use blocks  , only : refine_block, deallocate_datablock
-    use blocks  , only : mblocks, nleafs, dblocks, nchild, nsides, nfaces
+    use blocks  , only : nchild, nsides, nfaces
+    use blocks  , only : get_mblocks, get_nleafs
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -339,7 +340,7 @@ module mesh
 ! if there is only one block, and it is set not to be refined, refine it anyway
 ! because the resolution for the problem initiation may be too small
 !
-            if (mblocks .eq. 1 .and. l .eq. 1) &
+            if (get_mblocks() .eq. 1 .and. l .eq. 1) &
               pdata_block%meta%refine = 1
           end if
 
@@ -460,8 +461,8 @@ module mesh
 ! divide blocks between all processes, use the number of data blocks to do this,
 ! but keep blocks from the top level which have the same parent packed together
 !
-    l       = mod(nleafs, ncpus) - 1
-    lb( : ) = nleafs / ncpus
+    l       = mod(get_nleafs(), ncpus) - 1
+    lb( : ) = get_nleafs() / ncpus
     lb(0:l) = lb(0:l) + 1
 
 ! reset the processor and block numbers
@@ -535,9 +536,10 @@ module mesh
 
     use config   , only : maxlev, im, jm, km
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
-                        , nleafs, dblocks, nchild, ndims, nsides, nfaces       &
+                        , nchild, ndims, nsides, nfaces                        &
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
+    use blocks   , only : get_nleafs
     use error    , only : print_info, print_error
 #ifdef MPI
     use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
@@ -626,7 +628,7 @@ module mesh
 #ifdef MPI
 ! allocate buffer for the refinement field values
 !
-    allocate(ibuf(nleafs))
+    allocate(ibuf(get_nleafs()))
 
 ! reset the buffer
 !
@@ -647,7 +649,7 @@ module mesh
 
 ! update refinement flags across all processors
 !
-    call mallreducesuml(nleafs, ibuf(1:nleafs))
+    call mallreducesuml(get_nleafs(), ibuf(1:get_nleafs()))
 
 ! update non-local block refinement flags
 !
@@ -991,8 +993,8 @@ module mesh
 !!
 ! calculate the new division
 !
-    l       = mod(nleafs, ncpus) - 1
-    lb( : ) = nleafs / ncpus
+    l       = mod(get_nleafs(), ncpus) - 1
+    lb( : ) = get_nleafs() / ncpus
     lb(0:l) = lb(0:l) + 1
 
 ! iterate over all metablocks and reassign the processor numbers
@@ -1439,8 +1441,8 @@ module mesh
 !
   subroutine store_mesh_stats(n, t)
 
-    use blocks  , only : mblocks, nleafs
     use blocks  , only : block_meta, list_meta
+    use blocks  , only : get_mblocks, get_nleafs
     use config  , only : ncells, nghost, maxlev
     use mpitools, only : is_master, ncpus
 
@@ -1475,8 +1477,8 @@ module mesh
 
 ! calculate the coverage
 !
-      cov = (1.0 * nleafs) / tblocks
-      eff = (1.0 * nleafs * (ncells + 2 * nghost)**NDIMS)                      &
+      cov = (1.0 * get_nleafs()) / tblocks
+      eff = (1.0 * get_nleafs() * (ncells + 2 * nghost)**NDIMS)                &
                                        / product(effres(1:NDIMS) + 2 * nghost)
 
 ! get the block level distribution
@@ -1499,7 +1501,7 @@ module mesh
 ! write down the statistics
 !
       write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8),$)")               &
-                                              n, t, nleafs, mblocks, cov, eff
+                                   n, t, get_nleafs(), get_mblocks(), cov, eff
       write(funit,"('   ',$)")
       do l = 1, maxlev
         write(funit,"(2x,i6,$)") ldist(l)

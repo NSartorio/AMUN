@@ -1,12 +1,12 @@
 !!******************************************************************************
 !!
-!! module: blocks - handling block storage
+!! module: BLOCKS - defines and handles the meta and data block structures
 !!
-!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!******************************************************************************
 !!
-!!  This file is part of AMUN.
+!!  This file is part of the AMUN code.
 !!
 !!  This program is free software; you can redistribute it and/or
 !!  modify it under the terms of the GNU General Public License
@@ -29,16 +29,20 @@ module blocks
 
   implicit none
 
-! parameters
+! by default all variables are private
+!
+  private
+
+! module parameters
 !
   integer(kind=4), parameter :: ndims  = NDIMS
   integer(kind=4), parameter :: nsides = 2
   integer(kind=4), parameter :: nfaces = 2**(ndims-1)
   integer(kind=4), parameter :: nchild = 2**ndims
 
-!! BLOCK STRUCTURE POINTERS (have to be defined before structures)
+!! BLOCK STRUCTURE POINTERS (they have to be defined before structures)
 !!
-! define pointers to block_meta and block_data structures
+! define pointers to meta, data, and info block structures
 !
   type pointer_meta
     type(block_meta), pointer :: ptr
@@ -54,86 +58,163 @@ module blocks
 
 !! BLOCK STRUCTURES
 !
-! define block_meta structure
+! define the META block structure
 !
   type block_meta
-    type(block_meta)  , pointer :: prev             ! pointer to the previous block
-    type(block_meta)  , pointer :: next             ! pointer to the next block
-    type(block_meta)  , pointer :: parent           ! pointer to the parent block
-    type(pointer_meta)          :: child(nchild)    ! pointers to children
+                                 ! pointers to the previous and next meta blocks
+                                 !
+    type(block_meta)  , pointer :: prev, next
+
+                                 ! a pointer to the parent meta block
+                                 !
+    type(block_meta)  , pointer :: parent
+
+                                 ! pointers to the child meta blocks
+                                 !
+    type(pointer_meta)          :: child(nchild)
+
+                                 ! pointers to the neighbor meta blocks
+                                 !
     type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
-                                                    ! pointers to neighbors
 
-    type(block_data)  , pointer :: data             ! pointer to the data block
+                                 ! a pointer to the associated data block
+                                 !
+    type(block_data)  , pointer :: data
 
-    integer(kind=4)             :: id               ! block identificator
-    integer(kind=4)             :: cpu              ! the cpu id of the block
+                                 ! the block identificator
+                                 !
+    integer(kind=4)             :: id
+
+                                 ! the number of associated cpu
+                                 !
+    integer(kind=4)             :: cpu
+
+                                 ! the level of refinement
+                                 !
     integer(kind=4)             :: level            ! refinement level
-    integer(kind=4)             :: config           ! configuration flag
-    integer(kind=4)             :: refine           ! refinement flag:
-!                                                       -1 - derefine
-!                                                        0 - do nothing
-!                                                        1 - refine
 
-    integer(kind=4)             :: pos(ndims)       ! the position in the parent block
-    integer(kind=4)             :: coord(ndims)     ! coordinate of the lower
-!                                                     corner in the effective
-!                                                     resolution
+                                 ! the configuration flag for its children order
+                                 !
+    integer(kind=4)             :: config
 
-    logical                     :: leaf             ! leaf flag
+                                 ! the refinement flag, -1, 0, and 1 for
+                                 ! derefinement, no change, and refinement,
+                                 ! respectively
+                                 !
+    integer(kind=4)             :: refine
 
-    real(kind=8)                :: xmin, xmax       ! bounds for the x direction
-    real(kind=8)                :: ymin, ymax       ! bounds for the y direction
-    real(kind=8)                :: zmin, zmax       ! bounds for the z direction
+                                 ! the position of the block in its parent block
+                                 !
+    integer(kind=4)             :: pos(ndims)
+
+                                 ! the coordinate of the lower corner of the
+                                 ! block in the effective resolution units
+                                 !
+    integer(kind=4)             :: coord(ndims)
+
+                                 ! the leaf flag
+                                 !
+    logical                     :: leaf
+
+                                 ! the block coordinates in the physical units
+                                 !
+    real(kind=8)                :: xmin, xmax, ymin, ymax, zmin, zmax
+
   end type block_meta
 
-! define block_data structure
+! define the DATA block structure
 !
   type block_data
-    type(block_data), pointer :: prev             ! pointer to the previous block
-    type(block_data), pointer :: next             ! pointer to the next block
+                                 ! pointers to the previous and next data blocks
+                                 !
+    type(block_data), pointer :: prev, next
 
-    type(block_meta), pointer :: meta             ! pointer to the metadata block
+                                 ! a pointer to the associated meta block
+                                 !
+    type(block_meta), pointer :: meta
 
-    real, dimension(:,:,:,:)  , allocatable :: u  ! conserved variables
-    real, dimension(:,:,:,:,:), allocatable :: f  ! numerical fluxes
+                                 ! an allocatable array to store all variables
+                                 !
+    real, dimension(:,:,:,:)  , allocatable :: u
+
+                                 ! an allocatable array to store all fluxes
+                                 !
+    real, dimension(:,:,:,:,:), allocatable :: f
+
   end type block_data
 
-! define block_info structure for boundary exchange
+! define the INFO block structure
 !
   type block_info
-    type(block_info)  , pointer :: prev             ! pointer to the previous block
-    type(block_info)  , pointer :: next             ! pointer to the next block
-    type(block_meta)  , pointer :: block            ! pointer to the meta block
-    type(block_meta)  , pointer :: neigh            ! pointer to the neighbor block
-    integer(kind=4)             :: direction        ! direction of the neighbor block
-    integer(kind=4)             :: side             ! side of the neighbor block
-    integer(kind=4)             :: face             ! face of the neighbor block
-    integer(kind=4)             :: level_difference ! the difference of levels
+                                 ! pointers to the previous and next info blocks
+                                 !
+    type(block_info)  , pointer :: prev, next
+
+                                 ! a pointer to the associated meta block
+                                 !
+    type(block_meta)  , pointer :: block
+
+                                 ! a pointer to the associated neighbor block
+                                 !
+    type(block_meta)  , pointer :: neigh
+
+                                 ! the direction, side and face indices
+                                 !
+    integer(kind=4)             :: direction, side, face
+
+                                 ! the level difference between the block and
+                                 ! its neighbor
+                                 !
+    integer(kind=4)             :: level_difference
+
   end type block_info
 
+!! POINTER TO THE FIST AND LAST BLOCKS IN THE LISTS
+!!
 ! chains of meta blocks and data blocks
 !
   type(block_meta), pointer, save :: list_meta, last_meta
   type(block_data), pointer, save :: list_data, last_data
 
-! stored last id (should always increase)
+!! MODULE VARIABLES
+!!
+! the identificator of the last allocated block (should always increase)
 !
   integer(kind=4)     , save :: last_id
 
-! store number of allocated blocks and leafs
+! the numbers of allocated meta and data blocks, and leafs
 !
   integer(kind=4)     , save :: mblocks, dblocks, nleafs
 
-! store numbers of variables and fluxes
+! the numbers of variables and fluxes stored in data blocks
 !
   integer(kind=4)     , save :: nvars, nflux
 
-! store data block dimensions
+! the spacial dimensions of data block allocatable arrays
 !
   integer(kind=4)     , save :: nx, ny, nz
 
+! delcare public subroutines
+!
+  public :: pointer_meta, pointer_info
+  public :: block_meta, block_data, block_info
+  public :: list_meta, list_data
+  public :: nchild, ndims, nsides, nfaces
+  public :: init_blocks, clear_blocks
+  public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
+  public :: append_metablock, associate_blocks, append_datablock               &
+          , deallocate_datablock
+  public :: metablock_set_leaf, metablock_set_config, metablock_set_coord      &
+          , metablock_set_level, metablock_set_bounds
+  public :: datablock_set_dims
+  public :: refine_block, derefine_block
+
   contains
+!
+!!==============================================================================
+!!
+!! INITIALIZATION/FINALIZATION SUBROUTINES
+!!
 !
 !===============================================================================
 !
@@ -149,7 +230,7 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! nullify list pointers
+! nullify the list pointers
 !
     nullify(list_meta)
     nullify(list_data)
@@ -183,7 +264,8 @@ module blocks
 !
 !===============================================================================
 !
-! clear_blocks: subroutine clears the block variables
+! clear_blocks: subroutine delallocated the meta blocks and data blocks if
+!               associated with them
 !
 !===============================================================================
 !
@@ -191,13 +273,13 @@ module blocks
 
     implicit none
 
-! pointers
+! local pointer
 !
     type(block_meta), pointer :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
-! clear all meta blocks
+! deallocate all meta blocks
 !
     pmeta => list_meta
     do while(associated(pmeta))
@@ -209,62 +291,10 @@ module blocks
 !
   end subroutine clear_blocks
 !
-!===============================================================================
-!
-! increase_id: function increases the last ID by 1 and returns it
-!
-!===============================================================================
-!
-  function increase_id()
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: increase_id
-!
-!-------------------------------------------------------------------------------
-!
-! increase ID by 1
-!
-    last_id = last_id + 1
-
-! return ID
-!
-    increase_id = last_id
-
-    return
-!
-!-------------------------------------------------------------------------------
-!
-  end function increase_id
-!
-!===============================================================================
-!
-! set_datablock_dims: subroutine set the number of variables and dimensions
-!                     for arrays allocated in data blocks
-!
-!===============================================================================
-!
-  subroutine set_datablock_dims(nv, nf, ni, nj, nk)
-
-    implicit none
-
-! input arguments
-!
-    integer(kind=4), intent(in) :: nv, nf, ni, nj, nk
-!
-!-------------------------------------------------------------------------------
-!
-    nvars = nv
-    nflux = nf
-    nx    = ni
-    ny    = nj
-    nz    = nk
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine set_datablock_dims
+!!==============================================================================
+!!
+!! META BLOCK SUBROUTINES
+!!
 !
 !===============================================================================
 !
@@ -345,49 +375,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_metablock
-!
-!===============================================================================
-!
-! allocate_datablock: subroutine allocates space for one data block and returns
-!                     the pointer to this block
-!
-!===============================================================================
-!
-  subroutine allocate_datablock(pdata)
-
-    implicit none
-
-! output arguments
-!
-    type(block_data), pointer, intent(out) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! allocate block structure
-!
-    allocate(pdata)
-
-! nullify pointers
-!
-    nullify(pdata%prev)
-    nullify(pdata%next)
-    nullify(pdata%meta)
-
-! allocate space for the conserved variables
-!
-    allocate(pdata%u(nvars,nx,ny,nz))
-
-! allocate space for the numerical fluxes
-!
-    if (nflux .gt. 0) allocate(pdata%f(NDIMS,nflux,nx,ny,nz))
-
-! increase the number of allocated meta blocks
-!
-    dblocks = dblocks + 1
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine allocate_datablock
 !
 !===============================================================================
 !
@@ -474,6 +461,474 @@ module blocks
 !
 !===============================================================================
 !
+! append_metablock: subroutine allocates space for one meta block and appends it
+!                   to the meta block list
+!
+!===============================================================================
+!
+  subroutine append_metablock(pmeta)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(out) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block
+!
+    call allocate_metablock(pmeta)
+
+! add to the list
+!
+    if (associated(last_meta)) then
+      pmeta%prev => last_meta
+      last_meta%next => pmeta
+    else
+      list_meta => pmeta
+    end if
+
+! set the pointer to the last block in the list
+!
+    last_meta => pmeta
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_metablock
+!
+!!==============================================================================
+!!
+!! TOOL SUBROUTINES
+!!
+!
+!===============================================================================
+!
+! increase_id: function increases the last identificator by 1 and returns its
+!              value
+!
+!===============================================================================
+!
+  function increase_id()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: increase_id
+!
+!-------------------------------------------------------------------------------
+!
+! increase ID by 1
+!
+    last_id = last_id + 1
+
+! return ID
+!
+    increase_id = last_id
+
+    return
+!
+!-------------------------------------------------------------------------------
+!
+  end function increase_id
+!
+!===============================================================================
+!
+! set_last_id: subroutine sets the last identificator value
+!
+!===============================================================================
+!
+  subroutine set_last_id(id)
+
+    use error, only : print_error
+
+    implicit none
+
+! input argument
+!
+    integer(kind=4), intent(in) :: id
+!
+!-------------------------------------------------------------------------------
+!
+    if (last_id .gt. id) then
+      call print_error("blocks::set_last_id"                                   &
+                                 , "New last_id must be larger than old one!")
+    else
+      last_id = id
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_last_id
+!
+!===============================================================================
+!
+! get_last_id: function returns the last identificator value
+!
+!===============================================================================
+!
+  function get_last_id()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_last_id
+!
+!-------------------------------------------------------------------------------
+!
+! return ID
+!
+    get_last_id = last_id
+
+    return
+!
+!-------------------------------------------------------------------------------
+!
+  end function get_last_id
+!
+!===============================================================================
+!
+! get_mblocks: function returns the number of meta blocks
+!
+!===============================================================================
+!
+  function get_mblocks()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_mblocks
+!
+!-------------------------------------------------------------------------------
+!
+    get_mblocks = mblocks
+
+    return
+!
+!-------------------------------------------------------------------------------
+!
+  end function get_mblocks
+!
+!===============================================================================
+!
+! get_dblocks: function returns the number of data blocks
+!
+!===============================================================================
+!
+  function get_dblocks()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_dblocks
+!
+!-------------------------------------------------------------------------------
+!
+    get_dblocks = dblocks
+
+    return
+!
+!-------------------------------------------------------------------------------
+!
+  end function get_dblocks
+!
+!===============================================================================
+!
+! get_nleafs: function returns the number of leafs
+!
+!===============================================================================
+!
+  function get_nleafs()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_nleafs
+!
+!-------------------------------------------------------------------------------
+!
+    get_nleafs = nleafs
+
+    return
+!
+!-------------------------------------------------------------------------------
+!
+  end function get_nleafs
+!
+!===============================================================================
+!
+! associate_blocks: subroutine associates a pair of meta and data blocks
+!
+!===============================================================================
+!
+  subroutine associate_blocks(pmeta, pdata)
+
+    implicit none
+
+! output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+    pmeta%data => pdata
+    pdata%meta => pmeta
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine associate_blocks
+!
+!===============================================================================
+!
+! metablock_set_leaf: subroutine sets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_set_leaf(pmeta)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pmeta%leaf = .true.
+
+! increase the number of leafs
+!
+    nleafs = nleafs + 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_leaf
+!
+!===============================================================================
+!
+! metablock_unset_leaf: subroutine unsets the leaf flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_unset_leaf(pmeta)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pmeta%leaf = .false.
+
+! decrease the number of leafs
+!
+    nleafs = nleafs - 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_unset_leaf
+!
+!===============================================================================
+!
+! metablock_set_config: subroutine sets the config flag of data block
+!
+!===============================================================================
+!
+  subroutine metablock_set_config(pmeta, config)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: config
+!
+!-------------------------------------------------------------------------------
+!
+! set the config flag
+!
+    pmeta%config = config
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_config
+!
+!===============================================================================
+!
+! metablock_set_level: subroutine sets the level of data block
+!
+!===============================================================================
+!
+  subroutine metablock_set_level(pmeta, level)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: level
+!
+!-------------------------------------------------------------------------------
+!
+! set the refinement level
+!
+    pmeta%level = level
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_level
+!
+!===============================================================================
+!
+! metablock_set_position: subroutine sets the position of the meta block in the
+!                         parent block
+!
+!===============================================================================
+!
+  subroutine metablock_set_position(pmeta, px, py, pz)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: px, py, pz
+!
+!-------------------------------------------------------------------------------
+!
+! set the position in the parent block
+!
+    pmeta%pos(1) = px
+    pmeta%pos(2) = py
+#if NDIMS == 3
+    pmeta%pos(3) = pz
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_position
+!
+!===============================================================================
+!
+! metablock_set_coord: subroutine sets the coordinates of the meta block
+!
+!===============================================================================
+!
+  subroutine metablock_set_coord(pmeta, px, py, pz)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: px, py, pz
+!
+!-------------------------------------------------------------------------------
+!
+! set the coordintaes
+!
+    pmeta%coord(1) = px
+    pmeta%coord(2) = py
+#if NDIMS == 3
+    pmeta%coord(3) = pz
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_coord
+!
+!===============================================================================
+!
+! metablock_set_bounds: subroutine sets the bounds of data block
+!
+!===============================================================================
+!
+  subroutine metablock_set_bounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
+!
+!-------------------------------------------------------------------------------
+!
+! set bounds of the block
+!
+    pmeta%xmin = xmin
+    pmeta%xmax = xmax
+    pmeta%ymin = ymin
+    pmeta%ymax = ymax
+    pmeta%zmin = zmin
+    pmeta%zmax = zmax
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_bounds
+!
+!!==============================================================================
+!!
+!! DATA BLOCK SUBROUTINES
+!!
+!
+!===============================================================================
+!
+! allocate_datablock: subroutine allocates space for one data block and returns
+!                     the pointer to this block
+!
+!===============================================================================
+!
+  subroutine allocate_datablock(pdata)
+
+    implicit none
+
+! output arguments
+!
+    type(block_data), pointer, intent(out) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! allocate block structure
+!
+    allocate(pdata)
+
+! nullify pointers
+!
+    nullify(pdata%prev)
+    nullify(pdata%next)
+    nullify(pdata%meta)
+
+! allocate space for the conserved variables
+!
+    allocate(pdata%u(nvars,nx,ny,nz))
+
+! allocate space for the numerical fluxes
+!
+    if (nflux .gt. 0) allocate(pdata%f(NDIMS,nflux,nx,ny,nz))
+
+! increase the number of allocated meta blocks
+!
+    dblocks = dblocks + 1
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_datablock
+!
+!===============================================================================
+!
 ! deallocate_datablock: subroutine deallocates space ocuppied by a given datablock
 !
 !===============================================================================
@@ -539,44 +994,6 @@ module blocks
 !
 !===============================================================================
 !
-! append_metablock: subroutine allocates space for one meta block and appends it
-!                   to the meta block list
-!
-!===============================================================================
-!
-  subroutine append_metablock(pmeta)
-
-    implicit none
-
-! output arguments
-!
-    type(block_meta), pointer, intent(out) :: pmeta
-!
-!-------------------------------------------------------------------------------
-!
-! allocate block
-!
-    call allocate_metablock(pmeta)
-
-! add to the list
-!
-    if (associated(last_meta)) then
-      pmeta%prev => last_meta
-      last_meta%next => pmeta
-    else
-      list_meta => pmeta
-    end if
-
-! set the pointer to the last block in the list
-!
-    last_meta => pmeta
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine append_metablock
-!
-!===============================================================================
-!
 ! append_datablock: subroutine allocates space for one data block and appends it
 !                   to the data block list
 !
@@ -615,222 +1032,35 @@ module blocks
 !
 !===============================================================================
 !
-! associate_blocks: subroutine associates a pair of meta and data blocks
+! datablock_set_dims: subroutine sets the number of variables and dimensions
+!                     for arrays allocated in data blocks
 !
 !===============================================================================
 !
-  subroutine associate_blocks(pmeta, pdata)
+  subroutine datablock_set_dims(nv, nf, ni, nj, nk)
 
     implicit none
 
-! output arguments
+! input arguments
 !
-    type(block_meta), pointer, intent(inout) :: pmeta
-    type(block_data), pointer, intent(inout) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-    pmeta%data => pdata
-    pdata%meta => pmeta
+    integer(kind=4), intent(in) :: nv, nf, ni, nj, nk
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine associate_blocks
-!
-!===============================================================================
-!
-! metablock_setleaf: subroutine sets the leaf flag of data block
-!
-!===============================================================================
-!
-  subroutine metablock_setleaf(pmeta)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
+    nvars = nv
+    nflux = nf
+    nx    = ni
+    ny    = nj
+    nz    = nk
 !
 !-------------------------------------------------------------------------------
 !
-! set the leaf flag
+  end subroutine datablock_set_dims
 !
-    pmeta%leaf = .true.
-
-! increase the number of leafs
-!
-    nleafs = nleafs + 1
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_setleaf
-!
-!===============================================================================
-!
-! metablock_unsetleaf: subroutine unsets the leaf flag of data block
-!
-!===============================================================================
-!
-  subroutine metablock_unsetleaf(pmeta)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-!
-!-------------------------------------------------------------------------------
-!
-! set the leaf flag
-!
-    pmeta%leaf = .false.
-
-! decrease the number of leafs
-!
-    nleafs = nleafs - 1
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_unsetleaf
-!
-!===============================================================================
-!
-! metablock_setconfig: subroutine sets the config flag of data block
-!
-!===============================================================================
-!
-  subroutine metablock_setconfig(pmeta, config)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: config
-!
-!-------------------------------------------------------------------------------
-!
-! set the config flag
-!
-    pmeta%config = config
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_setconfig
-!
-!===============================================================================
-!
-! metablock_setlevel: subroutine sets the level of data block
-!
-!===============================================================================
-!
-  subroutine metablock_setlevel(pmeta, level)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: level
-!
-!-------------------------------------------------------------------------------
-!
-! set the refinement level
-!
-    pmeta%level = level
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_setlevel
-!
-!===============================================================================
-!
-! metablock_set_position: subroutine sets the position of the meta block in the
-!                         parent block
-!
-!===============================================================================
-!
-  subroutine metablock_set_position(pmeta, px, py, pz)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: px, py, pz
-!
-!-------------------------------------------------------------------------------
-!
-! set the position in the parent block
-!
-    pmeta%pos(1) = px
-    pmeta%pos(2) = py
-#if NDIMS == 3
-    pmeta%pos(3) = pz
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_set_position
-!
-!===============================================================================
-!
-! metablock_set_coord: subroutine sets the coordinates of the meta block
-!
-!===============================================================================
-!
-  subroutine metablock_set_coord(pmeta, px, py, pz)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: px, py, pz
-!
-!-------------------------------------------------------------------------------
-!
-! set the coordintaes
-!
-    pmeta%coord(1) = px
-    pmeta%coord(2) = py
-#if NDIMS == 3
-    pmeta%coord(3) = pz
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_set_coord
-!
-!===============================================================================
-!
-! metablock_setbounds: subroutine sets the bounds of data block
-!
-!===============================================================================
-!
-  subroutine metablock_setbounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
-!
-!-------------------------------------------------------------------------------
-!
-! set bounds of the block
-!
-    pmeta%xmin = xmin
-    pmeta%xmax = xmax
-    pmeta%ymin = ymin
-    pmeta%ymax = ymax
-    pmeta%zmin = zmin
-    pmeta%zmax = zmax
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_setbounds
+!!==============================================================================
+!!
+!! REFINEMENT/DEREFINEMENT SUBROUTINES
+!!
 !
 !===============================================================================
 !
@@ -873,7 +1103,7 @@ module blocks
 
 ! unset block leaf flag
 !
-      call metablock_unsetleaf(pblock)
+      call metablock_unset_leaf(pblock)
 
 ! reset refinement flag
 !
@@ -889,7 +1119,7 @@ module blocks
 
 ! set it as a leaf
 !
-        call metablock_setleaf(pblock%child(p)%ptr)
+        call metablock_set_leaf(pblock%child(p)%ptr)
 
 ! assign pointer to the parent block
 !
@@ -1271,7 +1501,7 @@ module blocks
 
 ! set block bounds
 !
-        call metablock_setbounds(pchild, xmn, xmx, ymn, ymx, zmn, zmx)
+        call metablock_set_bounds(pchild, xmn, xmx, ymn, ymx, zmn, zmx)
 
       end do
 
@@ -1416,13 +1646,13 @@ module blocks
 ! deallocate child blocks
 !
     do p = 1, nchild
-      call metablock_unsetleaf(pblock%child(p)%ptr)
+      call metablock_unset_leaf(pblock%child(p)%ptr)
       call deallocate_metablock(pblock%child(p)%ptr)
     end do
 
 ! set the leaf flag of parent block
 !
-    call metablock_setleaf(pblock)
+    call metablock_set_leaf(pblock)
 
 ! reset the refinement flag of the parent block
 !
@@ -1432,6 +1662,10 @@ module blocks
 !
   end subroutine derefine_block
 #ifdef DEBUG
+!!==============================================================================
+!!
+!! DEBUG SUBROUTINES
+!!
 !
 !===============================================================================
 !

@@ -154,9 +154,9 @@ module problem
   subroutine domain_default(res)
 
     use blocks, only : pointer_meta, block_meta, block_data, append_metablock  &
-                     , append_datablock, associate_blocks, metablock_setleaf   &
-                     , metablock_setconfig, metablock_setlevel                 &
-                     , metablock_set_coord, metablock_setbounds                &
+                     , append_datablock, associate_blocks, metablock_set_leaf  &
+                     , metablock_set_config, metablock_set_level               &
+                     , metablock_set_coord, metablock_set_bounds               &
                      , nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
                      , xmin, xmax, ymin, ymax, zmin, zmax, rdims
@@ -249,7 +249,7 @@ module problem
 
 ! set the configuration type
 !
-          call metablock_setconfig(block_array(loc(1),loc(2),loc(3))%ptr       &
+          call metablock_set_config(block_array(loc(1),loc(2),loc(3))%ptr      &
                                          , cfg(loc(1),loc(2),loc(3)))
 
 ! increase the block number
@@ -318,11 +318,11 @@ module problem
 
 ! mark it as the leaf
 !
-          call metablock_setleaf(pmeta)
+          call metablock_set_leaf(pmeta)
 
 ! set the level
 !
-          call metablock_setlevel(pmeta, 1)
+          call metablock_set_level(pmeta, 1)
 
 ! create a new data block
 !
@@ -338,7 +338,7 @@ module problem
 
 ! set the bounds
 !
-          call metablock_setbounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
+          call metablock_set_bounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
         end do
       end do
     end do
