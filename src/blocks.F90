@@ -96,9 +96,7 @@ module blocks
     type(block_meta), pointer :: meta             ! pointer to the metadata block
 
     real, dimension(:,:,:,:)  , allocatable :: u  ! conserved variables
-#ifdef CONSERVATIVE
     real, dimension(:,:,:,:,:), allocatable :: f  ! numerical fluxes
-#endif /* CONSERVATIVE */
   end type block_data
 
 ! define block_info structure for boundary exchange
@@ -126,6 +124,14 @@ module blocks
 ! store number of allocated blocks and leafs
 !
   integer(kind=4)     , save :: mblocks, dblocks, nleafs
+
+! store numbers of variables and fluxes
+!
+  integer(kind=4)     , save :: nvars, nflux
+
+! store data block dimensions
+!
+  integer(kind=4)     , save :: nx, ny, nz
 
 ! the effective resolution at all levels
 !
@@ -164,6 +170,17 @@ module blocks
     mblocks = 0
     dblocks = 0
     nleafs  = 0
+
+! set the initial number of variables and fluxes
+!
+    nvars   = 1
+    nflux   = 0
+
+! set the initial data block resolution
+!
+    nx      = 1
+    ny      = 1
+    nz      = 1
 
 ! reset ID
 !
@@ -245,6 +262,33 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end function increase_id
+!
+!===============================================================================
+!
+! set_datablock_dims: subroutine set the number of variables and dimensions
+!                     for arrays allocated in data blocks
+!
+!===============================================================================
+!
+  subroutine set_datablock_dims(nv, nf, ni, nj, nk)
+
+    implicit none
+
+! input arguments
+!
+    integer(kind=4), intent(in) :: nv, nf, ni, nj, nk
+!
+!-------------------------------------------------------------------------------
+!
+    nvars = nv
+    nflux = nf
+    nx    = ni
+    ny    = nj
+    nz    = nk
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_datablock_dims
 !
 !===============================================================================
 !
@@ -335,9 +379,6 @@ module blocks
 !
   subroutine allocate_datablock(pdata)
 
-    use config   , only : im, jm, km
-    use variables, only : nqt, nfl
-
     implicit none
 
 ! output arguments
@@ -358,14 +399,12 @@ module blocks
 
 ! allocate space for the conserved variables
 !
-    allocate(pdata%u(      nqt,im,jm,km))
+    allocate(pdata%u(nvars,nx,ny,nz))
 
-#ifdef CONSERVATIVE
 ! allocate space for the numerical fluxes
 !
-    allocate(pdata%f(NDIMS,nqt,im,jm,km))
+    if (nflux .gt. 0) allocate(pdata%f(NDIMS,nflux,nx,ny,nz))
 
-#endif /* CONSERVATIVE */
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
@@ -495,14 +534,12 @@ module blocks
 
 ! deallocate variables
 !
-      deallocate(pdata%u)
+      if (allocated(pdata%u)) deallocate(pdata%u)
 
-#ifdef CONSERVATIVE
 ! deallocate numerical fluxes
 !
-      deallocate(pdata%f)
+      if (allocated(pdata%f)) deallocate(pdata%f)
 
-#endif /* CONSERVATIVE */
 ! nullify pointers
 !
       nullify(pdata%next)
@@ -827,7 +864,7 @@ module blocks
 !
   subroutine refine_block(pblock, falloc_data)
 
-    use error   , only : print_error
+    use error, only : print_error
 
     implicit none
 

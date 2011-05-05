@@ -60,11 +60,13 @@ module mesh
 !
   subroutine init_mesh(flag)
 
-    use blocks  , only : res
-    use config  , only : maxlev, im, jm, km, ncells, rdims, ng                 &
-                       , xmin, xmax, ymin, ymax, zmin, zmax
-    use mpitools, only : is_master, ncpus
-    use timer   , only : start_timer, stop_timer
+    use blocks   , only : res
+    use blocks   , only : set_datablock_dims
+    use config   , only : maxlev, im, jm, km, ncells, rdims, ng                &
+                        , xmin, xmax, ymin, ymax, zmin, zmax
+    use mpitools , only : is_master, ncpus
+    use timer    , only : start_timer, stop_timer
+    use variables, only : nqt, nvr
 
     implicit none
 
@@ -86,6 +88,10 @@ module mesh
 ! start the mesh timer
 !
     call start_timer(5)
+
+! set data block dimensions
+!
+    call set_datablock_dims(nqt, nvr, im, jm, km)
 
 ! allocating space for coordinate variables
 !
