@@ -29,7 +29,7 @@ module blocks
 
   implicit none
 
-! by default all variables are private
+! by default, all variables and subroutines are private
 !
   private
 
@@ -37,10 +37,10 @@ module blocks
 !
   integer(kind=4), parameter :: ndims  = NDIMS
   integer(kind=4), parameter :: nsides = 2
-  integer(kind=4), parameter :: nfaces = 2**(ndims-1)
+  integer(kind=4), parameter :: nfaces = 2**(ndims - 1)
   integer(kind=4), parameter :: nchild = 2**ndims
 
-!! BLOCK STRUCTURE POINTERS (they have to be defined before structures)
+!! BLOCK STRUCTURE POINTERS (they have to be defined before block structures)
 !!
 ! define pointers to meta, data, and info block structures
 !
@@ -69,11 +69,11 @@ module blocks
                                  !
     type(block_meta)  , pointer :: parent
 
-                                 ! pointers to the child meta blocks
+                                 ! pointers to child meta blocks
                                  !
     type(pointer_meta)          :: child(nchild)
 
-                                 ! pointers to the neighbor meta blocks
+                                 ! pointers to neighbor meta blocks
                                  !
     type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
 
@@ -81,7 +81,7 @@ module blocks
                                  !
     type(block_data)  , pointer :: data
 
-                                 ! the block identificator
+                                 ! the block identification
                                  !
     integer(kind=4)             :: id
 
@@ -91,7 +91,7 @@ module blocks
 
                                  ! the level of refinement
                                  !
-    integer(kind=4)             :: level            ! refinement level
+    integer(kind=4)             :: level
 
                                  ! the configuration flag for its children order
                                  !
@@ -178,7 +178,7 @@ module blocks
 
 !! MODULE VARIABLES
 !!
-! the identificator of the last allocated block (should always increase)
+! the identification of the last allocated block (should always increase)
 !
   integer(kind=4)     , save :: last_id
 
@@ -194,7 +194,7 @@ module blocks
 !
   integer(kind=4)     , save :: nx, ny, nz
 
-! delcare public subroutines
+! declare public subroutines
 !
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
@@ -264,7 +264,7 @@ module blocks
 !
 !===============================================================================
 !
-! clear_blocks: subroutine delallocated the meta blocks and data blocks if
+! clear_blocks: subroutine deallocates the meta blocks and data blocks if
 !               associated with them
 !
 !===============================================================================
@@ -378,7 +378,7 @@ module blocks
 !
 !===============================================================================
 !
-! deallocate_metablock: subroutine deallocates space ocuppied by a given metablock
+! deallocate_metablock: subroutine deallocates space occupied by a given meta block
 !
 !===============================================================================
 !
@@ -504,7 +504,7 @@ module blocks
 !
 !===============================================================================
 !
-! increase_id: function increases the last identificator by 1 and returns its
+! increase_id: function increases the last identification by 1 and returns its
 !              value
 !
 !===============================================================================
@@ -535,7 +535,7 @@ module blocks
 !
 !===============================================================================
 !
-! set_last_id: subroutine sets the last identificator value
+! set_last_id: subroutine sets the last identification value
 !
 !===============================================================================
 !
@@ -564,7 +564,7 @@ module blocks
 !
 !===============================================================================
 !
-! get_last_id: function returns the last identificator value
+! get_last_id: function returns the last identification value
 !
 !===============================================================================
 !
@@ -714,7 +714,7 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_unset_leaf: subroutine unsets the leaf flag of data block
+! metablock_unset_leaf: subroutine resets the leaf flag of data block
 !
 !===============================================================================
 !
@@ -837,7 +837,7 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! set the coordintaes
+! set the coordinates
 !
     pmeta%coord(1) = px
     pmeta%coord(2) = py
@@ -862,7 +862,9 @@ module blocks
 ! input/output arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
-    real                     , intent(in)    :: xmin, xmax, ymin, ymax, zmin, zmax
+    real                     , intent(in)    :: xmin, xmax
+    real                     , intent(in)    :: ymin, ymax
+    real                     , intent(in)    :: zmin, zmax
 !
 !-------------------------------------------------------------------------------
 !
@@ -917,7 +919,7 @@ module blocks
 
 ! allocate space for the numerical fluxes
 !
-    if (nflux .gt. 0) allocate(pdata%f(NDIMS,nflux,nx,ny,nz))
+    if (nflux .gt. 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
 
 ! increase the number of allocated meta blocks
 !
@@ -929,7 +931,8 @@ module blocks
 !
 !===============================================================================
 !
-! deallocate_datablock: subroutine deallocates space ocuppied by a given datablock
+! deallocate_datablock: subroutine deallocates space occupied by a given data
+!                       block
 !
 !===============================================================================
 !
@@ -1530,8 +1533,10 @@ module blocks
 ! connect blocks in chain
 !
         do p = 2, nchild
-          pblock%child(order(p  ))%ptr%data%prev => pblock%child(order(p-1))%ptr%data
-          pblock%child(order(p-1))%ptr%data%next => pblock%child(order(p  ))%ptr%data
+          pblock%child(order(p  ))%ptr%data%prev =>                            &
+                                             pblock%child(order(p-1))%ptr%data
+          pblock%child(order(p-1))%ptr%data%next =>                            &
+                                             pblock%child(order(p  ))%ptr%data
         end do
 
 ! insert this chain after the parent block
@@ -1561,7 +1566,9 @@ module blocks
 
 ! terminate program if the pointer passed by argument is not associated
 !
-      call print_error("blocks::refine_block","Input pointer is not associated! Terminating!")
+      call print_error("blocks::refine_block"                                  &
+                            , "Input pointer is not associated! Terminating!")
+
     end if
 !
 !-------------------------------------------------------------------------------
