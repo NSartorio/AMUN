@@ -218,26 +218,24 @@ module blocks
 !
 !===============================================================================
 !
-! init_blocks: subroutine initializes the block variables
+! init_blocks: subroutine initializes the BLOCK module variables
 !
 !===============================================================================
 !
   subroutine init_blocks()
 
-    use error, only : print_warning
-
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! nullify the list pointers
+! nullify list pointers
 !
     nullify(list_meta)
     nullify(list_data)
     nullify(last_meta)
     nullify(last_data)
 
-! reset the number of meta and data blocks, and leafs
+! reset the number of meta blocks, data blocks, and leafs
 !
     mblocks = 0
     dblocks = 0
@@ -254,7 +252,7 @@ module blocks
     ny      = 1
     nz      = 1
 
-! reset ID
+! reset identification counter
 !
     last_id = 0
 
@@ -264,8 +262,8 @@ module blocks
 !
 !===============================================================================
 !
-! clear_blocks: subroutine deallocates the meta blocks and data blocks if
-!               associated with them
+! clear_blocks: subroutine iterates over all meta blocks and deallocates them
+!               and associated data blocks
 !
 !===============================================================================
 !
@@ -273,18 +271,26 @@ module blocks
 
     implicit none
 
-! local pointer
+! a pointer to the current meta block
 !
     type(block_meta), pointer :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
-! deallocate all meta blocks
+! assiociate pmeta pointer with the first block in the list
 !
     pmeta => list_meta
+
     do while(associated(pmeta))
+
+! deallocate current meta block
+!
       call deallocate_metablock(pmeta)
+
+! associate pmeta pointer with the next meta block in the list
+!
       pmeta => list_meta
+
     end do
 
 !-------------------------------------------------------------------------------
