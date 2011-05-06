@@ -53,9 +53,9 @@ program amun
   character(len=60) :: fmt
   integer(kind=4)   :: iterm = 0
   integer           :: ed, eh, em, es, ec
-  real              :: tall, tbeg, tcur, per
-#ifdef SIGNALS
+  real              :: tall, tcur, tpre, per
 
+#ifdef SIGNALS
 ! commons required to share iterm flag
 !
   common /signals/ iterm
@@ -126,7 +126,6 @@ program amun
   t    = 0.0
   dt   = cfl * dtini
   dtn  = dtini
-  tbeg = 0.0
   ed   = 9999
   eh   = 23
   em   = 59
@@ -195,10 +194,6 @@ program amun
 !
     call restart_job()
 
-! reset the start time for the execution time estimate
-!
-    tbeg = t
-
   end if
 
 #ifdef FORCE
@@ -229,6 +224,10 @@ program amun
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",a1,$)') n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
   end if
+
+! set the previous time needed to estimate the execution time
+!
+  tpre = get_timer_total()
 
 ! main loop
 !
@@ -270,13 +269,14 @@ program amun
 ! get current time in seconds
 !
     tcur = get_timer_total()
-    ec   = int((tmax - t) / (t - tbeg) * tcur, kind=4)
+    ec   = int((tmax - t) * (tcur - tpre) / dt, kind=4)
     es   = max(0, int(mod(ec,60)))
     em   = int(mod(ec/60,60))
     eh   = int(ec/3600)
     ed   = int(eh/24)
     eh   = int(mod(eh, 24))
     ed   = min(9999,ed)
+    tpre = tcur
 
 ! print progress information
 !
