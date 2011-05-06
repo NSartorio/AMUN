@@ -371,14 +371,15 @@ module blocks
 ! increase the number of allocated meta blocks
 !
     mblocks = mblocks + 1
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_metablock
 !
 !===============================================================================
 !
-! deallocate_metablock: subroutine deallocates space occupied by a given meta block
+! deallocate_metablock: subroutine deallocates space occupied by a given meta
+!                       block
 !
 !===============================================================================
 !
@@ -454,7 +455,7 @@ module blocks
       mblocks = mblocks - 1
 
     end if
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_metablock
@@ -492,7 +493,7 @@ module blocks
 ! set the pointer to the last block in the list
 !
     last_meta => pmeta
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_metablock
@@ -528,7 +529,7 @@ module blocks
     increase_id = last_id
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function increase_id
@@ -583,7 +584,7 @@ module blocks
     get_last_id = last_id
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function get_last_id
@@ -607,7 +608,7 @@ module blocks
     get_mblocks = mblocks
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function get_mblocks
@@ -631,7 +632,7 @@ module blocks
     get_dblocks = dblocks
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function get_dblocks
@@ -655,7 +656,7 @@ module blocks
     get_nleafs = nleafs
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function get_nleafs
@@ -679,7 +680,7 @@ module blocks
 !
     pmeta%data => pdata
     pdata%meta => pmeta
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine associate_blocks
@@ -707,7 +708,7 @@ module blocks
 ! increase the number of leafs
 !
     nleafs = nleafs + 1
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_leaf
@@ -735,7 +736,7 @@ module blocks
 ! decrease the number of leafs
 !
     nleafs = nleafs - 1
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_unset_leaf
@@ -760,7 +761,7 @@ module blocks
 ! set the config flag
 !
     pmeta%config = config
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_config
@@ -785,7 +786,7 @@ module blocks
 ! set the refinement level
 !
     pmeta%level = level
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_level
@@ -876,7 +877,7 @@ module blocks
     pmeta%ymax = ymax
     pmeta%zmin = zmin
     pmeta%zmax = zmax
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_bounds
@@ -924,7 +925,7 @@ module blocks
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_datablock
@@ -990,7 +991,7 @@ module blocks
       dblocks = dblocks - 1
 
     end if
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_datablock
@@ -1028,7 +1029,7 @@ module blocks
 ! set the pointer to the last block in the list
 !
     last_data => pdata
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_datablock
@@ -1055,7 +1056,7 @@ module blocks
     nx    = ni
     ny    = nj
     nz    = nk
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine datablock_set_dims
@@ -1570,7 +1571,7 @@ module blocks
                             , "Input pointer is not associated! Terminating!")
 
     end if
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine refine_block
@@ -1664,7 +1665,7 @@ module blocks
 ! reset the refinement flag of the parent block
 !
     pblock%refine = 0
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine derefine_block
@@ -1782,7 +1783,7 @@ module blocks
         end do
       end do
     end do
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine check_metablock
