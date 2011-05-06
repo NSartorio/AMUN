@@ -208,6 +208,9 @@ module blocks
           , metablock_set_level, metablock_set_bounds
   public :: datablock_set_dims
   public :: refine_block, derefine_block
+#ifdef DEBUG
+  public :: check_metablock
+#endif /* DEBUG */
 
   contains
 !

@@ -1530,7 +1530,6 @@ module mesh
   subroutine check_mesh(string)
 
     use blocks, only : block_meta, list_meta
-    use blocks, only : last_id, nchild, ndims, nsides, nfaces
     use blocks, only : check_metablock
 
     implicit none
