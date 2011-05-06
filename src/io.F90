@@ -1702,6 +1702,7 @@ module io
     use blocks  , only : block_meta, list_meta
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks
+    use blocks  , only : metablock_set_leaf
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f
@@ -1835,11 +1836,7 @@ module io
         pmeta%pos(:)   = pos(l,:)
         pmeta%coord(:) = cor(l,:)
 
-        if (lea(l) .eq. 1) then
-          pmeta%leaf = .true.
-        else
-          pmeta%leaf = .false.
-        end if
+        if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
 
         l = l + 1
         pmeta => pmeta%next
