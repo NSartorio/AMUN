@@ -1469,52 +1469,65 @@ module mesh
 !
     type(block_meta), pointer :: pmeta
 
+! local variables
+!
+    integer(kind=4), save :: nm = 0, nl = 0
+
 !-------------------------------------------------------------------------------
 !
 ! store the statistics about mesh
 !
     if (is_master()) then
 
+      if (nm .ne. get_mblocks() .or. nl .ne. get_nleafs()) then
+
+! set new numbers of meta blocks and leafs
+!
+      nm = get_mblocks()
+      nl = get_nleafs()
+
 ! calculate the coverage
 !
-      cov = (1.0 * get_nleafs()) / tblocks
-      eff = (1.0 * get_nleafs() * (ncells + 2 * nghost)**NDIMS)                &
+      cov = (1.0 * nl) / tblocks
+      eff = (1.0 * nl * (ncells + 2 * nghost)**NDIMS)                          &
                                        / product(effres(1:NDIMS) + 2 * nghost)
 
 ! get the block level distribution
 !
-      ldist(:) = 0
+        ldist(:) = 0
 #ifdef MPI
-      cdist(:) = 0
+        cdist(:) = 0
 #endif /* MPI */
-      pmeta => list_meta
-      do while(associated(pmeta))
-        if (pmeta%leaf) then
-          ldist(pmeta%level) = ldist(pmeta%level) + 1
+        pmeta => list_meta
+        do while(associated(pmeta))
+          if (pmeta%leaf) then
+            ldist(pmeta%level) = ldist(pmeta%level) + 1
 #ifdef MPI
-          cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
+            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
 #endif /* MPI */
-        end if
-        pmeta => pmeta%next
-      end do
+          end if
+          pmeta => pmeta%next
+        end do
 
 ! write down the statistics
 !
-      write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8),$)")               &
-                                   n, t, get_nleafs(), get_mblocks(), cov, eff
-      write(funit,"('   ',$)")
-      do l = 1, maxlev
-        write(funit,"(2x,i6,$)") ldist(l)
-      end do
+        write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8),$)")             &
+                                                        n, t, nl, nm, cov, eff
+        write(funit,"('   ',$)")
+        do l = 1, maxlev
+          write(funit,"(2x,i6,$)") ldist(l)
+        end do
 #ifdef MPI
-      write(funit,"('   ',$)")
-      do l = 1, ncpus
-        write(funit,"(2x,i6,$)") cdist(l)
-      end do
+        write(funit,"('   ',$)")
+        do l = 1, ncpus
+          write(funit,"(2x,i6,$)") cdist(l)
+        end do
 #endif /* MPI */
-      write(funit,"('')")
+        write(funit,"('')")
 
-    end if
+      end if ! number of blocks or leafs changed
+
+    end if ! is master
 !
 !-------------------------------------------------------------------------------
 !
