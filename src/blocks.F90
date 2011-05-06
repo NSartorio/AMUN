@@ -204,8 +204,9 @@ module blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: append_metablock, associate_blocks, append_datablock               &
           , deallocate_datablock
-  public :: metablock_set_leaf, metablock_set_config, metablock_set_coord      &
-          , metablock_set_level, metablock_set_bounds
+  public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
+          , metablock_set_config, metablock_set_level, metablock_set_position  &
+          , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
   public :: datablock_set_dims
   public :: refine_block, derefine_block
 #ifdef DEBUG
@@ -694,7 +695,101 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_leaf: subroutine sets the leaf flag of data block
+! metablock_set_id: subroutine sets the identification value
+!
+!===============================================================================
+!
+  subroutine metablock_set_id(pmeta, id)
+
+    implicit none
+
+! input arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: id
+!
+!-------------------------------------------------------------------------------
+!
+! set the id field
+!
+    pmeta%id = id
+
+! check if the id is larger then last_id, if so reset last_id to id
+!
+    if (last_id .lt. id) last_id = id
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_id
+!
+!===============================================================================
+!
+! metablock_set_cpu: subroutine sets the cpu number
+!
+!===============================================================================
+!
+  subroutine metablock_set_cpu(pmeta, cpu)
+
+    implicit none
+
+! input arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: cpu
+!
+!-------------------------------------------------------------------------------
+!
+! set the cpu field
+!
+    pmeta%cpu = cpu
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_cpu
+!
+!===============================================================================
+!
+! metablock_set_refine: subroutine sets the refine flag
+!
+!===============================================================================
+!
+  subroutine metablock_set_refine(pmeta, refine)
+
+    use error, only : print_error
+
+    implicit none
+
+! input arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: refine
+!
+!-------------------------------------------------------------------------------
+!
+! check if the refine value is correct
+!
+    if (abs(refine) .gt. 1) then
+
+! print error about wrong refine flag
+!
+      call print_error("blocks::metablock_set_refine"                          &
+                                            , "New refine flag is incorrect!")
+
+    else
+
+! set the refine field
+!
+      pmeta%refine = refine
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_refine
+!
+!===============================================================================
+!
+! metablock_set_leaf: subroutine marks the block as a leaf
 !
 !===============================================================================
 !
@@ -722,7 +817,7 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_unset_leaf: subroutine resets the leaf flag of data block
+! metablock_unset_leaf: subroutine unmarks the block as a leaf
 !
 !===============================================================================
 !
@@ -750,7 +845,7 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_config: subroutine sets the config flag of data block
+! metablock_set_config: subroutine sets the configuration flag
 !
 !===============================================================================
 !

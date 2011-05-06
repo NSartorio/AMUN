@@ -1702,7 +1702,11 @@ module io
     use blocks  , only : block_meta, list_meta
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks
-    use blocks  , only : metablock_set_leaf
+    use blocks  , only : metablock_set_id, metablock_set_cpu                   &
+                       , metablock_set_refine, metablock_set_config            &
+                       , metablock_set_level, metablock_set_position           &
+                       , metablock_set_coord, metablock_set_bounds             &
+                       , metablock_set_leaf
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f
@@ -1822,21 +1826,18 @@ module io
 
         block_array(id(l))%ptr => pmeta
 
-        pmeta%id       = id(l)
-        pmeta%cpu      = cpu(l)
-        pmeta%level    = lev(l)
-        pmeta%config   = cfg(l)
-        pmeta%refine   = ref(l)
-        pmeta%xmin     = xmn(l)
-        pmeta%xmax     = xmx(l)
-        pmeta%ymin     = ymn(l)
-        pmeta%ymax     = ymx(l)
-        pmeta%zmin     = zmn(l)
-        pmeta%zmax     = zmx(l)
-        pmeta%pos(:)   = pos(l,:)
-        pmeta%coord(:) = cor(l,:)
+        call metablock_set_id      (pmeta, id (l))
+        call metablock_set_cpu     (pmeta, cpu(l))
+        call metablock_set_refine  (pmeta, ref(l))
+        call metablock_set_config  (pmeta, cfg(l))
+        call metablock_set_level   (pmeta, lev(l))
+        call metablock_set_position(pmeta, pos(l,1), pos(l,2), pos(l,3))
+        call metablock_set_coord   (pmeta, cor(l,1), cor(l,2), cor(l,3))
+        call metablock_set_bounds  (pmeta, xmn(l), xmx(l), ymn(l), ymx(l)      &
+                                                             , zmn(l), zmx(l))
 
         if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
+
 
         l = l + 1
         pmeta => pmeta%next
