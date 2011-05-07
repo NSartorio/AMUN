@@ -112,7 +112,7 @@ module problem
 !
 !===============================================================================
 !
-  subroutine update_shapes(pdata)
+  subroutine update_shapes(pdata, t)
 
     use blocks, only : block_data
     use config, only : problem
@@ -120,12 +120,13 @@ module problem
 ! input arguments
 !
     type(block_data), intent(inout) :: pdata
+    real            , intent(in)    :: t
 !
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
     case("binaries")
-      call shape_binaries(pdata)
+      call shape_binaries(pdata, t)
     case default
     end select
 
@@ -714,8 +715,8 @@ module problem
     use blocks   , only : block_data
     use config   , only : im, jm, km, in, jn, kn, ng
     use config   , only : dens, pres, csnd2, gamma
-    use config   , only : dnfac, dnrat, v1ini, v2ini
-    use config   , only : x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c
+    use config   , only : dnfac, dnrat
+    use config   , only : rstar, vstar, rsat, dsat, vsat
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -738,8 +739,8 @@ module problem
     integer :: i, j, k
     real    :: dx, dy, dz
     real    :: dnamb, pramb
-    real    :: dnstar1, prstar1, x1l, y1l, z1l, r1
-    real    :: dnstar2, prstar2, x2l, y2l, z2l, r2
+    real    :: dnstar, prstar, x1l, y1l, z1l, r1
+    real    :: dnsat , prsat , x2l, y2l, z2l, r2
 
 ! local arrays
 !
@@ -763,10 +764,10 @@ module problem
 !
     dnamb   = dens
     pramb   = pres
-    dnstar1 = dnamb * dnfac * dnrat
-    dnstar2 = dnamb * dnfac
-    prstar1 = pramb * dnfac
-    prstar2 = pramb * dnfac / dnrat
+    dnstar  = dnamb * dnfac * dnrat
+    dnsat   = dnamb * dnfac
+    prstar  = pramb * dnfac
+    prsat   = pramb * dnfac / dnrat
 
 ! calculate cell sizes
 !
@@ -795,13 +796,13 @@ module problem
 !
     do k = 1, km
 #if NDIMS == 3
-      z1l = z(k) - z1c
-      z2l = z(k) - z2c
+      z1l = z(k)
+      z2l = z(k)
 #endif /* NDIMS == 3 */
 
       do j = 1, jm
-        y1l = y(j) - y1c
-        y2l = y(j) - y2c
+        y1l = y(j)
+        y2l = y(j)
 
 ! reset primitive variables
 !
@@ -823,8 +824,8 @@ module problem
 
         do i = 1, im
 
-          x1l = x(i) - x1c
-          x2l = x(i) - x2c
+          x1l = x(i)
+          x2l = x(i) + dsat
 
 ! calculate radia for both stars
 !
@@ -833,31 +834,31 @@ module problem
 
 ! variables within the first start
 !
-          if (r1 .le. r1c) then
+          if (r1 .le. rstar) then
 
-            q(idn,i) = dnstar1
-            q(ivx,i) = v1ini * x1l
-            q(ivy,i) = v1ini * y1l
+            q(idn,i) = dnstar
+            q(ivx,i) = vstar * x1l
+            q(ivy,i) = vstar * y1l
 #if NDIMS == 3
-            q(ivz,i) = v1ini * z1l
+            q(ivz,i) = vstar * z1l
 #endif /* NDIMS == 3 */
 #ifdef ADI
-            q(ipr,i) = prstar1
+            q(ipr,i) = prstar
 #endif /* ADI */
           end if
 
 ! variables within the second start
 !
-          if (r2 .le. r2c) then
+          if (r2 .le. rsat) then
 
-            q(idn,i) = dnstar2
-            q(ivx,i) = v2ini * x2l
-            q(ivy,i) = v2ini * y2l
+            q(idn,i) = dnsat
+            q(ivx,i) = vsat * x2l
+            q(ivy,i) = vsat * y2l
 #if NDIMS == 3
-            q(ivz,i) = v2ini * z2l
+            q(ivz,i) = vsat * z2l
 #endif /* NDIMS == 3 */
 #ifdef ADI
-            q(ipr,i) = prstar2
+            q(ipr,i) = prsat
 #endif /* ADI */
           end if
 
@@ -1388,15 +1389,16 @@ module problem
 !
 !===============================================================================
 !
-  subroutine shape_binaries(pdata)
+  subroutine shape_binaries(pdata, t)
 
     use blocks   , only : block_data
     use config   , only : ng, in, jn, kn, im, jm, km
-    use config   , only : x1c, y1c, z1c, r1c, v1ini, x2c, y2c, z2c, r2c, v2ini
+    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
     use config   , only : dens, dnfac, dnrat, pres, csnd2
 #ifdef ADI
     use config   , only : gamma, gammam1i
 #endif /* ADI */
+    use constants, only : dpi
     use variables, only : idn, imx, imy, imz
 #ifdef ADI
     use variables, only : ien
@@ -1411,16 +1413,17 @@ module problem
 ! input arguments
 !
     type(block_data), intent(inout) :: pdata
+    real            , intent(in)    :: t
 
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz
+    real    :: dx, dy, dz, ang = 0.0d0, dist, rad, amp, asat, bsat, xsat
     real    :: dnamb, pramb
-    real    :: dnstar1, prstar1, x1l, y1l, z1l, r1, dv1
-    real    :: dnstar2, prstar2, x2l, y2l, z2l, r2, dv2
+    real    :: dnstar, prstar, dnvstar, x1l, y1l, z1l, r1
+    real    :: dnsat , prsat , dnvsat , x2l, y2l, z2l, r2
 #ifdef ADI
-    real    :: ekin, ek1, ek2
+    real    :: ekin, ekstar, eksat
 #ifdef MHD
     real    :: emag
 #endif /* MHD */
@@ -1467,48 +1470,57 @@ module problem
 #endif /* ADI */
     dnamb   = dens
     pramb   = pres
-    dnstar1 = dnamb * dnfac * dnrat
-    dnstar2 = dnamb * dnfac
-    prstar1 = pramb * dnfac
-    prstar2 = pramb * dnfac / dnrat
-    dv1     = dnstar1 * v1ini
-    dv2     = dnstar2 * v2ini
+    dnstar  = dnamb * dnfac * dnrat
+    dnsat   = dnamb * dnfac
+    prstar  = pramb * dnfac
+    prsat   = pramb * dnfac / dnrat
+    dnvstar = dnstar * vstar
+    dnvsat  = dnsat  * vsat
 #ifdef ADI
-    ek1     = 0.5d0 * dnstar1 * v1ini * v1ini
-    ek2     = 0.5d0 * dnstar2 * v2ini * v2ini
+    ekstar  = 0.5d0 * dnstar * vstar * vstar
+    eksat   = 0.5d0 * dnsat  * vsat  * vsat
 #endif /* ADI */
+    if (tsat .gt. 0.0d0) then
+      ang     = dpi * t / tsat
+    end if
+    asat    = dsat / (1.0 - esat)
+    bsat    = sqrt(asat * asat - xsat * xsat)
+    xsat    = asat * esat
+    rad     = 0.5d0 * (asat + bsat)
+    amp     = 0.5d0 * (asat - bsat)
+    dist    = rad - amp * cos(ang)
 
 ! reset update
 !
     do k = 1, km
 #if NDIMS == 3
-      z1l = z(k) - z1c
-      z2l = z(k) - z2c
+      z1l = z(k)
+      z2l = z(k)
 #endif /* NDIMS == 3 */
 
       do j = 1, jm
-        y1l = y(j) - y1c
-        y2l = y(j) - y2c
+        y1l = y(j)
+        y2l = y(j) + dist * sin(ang)
 
         do i = 1, im
-          x1l = x(i) - x1c
-          x2l = x(i) - x2c
+          x1l = x(i)
+          x2l = x(i) - xsat + dist * cos(ang)
 
           r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
           r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
 
 ! variables within the first start
 !
-          if (r1 .le. r1c) then
+          if (r1 .le. rstar) then
 
-            pdata%u(idn,i,j,k) = dnstar1
-            pdata%u(imx,i,j,k) = dv1 * x1l
-            pdata%u(imy,i,j,k) = dv1 * y1l
+            pdata%u(idn,i,j,k) = dnstar
+            pdata%u(imx,i,j,k) = dnvstar * x1l
+            pdata%u(imy,i,j,k) = dnvstar * y1l
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dv1 * z1l
+            pdata%u(imz,i,j,k) = dnvstar * z1l
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
@@ -1519,23 +1531,23 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 #ifdef ADI
-            ekin = ek1 * r1 * r1
-            pdata%u(ien,i,j,k) = gammam1i * prstar1 + ekin
+            ekin = ekstar * r1 * r1
+            pdata%u(ien,i,j,k) = gammam1i * prstar + ekin
 #endif /* ADI */
           end if
 
 ! variables within the second start
 !
-          if (r2 .le. r2c) then
+          if (r2 .le. rsat) then
 
-            pdata%u(idn,i,j,k) = dnstar2
-            pdata%u(imx,i,j,k) = dv2 * x2l
-            pdata%u(imy,i,j,k) = dv2 * y2l
+            pdata%u(idn,i,j,k) = dnsat
+            pdata%u(imx,i,j,k) = dnvsat * x2l
+            pdata%u(imy,i,j,k) = dnvsat * y2l
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dv2 * z2l
+            pdata%u(imz,i,j,k) = dnvsat * z2l
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
@@ -1546,8 +1558,8 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 #ifdef ADI
-            ekin = ek2 * r2 * r2
-            pdata%u(ien,i,j,k) = gammam1i * prstar2 + ekin
+            ekin = eksat * r2 * r2
+            pdata%u(ien,i,j,k) = gammam1i * prsat + ekin
 #endif /* ADI */
           end if
 

@@ -433,7 +433,7 @@ module evolution
 #ifdef SHAPE
 ! update solid shapes
 !
-    call update_shapes(pblock)
+    call update_shapes(pblock, t)
 #endif /* SHAPE */
 
 !-------------------------------------------------------------------------------
@@ -859,7 +859,7 @@ module evolution
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock)
+    call update_shapes(pblock, t)
 #endif /* SHAPE */
 
 !-------------------------------------------------------------------------------
@@ -1019,7 +1019,7 @@ module evolution
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock)
+    call update_shapes(pblock, t)
 
 #endif /* SHAPE */
 
@@ -1207,7 +1207,7 @@ module evolution
 #ifdef SHAPE
 ! restrict update in a defined shape
 !
-    call update_shapes(pblock)
+    call update_shapes(pblock, t)
 
 #endif /* SHAPE */
 

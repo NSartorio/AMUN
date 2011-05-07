@@ -94,10 +94,10 @@ module config
 ! initial values
 !
   real               , save :: dens = 1.0, pres = 1.0, rmid = 0.5, rcut = 0.1
-  real               , save :: x1c = 0.0, y1c = 0.0, z1c = 0.0, r1c = 0.1
-  real               , save :: x2c = 0.0, y2c = 0.0, z2c = 0.0, r2c = 0.1
+  real               , save :: rstar = 0.1, rsat = 0.1, dsat = 1.0
+  real               , save :: vstar = 0.0, vsat = 2.0
+  real               , save :: tsat  = 1.0, esat = 1.0
   real               , save :: dnfac = 1.0, dnrat = 1.0
-  real               , save :: v1ini = 0.0, v2ini = 2.0
   real               , save :: ratio = 1.0
   real               , save :: bamp = 1.0, bper = 0.0, vper = 0.0
   real               , save :: ydel = 0.1, ycut = 0.1
@@ -275,30 +275,24 @@ module config
       read(value,        *) rmid
     case("rcut")
       read(value,        *) rcut
-    case("x1c")
-      read(value,        *) x1c
-    case("y1c")
-      read(value,        *) y1c
-    case("z1c")
-      read(value,        *) z1c
-    case("r1c")
-      read(value,        *) r1c
-    case("x2c")
-      read(value,        *) x2c
-    case("y2c")
-      read(value,        *) y2c
-    case("z2c")
-      read(value,        *) z2c
-    case("r2c")
-      read(value,        *) r2c
     case("dnfac")
       read(value,        *) dnfac
     case("dnrat")
       read(value,        *) dnrat
-    case("v1ini")
-      read(value,        *) v1ini
-    case("v2ini")
-      read(value,        *) v2ini
+    case("rstar")
+      read(value,        *) rstar
+    case("vstar")
+      read(value,        *) vstar
+    case("rsat")
+      read(value,        *) rsat
+    case("dsat")
+      read(value,        *) dsat
+    case("vsat")
+      read(value,        *) vsat
+    case("tsat")
+      read(value,        *) tsat
+    case("esat")
+      read(value,        *) esat
     case("ratio")
       read(value,        *) ratio
     case("bamp")
