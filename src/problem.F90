@@ -1418,7 +1418,8 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, ang = 0.0d0, dist, rad, amp, asat, bsat, xsat
+    real    :: dx, dy, dz, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
+    real    :: dist, rad, amp, asat, bsat, xsat
     real    :: dnamb, pramb
     real    :: dnstar, prstar, dnvstar, x1l, y1l, z1l, r1
     real    :: dnsat , prsat , dnvsat , x2l, y2l, z2l, r2
@@ -1482,13 +1483,17 @@ module problem
 #endif /* ADI */
     if (tsat .gt. 0.0d0) then
       ang     = dpi * t / tsat
+      sn      = sin(ang)
+      cs      = cos(ang)
     end if
     asat    = dsat / (1.0d0 - esat)
     xsat    = asat * esat
     bsat    = sqrt(asat * asat - xsat * xsat)
     rad     = 0.5d0 * (asat + bsat)
     amp     = 0.5d0 * (asat - bsat)
-    dist    = rad - amp * cos(ang)
+    dist    = asat - amp * sn * sn
+    xsh     = dist * cs - xsat
+    ysh     = dist * sn
 
 ! reset update
 !
@@ -1500,11 +1505,11 @@ module problem
 
       do j = 1, jm
         y1l = y(j)
-        y2l = y(j) + dist * sin(ang)
+        y2l = y(j) + ysh
 
         do i = 1, im
           x1l = x(i)
-          x2l = x(i) - xsat + dist * cos(ang)
+          x2l = x(i) + xsh
 
           r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
           r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
