@@ -112,21 +112,20 @@ module problem
 !
 !===============================================================================
 !
-  subroutine update_shapes(pblock, du)
+  subroutine update_shapes(pdata)
 
     use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block_data)         , intent(inout) :: pblock
-    real, dimension(:,:,:,:) , intent(inout) :: du
+    type(block_data), intent(inout) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
     case("binaries")
-      call shape_binaries(pblock, du)
+      call shape_binaries(pdata)
     case default
     end select
 
@@ -723,6 +722,12 @@ module problem
 #ifdef ADI
     use variables, only : ipr
 #endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
 ! input arguments
 !
@@ -807,6 +812,14 @@ module problem
 #ifdef ADI
         q(ipr,:) = pramb
 #endif /* ADI */
+#ifdef MHD
+        q(ibx,:) = 0.0d0
+        q(iby,:) = 0.0d0
+        q(ibz,:) = 0.0d0
+#ifdef GLM
+        q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
 
         do i = 1, im
 
@@ -1370,28 +1383,48 @@ module problem
 !
 !===============================================================================
 !
-! shape_binaries: subroutine initializes the variables for the binary star
-!                problem
+! shape_binaries: subroutine resets the variables to the initial state for
+!                 solid bodies embedded in the domain
 !
 !===============================================================================
 !
-  subroutine shape_binaries(pblock, du)
+  subroutine shape_binaries(pdata)
 
     use blocks   , only : block_data
     use config   , only : ng, in, jn, kn, im, jm, km
-    use config   , only : x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c
+    use config   , only : x1c, y1c, z1c, r1c, v1ini, x2c, y2c, z2c, r2c, v2ini
+    use config   , only : dens, dnfac, dnrat, pres, csnd2
+#ifdef ADI
+    use config   , only : gamma, gammam1i
+#endif /* ADI */
+    use variables, only : idn, imx, imy, imz
+#ifdef ADI
+    use variables, only : ien
+#endif /* ADI */
+#ifdef MHD
+    use variables, only : ibx, iby, ibz
+#ifdef GLM
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
 
 ! input arguments
 !
-    type(block_data)         , intent(inout) :: pblock
-    real, dimension(:,:,:,:) , intent(inout) :: du
+    type(block_data), intent(inout) :: pdata
 
 ! local variables
 !
     integer :: i, j, k
     real    :: dx, dy, dz
-    real    :: x1l, y1l, z1l, r1
-    real    :: x2l, y2l, z2l, r2
+    real    :: dnamb, pramb
+    real    :: dnstar1, prstar1, x1l, y1l, z1l, r1, dv1
+    real    :: dnstar2, prstar2, x2l, y2l, z2l, r2, dv2
+#ifdef ADI
+    real    :: ekin, ek1, ek2
+#ifdef MHD
+    real    :: emag
+#endif /* MHD */
+#endif /* ADI */
 
 ! local arrays
 !
@@ -1403,26 +1436,47 @@ module problem
 !
 ! calculate cell sizes
 !
-    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
-    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+    dx = (pdata%meta%xmax - pdata%meta%xmin) / in
+    dy = (pdata%meta%ymax - pdata%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+    dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pdata%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pdata%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pdata%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 
     z1l  = 0.0
     z2l  = 0.0
 #endif /* NDIMS == 3 */
+
+! calculate parameters
+!
+#ifdef ISO
+    pres = csnd2 * dens
+#endif /* ISO */
+#ifdef ADI
+    pres = csnd2 * dens / gamma
+#endif /* ADI */
+    dnamb   = dens
+    pramb   = pres
+    dnstar1 = dnamb * dnfac * dnrat
+    dnstar2 = dnamb * dnfac
+    prstar1 = pramb * dnfac
+    prstar2 = pramb * dnfac / dnrat
+    dv1     = dnstar1 * v1ini
+    dv2     = dnstar2 * v2ini
+#ifdef ADI
+    ek1     = 0.5d0 * dnstar1 * v1ini * v1ini
+    ek2     = 0.5d0 * dnstar2 * v2ini * v2ini
+#endif /* ADI */
 
 ! reset update
 !
@@ -1443,13 +1497,59 @@ module problem
           r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
           r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
 
+! variables within the first start
+!
           if (r1 .le. r1c) then
-            du(:,i,j,k) = 0.0
-          endif
 
+            pdata%u(idn,i,j,k) = dnstar1
+            pdata%u(imx,i,j,k) = dv1 * x1l
+            pdata%u(imy,i,j,k) = dv1 * y1l
+#if NDIMS == 2
+            pdata%u(imz,i,j,k) = 0.0d0
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            pdata%u(imz,i,j,k) = dv1 * z1l
+#endif /* NDIMS == 3 */
+#ifdef MHD
+            pdata%u(ibx,i,j,k) = 0.0d0
+            pdata%u(iby,i,j,k) = 0.0d0
+            pdata%u(ibz,i,j,k) = 0.0d0
+#ifdef GLM
+            pdata%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+#ifdef ADI
+            ekin = ek1 * r1 * r1
+            pdata%u(ien,i,j,k) = gammam1i * prstar1 + ekin
+#endif /* ADI */
+          end if
+
+! variables within the second start
+!
           if (r2 .le. r2c) then
-            du(:,i,j,k) = 0.0
-          endif
+
+            pdata%u(idn,i,j,k) = dnstar2
+            pdata%u(imx,i,j,k) = dv2 * x2l
+            pdata%u(imy,i,j,k) = dv2 * y2l
+#if NDIMS == 2
+            pdata%u(imz,i,j,k) = 0.0d0
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            pdata%u(imz,i,j,k) = dv2 * z2l
+#endif /* NDIMS == 3 */
+#ifdef MHD
+            pdata%u(ibx,i,j,k) = 0.0d0
+            pdata%u(iby,i,j,k) = 0.0d0
+            pdata%u(ibz,i,j,k) = 0.0d0
+#ifdef GLM
+            pdata%u(iph,i,j,k) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+#ifdef ADI
+            ekin = ek2 * r2 * r2
+            pdata%u(ien,i,j,k) = gammam1i * prstar2 + ekin
+#endif /* ADI */
+          end if
 
         end do ! i
       end do ! j

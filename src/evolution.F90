@@ -349,6 +349,9 @@ module evolution
     use variables, only : ien
 #endif /* ADI */
 #endif /* FORCE */
+#ifdef SHAPE
+    use problem  , only : update_shapes
+#endif /* SHAPE */
 
     implicit none
 
@@ -426,6 +429,12 @@ module evolution
     pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
 #endif /* FORCE */
+
+#ifdef SHAPE
+! update solid shapes
+!
+    call update_shapes(pblock)
+#endif /* SHAPE */
 
 !-------------------------------------------------------------------------------
 !
@@ -792,12 +801,6 @@ module evolution
 !
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du)
-#endif /* SHAPE */
-
 ! update the solution for the fluid variables
 !
     pblock%u(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
@@ -852,7 +855,13 @@ module evolution
     pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
 #endif /* FORCE */
+
+#ifdef SHAPE
+! restrict update in a defined shape
 !
+    call update_shapes(pblock)
+#endif /* SHAPE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_euler
@@ -928,12 +937,6 @@ module evolution
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du(:,:,:,:))
-
-#endif /* SHAPE */
 ! update the solution for the fluid variables
 !
     u1(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
@@ -958,12 +961,6 @@ module evolution
 !
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du(:,:,:,:))
-
-#endif /* SHAPE */
 ! update the solution for the fluid variables
 !
     pblock%u(1:nfl,:,:,:) = 0.5d0 * (pblock%u(1:nfl,:,:,:)                     &
@@ -1018,7 +1015,14 @@ module evolution
     pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
 #endif /* FORCE */
+
+#ifdef SHAPE
+! restrict update in a defined shape
 !
+    call update_shapes(pblock)
+
+#endif /* SHAPE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
@@ -1098,12 +1102,6 @@ module evolution
 !!
     call update(pblock%u(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du(:,:,:,:))
-#endif /* SHAPE */
-
 ! update the solution for the fluid variables
 !
     u1(1:nfl,:,:,:) = pblock%u(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
@@ -1128,12 +1126,6 @@ module evolution
 !!
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
 
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du(:,:,:,:))
-#endif /* SHAPE */
-
 ! update the solution for the fluid variables
 !
     u1(1:nfl,:,:,:) = f4 * (3.0d0 * pblock%u(1:nfl,:,:,:)                      &
@@ -1156,12 +1148,6 @@ module evolution
 !! 3rd step of integration
 !!
     call update(u1(:,:,:,:), du(:,:,:,:), dxi, dyi, dzi)
-
-#ifdef SHAPE
-! restrict update in a defined shape
-!
-    call update_shapes(pblock, du(:,:,:,:))
-#endif /* SHAPE */
 
 ! update the solution for the fluid variables
 !
@@ -1217,7 +1203,14 @@ module evolution
     pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
 #endif /* FORCE */
+
+#ifdef SHAPE
+! restrict update in a defined shape
 !
+    call update_shapes(pblock)
+
+#endif /* SHAPE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk3
