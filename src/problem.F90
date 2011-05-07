@@ -1483,9 +1483,9 @@ module problem
     if (tsat .gt. 0.0d0) then
       ang     = dpi * t / tsat
     end if
-    asat    = dsat / (1.0 - esat)
-    bsat    = sqrt(asat * asat - xsat * xsat)
+    asat    = dsat / (1.0d0 - esat)
     xsat    = asat * esat
+    bsat    = sqrt(asat * asat - xsat * xsat)
     rad     = 0.5d0 * (asat + bsat)
     amp     = 0.5d0 * (asat - bsat)
     dist    = rad - amp * cos(ang)
