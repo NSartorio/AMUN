@@ -194,6 +194,10 @@ program amun
 !
     call restart_job()
 
+! find new time step
+!
+    call find_new_timestep()
+
   end if
 
 #ifdef FORCE

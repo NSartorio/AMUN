@@ -30,7 +30,7 @@ module evolution
   implicit none
 
   integer, save :: n
-  real   , save :: t, dt, dtn
+  real   , save :: t, dt, dtn, dxmin
 
   contains
 !
@@ -211,7 +211,7 @@ module evolution
 
 ! local variables
 !
-    real                      :: cm, dxmin
+    real                      :: cm
     integer(kind=4)           :: lev
 
 ! local pointers
@@ -338,7 +338,6 @@ module evolution
     use mesh     , only : adxi, adyi, adzi
 #if defined MHD && defined GLM
     use config   , only : alpha_p
-    use mesh     , only : dx_min
     use scheme   , only : cmax
     use variables, only : iph
 #endif /* MHD & GLM */
@@ -390,7 +389,7 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dx_min)
+    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* MHD & GLM */
 #ifdef FORCE
@@ -748,7 +747,6 @@ module evolution
     use variables, only : ibx, ibz
 #ifdef GLM
     use config   , only : alpha_p
-    use mesh     , only : dx_min
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -820,7 +818,7 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dx_min)
+    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
@@ -885,7 +883,6 @@ module evolution
     use variables, only : ibx, ibz
 #ifdef GLM
     use config   , only : alpha_p
-    use mesh     , only : dx_min
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -986,7 +983,7 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dx_min)
+    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 
 #endif /* GLM */
@@ -1052,7 +1049,6 @@ module evolution
     use variables, only : ibx, ibz
 #ifdef GLM
     use config   , only : alpha_p
-    use mesh     , only : dx_min
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -1186,7 +1182,7 @@ module evolution
 
 ! evolve analytically Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dx_min)
+    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
