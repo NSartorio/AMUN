@@ -34,7 +34,7 @@ program amun
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
-  use evolution, only : evolve, update_maximum_speed, n, t, dt, dtn
+  use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
 #endif /* FORCE */
@@ -168,9 +168,9 @@ program amun
 !
     call store_mesh_stats(n, t)
 
-! update the maximum speed in the system
+! find new time step
 !
-    call update_maximum_speed()
+    call find_new_timestep()
 
 ! store integrals
 !

@@ -51,20 +51,12 @@ module evolution
 #ifdef REFINE
     use config    , only : maxlev
 #endif /* REFINE */
-#ifdef VISCOSITY
-    use config    , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config    , only : ueta
-#endif /* MHD & RESISTIVITY */
+    use mesh      , only : update_mesh
+    use timer     , only : start_timer, stop_timer
 #ifdef FORCE
     use forcing   , only : fourier_transform, evolve_forcing
-#endif /* FORCE */
-    use mesh      , only : update_mesh
-    use mesh      , only : dx_min
-    use scheme    , only : cmax
-    use timer     , only : start_timer, stop_timer
     use variables , only : idn, imz
+#endif /* FORCE */
 
     implicit none
 
@@ -179,19 +171,9 @@ module evolution
     end if ! maxlev > 1
 #endif /* REFINE */
 
-! update the maximum speed
+! find new time step
 !
-    call update_maximum_speed()
-
-! get maximum time step
-!
-    dtn = dx_min / max(cmax, 1.0d-16)
-#ifdef VISCOSITY
-    dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, visc))
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    dtn = min(dtn, 0.5d0 * dx_min * dx_min / max(1.0d-16, ueta))
-#endif /* MHD & RESISTIVITY */
+    call find_new_timestep()
 
 ! stop the evolution timer
 !
@@ -203,26 +185,39 @@ module evolution
 !
 !===============================================================================
 !
-! update_maximum_speed: subroutine updates module variable cmax with the value
-!                       corresponding to the maximum speed in the system
+! find_new_timestep: subroutine updates the maximum speed among the leafs and
+!                    calculates new time step
 !
 !===============================================================================
 !
-  subroutine update_maximum_speed()
+  subroutine find_new_timestep()
 
-    use blocks  , only : block_data, list_data
+    use blocks  , only : block_meta, block_data, list_meta, list_data
+    use config  , only : maxlev
 #ifdef MPI
     use mpitools, only : mallreducemaxr
 #endif /* MPI */
+    use mesh    , only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
     use timer   , only : start_timer, stop_timer
+#ifdef VISCOSITY
+    use config  , only : visc
+#endif /* VISCOSITY */
+#if defined MHD && defined RESISTIVITY
+    use config  , only : ueta
+#endif /* MHD & RESISTIVITY */
 
     implicit none
 
 ! local variables
 !
-    type(block_data), pointer :: pblock
-    real                      :: cm
+    real                      :: cm, dxmin
+    integer(kind=4)           :: lev
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
@@ -230,27 +225,76 @@ module evolution
 !
     call start_timer(6)
 
-! reset the maximum speed
+! reset the maximum speed, and highest level
 !
-    cmax = 1.0d-16
+    cmax   = 1.0d-16
+    lev    = 1
 
-! iterate over all blocks in order to find the maximum speed
+! initiate the smallest spacial step
 !
-    pblock => list_data
-    do while (associated(pblock))
+#if NDIMS == 2
+    dxmin = min(adx(lev), ady(lev))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    dxmin = min(adx(lev), ady(lev), adz(lev))
+#endif /* NDIMS == 3 */
+
+! if maxlev > 1, find the highest level
+!
+    if (maxlev .gt. 1) then
+
+! iterate over all meta blocks and find the highest level with leafs
+!
+      pmeta => list_meta
+      do while (associated(pmeta))
+
+! check if the metablock is a leaf, if so obtaind the highest level
+!
+        if (pmeta%leaf) lev = max(lev, pmeta%level)
+
+! associate the pointer with the next block
+!
+        pmeta => pmeta%next
+
+      end do ! meta blocks
+
+! find the smallest spacial step
+!
+#if NDIMS == 2
+      dxmin = min(adx(lev), ady(lev))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      dxmin = min(adx(lev), ady(lev), adz(lev))
+#endif /* NDIMS == 3 */
+
+    end if ! maxlev > 1
+
+! iterate over all data blocks in order to find the maximum speed among them
+!
+    pdata => list_data
+    do while (associated(pdata))
 
 ! check if this block is a leaf
 !
-      if (pblock%meta%leaf) &
-        cm = maxspeed(pblock%u)
+      if (pdata%meta%leaf) then
+
+! find the maximum level occupied by blocks (can be smaller than maxlev)
+!
+
+
+! obtain the maximum speed for the current block
+!
+        cm = maxspeed(pdata%u(:,:,:,:))
 
 ! compare global and local maximum speeds
 !
-      cmax = max(cmax, cm)
+        cmax = max(cmax, cm)
 
-! assign pointer to the next block
+      end if ! leaf
+
+! assiociate the pointer with the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
     end do
 
@@ -260,13 +304,23 @@ module evolution
     call mallreducemaxr(cmax)
 #endif /* MPI */
 
+! calcilate new time step
+!
+    dtn = dxmin / max(cmax, 1.0d-16)
+#ifdef VISCOSITY
+    dtn = min(dtn, 0.5d0 * dxmin * dxmin / max(1.0d-16, visc))
+#endif /* VISCOSITY */
+#if defined MHD && defined RESISTIVITY
+    dtn = min(dtn, 0.5d0 * dxmin * dxmin / max(1.0d-16, ueta))
+#endif /* MHD & RESISTIVITY */
+
 ! stop the evolution timer
 !
     call stop_timer(6)
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine update_maximum_speed
+  end subroutine find_new_timestep
 #ifdef CONSERVATIVE
 !
 !===============================================================================

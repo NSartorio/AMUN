@@ -29,10 +29,6 @@ module mesh
 
   implicit none
 
-! minimum grid step
-!
-  real, save :: dx_min = 1.0
-
 ! spatial coordinates for all levels of refinements
 !
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -158,10 +154,6 @@ module mesh
 
       advol(l) = adx(l) * ady(l) * adz(l)
     end do
-
-! get the minimum grid step
-!
-    dx_min = 0.5 * min(adx(maxlev), ady(maxlev), adz(maxlev))
 
 ! print general information about resolutions
 !
