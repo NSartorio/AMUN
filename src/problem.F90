@@ -119,24 +119,16 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data)         , intent(inout) :: pblock
     real, dimension(:,:,:,:) , intent(inout) :: du
-
-! local arguments
-!
-    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
-    pb => pblock
-
     select case(trim(problem))
     case("binaries")
-      call shape_binaries(pb, du)
+      call shape_binaries(pblock, du)
     case default
     end select
-
-    nullify(pb)
 
 !-------------------------------------------------------------------------------
 !
@@ -721,12 +713,15 @@ module problem
   subroutine init_binaries(pblock)
 
     use blocks   , only : block_data
-    use config   , only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat &
-                        , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c, v1ini, v2ini &
-                        , csnd2, gamma, gammam1i
-    use variables, only : idn, imx, imy, imz
+    use config   , only : im, jm, km, in, jn, kn, ng
+    use config   , only : dens, pres, csnd2, gamma
+    use config   , only : dnfac, dnrat, v1ini, v2ini
+    use config   , only : x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c
+    use scheme   , only : prim2cons
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz
 #ifdef ADI
-    use variables, only : ien
+    use variables, only : ipr
 #endif /* ADI */
 
 ! input arguments
@@ -736,13 +731,17 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, dnamb, enamb, ekin
-    real    :: dnstar1, enstar1, x1l, y1l, z1l, r1
-    real    :: dnstar2, enstar2, x2l, y2l, z2l, r2
+    real    :: dx, dy, dz
+    real    :: dnamb, pramb
+    real    :: dnstar1, prstar1, x1l, y1l, z1l, r1
+    real    :: dnstar2, prstar2, x2l, y2l, z2l, r2
 
 ! local arrays
 !
-    real, dimension(:), allocatable :: x, y, z
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nqt,im) :: q, u
 !
 !-------------------------------------------------------------------------------
 !
@@ -758,17 +757,11 @@ module problem
 ! calculate parameters
 !
     dnamb   = dens
-    dnstar2 = dnamb*dnfac
-    dnstar1 = dnstar2*dnrat
-    enamb   = gammam1i*pres
-    enstar1 = enamb*dnfac
-    enstar2 = enstar1/dnrat
-
-! allocate coordinates
-!
-    allocate(x(im))
-    allocate(y(jm))
-    allocate(z(km))
+    pramb   = pres
+    dnstar1 = dnamb * dnfac * dnrat
+    dnstar2 = dnamb * dnfac
+    prstar1 = pramb * dnfac
+    prstar2 = pramb * dnfac / dnrat
 
 ! calculate cell sizes
 !
@@ -793,16 +786,6 @@ module problem
     z2l  = 0.0
 #endif /* NDIMS == 3 */
 
-! set variables
-!
-    pblock%u(idn,:,:,:) = dnamb
-    pblock%u(imx,:,:,:) = 0.0d0
-    pblock%u(imy,:,:,:) = 0.0d0
-    pblock%u(imz,:,:,:) = 0.0d0
-#ifdef ADI
-    pblock%u(ien,:,:,:) = enamb
-#endif /* ADI */
-
 ! set initial pressure
 !
     do k = 1, km
@@ -815,47 +798,68 @@ module problem
         y1l = y(j) - y1c
         y2l = y(j) - y2c
 
+! reset primitive variables
+!
+        q(idn,:) = dnamb
+        q(ivx,:) = 0.0d0
+        q(ivy,:) = 0.0d0
+        q(ivz,:) = 0.0d0
+#ifdef ADI
+        q(ipr,:) = pramb
+#endif /* ADI */
+
         do i = 1, im
+
           x1l = x(i) - x1c
           x2l = x(i) - x2c
 
+! calculate radia for both stars
+!
           r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
           r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
 
-          if (r1 .le. r1c) then
-            pblock%u(idn,i,j,k) = dnstar1
-            pblock%u(imx,i,j,k) = dnstar1*v1ini*x1l
-            pblock%u(imy,i,j,k) = dnstar1*v1ini*y1l
-#if NDIMS == 3
-            pblock%u(imz,i,j,k) = dnstar1*v1ini*z1l
-#endif /* NDIMS == 3 */
-            ekin = 0.5 * dnstar1 * v1ini**2 * (x1l**2 + y1l**2 + z1l**2)
-#ifdef ADI
-            pblock%u(ien,i,j,k) = enstar1 + ekin
-#endif /* ADI */
-          endif
-
-          if (r2 .le. r2c) then
-            pblock%u(idn,i,j,k) = dnstar2
-            pblock%u(imx,i,j,k) = dnstar2*v2ini*x2l
-            pblock%u(imy,i,j,k) = dnstar2*v2ini*y2l
-#if NDIMS == 3
-            pblock%u(imz,i,j,k) = dnstar2*v2ini*z2l
-#endif /* NDIMS == 3 */
-            ekin = 0.5 * dnstar2 * v2ini**2 * (x2l**2 + y2l**2 + z2l**2)
-#ifdef ADI
-            pblock%u(ien,i,j,k) = enstar2 + ekin
-#endif /* ADI */
-          endif
-        end do
-      end do
-    end do
-
-! deallocate coordinates
+! variables within the first start
 !
-    deallocate(x)
-    deallocate(y)
-    deallocate(z)
+          if (r1 .le. r1c) then
+
+            q(idn,i) = dnstar1
+            q(ivx,i) = v1ini * x1l
+            q(ivy,i) = v1ini * y1l
+#if NDIMS == 3
+            q(ivz,i) = v1ini * z1l
+#endif /* NDIMS == 3 */
+#ifdef ADI
+            q(ipr,i) = prstar1
+#endif /* ADI */
+          end if
+
+! variables within the second start
+!
+          if (r2 .le. r2c) then
+
+            q(idn,i) = dnstar2
+            q(ivx,i) = v2ini * x2l
+            q(ivy,i) = v2ini * y2l
+#if NDIMS == 3
+            q(ivz,i) = v2ini * z2l
+#endif /* NDIMS == 3 */
+#ifdef ADI
+            q(ipr,i) = prstar2
+#endif /* ADI */
+          end if
+
+        end do ! i
+
+! convert primitive variables to conserved
+!
+        call prim2cons(im, q(:,:), u(:,:))
+
+! copy conservative variables to the current block
+!
+        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do ! j
+    end do ! k
 
 !-------------------------------------------------------------------------------
 !
@@ -1374,14 +1378,12 @@ module problem
   subroutine shape_binaries(pblock, du)
 
     use blocks   , only : block_data
-    use config   , only : ng, in, jn, kn, im, jm, km, dens, pres, dnfac, dnrat &
-                        , x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c               &
-                        , csnd2, gamma, gammam1i
-    use variables, only : idn, imx, imy, imz, ien
+    use config   , only : ng, in, jn, kn, im, jm, km
+    use config   , only : x1c, y1c, z1c, r1c, x2c, y2c, z2c, r2c
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data)         , intent(inout) :: pblock
     real, dimension(:,:,:,:) , intent(inout) :: du
 
 ! local variables
@@ -1393,16 +1395,12 @@ module problem
 
 ! local arrays
 !
-    real, dimension(:), allocatable :: x, y, z
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
 !
 !-------------------------------------------------------------------------------
 !
-! allocate coordinates
-!
-    allocate(x(im))
-    allocate(y(jm))
-    allocate(z(km))
-
 ! calculate cell sizes
 !
     dx = (pblock%meta%xmax - pblock%meta%xmin) / in
@@ -1452,15 +1450,10 @@ module problem
           if (r2 .le. r2c) then
             du(:,i,j,k) = 0.0
           endif
-        end do
-      end do
-    end do
 
-! deallocate coordinates
-!
-    deallocate(x)
-    deallocate(y)
-    deallocate(z)
+        end do ! i
+      end do ! j
+    end do ! k
 
 !-------------------------------------------------------------------------------
 !
