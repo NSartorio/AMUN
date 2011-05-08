@@ -357,7 +357,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -563,7 +563,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -606,7 +606,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -670,7 +670,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -770,7 +770,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -906,7 +906,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !
@@ -1067,7 +1067,7 @@ module evolution
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pblock
 
 ! local variables
 !

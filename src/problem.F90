@@ -119,8 +119,8 @@ module problem
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pdata
-    real            , intent(in)    :: t
+    type(block_data), pointer, intent(inout) :: pdata
+    real                     , intent(in)    :: t
 !
 !-------------------------------------------------------------------------------
 !
@@ -1412,8 +1412,8 @@ module problem
 
 ! input arguments
 !
-    type(block_data), intent(inout) :: pdata
-    real            , intent(in)    :: t
+    type(block_data), pointer, intent(inout) :: pdata
+    real                     , intent(in)    :: t
 
 ! local variables
 !
