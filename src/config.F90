@@ -165,7 +165,7 @@ module config
 !
 !===============================================================================
 !
-  subroutine read_config
+  subroutine read_config()
 
     use error, only : print_error, print_warning
 !
@@ -175,7 +175,7 @@ module config
 
 ! local parameters
 !
-    character(len=*), parameter :: fl = "./config.in"
+    character(len=255) :: fl = "./config.in"
 
 ! local variables
 !
@@ -185,11 +185,28 @@ module config
 !
 !-------------------------------------------------------------------------------
 !
-! check if file exists
+! parse command line to check if another configuration file name has be
+! specified
+!
+  do l = 1, iargc(), 2
+    call getarg(l, line)
+    if (trim(line) .eq. '-c' .or. trim(line) .eq. '--config') then
+      call getarg(l + 1, line)
+      if (trim(line) .eq. '') then
+        call print_error("config::read_config", "Command line argument" //     &
+                              " --config requires a configuration file name!")
+      else
+        write(fl,'(a)') trim(line)
+      end if
+    end if
+  end do
+
+! check if the configuration file exists
 !
     inquire(file = fl, exist = info)
     if (.not. info) then
-      call print_error("config::read_config", "Could not find config.in file!")
+      call print_error("config::read_config", "Could not find a " //           &
+                                "configuration file of the name " // trim(fl))
     endif
 
 ! open file
