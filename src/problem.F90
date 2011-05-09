@@ -729,7 +729,7 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz
+    real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
     real    :: dnstar, prstar, x1l, y1l, z1l, r1
     real    :: dnsat , prsat , x2l, y2l, z2l, r2
@@ -767,8 +767,10 @@ module problem
     dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
 #if NDIMS == 3
     dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+    dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
     dz = 1.0
+    dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
@@ -826,7 +828,7 @@ module problem
 
 ! variables within the first start
 !
-          if (r1 .le. rstar) then
+          if (r1 .le. max(rstar, dr)) then
 
             q(idn,i) = dnstar
             q(ivx,i) = vstar * x1l
@@ -841,7 +843,7 @@ module problem
 
 ! variables within the second start
 !
-          if (r2 .le. rsat) then
+          if (r2 .le. max(rsat, dr)) then
 
             q(idn,i) = dnsat
             q(ivx,i) = vsat * x2l
@@ -1410,7 +1412,7 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
+    real    :: dx, dy, dz, dr, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
     real    :: dist, rad, amp, asat, bsat, xsat
     real    :: dnamb, pramb
     real    :: dnstar, prstar, dnvstar, x1l, y1l, z1l, r1
@@ -1436,8 +1438,10 @@ module problem
     dy = (pdata%meta%ymax - pdata%meta%ymin) / jn
 #if NDIMS == 3
     dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
+    dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
     dz = 1.0
+    dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
@@ -1508,7 +1512,7 @@ module problem
 
 ! variables within the first start
 !
-          if (r1 .le. rstar) then
+          if (r1 .le. max(rstar, dr)) then
 
             pdata%u(idn,i,j,k) = dnstar
             pdata%u(imx,i,j,k) = dnvstar * x1l
@@ -1535,7 +1539,7 @@ module problem
 
 ! variables within the second start
 !
-          if (r2 .le. rsat) then
+          if (r2 .le. max(rsat, dr)) then
 
             pdata%u(idn,i,j,k) = dnsat
             pdata%u(imx,i,j,k) = dnvsat * x2l
