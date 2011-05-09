@@ -731,8 +731,8 @@ module problem
     integer :: i, j, k
     real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
-    real    :: dnstar, prstar, rc
-    real    :: dnsat , prsat , rs, xs, ys, zs
+    real    :: dnstar, prstar, vrstar, rc
+    real    :: dnsat , prsat , vrsat , rs, xs, ys, zs
 
 ! local arrays
 !
@@ -760,6 +760,8 @@ module problem
     dnsat   = dnamb * dnfac
     prstar  = pramb * dnfac
     prsat   = pramb * dnfac / dnrat
+    vrstar  = vstar / rstar
+    vrsat   = vsat  / rsat
 
 ! calculate cell sizes
 !
@@ -827,10 +829,10 @@ module problem
           if (rc .le. max(rstar, dr)) then
 
             q(idn,i) = dnstar
-            q(ivx,i) = vstar * x(i)
-            q(ivy,i) = vstar * y(j)
+            q(ivx,i) = vrstar * x(i)
+            q(ivy,i) = vrstar * y(j)
 #if NDIMS == 3
-            q(ivz,i) = vstar * z(k)
+            q(ivz,i) = vrstar * z(k)
 #endif /* NDIMS == 3 */
 #ifdef ADI
             q(ipr,i) = prstar
@@ -842,10 +844,10 @@ module problem
           if (rs .le. max(rsat, dr)) then
 
             q(idn,i) = dnsat
-            q(ivx,i) = vsat * xs
-            q(ivy,i) = vsat * ys
+            q(ivx,i) = vrsat * xs
+            q(ivy,i) = vrsat * ys
 #if NDIMS == 3
-            q(ivz,i) = vsat * zs
+            q(ivz,i) = vrsat * zs
 #endif /* NDIMS == 3 */
 #ifdef ADI
             q(ipr,i) = prsat
@@ -1410,8 +1412,8 @@ module problem
     integer :: i, j, k
     real    :: dx, dy, dz, dr, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
     real    :: dnamb, pramb
-    real    :: dnstar, prstar, dnvstar, rc
-    real    :: dnsat , prsat , dnvsat , rs, xs, ys, zs
+    real    :: dnstar, vrstar, prstar, rc
+    real    :: dnsat , vrsat , prsat , rs, xs, ys, zs
     real    :: asat, bsat, xsat
 #ifdef ADI
     real    :: ekin, ekstar, eksat
@@ -1428,6 +1430,37 @@ module problem
 !
 !-------------------------------------------------------------------------------
 !
+! calculate parameters
+!
+#ifdef ISO
+    pres = csnd2 * dens
+#endif /* ISO */
+#ifdef ADI
+    pres = csnd2 * dens / gamma
+#endif /* ADI */
+    dnamb   = dens
+    pramb   = pres
+    dnstar  = dnamb * dnfac * dnrat
+    dnsat   = dnamb * dnfac
+    prstar  = pramb * dnfac
+    prsat   = pramb * dnfac / dnrat
+    vrstar  = vstar / rstar
+    vrsat   = vsat  / rsat
+#ifdef ADI
+    ekstar  = 0.5d0 * dnstar * vstar * vstar
+    eksat   = 0.5d0 * dnsat  * vsat  * vsat
+#endif /* ADI */
+    if (tsat .gt. 0.0d0) then
+      ang     = dpi * t / tsat
+      sn      = sin(ang)
+      cs      = cos(ang)
+    end if
+    asat    = dsat / (1.0d0 - esat)
+    xsat    = asat * esat
+    bsat    = sqrt(asat * asat - xsat * xsat)
+    xsh     = asat * cs - xsat
+    ysh     = bsat * sn
+
 ! calculate cell sizes
 !
     dx = (pdata%meta%xmax - pdata%meta%xmin) / in
@@ -1452,37 +1485,6 @@ module problem
     zs   = 0.0d0
 #endif /* NDIMS == 3 */
 
-! calculate parameters
-!
-#ifdef ISO
-    pres = csnd2 * dens
-#endif /* ISO */
-#ifdef ADI
-    pres = csnd2 * dens / gamma
-#endif /* ADI */
-    dnamb   = dens
-    pramb   = pres
-    dnstar  = dnamb * dnfac * dnrat
-    dnsat   = dnamb * dnfac
-    prstar  = pramb * dnfac
-    prsat   = pramb * dnfac / dnrat
-    dnvstar = dnstar * vstar
-    dnvsat  = dnsat  * vsat
-#ifdef ADI
-    ekstar  = 0.5d0 * dnstar * vstar * vstar
-    eksat   = 0.5d0 * dnsat  * vsat  * vsat
-#endif /* ADI */
-    if (tsat .gt. 0.0d0) then
-      ang     = dpi * t / tsat
-      sn      = sin(ang)
-      cs      = cos(ang)
-    end if
-    asat    = dsat / (1.0d0 - esat)
-    xsat    = asat * esat
-    bsat    = sqrt(asat * asat - xsat * xsat)
-    xsh     = asat * cs - xsat
-    ysh     = bsat * sn
-
 ! reset update
 !
     do k = 1, km
@@ -1504,13 +1506,13 @@ module problem
           if (rc .le. max(rstar, dr)) then
 
             pdata%u(idn,i,j,k) = dnstar
-            pdata%u(imx,i,j,k) = dnvstar * x(i)
-            pdata%u(imy,i,j,k) = dnvstar * y(j)
+            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * vrstar * x(i)
+            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * vrstar * y(j)
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dnvstar * z(k)
+            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrstar * z(k)
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
@@ -1531,13 +1533,13 @@ module problem
           if (rs .le. max(rsat, dr)) then
 
             pdata%u(idn,i,j,k) = dnsat
-            pdata%u(imx,i,j,k) = dnvsat * xs
-            pdata%u(imy,i,j,k) = dnvsat * ys
+            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * vrsat * xs
+            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * vrsat * ys
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dnvsat * zs
+            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrsat * zs
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
