@@ -73,33 +73,25 @@ module problem
 ! input arguments
 !
     type(block_data), pointer, intent(inout) :: pblock
-
-! local arguments
-!
-    type(block_data), pointer :: pb
 !
 !-------------------------------------------------------------------------------
 !
-    pb => pblock
-
     select case(trim(problem))
     case("blast")
-      call init_blast(pb)
+      call init_blast(pblock)
     case("implosion")
-      call init_implosion(pb)
+      call init_implosion(pblock)
     case("binaries")
-      call init_binaries(pb)
+      call init_binaries(pblock)
     case("reconnection")
-      call init_reconnection(pb)
+      call init_reconnection(pblock)
     case("multi_current_sheet")
-      call init_multi_current_sheet(pb)
+      call init_multi_current_sheet(pblock)
     case("turbulence")
-      call init_turbulence(pb)
+      call init_turbulence(pblock)
     case("orszag_tang")
-      call init_orszag_tang(pb)
+      call init_orszag_tang(pblock)
     end select
-
-    nullify(pb)
 
 !-------------------------------------------------------------------------------
 !
