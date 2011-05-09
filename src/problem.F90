@@ -731,8 +731,8 @@ module problem
     integer :: i, j, k
     real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
-    real    :: dnstar, prstar, x1l, y1l, z1l, r1
-    real    :: dnsat , prsat , x2l, y2l, z2l, r2
+    real    :: dnstar, prstar, rc
+    real    :: dnsat , prsat , rs, xs, ys, zs
 
 ! local arrays
 !
@@ -769,34 +769,31 @@ module problem
     dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
     dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
-    dz = 1.0
+    dz = 1.0d0
     dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pblock%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pblock%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * dz + pblock%meta%zmin
 #else /* NDIMS == 3 */
-    z(1) = 0.0
+    z(1) = 0.0d0
 
-    z1l  = 0.0
-    z2l  = 0.0
+    zs   = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! set initial pressure
 !
     do k = 1, km
 #if NDIMS == 3
-      z1l = z(k)
-      z2l = z(k)
+      zs = z(k)
 #endif /* NDIMS == 3 */
 
       do j = 1, jm
-        y1l = y(j)
-        y2l = y(j)
+        ys = y(j)
 
 ! reset primitive variables
 !
@@ -818,23 +815,22 @@ module problem
 
         do i = 1, im
 
-          x1l = x(i)
-          x2l = x(i) + dsat
+          xs = x(i) - dsat
 
 ! calculate radia for both stars
 !
-          r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
-          r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
+          rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+          rs = sqrt(xs * xs + ys * ys + zs * zs)
 
 ! variables within the first start
 !
-          if (r1 .le. max(rstar, dr)) then
+          if (rc .le. max(rstar, dr)) then
 
             q(idn,i) = dnstar
-            q(ivx,i) = vstar * x1l
-            q(ivy,i) = vstar * y1l
+            q(ivx,i) = vstar * x(i)
+            q(ivy,i) = vstar * y(j)
 #if NDIMS == 3
-            q(ivz,i) = vstar * z1l
+            q(ivz,i) = vstar * z(k)
 #endif /* NDIMS == 3 */
 #ifdef ADI
             q(ipr,i) = prstar
@@ -843,13 +839,13 @@ module problem
 
 ! variables within the second start
 !
-          if (r2 .le. max(rsat, dr)) then
+          if (rs .le. max(rsat, dr)) then
 
             q(idn,i) = dnsat
-            q(ivx,i) = vsat * x2l
-            q(ivy,i) = vsat * y2l
+            q(ivx,i) = vsat * xs
+            q(ivy,i) = vsat * ys
 #if NDIMS == 3
-            q(ivz,i) = vsat * z2l
+            q(ivz,i) = vsat * zs
 #endif /* NDIMS == 3 */
 #ifdef ADI
             q(ipr,i) = prsat
@@ -1415,8 +1411,8 @@ module problem
     real    :: dx, dy, dz, dr, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
     real    :: dist, rad, amp, asat, bsat, xsat
     real    :: dnamb, pramb
-    real    :: dnstar, prstar, dnvstar, x1l, y1l, z1l, r1
-    real    :: dnsat , prsat , dnvsat , x2l, y2l, z2l, r2
+    real    :: dnstar, prstar, dnvstar, rc
+    real    :: dnsat , prsat , dnvsat , rs, xs, ys, zs
 #ifdef ADI
     real    :: ekin, ekstar, eksat
 #ifdef MHD
@@ -1440,21 +1436,20 @@ module problem
     dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
     dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
-    dz = 1.0
+    dz = 1.0d0
     dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
 ! generate coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pdata%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pdata%meta%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pdata%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pdata%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pdata%meta%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * dz + pdata%meta%zmin
 #else /* NDIMS == 3 */
-    z(1) = 0.0
+    z(1) = 0.0d0
 
-    z1l  = 0.0
-    z2l  = 0.0
+    zs   = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! calculate parameters
@@ -1495,33 +1490,30 @@ module problem
 !
     do k = 1, km
 #if NDIMS == 3
-      z1l = z(k)
-      z2l = z(k)
+      zs = z(k)
 #endif /* NDIMS == 3 */
 
       do j = 1, jm
-        y1l = y(j)
-        y2l = y(j) + ysh
+        ys = y(j) - ysh
 
         do i = 1, im
-          x1l = x(i)
-          x2l = x(i) + xsh
+          xs = x(i) - xsh
 
-          r1 = sqrt(x1l**2 + y1l**2 + z1l**2)
-          r2 = sqrt(x2l**2 + y2l**2 + z2l**2)
+          rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+          rs = sqrt(xs * xs + ys * ys + zs * zs)
 
 ! variables within the first start
 !
-          if (r1 .le. max(rstar, dr)) then
+          if (rc .le. max(rstar, dr)) then
 
             pdata%u(idn,i,j,k) = dnstar
-            pdata%u(imx,i,j,k) = dnvstar * x1l
-            pdata%u(imy,i,j,k) = dnvstar * y1l
+            pdata%u(imx,i,j,k) = dnvstar * x(i)
+            pdata%u(imy,i,j,k) = dnvstar * y(j)
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dnvstar * z1l
+            pdata%u(imz,i,j,k) = dnvstar * z(k)
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
@@ -1539,16 +1531,16 @@ module problem
 
 ! variables within the second start
 !
-          if (r2 .le. max(rsat, dr)) then
+          if (rs .le. max(rsat, dr)) then
 
             pdata%u(idn,i,j,k) = dnsat
-            pdata%u(imx,i,j,k) = dnvsat * x2l
-            pdata%u(imy,i,j,k) = dnvsat * y2l
+            pdata%u(imx,i,j,k) = dnvsat * xs
+            pdata%u(imy,i,j,k) = dnvsat * ys
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = dnvsat * z2l
+            pdata%u(imz,i,j,k) = dnvsat * zs
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
