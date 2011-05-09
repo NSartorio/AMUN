@@ -188,13 +188,13 @@ module config
 ! parse command line to check if another configuration file name has be
 ! specified
 !
-  do l = 1, iargc(), 2
+  do l = 1, iargc()
     call getarg(l, line)
     if (trim(line) .eq. '-c' .or. trim(line) .eq. '--config') then
       call getarg(l + 1, line)
       if (trim(line) .eq. '') then
-        call print_error("config::read_config", "Command line argument" //     &
-                              " --config requires a configuration file name!")
+        call print_error("config::read_config", "Command line arguments" //    &
+                                       " --config or -c require a file name!")
       else
         write(fl,'(a)') trim(line)
       end if
@@ -205,8 +205,8 @@ module config
 !
     inquire(file = fl, exist = info)
     if (.not. info) then
-      call print_error("config::read_config", "Could not find a " //           &
-                                "configuration file of the name " // trim(fl))
+      call print_error("config::read_config", "Could not find " //             &
+                                     "configuration file " // trim(fl) // "!")
     endif
 
 ! open file
