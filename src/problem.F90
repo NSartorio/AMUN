@@ -708,7 +708,8 @@ module problem
     use config   , only : im, jm, km, in, jn, kn, ng
     use config   , only : dens, pres, csnd2, gamma
     use config   , only : dnfac, dnrat
-    use config   , only : rstar, vstar, rsat, dsat, vsat
+    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat
+    use constants, only : dpi
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -733,6 +734,9 @@ module problem
     real    :: dnamb, pramb
     real    :: dnstar, prstar, vrstar, rc
     real    :: dnsat , prsat , vrsat , rs, xs, ys, zs
+    real    :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
+    real    :: asat, bsat, xsat
+    real    :: xsh, ysh, xvl, yvl
 
 ! local arrays
 !
@@ -762,6 +766,13 @@ module problem
     prsat   = pramb * dnfac / dnrat
     vrstar  = vstar / rstar
     vrsat   = vsat  / rsat
+    if (tsat .gt. 0.0d0) then
+      om      = dpi / tsat
+      sn      = 0.0d0
+      cs      = 1.0d0
+    end if
+    xvl     = - asat * om * sn
+    yvl     =   bsat * om * cs
 
 ! calculate cell sizes
 !
@@ -795,7 +806,7 @@ module problem
 #endif /* NDIMS == 3 */
 
       do j = 1, jm
-        ys = y(j)
+        ys = y(j) - ysh
 
 ! reset primitive variables
 !
@@ -817,7 +828,7 @@ module problem
 
         do i = 1, im
 
-          xs = x(i) - dsat
+          xs = x(i) - xsh
 
 ! calculate radia for both stars
 !
@@ -844,8 +855,8 @@ module problem
           if (rs .le. max(rsat, dr)) then
 
             q(idn,i) = dnsat
-            q(ivx,i) = vrsat * xs
-            q(ivy,i) = vrsat * ys
+            q(ivx,i) = vrsat * xs + xvl
+            q(ivy,i) = vrsat * ys + yvl
 #if NDIMS == 3
             q(ivz,i) = vrsat * zs
 #endif /* NDIMS == 3 */
@@ -1410,17 +1421,19 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, dr, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
+    real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
     real    :: dnstar, vrstar, prstar, rc
     real    :: dnsat , vrsat , prsat , rs, xs, ys, zs
-    real    :: asat, bsat, xsat
 #ifdef ADI
     real    :: ekin, ekstar, eksat
 #ifdef MHD
     real    :: emag
 #endif /* MHD */
 #endif /* ADI */
+    real    :: om = 0.0d0, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0
+    real    :: asat, bsat, xsat
+    real    :: xsh, ysh, xvl, yvl
 
 ! local arrays
 !
@@ -1451,7 +1464,8 @@ module problem
     eksat   = 0.5d0 * dnsat  * vsat  * vsat
 #endif /* ADI */
     if (tsat .gt. 0.0d0) then
-      ang     = dpi * t / tsat
+      om      = dpi / tsat
+      ang     = om * t
       sn      = sin(ang)
       cs      = cos(ang)
     end if
@@ -1460,6 +1474,8 @@ module problem
     bsat    = sqrt(asat * asat - xsat * xsat)
     xsh     = asat * cs - xsat
     ysh     = bsat * sn
+    xvl     = - asat * om * sn
+    yvl     =   bsat * om * cs
 
 ! calculate cell sizes
 !
@@ -1533,8 +1549,8 @@ module problem
           if (rs .le. max(rsat, dr)) then
 
             pdata%u(idn,i,j,k) = dnsat
-            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * vrsat * xs
-            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * vrsat * ys
+            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * (vrsat * xs + xvl)
+            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * (vrsat * ys + yvl)
 #if NDIMS == 2
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
