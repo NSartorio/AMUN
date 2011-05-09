@@ -1532,7 +1532,7 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 #ifdef ADI
-            ekin = ekstar * r1 * r1
+            ekin = 0.5d0 * sum(pdata%u(imx:imz,i,j,k)**2) / pdata%u(idn,i,j,k)
             pdata%u(ien,i,j,k) = gammam1i * prstar + ekin
 #endif /* ADI */
           end if
@@ -1559,7 +1559,7 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 #ifdef ADI
-            ekin = eksat * r2 * r2
+            ekin = 0.5d0 * sum(pdata%u(imx:imz,i,j,k)**2) / pdata%u(idn,i,j,k)
             pdata%u(ien,i,j,k) = gammam1i * prsat + ekin
 #endif /* ADI */
           end if
