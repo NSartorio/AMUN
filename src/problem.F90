@@ -1409,10 +1409,10 @@ module problem
 !
     integer :: i, j, k
     real    :: dx, dy, dz, dr, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0, xsh, ysh
-    real    :: dist, rad, amp, asat, bsat, xsat
     real    :: dnamb, pramb
     real    :: dnstar, prstar, dnvstar, rc
     real    :: dnsat , prsat , dnvsat , rs, xs, ys, zs
+    real    :: asat, bsat, xsat
 #ifdef ADI
     real    :: ekin, ekstar, eksat
 #ifdef MHD
@@ -1480,11 +1480,8 @@ module problem
     asat    = dsat / (1.0d0 - esat)
     xsat    = asat * esat
     bsat    = sqrt(asat * asat - xsat * xsat)
-    rad     = 0.5d0 * (asat + bsat)
-    amp     = 0.5d0 * (asat - bsat)
-    dist    = asat - amp * sn * sn
-    xsh     = dist * cs - xsat
-    ysh     = dist * sn
+    xsh     = asat * cs - xsat
+    ysh     = bsat * sn
 
 ! reset update
 !
