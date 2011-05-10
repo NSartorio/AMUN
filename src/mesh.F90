@@ -981,6 +981,67 @@ module mesh
     end do
 
 #ifdef MPI
+! redistribute blocks equally among all processors
+!
+    call redistribute_blocks()
+#endif /* MPI */
+
+#ifdef DEBUG
+! check mesh
+!
+    call check_mesh('after update_mesh')
+#endif /* DEBUG */
+
+! stop the mesh timer
+!
+    call stop_timer(5)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_mesh
+#ifdef MPI
+!
+!===============================================================================
+!
+! redistribute_blocks: subroutine redistributes blocks equally between
+!                      processors
+!
+!===============================================================================
+!
+  subroutine redistribute_blocks()
+
+    use blocks   , only : block_meta, block_data, list_meta, list_data
+    use blocks   , only : get_nleafs, append_datablock, deallocate_datablock   &
+                        , associate_blocks
+    use config   , only : im, jm, km
+    use mpitools , only : ncpus, ncpu, msendf, mrecvf
+    use variables, only : nqt
+
+    implicit none
+
+! local variables
+!
+    integer(kind=4) :: l, n
+! 
+! tag for the MPI data exchange
+!
+    integer(kind=4)                            :: itag
+
+! array for number of data block for autobalancing
+!
+    integer(kind=4), dimension(0:ncpus-1)      :: lb
+
+! local buffer for data block exchange
+!
+    real(kind=8)   , dimension(nqt,im,jm,km)   :: rbuf
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
+
+!-------------------------------------------------------------------------------
+!
 !! AUTO BALANCING
 !!
 ! calculate the new division
@@ -1043,6 +1104,7 @@ module mesh
 ! receive data block
 !
           end if
+
         end if
 
 ! set new processor number
@@ -1065,22 +1127,13 @@ module mesh
 ! assign pointer to the next block
 !
       pmeta => pmeta%next
+
     end do
-#endif /* MPI */
-
-#ifdef DEBUG
-! check mesh
-!
-    call check_mesh('after update_mesh')
-#endif /* DEBUG */
-
-! stop the mesh timer
-!
-    call stop_timer(5)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine update_mesh
+  end subroutine redistribute_blocks
+#endif /* MPI */
 !
 !===============================================================================
 !
