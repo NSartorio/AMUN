@@ -40,7 +40,8 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : nfile, write_data, write_restart_data, restart_job
-  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
+  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh &
+                      , redistribute_blocks
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -193,6 +194,11 @@ program amun
 ! reconstruct the meta and data block structures from a given restart file
 !
     call restart_job()
+
+! redistribute blocks between processors in case the number of processors has
+! changed
+!
+    call redistribute_blocks()
 
 ! find new time step
 !

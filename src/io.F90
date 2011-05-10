@@ -344,7 +344,7 @@ module io
     use hdf5    , only : H5F_ACC_RDONLY_F
     use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
                        , h5fclose_f
-    use mpitools, only : ncpu
+    use mpitools, only : ncpus, ncpu
 
 ! declare variables
 !
@@ -354,7 +354,7 @@ module io
 !
     character(len=64) :: fl
     integer(hid_t)    :: fid
-    integer           :: err
+    integer           :: err, lcpus, lcpu
     logical           :: info
 !
 !-------------------------------------------------------------------------------
@@ -367,9 +367,30 @@ module io
 !
     if (err .ge. 0) then
 
+! find the number of processors counting all restart files
+!
+      lcpus = 0
+      info  = .true.
+      do while(info)
+        lcpus = lcpus + 1
+        write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpus, '.h5'
+        inquire(file = fl, exist = info)
+      end do
+
+! if the number of processors is larger then the number of files, use the last
+! file for the remaining processors
+!
+      lcpu = ncpu
+      if (lcpus .lt. ncpus) then
+        lcpu = min(lcpus - 1, ncpu)
+      end if
+      if (lcpus .gt. ncpus) then
+        call print_error("io::read_data_h5", "This is not supported yet!")
+      end if
+
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, ncpu, '.h5'
+      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
 
 ! check if the HDF5 file exists
 !
@@ -403,7 +424,7 @@ module io
 
 ! read data blocks
 !
-              call read_datablocks_h5(fid)
+              if (lcpu .eq. ncpu) call read_datablocks_h5(fid)
 
 ! deallocate the array of block pointers
 !
@@ -674,7 +695,7 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
-                       , lnleafs, lncells, lnghost, lnseeds, lmaxlev
+                       , lnleafs, lncells, lnghost, lnseeds, lmaxlev, lncpu
 
 ! local pointers
 !
@@ -740,6 +761,8 @@ module io
               else
                 fcor = 2**(maxlev - lmaxlev)
               end if
+            case('ncpu')
+              call read_attribute_integer_h5(aid, aname, lncpu)
             case('last_id')
               call read_attribute_integer_h5(aid, aname, llast_id)
             case('mblocks')
@@ -856,9 +879,13 @@ module io
 
 ! allocate all datablocks
 !
-        do l = 1, ldblocks
-          call append_datablock(pdata)
-        end do
+        if (lncpu .eq. ncpu) then
+          do l = 1, ldblocks
+            call append_datablock(pdata)
+          end do
+        else
+          ldblocks = 0
+        end if
 
 ! check if the number of created datablocks is equal to the ldblocks
 !
@@ -1837,7 +1864,6 @@ module io
                                                              , zmn(l), zmx(l))
 
         if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
-
 
         l = l + 1
         pmeta => pmeta%next
