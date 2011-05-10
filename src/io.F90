@@ -1849,7 +1849,7 @@ module io
       pmeta => list_meta
       do while(associated(pmeta))
 
-        pmeta%parent => block_array(par(l))%ptr
+        if (par(l) .gt. 0) pmeta%parent => block_array(par(l))%ptr
 
         do p = 1, nchild
           if (chl(l,p) .gt. 0) then
