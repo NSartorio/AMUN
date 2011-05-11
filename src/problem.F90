@@ -705,11 +705,12 @@ module problem
   subroutine init_binaries(pblock)
 
     use blocks   , only : block_data
-    use config   , only : im, jm, km, in, jn, kn, ng
+    use config   , only : im, jm, km
     use config   , only : dens, pres, csnd2, gamma
     use config   , only : dnfac, dnrat
     use config   , only : rstar, vstar, rsat, dsat, vsat, tsat
     use constants, only : dpi
+    use coords   , only : ax, ay, az, adx, ady, adz
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -733,7 +734,7 @@ module problem
     real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
     real    :: dnstar, prstar, vrstar, rc
-    real    :: dnsat , prsat , vrsat , rs, xs, ys, zs
+    real    :: dnsat , prsat , vrsat , rs, xs, ys
     real    :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
     real    :: asat, bsat, xsat
     real    :: xsh, ysh, xvl, yvl
@@ -774,36 +775,31 @@ module problem
     xvl     = - asat * om * sn
     yvl     =   bsat * om * cs
 
-! calculate cell sizes
+! obtain cell sizes
 !
-    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
-    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+    dx = adx(pblock%meta%level)
+    dy = ady(pblock%meta%level)
 #if NDIMS == 3
-    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+    dz = adz(pblock%meta%level)
     dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
     dz = 1.0d0
     dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
-! generate coordinates
+! obtain block coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pblock%meta%ymin
+    x(:) = pblock%meta%xmin + ax(pblock%meta%level,:)
+    y(:) = pblock%meta%ymin + ay(pblock%meta%level,:)
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * dz + pblock%meta%zmin
+    z(:) = pblock%meta%zmin + az(pblock%meta%level,:)
 #else /* NDIMS == 3 */
-    z(1) = 0.0d0
-
-    zs   = 0.0d0
+    z(:) = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! set initial pressure
 !
     do k = 1, km
-#if NDIMS == 3
-      zs = z(k)
-#endif /* NDIMS == 3 */
 
       do j = 1, jm
         ys = y(j) - ysh
@@ -833,7 +829,7 @@ module problem
 ! calculate radia for both stars
 !
           rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          rs = sqrt(xs * xs + ys * ys + zs * zs)
+          rs = sqrt(xs * xs + ys * ys + z(k)**2)
 
 ! variables within the first start
 !
@@ -858,7 +854,7 @@ module problem
             q(ivx,i) = vrsat * xs + xvl
             q(ivy,i) = vrsat * ys + yvl
 #if NDIMS == 3
-            q(ivz,i) = vrsat * zs
+            q(ivz,i) = vrsat * z(k)
 #endif /* NDIMS == 3 */
 #ifdef ADI
             q(ipr,i) = prsat
@@ -1395,13 +1391,14 @@ module problem
   subroutine shape_binaries(pdata, t)
 
     use blocks   , only : block_data
-    use config   , only : ng, in, jn, kn, im, jm, km
+    use config   , only : im, jm, km
     use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
     use config   , only : dens, dnfac, dnrat, pres, csnd2
 #ifdef ADI
     use config   , only : gamma, gammam1i
 #endif /* ADI */
     use constants, only : dpi
+    use coords   , only : ax, ay, az, adx, ady, adz
     use variables, only : idn, imx, imy, imz
 #ifdef ADI
     use variables, only : ien
@@ -1424,7 +1421,7 @@ module problem
     real    :: dx, dy, dz, dr
     real    :: dnamb, pramb
     real    :: dnstar, vrstar, prstar, rc
-    real    :: dnsat , vrsat , prsat , rs, xs, ys, zs
+    real    :: dnsat , vrsat , prsat , rs, xs, ys
 #ifdef ADI
     real    :: ekin, ekstar, eksat
 #ifdef MHD
@@ -1477,36 +1474,31 @@ module problem
     xvl     = - asat * om * sn
     yvl     =   bsat * om * cs
 
-! calculate cell sizes
+! obtain cell sizes
 !
-    dx = (pdata%meta%xmax - pdata%meta%xmin) / in
-    dy = (pdata%meta%ymax - pdata%meta%ymin) / jn
+    dx = adx(pdata%meta%level)
+    dy = ady(pdata%meta%level)
 #if NDIMS == 3
-    dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
+    dz = adz(pdata%meta%level)
     dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
     dz = 1.0d0
     dr = sqrt(dx * dx + dy * dy)
 #endif /* NDIMS == 3 */
 
-! generate coordinates
+! obtain block coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pdata%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pdata%meta%ymin
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * dz + pdata%meta%zmin
+    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
 #else /* NDIMS == 3 */
-    z(1) = 0.0d0
-
-    zs   = 0.0d0
+    z(:) = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! reset update
 !
     do k = 1, km
-#if NDIMS == 3
-      zs = z(k)
-#endif /* NDIMS == 3 */
 
       do j = 1, jm
         ys = y(j) - ysh
@@ -1515,7 +1507,7 @@ module problem
           xs = x(i) - xsh
 
           rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          rs = sqrt(xs * xs + ys * ys + zs * zs)
+          rs = sqrt(xs * xs + ys * ys + z(k)**2)
 
 ! variables within the first start
 !
@@ -1555,7 +1547,7 @@ module problem
             pdata%u(imz,i,j,k) = 0.0d0
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrsat * zs
+            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrsat * z(k)
 #endif /* NDIMS == 3 */
 #ifdef MHD
             pdata%u(ibx,i,j,k) = 0.0d0
