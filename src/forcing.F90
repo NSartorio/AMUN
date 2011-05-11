@@ -499,7 +499,7 @@ module forcing
 
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
-    use mesh     , only : ax, ay, az, advol
+    use coords   , only : ax, ay, az, advol
     use timer    , only : start_timer, stop_timer
     use variables, only : idn, imx, imy, imz
 
@@ -664,7 +664,7 @@ module forcing
 
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
-    use mesh     , only : ax, ay, az, advol
+    use coords   , only : ax, ay, az, advol
     use timer    , only : start_timer, stop_timer
 
     implicit none

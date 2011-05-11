@@ -29,21 +29,9 @@ module mesh
 
   implicit none
 
-! spatial coordinates for all levels of refinements
-!
-  real, dimension(:,:), allocatable, save :: ax  , ay  , az
-  real, dimension(:  ), allocatable, save :: adx , ady , adz
-  real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
-  real, dimension(:  ), allocatable, save :: advol
-
 ! maximum number of covering blocks
 !
   integer                 , save :: tblocks = 1
-  integer,dimension(NDIMS), save :: effres  = 1
-
-! the effective resolution for all levels
-!
-  integer(kind=4), dimension(:,:), allocatable, save :: res
 
 ! log file for the mesh statistics
 !
@@ -92,92 +80,9 @@ module mesh
 !
     call datablock_set_dims(nqt, nvr, im, jm, km)
 
-! allocating space for coordinate variables
-!
-    allocate(ax   (maxlev, im))
-    allocate(ay   (maxlev, jm))
-    allocate(az   (maxlev, km))
-    allocate(adx  (maxlev))
-    allocate(ady  (maxlev))
-    allocate(adz  (maxlev))
-    allocate(adxi (maxlev))
-    allocate(adyi (maxlev))
-    allocate(adzi (maxlev))
-    allocate(advol(maxlev))
-    allocate(res  (maxlev, 3))
-
-! reset the coordinate variables
-!
-    ax(:,:)  = 0.0d0
-    ay(:,:)  = 0.0d0
-    az(:,:)  = 0.0d0
-    adx(:)   = 1.0d0
-    ady(:)   = 1.0d0
-    adz(:)   = 1.0d0
-    adxi(:)  = 1.0d0
-    adyi(:)  = 1.0d0
-    adzi(:)  = 1.0d0
-    advol(:) = 1.0d0
-    res(:,:) = 1
-
-! generating coordinates for all levels
-!
-    do l = 1, maxlev
-
-      n = ncells * 2**(l - 1)
-
-! calculate the effective resolution at each level
-!
-      res(l,1)  = in * 2**(maxlev - l)
-      res(l,2)  = jn * 2**(maxlev - l)
-#if NDIMS == 3
-      res(l,3)  = kn * 2**(maxlev - l)
-#endif /* NDIMS == 3 */
-
-      adx (l) = (xmax - xmin) / (rdims(1) * n)
-      ady (l) = (ymax - ymin) / (rdims(2) * n)
-#if NDIMS == 3
-      adz (l) = (zmax - zmin) / (rdims(3) * n)
-#endif /* NDIMS == 3 */
-
-      ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
-      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
-#if NDIMS == 3
-      az(l,:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * adz(l)
-#endif /* NDIMS == 3 */
-
-      adxi(l) = 1.0d0 / adx(l)
-      adyi(l) = 1.0d0 / ady(l)
-#if NDIMS == 3
-      adzi(l) = 1.0d0 / adz(l)
-#endif /* NDIMS == 3 */
-
-      advol(l) = adx(l) * ady(l) * adz(l)
-    end do
-
 ! print general information about resolutions
 !
     if (is_master()) then
-
-      bm( :     ) = 1
-      rm( :     ) = 1
-      dm( :     ) = 1
-
-      bm(1:NDIMS) = rdims(1:NDIMS) * ncells
-      rm(1:NDIMS) = rdims(1:NDIMS) * res(1,1:NDIMS)
-      dm(1:NDIMS) = rm(1:NDIMS) / ncells
-
-      effres(1:NDIMS) = rm(1:NDIMS)
-      tblocks         = product(dm(:))
-
-      write(*,*)
-      write(*,"(1x,a)"         ) "Geometry:"
-      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
-      write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", tblocks
-      write(*,"(4x,a,3(1x,i6))") "base resolution        =", bm(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
 
 ! prepare the file for logging mesh statistics; only the master process handles
 ! this part
@@ -248,11 +153,12 @@ module mesh
 !
   subroutine generate_mesh()
 
-    use config  , only : maxlev, rdims
     use blocks  , only : block_meta, block_data, list_meta, list_data
     use blocks  , only : refine_block, deallocate_datablock
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
+    use config  , only : maxlev, rdims
+    use coords  , only : res
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
@@ -526,12 +432,13 @@ module mesh
 !
   subroutine update_mesh()
 
-    use config   , only : maxlev, im, jm, km
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
                         , nchild, ndims, nsides, nfaces                        &
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
     use blocks   , only : get_nleafs
+    use config   , only : maxlev, im, jm, km
+    use coords   , only : res
     use error    , only : print_info, print_error
 #ifdef MPI
     use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
@@ -1022,7 +929,7 @@ module mesh
 ! local variables
 !
     integer(kind=4) :: l, n
-! 
+!
 ! tag for the MPI data exchange
 !
     integer(kind=4)                            :: itag
@@ -1452,20 +1359,6 @@ module mesh
 !
     call clear_blocks
 
-! deallocating coordinate variables
-!
-    if (allocated(ax)   ) deallocate(ax)
-    if (allocated(ay)   ) deallocate(ay)
-    if (allocated(az)   ) deallocate(az)
-    if (allocated(adx)  ) deallocate(adx)
-    if (allocated(ady)  ) deallocate(ady)
-    if (allocated(adz)  ) deallocate(adz)
-    if (allocated(adxi) ) deallocate(adxi)
-    if (allocated(adyi) ) deallocate(adyi)
-    if (allocated(adzi) ) deallocate(adzi)
-    if (allocated(advol)) deallocate(advol)
-    if (allocated(res)  ) deallocate(res)
-
 ! close the handler of the mesh statistics file
 !
     if (is_master()) close(funit)
@@ -1489,6 +1382,7 @@ module mesh
     use blocks  , only : block_meta, list_meta
     use blocks  , only : get_mblocks, get_nleafs
     use config  , only : ncells, nghost, maxlev
+    use coords  , only : effres
     use mpitools, only : is_master, ncpus
 
     implicit none

@@ -141,7 +141,7 @@ module integrals
 #ifdef FORCE
     use forcing  , only : fcor, finp
 #endif /* FORCE */
-    use mesh     , only : advol
+    use coords   , only : advol
     use mpitools , only : is_master, mallreducesumd
     use variables, only : idn, imx, imy, imz
 #ifdef ADI

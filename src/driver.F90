@@ -34,6 +34,7 @@ program amun
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
+  use coords   , only : init_coords, clear_coords
   use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
@@ -147,6 +148,10 @@ program amun
 ! initialize block module
 !
   call init_blocks()
+
+! initialize the coordinate module
+!
+  call init_coords(is_master())
 
 ! check if we initiate new problem or restart previous job
 !
@@ -328,6 +333,10 @@ program amun
 ! deallocate and reset mesh
 !
   call clear_mesh()
+
+! finalize the coordinate module
+!
+  call clear_coords()
 
 ! get total time
 !

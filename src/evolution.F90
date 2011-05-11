@@ -197,7 +197,7 @@ module evolution
 #ifdef MPI
     use mpitools, only : mallreducemaxr
 #endif /* MPI */
-    use mesh    , only : adx, ady, adz
+    use coords  , only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
     use timer   , only : start_timer, stop_timer
 #ifdef VISCOSITY
@@ -335,7 +335,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
 #if defined MHD && defined GLM
     use config   , only : alpha_p
     use scheme   , only : cmax
@@ -556,7 +556,7 @@ module evolution
   subroutine flux_euler(pblock)
 
     use blocks   , only : block_data
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
     use scheme   , only : update_flux
 
     implicit none
@@ -598,7 +598,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -662,7 +662,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -746,7 +746,7 @@ module evolution
 #ifdef FORCE
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -882,7 +882,7 @@ module evolution
 #ifdef FORCE
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -1043,7 +1043,7 @@ module evolution
 #ifdef FORCE
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use mesh     , only : adxi, adyi, adzi
+    use coords   , only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */

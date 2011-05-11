@@ -2240,7 +2240,7 @@ module io
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
-    use mesh  , only : adx, ady, adz, res
+    use coords, only : adx, ady, adz, res
 
 ! declare variables
 !
