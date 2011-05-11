@@ -885,7 +885,7 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_reconnection(pblock)
+  subroutine init_reconnection(pdata)
 
     use blocks   , only : block_data
     use config   , only : in, jn, kn, im, jm, km, ng                           &
@@ -909,7 +909,7 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! local variables
 !
@@ -941,20 +941,20 @@ module problem
 
 ! calculate the cell sizes
 !
-    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
-    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+    dx = (pdata%meta%xmax - pdata%meta%xmin) / in
+    dy = (pdata%meta%ymax - pdata%meta%ymin) / jn
 #if NDIMS == 3
-    dz = (pblock%meta%zmax - pblock%meta%zmin) / kn
+    dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
 #else /* NDIMS == 3 */
     dz = 1.0
 #endif /* NDIMS == 3 */
 
 ! generate the coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pblock%meta%ymin
+    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pdata%meta%xmin
+    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pdata%meta%ymin
 #if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pblock%meta%zmin
+    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pdata%meta%zmin
 #else /* NDIMS == 3 */
     z(1) = 0.0
 #endif /* NDIMS == 3 */
@@ -1022,7 +1022,7 @@ module problem
 
 ! copy conservative variables to the current block
 !
-        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
       end do
     end do
