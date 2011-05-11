@@ -888,12 +888,13 @@ module problem
   subroutine init_reconnection(pdata)
 
     use blocks   , only : block_data
-    use config   , only : in, jn, kn, im, jm, km, ng                           &
-                        , xmin, xmax, dens, pres, bamp, bper, ydel, ycut
+    use config   , only : im, jm, km
+    use config   , only : xmin, xmax, dens, pres, bamp, bper, ydel, ycut
 #ifdef ISO
     use config   , only : csnd2
 #endif /* ISO */
     use constants, only : dpi
+    use coords   , only : ax, ay, az
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -915,7 +916,7 @@ module problem
 !
     integer(kind=4), dimension(3) :: dm
     integer                       :: i, j, k
-    real                          :: xlen, dx, dy, dz, yexp
+    real                          :: xlen, yexp
 #ifdef MHD
     real                          :: ptot, pmag
 #endif /* MHD */
@@ -939,24 +940,14 @@ module problem
     ptot = 0.5d0 * bamp * bamp
 #endif /* MHD */
 
-! calculate the cell sizes
+! obtain block coordinates
 !
-    dx = (pdata%meta%xmax - pdata%meta%xmin) / in
-    dy = (pdata%meta%ymax - pdata%meta%ymin) / jn
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
 #if NDIMS == 3
-    dz = (pdata%meta%zmax - pdata%meta%zmin) / kn
+    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
 #else /* NDIMS == 3 */
-    dz = 1.0
-#endif /* NDIMS == 3 */
-
-! generate the coordinates
-!
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5) * dx + pdata%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5) * dy + pdata%meta%ymin
-#if NDIMS == 3
-    z(:) = ((/(k, k = 1, km)/) - ng - 0.5) * dz + pdata%meta%zmin
-#else /* NDIMS == 3 */
-    z(1) = 0.0
+    z(:) = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! set variables
