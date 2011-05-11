@@ -702,7 +702,7 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_binaries(pblock)
+  subroutine init_binaries(pdata)
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
@@ -726,7 +726,7 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! local variables
 !
@@ -777,10 +777,10 @@ module problem
 
 ! obtain cell sizes
 !
-    dx = adx(pblock%meta%level)
-    dy = ady(pblock%meta%level)
+    dx = adx(pdata%meta%level)
+    dy = ady(pdata%meta%level)
 #if NDIMS == 3
-    dz = adz(pblock%meta%level)
+    dz = adz(pdata%meta%level)
     dr = sqrt(dx * dx + dy * dy + dz * dz)
 #else /* NDIMS == 3 */
     dz = 1.0d0
@@ -789,10 +789,10 @@ module problem
 
 ! obtain block coordinates
 !
-    x(:) = pblock%meta%xmin + ax(pblock%meta%level,:)
-    y(:) = pblock%meta%ymin + ay(pblock%meta%level,:)
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
 #if NDIMS == 3
-    z(:) = pblock%meta%zmin + az(pblock%meta%level,:)
+    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
 #else /* NDIMS == 3 */
     z(:) = 0.0d0
 #endif /* NDIMS == 3 */
@@ -869,7 +869,7 @@ module problem
 
 ! copy conservative variables to the current block
 !
-        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
       end do ! j
     end do ! k
