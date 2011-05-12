@@ -701,7 +701,7 @@ module problem
     use config   , only : dnfac, dnrat
     use config   , only : rstar, vstar, rsat, dsat, vsat, tsat
     use constants, only : dpi
-    use coords   , only : ax, ay, az, adx, ady, adz
+    use coords   , only : ax, ay, az, adr
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -722,7 +722,7 @@ module problem
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz, dr
+    real    :: dr
     real    :: dnamb, pramb
     real    :: dnstar, prstar, vrstar, rc
     real    :: dnsat , prsat , vrsat , rs, xs, ys
@@ -766,17 +766,9 @@ module problem
     xvl     = - asat * om * sn
     yvl     =   bsat * om * cs
 
-! obtain cell sizes
+! obtain the diagonal size of a cell at the current level
 !
-    dx = adx(pdata%meta%level)
-    dy = ady(pdata%meta%level)
-#if NDIMS == 3
-    dz = adz(pdata%meta%level)
-    dr = sqrt(dx * dx + dy * dy + dz * dz)
-#else /* NDIMS == 3 */
-    dz = 1.0d0
-    dr = sqrt(dx * dx + dy * dy)
-#endif /* NDIMS == 3 */
+    dr   = adr(pdata%meta%level)
 
 ! obtain block coordinates
 !
