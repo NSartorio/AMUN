@@ -1531,7 +1531,7 @@ module problem
 !
 !===============================================================================
 !
-  function check_ref(pblock)
+  function check_ref(pdata)
 
     use blocks   , only : block_data
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke                   &
@@ -1548,7 +1548,7 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! return variable
 !
@@ -1577,18 +1577,18 @@ module problem
 !
     do k = 1, km
       do j = 1, jm
-        dn(1:im,j,k) = pblock%u(idn,1:im,j,k)
+        dn(1:im,j,k) = pdata%u(idn,1:im,j,k)
 #ifdef ADI
-        u(1:nqt,1:im) = pblock%u(1:nqt,1:im,j,k)
+        u(1:nqt,1:im) = pdata%u(1:nqt,1:im,j,k)
 
         call cons2prim(im, u(:,:), q(:,:))
 
         pr(1:im,j,k) = q(ipr,1:im)
 #endif /* ADI */
 #ifdef MHD
-        bx(1:im,j,k) = pblock%u(ibx,1:im,j,k)
-        by(1:im,j,k) = pblock%u(iby,1:im,j,k)
-        bz(1:im,j,k) = pblock%u(ibz,1:im,j,k)
+        bx(1:im,j,k) = pdata%u(ibx,1:im,j,k)
+        by(1:im,j,k) = pdata%u(iby,1:im,j,k)
+        bz(1:im,j,k) = pdata%u(ibz,1:im,j,k)
 #endif /* MHD */
       end do
     end do
