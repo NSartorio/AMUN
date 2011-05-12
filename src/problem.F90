@@ -65,32 +65,32 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_problem(pblock)
+  subroutine init_problem(pdata)
 
     use blocks, only : block_data
     use config, only : problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
     select case(trim(problem))
     case("blast")
-      call init_blast(pblock)
+      call init_blast(pdata)
     case("implosion")
-      call init_implosion(pblock)
+      call init_implosion(pdata)
     case("binaries")
-      call init_binaries(pblock)
+      call init_binaries(pdata)
     case("reconnection")
-      call init_reconnection(pblock)
+      call init_reconnection(pdata)
     case("multi_current_sheet")
-      call init_multi_current_sheet(pblock)
+      call init_multi_current_sheet(pdata)
     case("turbulence")
-      call init_turbulence(pblock)
+      call init_turbulence(pdata)
     case("orszag_tang")
-      call init_orszag_tang(pblock)
+      call init_orszag_tang(pdata)
     end select
 
 !-------------------------------------------------------------------------------
