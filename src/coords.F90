@@ -36,7 +36,7 @@ module coords
 ! the block coordinates for all levels of refinement
 !
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
-  real, dimension(:  ), allocatable, save :: adx , ady , adz
+  real, dimension(:  ), allocatable, save :: adx , ady , adz, adr
   real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
   real, dimension(:  ), allocatable, save :: advol
 
@@ -88,6 +88,7 @@ module coords
     allocate(adx  (maxlev))
     allocate(ady  (maxlev))
     allocate(adz  (maxlev))
+    allocate(adr  (maxlev))
     allocate(adxi (maxlev))
     allocate(adyi (maxlev))
     allocate(adzi (maxlev))
@@ -102,6 +103,7 @@ module coords
     adx  (:)   = 1.0d0
     ady  (:)   = 1.0d0
     adz  (:)   = 1.0d0
+    adr  (:)   = 1.0d0
     adxi (:)   = 1.0d0
     adyi (:)   = 1.0d0
     adzi (:)   = 1.0d0
@@ -124,6 +126,12 @@ module coords
       ady (l) = (ymax - ymin) / (rdims(2) * nj)
 #if NDIMS == 3
       adz (l) = (zmax - zmin) / (rdims(3) * nk)
+#endif /* NDIMS == 3 */
+#if NDIMS == 2
+      adr (l) = sqrt(adx(l)**2 + ady(l)**2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      adr (l) = sqrt(adx(l)**2 + ady(l)**2 + adz(l)**2)
 #endif /* NDIMS == 3 */
 
 ! calculate the inverse of cell size at each level
@@ -215,6 +223,7 @@ module coords
     if (allocated(adx)  ) deallocate(adx)
     if (allocated(ady)  ) deallocate(ady)
     if (allocated(adz)  ) deallocate(adz)
+    if (allocated(adr)  ) deallocate(adr)
     if (allocated(adxi) ) deallocate(adxi)
     if (allocated(adyi) ) deallocate(adyi)
     if (allocated(adzi) ) deallocate(adzi)
