@@ -593,55 +593,56 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_implosion(pblock)
+  subroutine init_implosion(pdata)
 
     use blocks   , only : block_data
-    use config   , only : in, jn, kn, im, jm, km, ng, dens, pres, rmid, gammam1i
-    use variables, only : idn, imx, imy, imz
+    use config   , only : im, jm, km
+    use config   , only : dens, pres, rmid, gammam1i
+    use coords   , only : ax, ay, adx, ady
+    use scheme   , only : prim2cons
+    use variables, only : nqt
+    use variables, only : idn, ivx, ivy, ivz
 #ifdef ADI
-    use variables, only : ien
+    use variables, only : ipr
 #endif /* ADI */
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! local variables
 !
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
-    real                          :: dx, dy, dxh, dyh, rc, rl, ru, ds, dl, dr
+    integer                 :: i, j, k
+    real                    :: dx, dy, dxh, dyh, rc, rl, ru, ds, dl, dr
 
 ! local arrays
 !
-    real, dimension(:), allocatable :: x, y
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nqt,im) :: q, u
 !
 !-------------------------------------------------------------------------------
 !
-! allocate coordinates
+! obtain the cell sizes
 !
-    allocate(x(im))
-    allocate(y(jm))
-
-! calculate cell sizes
-!
-    dx  = (pblock%meta%xmax - pblock%meta%xmin) / in
-    dy  = (pblock%meta%ymax - pblock%meta%ymin) / jn
+    dx  = adx(pdata%meta%level)
+    dy  = ady(pdata%meta%level)
     dxh = 0.5d0 * dx
     dyh = 0.5d0 * dy
     ds  = dx * dy
 
-! generate coordinates
+! obtain block coordinates
 !
-    x(:) = ((/(i, i = 1, im)/) - ng) * dx - dxh + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng) * dy - dyh + pblock%meta%ymin
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
 
-! set variables
+! initiate the primitive variables
 !
-    pblock%u(idn,:,:,:) = dens
-    pblock%u(imx,:,:,:) = 0.0d0
-    pblock%u(imy,:,:,:) = 0.0d0
-    pblock%u(imz,:,:,:) = 0.0d0
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
 
 ! set initial pressure
 !
@@ -652,14 +653,14 @@ module problem
         ru = rc + dxh + dyh
 
         if (ru .le. rmid) then
-          pblock%u(idn,i,j,:) = 0.125d0
+          q(idn,i) = 0.125d0
 #ifdef ADI
-          pblock%u(ien,i,j,:) = gammam1i * 0.140d0
+          q(ipr,i) = 0.140d0
 #endif /* ADI */
         else if (rl .ge. rmid) then
-          pblock%u(idn,i,j,:) = 1.0d0
+          q(idn,i) = 1.0d0
 #ifdef ADI
-          pblock%u(ien,i,j,:) = gammam1i
+          q(ipr,i) = 1.0d0
 #endif /* ADI */
         else
           if (rc .ge. rmid) then
@@ -669,18 +670,22 @@ module problem
             dr = 0.125d0 * (ru - rmid)**2 / ds
             dl = 1.0d0 - dr
           endif
-          pblock%u(idn,i,j,:) = 0.125d0 * dl + dr
+          q(idn,i) = 0.125d0 * dl + dr
 #ifdef ADI
-          pblock%u(ien,i,j,:) = gammam1i * (0.140d0 * dl + dr)
+          q(ipr,i) = 0.140d0 * dl + dr
 #endif /* ADI */
         endif
       end do
-    end do
 
-! deallocate coordinates
+! convert primitive variables to conserved
 !
-    deallocate(x)
-    deallocate(y)
+      call prim2cons(im, q(:,:), u(:,:))
+
+! copy conservative variables to the current block
+!
+      pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+    end do
 
 !-------------------------------------------------------------------------------
 !
