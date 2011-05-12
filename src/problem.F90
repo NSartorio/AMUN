@@ -1237,11 +1237,10 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_orszag_tang(pblock)
+  subroutine init_orszag_tang(pdata)
 
-    use constants, only : dpi, qpi
     use blocks   , only : block_data
-    use config   , only : im, jm, km, in, jn, kn, ng
+    use config   , only : im, jm, km
     use config   , only : dens, bamp
 #ifdef ADI
     use config   , only : gamma, pres
@@ -1249,6 +1248,8 @@ module problem
 #ifdef ISO
     use config   , only : csnd
 #endif /* ISO */
+    use constants, only : dpi, qpi
+    use coords   , only : ax, ay
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -1264,13 +1265,11 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! local variables
 !
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
-    real                          :: dx, dy
+    integer                 :: i, j, k
 
 ! local arrays
 !
@@ -1292,17 +1291,12 @@ module problem
     bamp = csnd * (5.0d0 / 3.0d0) / qpi
 #endif /* ISO */
 
-! calculate the cell sizes
+! obtain block coordinates
 !
-    dx = (pblock%meta%xmax - pblock%meta%xmin) / in
-    dy = (pblock%meta%ymax - pblock%meta%ymin) / jn
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
 
-! generate the coordinates
-!
-    x(:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * dx + pblock%meta%xmin
-    y(:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * dy + pblock%meta%ymin
-
-! set variables
+! initialize the primitive variables
 !
     q(idn,:) = dens
 #ifdef ADI
@@ -1335,7 +1329,7 @@ module problem
 
 ! copy conservative variables to the current block
 !
-        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
       end do
     end do
