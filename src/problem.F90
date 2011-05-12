@@ -643,8 +643,11 @@ module problem
     q(ivx,:) = 0.0d0
     q(ivy,:) = 0.0d0
     q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
 
-! set initial pressure
+! set initial density and pressure
 !
     do j = 1, jm
       do i = 1, im
@@ -683,7 +686,9 @@ module problem
 
 ! copy conservative variables to the current block
 !
-      pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+      do k = 1, km
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+      end do
 
     end do
 
