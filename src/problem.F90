@@ -1160,10 +1160,11 @@ module problem
 !
 !===============================================================================
 !
-  subroutine init_turbulence(pblock)
+  subroutine init_turbulence(pdata)
 
     use blocks   , only : block_data
-    use config   , only : im, jm, km, dens, pres, bamp
+    use config   , only : im, jm, km
+    use config   , only : dens, pres, bamp
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -1179,12 +1180,11 @@ module problem
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pblock
+    type(block_data), pointer, intent(inout) :: pdata
 
 ! local variables
 !
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
+    integer                 :: j, k
 
 ! local arrays
 !
@@ -1193,7 +1193,7 @@ module problem
 !
 !-------------------------------------------------------------------------------
 !
-! set variables
+! initiate the primitive variables
 !
     q(idn,:) = dens
     q(ivx,:) = 0.0d0
@@ -1211,22 +1211,22 @@ module problem
 #endif /* GLM */
 #endif /* MHD */
 
+! convert the primitive variables to their conserved representation
+!
+    call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
+
 ! set the initial profiles
 !
     do k = 1, km
       do j = 1, jm
 
-! convert primitive variables to conserved
+! copy the conservative variables to the current block
 !
-        call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
-
-! copy conservative variables to the current block
-!
-        pblock%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
 
       end do
     end do
-!
+
 !-------------------------------------------------------------------------------
 !
   end subroutine init_turbulence
