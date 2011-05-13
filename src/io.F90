@@ -36,6 +36,11 @@ module io
 !
   integer(kind=4), save :: nfile = -1, nrest = 0
 
+! local variables to store the number of processors and maximum level read from
+! the restart file
+!
+  integer(kind=4), save :: rmaxlev = 1, rncpus = 1
+
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
 !
@@ -354,7 +359,7 @@ module io
 !
     character(len=64) :: fl
     integer(hid_t)    :: fid
-    integer           :: err, lcpus, lcpu
+    integer           :: err, lcpu
     logical           :: info
 !
 !-------------------------------------------------------------------------------
@@ -367,24 +372,18 @@ module io
 !
     if (err .ge. 0) then
 
-! find the number of processors counting all restart files
+! read restart parameters, such as, the number of processors and maximum level
 !
-      lcpus = 0
-      info  = .true.
-      do while(info)
-        lcpus = lcpus + 1
-        write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpus, '.h5'
-        inquire(file = fl, exist = info)
-      end do
+      call read_restart_params_h5()
 
 ! if the number of processors is larger then the number of files, use the last
 ! file for the remaining processors
 !
       lcpu = ncpu
-      if (lcpus .lt. ncpus) then
-        lcpu = min(lcpus - 1, ncpu)
+      if (rncpus .lt. ncpus) then
+        lcpu = min(rncpus - 1, ncpu)
       end if
-      if (lcpus .gt. ncpus) then
+      if (rncpus .gt. ncpus) then
         call print_error("io::read_data_h5", "This is not supported yet!")
       end if
 
@@ -506,6 +505,192 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_data_h5
+!
+!===============================================================================
+!
+! read_restart_params_h5: subroutine reads parameters required to decide how to
+!                         restart the job
+!
+!===============================================================================
+!
+  subroutine read_restart_params_h5()
+
+! references to other modules
+!
+    use error   , only : print_error
+    use hdf5    , only : hid_t
+    use hdf5    , only : H5F_ACC_RDONLY_F
+    use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
+                       , h5fclose_f, h5gopen_f, h5gclose_f                     &
+                       , h5aopen_by_name_f, h5aclose_f
+
+! declare variables
+!
+    implicit none
+
+! local variables
+!
+    character(len=64) :: fl
+    integer(hid_t)    :: fid, gid, aid
+    integer           :: err
+    logical           :: info
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the filename
+!
+    write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+
+! check if the HDF5 file exists
+!
+    inquire(file = fl, exist = info)
+
+    if (info) then
+
+! check if this is an HDF5 file
+!
+      call h5fis_hdf5_f(fl, info, err)
+
+! check if it was possible to verify the file format
+!
+      if (err .ge. 0) then
+
+! check if the file is in HDF5 format
+!
+        if (info) then
+
+! opent the current HDF5 file
+!
+          call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! check if the file has been opened successfuly
+!
+          if (err .ge. 0) then
+
+! read attribute 'ncpus'
+!
+            call h5aopen_by_name_f(fid, "/attributes", "ncpus", aid, err)
+
+! check if the attribute has been opened successfully
+!
+            if (err .ge. 0) then
+
+! read the attribute ncpus
+!
+              call read_attribute_integer_h5(aid, "ncpus", rncpus)
+
+! close the attribute
+!
+              call h5aclose_f(aid, err)
+
+! check if the attribute has been closed successfully
+!
+              if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+                call print_error("io::read_restart_params_h5"                  &
+                                        , "Cannot close the attribute ncpus!")
+
+              end if
+
+            else
+
+! print error about the problem with opening the attribute
+!
+              call print_error("io::read_restart_params_h5"                    &
+                                         , "Cannot open the attribute ncpus!")
+
+            end if
+
+! read attribute 'maxlev'
+!
+            call h5aopen_by_name_f(fid, "/attributes", "maxlev", aid, err)
+
+! check if the attribute has been opened successfully
+!
+            if (err .ge. 0) then
+
+! read the attribute maxlev
+!
+              call read_attribute_integer_h5(aid, "maxlev", rmaxlev)
+
+! close the attribute
+!
+              call h5aclose_f(aid, err)
+
+! check if the attribute has been closed successfully
+!
+              if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+                call print_error("io::read_restart_params_h5"                  &
+                                       , "Cannot close the attribute maxlev!")
+
+              end if
+
+            else
+
+! print error about the problem with opening the attribute
+!
+              call print_error("io::read_restart_params_h5"                    &
+                                        , "Cannot open the attribute maxlev!")
+
+            end if
+
+! terminate access to the current file
+!
+            call h5fclose_f(fid, err)
+
+! check if the file has been closed successfully
+!
+            if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+              call print_error("io::read_restart_params_h5"                    &
+                                          , "Cannot close file: " // trim(fl))
+
+            end if
+
+          else
+
+! print error about the problem with opening the HDF5 file
+!
+            call print_error("io::read_restart_params_h5"                      &
+                                           , "Cannot open file: " // trim(fl))
+
+          end if
+
+        else
+
+! print error about the wrong file format
+!
+          call print_error("io::read_restart_params_h5", "File " // trim(fl)   &
+                                                   // " is not an HDF5 file!")
+        end if
+
+      else
+
+! print error about the problem with checking the file format
+!
+        call print_error("io::read_restart_params_h5"                          &
+                                            , "Cannot check the file format!")
+
+      end if
+
+    else
+
+! print error if the file does not exist
+!
+      call print_error("io::read_restart_params_h5", "File " // trim(fl)       &
+                                                        // " does not exist!")
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_restart_params_h5
 !
 !===============================================================================
 !
