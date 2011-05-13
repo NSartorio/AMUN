@@ -104,18 +104,18 @@ module mesh
 ! write the mesh statistics file header
 !
         write(funit,"('#')")
-        write(funit,"('#',4x,'step',5x,'time',11x,'leaf',4x,'meta'" //         &
+        write(funit,"('#',4x,'step',5x,'time',11x,'leaf',4x,'meta'," //        &
                            "6x,'coverage',8x,'AMR',11x,'block distribution')")
-        write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'" //         &
-                                                        ",6x,'efficiency',$)")
-        write(funit,"(1x,a12,$)") 'level = 1'
+        write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'," //        &
+                                              "6x,'efficiency')",advance='no')
+        write(funit,"(1x,a12)",advance="no") 'level = 1'
         do l = 2, maxlev
-          write(funit,"(2x,i6,$)") l
+          write(funit,"(2x,i6)",advance="no") l
         end do
 #ifdef MPI
-        write(funit,"(1x,a10,$)") 'cpu = 1'
+        write(funit,"(1x,a10)",advance="no") 'cpu = 1'
         do n = 2, ncpus
-          write(funit,"(2x,i6,$)") n
+          write(funit,"(2x,i6)",advance="no") n
         end do
 #endif /* MPI */
         write(funit,"('' )")
@@ -194,8 +194,8 @@ module mesh
 !
     if (is_master()) then
       write(*,*)
-      write(*,"(1x,a)"  ) "Generating the initial mesh:"
-      write(*,"(4x,a,$)") "generating level       =    "
+      write(*,"(1x,a)"             ) "Generating the initial mesh:"
+      write(*,"(4x,a)",advance="no") "generating level       =    "
     end if
 
     l = 1
@@ -204,7 +204,7 @@ module mesh
 ! print the level currently processed
 !
       if (is_master()) &
-        write(*,"(1x,i2,$)") l
+        write(*,"(1x,i2)",advance="no") l
 
 ! iterate over all data blocks at the current level and initialize the problem
 !
@@ -1450,16 +1450,16 @@ module mesh
 
 ! write down the statistics
 !
-        write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8),$)")             &
+        write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8))",advance="no")  &
                                                         n, t, nl, nm, cov, eff
-        write(funit,"('   ',$)")
+        write(funit,"('   ')",advance="no")
         do l = 1, maxlev
-          write(funit,"(2x,i6,$)") ldist(l)
+          write(funit,"(2x,i6)",advance="no") ldist(l)
         end do
 #ifdef MPI
-        write(funit,"('   ',$)")
+        write(funit,"('   ')",advance="no")
         do l = 1, ncpus
-          write(funit,"(2x,i6,$)") cdist(l)
+          write(funit,"(2x,i6)",advance="no") cdist(l)
         end do
 #endif /* MPI */
         write(funit,"('')")

@@ -1562,7 +1562,7 @@ module problem
 
 ! return variable
 !
-    integer(kind=1) :: check_ref
+    integer(kind=4) :: check_ref
 
 ! local variables
 !

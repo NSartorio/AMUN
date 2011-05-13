@@ -182,6 +182,12 @@ module config
     logical            :: info
     character(len=255) :: line, name, value
     integer            :: l
+
+! external functions
+!
+    integer            :: iargc
+
+    intrinsic          :: iargc, getarg
 !
 !-------------------------------------------------------------------------------
 !

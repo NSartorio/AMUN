@@ -237,7 +237,8 @@ program amun
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
-            ',1i2.2,"s",a1,$)') n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+            ',1i2.2,"s\r")',advance="no")                                      &
+                                        n, t, dt, get_nleafs(), ed, eh, em, es
   end if
 
 ! set the previous time needed to estimate the execution time
@@ -297,9 +298,8 @@ program amun
 !
     if (is_master())                                                           &
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",a1,$)') n, t, dt, get_nleafs(), ed, eh, em, es       &
-                                , char(13)
-
+              ',1i2.2,"s\r")',advance="no")                                    &
+                                        n, t, dt, get_nleafs(), ed, eh, em, es
 #if defined SIGNALS && defined MPI
 ! reduce termination flag over all processors
 !
