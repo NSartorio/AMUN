@@ -41,8 +41,10 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : nfile, write_data, write_restart_data, restart_job
-  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh &
-                      , redistribute_blocks
+  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
+#ifdef MPI
+  use mesh     , only : redistribute_blocks
+#endif /* MPI */
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
@@ -200,10 +202,12 @@ program amun
 !
     call restart_job()
 
+#ifdef MPI
 ! redistribute blocks between processors in case the number of processors has
 ! changed
 !
     call redistribute_blocks()
+#endif /* MPI */
 
 ! find new time step
 !
