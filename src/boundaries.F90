@@ -34,17 +34,15 @@ module boundaries
 !===============================================================================
 !
 ! boundary_variables: subroutine sweeps over all leaf blocks and performs
-!                    their boundary update
+!                     their conserved variables boundary update
 !
 !===============================================================================
 !
   subroutine boundary_variables()
 
-! references to other modules
-!
+    use blocks   , only : ndims, nsides, nfaces
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
-    use blocks   , only : ndims, nsides, nfaces
     use config   , only : periodic
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
@@ -71,7 +69,7 @@ module boundaries
 
 ! local pointers
 !
-    type(block_meta), pointer :: pblock, pneigh
+    type(block_meta), pointer :: pmeta, pblock, pneigh
     type(block_data), pointer :: pbdata, pndata
 #ifdef MPI
     type(block_info), pointer :: pinfo
@@ -92,27 +90,51 @@ module boundaries
 !
       if (.not. periodic(idir)) then
 
-        pblock => list_meta
-        do while(associated(pblock))
+! associate a pointer with the first meta block
+!
+        pmeta => list_meta
+
+! iterate over all meta blocks
+!
+        do while(associated(pmeta))
+
+! check if the current meta block is a leaf
+!
+          if (pmeta%leaf) then
 
 #ifdef MPI
-          if (pblock%leaf .and. pblock%cpu .eq. ncpu) then
-#else /* MPI */
-          if (pblock%leaf) then
+! check if the current block belongs to the current processor
+!
+            if (pmeta%cpu .eq. ncpu) then
 #endif /* MPI */
-            do iside = 1, nsides
-              do iface = 1, nfaces
-                pneigh => pblock%neigh(idir,iside,iface)%ptr
-                if (.not. associated(pneigh) .and. iface .eq. 1)               &
-                  call bnd_spec(pblock%data, idir, iside)
-              end do ! faces
-            end do ! sides
+
+! iterate over all neighbors
+!
+              do iside = 1, nsides
+
+! associate a pointer with the current neighbor
+!
+                pneigh => pmeta%neigh(idir,iside,1)%ptr
+
+! check if the neighbor is not associated; it means that this is a specific
+! boundary
+!
+                if (.not. associated(pneigh))                                  &
+                               call boundary_specific(pmeta%data, idir, iside)
+
+              end do ! sides
+#ifdef MPI
+            end if ! current cpu
+#endif /* MPI */
           end if ! leaf
 
-          pblock => pblock%next ! assign pointer to the next block
+! associate the pointer with the next meta block
+!
+          pmeta => pmeta%next
+
         end do ! meta blocks
 
-      end if
+      end if ! not periodic
 
 #ifdef MPI
 ! reset the block counter
@@ -2092,11 +2114,12 @@ module boundaries
 !
 !===============================================================================
 !
-! bnd_spec: subroutine to apply specific boundary conditions
+! boundary_specific: subroutine applies specific boundary conditions to the
+!                    current block
 !
 !===============================================================================
 !
-  subroutine bnd_spec(pb, id, il)
+  subroutine boundary_specific(pdata, idir, iside)
 
     use blocks       , only : block_data
     use config       , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry      &
@@ -2116,8 +2139,8 @@ module boundaries
 
 ! arguments
 !
-    type(block_data), pointer, intent(inout) :: pb
-    integer                  , intent(in)    :: id, il
+    type(block_data), pointer, intent(inout) :: pdata
+    integer                  , intent(in)    :: idir, iside
 
 ! local variables
 !
@@ -2135,26 +2158,44 @@ module boundaries
 !
 ! calcuate the flag determinig the side of boundary to update
 !
-    ii = 10 * id + il
+    ii = 10 * idir + iside
 
 ! perform update according to the flag
 !
     select case(ii)
+
+! left side along the X direction
+!
     case(11)
+
       select case(xlbndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do i = 1, ng
           it = ib  - i
           is = ibl + i
-          do k = 1, km
-            do j = 1, jm
-              pb%u(  :,it,j,k) =  pb%u(   :,is,j,k)
-              pb%u(imx,it,j,k) = -pb%u(imx,is,j,k)
-          end do
-          end do
+
+          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
+          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do i = 1, ng
+          pdata%u(1:nfl,i,:,:) = pdata%u(1:nfl,ib,:,:)
+          pdata%u(  iby,i,:,:) = pdata%u(  iby,ib,:,:)
+          pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ib,:,:)
+#ifdef GLM
+          pdata%u(  iph,i,:,:) = pdata%u(  iph,ib,:,:)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do k = 1, km
 #if NDIMS == 3
           km1 = max( 1, k-1)
@@ -2163,59 +2204,75 @@ module boundaries
           do j = 1, jm
             jm1 = max( 1, j-1)
             jp1 = min(jm, j+1)
-            do i = ng, 1, -1
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ib,j,k)
 
-              dbp = pb%u(iby,ib,jp1,k) - pb%u(iby,ib,j  ,k)
-              dbm = pb%u(iby,ib,j  ,k) - pb%u(iby,ib,jm1,k)
-              dby = limiter(dbp, dbm)
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(iby,ib,jp1,k) - pdata%u(iby,ib,j  ,k)
+            dbm = pdata%u(iby,ib,j  ,k) - pdata%u(iby,ib,jm1,k)
+            dby = limiter(dbp, dbm)
 #if NDIMS == 3
-              dbp = pb%u(ibz,ib,j,kp1) - pb%u(ibz,ib,j,k  )
-              dbm = pb%u(ibz,ib,j,k  ) - pb%u(ibz,ib,j,km1)
-              dbz = limiter(dbp, dbm)
+            dbp = pdata%u(ibz,ib,j,kp1) - pdata%u(ibz,ib,j,k  )
+            dbm = pdata%u(ibz,ib,j,k  ) - pdata%u(ibz,ib,j,km1)
+            dbz = limiter(dbp, dbm)
 #endif /* NDIMS == 3 */
+
+! update normal component of magnetic field from the divergence free condition
+!
+            do i = ng, 1, -1
 #if NDIMS == 2
-              pb%u(ibx,i,j,k) = pb%u(ibx,i+1,j,k) + dby
+              pdata%u(ibx,i,j,k) = pdata%u(ibx,i+1,j,k) + dby
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(ibx,i,j,k) = pb%u(ibx,i+1,j,k) + dby + dbz
+              pdata%u(ibx,i,j,k) = pdata%u(ibx,i+1,j,k) + dby + dbz
 #endif /* NDIMS == 3 */
-              pb%u(iby,i,j,k) = pb%u(iby,ib,j,k)
-              pb%u(ibz,i,j,k) = pb%u(ibz,ib,j,k)
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,ib,j,k)
-#endif /* GLM */
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
-        do k = 1, km
-          do j = 1, jm
-            do i = 1, ng
-              pb%u(:,i,j,k) = pb%u(:,ib,j,k)
+
+      case default ! "open" as default boundary conditions
+
+        do i = 1, ng
+          pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,i,:,:) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
+
+! right side along the X direction
+!
     case(12)
+
       select case(xubndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do i = 1, ng
           it = ie  + i
           is = ieu - i
-          do k = 1, km
-            do j = 1, jm
-              pb%u(  :,it,j,k) =  pb%u(  :,is,j,k)
-              pb%u(imx,it,j,k) = -pb%u(imx,is,j,k)
-            end do
-          end do
+
+          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
+          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do i = ieu, im
+          pdata%u(1:nfl,i,:,:) = pdata%u(1:nfl,ie,:,:)
+          pdata%u(  iby,i,:,:) = pdata%u(  iby,ie,:,:)
+          pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ie,:,:)
+#ifdef GLM
+          pdata%u(  iph,i,:,:) = pdata%u(  iph,ie,:,:)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do k = 1, km
 #if NDIMS == 3
           km1 = max( 1, k-1)
@@ -2224,60 +2281,75 @@ module boundaries
           do j = 1, jm
             jm1 = max( 1, j-1)
             jp1 = min(jm, j+1)
-            do i = ieu, im
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,ie,j,k)
 
-              dbp = pb%u(iby,ie,jp1,k) - pb%u(iby,ie,j  ,k)
-              dbm = pb%u(iby,ie,j  ,k) - pb%u(iby,ie,jm1,k)
-              dby = limiter(dbp, dbm)
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(iby,ie,jp1,k) - pdata%u(iby,ie,j  ,k)
+            dbm = pdata%u(iby,ie,j  ,k) - pdata%u(iby,ie,jm1,k)
+            dby = limiter(dbp, dbm)
 #if NDIMS == 3
-              dbp = pb%u(ibz,ie,j,kp1) - pb%u(ibz,ie,j,k  )
-              dbm = pb%u(ibz,ie,j,k  ) - pb%u(ibz,ie,j,km1)
-              dbz = limiter(dbp, dbm)
+            dbp = pdata%u(ibz,ie,j,kp1) - pdata%u(ibz,ie,j,k  )
+            dbm = pdata%u(ibz,ie,j,k  ) - pdata%u(ibz,ie,j,km1)
+            dbz = limiter(dbp, dbm)
 #endif /* NDIMS == 3 */
 
+! update normal component of magnetic field from the divergence free condition
+!
+            do i = ieu, im
 #if NDIMS == 2
-              pb%u(ibx,i,j,k) = pb%u(ibx,i-1,j,k) - dby
+              pdata%u(ibx,i,j,k) = pdata%u(ibx,i-1,j,k) - dby
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(ibx,i,j,k) = pb%u(ibx,i-1,j,k) - dby - dbz
+              pdata%u(ibx,i,j,k) = pdata%u(ibx,i-1,j,k) - dby - dbz
 #endif /* NDIMS == 3 */
-              pb%u(iby,i,j,k) = pb%u(iby,ie,j,k)
-              pb%u(ibz,i,j,k) = pb%u(ibz,ie,j,k)
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,ie,j,k)
-#endif /* GLM */
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
-        do k = 1, km
-          do j = 1, jm
-            do i = ieu, im
-              pb%u(:,i,j,k) = pb%u(:,ie,j,k)
+
+      case default ! "open" as default boundary conditions
+
+        do i = ieu, im
+          pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,i,:,:) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
+
+! left side along the Y direction
+!
     case(21)
+
       select case(ylbndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do j = 1, ng
           jt = jb  - j
           js = jbl + j
-          do k = 1, km
-            do i = 1, im
-              pb%u(  :,i,jt,k) =  pb%u(  :,i,js,k)
-              pb%u(imy,i,jt,k) = -pb%u(imy,i,js,k)
-            end do
-          end do
+
+          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
+          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do j = 1, ng
+          pdata%u(1:nfl,:,j,:) = pdata%u(1:nfl,:,jb,:)
+          pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,jb,:)
+          pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,jb,:)
+#ifdef GLM
+          pdata%u(  iph,:,j,:) = pdata%u(  iph,:,jb,:)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do k = 1, km
 #if NDIMS == 3
           km1 = max( 1, k-1)
@@ -2286,60 +2358,75 @@ module boundaries
           do i = 1, im
             im1 = max( 1, i-1)
             ip1 = min(im, i+1)
-            do j = ng, 1, -1
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,jb,k)
 
-              dbp = pb%u(ibx,ip1,jb,k) - pb%u(ibx,i  ,jb,k)
-              dbm = pb%u(ibx,i  ,jb,k) - pb%u(ibx,im1,jb,k)
-              dbx = limiter(dbp, dbm)
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(ibx,ip1,jb,k) - pdata%u(ibx,i  ,jb,k)
+            dbm = pdata%u(ibx,i  ,jb,k) - pdata%u(ibx,im1,jb,k)
+            dbx = limiter(dbp, dbm)
 #if NDIMS == 3
-              dbp = pb%u(ibz,i,jb,kp1) - pb%u(ibz,i,jb,k  )
-              dbm = pb%u(ibz,i,jb,k  ) - pb%u(ibz,i,jb,km1)
-              dbz = limiter(dbp, dbm)
+            dbp = pdata%u(ibz,i,jb,kp1) - pdata%u(ibz,i,jb,k  )
+            dbm = pdata%u(ibz,i,jb,k  ) - pdata%u(ibz,i,jb,km1)
+            dbz = limiter(dbp, dbm)
 #endif /* NDIMS == 3 */
 
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,jb,k)
+! update normal component of magnetic field from the divergence free condition
+!
+            do j = ng, 1, -1
 #if NDIMS == 2
-              pb%u(iby,i,j,k) = pb%u(iby,i,j+1,k) + dbx
+              pdata%u(iby,i,j,k) = pdata%u(iby,i,j+1,k) + dbx
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(iby,i,j,k) = pb%u(iby,i,j+1,k) + dbx + dbz
+              pdata%u(iby,i,j,k) = pdata%u(iby,i,j+1,k) + dbx + dbz
 #endif /* NDIMS == 3 */
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,jb,k)
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,i,jb,k)
-#endif /* GLM */
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
-        do k = 1, km
-          do j = 1, ng
-            do i = 1, im
-              pb%u(:,i,j,k) = pb%u(:,i,jb,k)
+
+      case default ! "open" as default boundary conditions
+
+        do j = 1, ng
+          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,:,j,:) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
+
+! right side along the Y direction
+!
     case(22)
+
       select case(yubndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do j = 1, ng
           jt = je  + j
           js = jeu - j
-          do k = 1, km
-            do i = 1, im
-              pb%u(  :,i,jt,k) =  pb%u(  :,i,js,k)
-              pb%u(imy,i,jt,k) = -pb%u(imy,i,js,k)
-            end do
-          end do
+
+          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
+          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do j = jeu, jm
+          pdata%u(1:nfl,:,j,:) = pdata%u(1:nfl,:,je,:)
+          pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,je,:)
+          pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,je,:)
+#ifdef GLM
+          pdata%u(  iph,:,j,:) = pdata%u(  iph,:,je,:)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do k = 1, km
 #if NDIMS == 3
           km1 = max( 1, k-1)
@@ -2348,162 +2435,192 @@ module boundaries
           do i = 1, im
             im1 = max( 1, i-1)
             ip1 = min(im, i+1)
-            do j = jeu, jm
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,je,k)
 
-              dbp = pb%u(ibx,ip1,je,k) - pb%u(ibx,i  ,je,k)
-              dbm = pb%u(ibx,i  ,je,k) - pb%u(ibx,im1,je,k)
-              dbx = limiter(dbp, dbm)
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(ibx,ip1,je,k) - pdata%u(ibx,i  ,je,k)
+            dbm = pdata%u(ibx,i  ,je,k) - pdata%u(ibx,im1,je,k)
+            dbx = limiter(dbp, dbm)
 #if NDIMS == 3
-              dbp = pb%u(ibz,i,je,kp1) - pb%u(ibz,i,je,k  )
-              dbm = pb%u(ibz,i,je,k  ) - pb%u(ibz,i,je,km1)
-              dbz = limiter(dbp, dbm)
+            dbp = pdata%u(ibz,i,je,kp1) - pdata%u(ibz,i,je,k  )
+            dbm = pdata%u(ibz,i,je,k  ) - pdata%u(ibz,i,je,km1)
+            dbz = limiter(dbp, dbm)
 #endif /* NDIMS == 3 */
 
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,je,k)
+! update normal component of magnetic field from the divergence free condition
+!
+            do j = jeu, jm
 #if NDIMS == 2
-              pb%u(iby,i,j,k) = pb%u(iby,i,j-1,k) - dbx
+              pdata%u(iby,i,j,k) = pdata%u(iby,i,j-1,k) - dbx
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pb%u(iby,i,j,k) = pb%u(iby,i,j-1,k) - dbx - dbz
+              pdata%u(iby,i,j,k) = pdata%u(iby,i,j-1,k) - dbx - dbz
 #endif /* NDIMS == 3 */
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,je,k)
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,i,je,k)
-#endif /* GLM */
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
-        do k = 1, km
-          do j = jeu, jm
-            do i = 1, im
-              pb%u(:,i,j,k) = pb%u(:,i,je,k)
+
+      case default ! "open" as default boundary conditions
+
+        do j = jeu, jm
+          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,:,j,:) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
+
 #if NDIMS == 3
+! left side along the Z direction
+!
     case(31)
+
       select case(zlbndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do k = 1, ng
           kt = kb  - k
           ks = kbl + k
-          do j = 1, jm
-            do i = 1, im
-              pb%u(  :,i,j,kt) =  pb%u(  :,i,j,ks)
-              pb%u(imz,i,j,kt) = -pb%u(imz,i,j,ks)
-            end do
-          end do
+
+          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
+          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do k = 1, ng
+          pdata%u(1:nfl,:,:,k) = pdata%u(1:nfl,:,:,kb)
+          pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,kb)
+          pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,kb)
+#ifdef GLM
+          pdata%u(  iph,:,:,k) = pdata%u(  iph,:,:,kb)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do j = 1, jm
           jm1 = max( 1, j-1)
           jp1 = min(jm, j+1)
           do i = 1, im
             im1 = max( 1, i-1)
             ip1 = min(im, i+1)
+
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(ibx,ip1,j,kb) - pdata%u(ibx,i  ,j,kb)
+            dbm = pdata%u(ibx,i  ,j,kb) - pdata%u(ibx,im1,j,kb)
+            dbx = limiter(dbp, dbm)
+
+            dbp = pdata%u(iby,i,jp1,kb) - pdata%u(iby,i,j  ,kb)
+            dbm = pdata%u(iby,i,j  ,kb) - pdata%u(iby,i,jm1,kb)
+            dbz = limiter(dbp, dbm)
+
+! update normal component of magnetic field from the divergence free condition
+!
             do k = ng, 1, -1
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,kb)
-
-              dbp = pb%u(ibx,ip1,j,kb) - pb%u(ibx,i  ,j,kb)
-              dbm = pb%u(ibx,i  ,j,kb) - pb%u(ibx,im1,j,kb)
-              dbx = limiter(dbp, dbm)
-
-              dbp = pb%u(iby,i,jp1,kb) - pb%u(iby,i,j  ,kb)
-              dbm = pb%u(iby,i,j  ,kb) - pb%u(iby,i,jm1,kb)
-              dbz = limiter(dbp, dbm)
-
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,kb)
-              pb%u(iby,i,j,k) = pb%u(iby,i,j,kb)
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,k+1) + dbx + dbz
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,i,j,kb)
-#endif /* GLM */
+              pdata%u(ibz,i,j,k) = pdata%u(ibz,i,j,k+1) + dbx + dbz
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
+
+      case default ! "open" as default boundary conditions
+
         do k = 1, ng
-          do j = 1, jm
-            do i = 1, im
-              pb%u(:,i,j,k) = pb%u(:,i,j,kb)
+          pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,:,:,k) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
+
+! right side along the Z direction
+!
     case(32)
+
       select case(zubndry)
-      case("reflecting")
+
+      case("reflecting", "reflect")
+
         do k = 1, ng
           kt = ke  + k
           ks = keu - k
-          do j = 1, jm
-            do i = 1, im
-              pb%u(  :,i,j,kt) =  pb%u(  :,i,j,ks)
-              pb%u(imz,i,j,kt) = -pb%u(imz,i,j,ks)
-            end do
-          end do
+
+          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
+          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
         end do
+
 #ifdef MHD
-      case("divb")
+      case("open", "divb")
+
+! update fluid variables and transverse components of magnetic field
+!
+        do k = keu, km
+          pdata%u(1:nfl,:,:,k) = pdata%u(1:nfl,:,:,ke)
+          pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,ke)
+          pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,ke)
+#ifdef GLM
+          pdata%u(  iph,:,:,k) = pdata%u(  iph,:,:,ke)
+#endif /* GLM */
+        end do
+
+! update normal component of magnetic field
+!
         do j = 1, jm
           jm1 = max( 1, j-1)
           jp1 = min(jm, j+1)
           do i = 1, im
             im1 = max( 1, i-1)
             ip1 = min(im, i+1)
+
+! calculate derivatives of transverse components of magnetic field
+!
+            dbp = pdata%u(ibx,ip1,j,ke) - pdata%u(ibx,i  ,j,ke)
+            dbm = pdata%u(ibx,i  ,j,ke) - pdata%u(ibx,im1,j,ke)
+            dbx = limiter(dbp, dbm)
+
+            dbp = pdata%u(iby,i,jp1,ke) - pdata%u(iby,i,j  ,ke)
+            dbm = pdata%u(iby,i,j  ,ke) - pdata%u(iby,i,jm1,ke)
+            dbz = limiter(dbp, dbm)
+
+! update normal component of magnetic field from the divergence free condition
+!
             do k = keu, km
-              pb%u(1:nfl,i,j,k) = pb%u(1:nfl,i,j,ke)
-
-              dbp = pb%u(ibx,ip1,j,ke) - pb%u(ibx,i  ,j,ke)
-              dbm = pb%u(ibx,i  ,j,ke) - pb%u(ibx,im1,j,ke)
-              dbx = limiter(dbp, dbm)
-
-              dbp = pb%u(iby,i,jp1,ke) - pb%u(iby,i,j  ,ke)
-              dbm = pb%u(iby,i,j  ,ke) - pb%u(iby,i,jm1,ke)
-              dbz = limiter(dbp, dbm)
-
-              pb%u(ibx,i,j,k) = pb%u(ibx,i,j,ke)
-              pb%u(iby,i,j,k) = pb%u(iby,i,j,ke)
-              pb%u(ibz,i,j,k) = pb%u(ibz,i,j,k-1) - dbx - dbz
-#ifdef GLM
-              pb%u(iph,i,j,k) = pb%u(iph,i,j,ke)
-#endif /* GLM */
+              pdata%u(ibz,i,j,k) = pdata%u(ibz,i,j,k-1) - dbx - dbz
             end do
           end do
         end do
 #endif /* MHD */
-      case default ! set "open" for default
+
+      case default ! "open" as default boundary conditions
+
         do k = keu, km
-          do j = 1, jm
-            do i = 1, im
-              pb%u(:,i,j,k) = pb%u(:,i,j,ke)
+          pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
 #if defined MHD && defined GLM
-              pb%u(iph,i,j,k) = 0.0d0
+          pdata%u(iph,:,:,k) = 0.0d0
 #endif /* MHD & GLM */
-            end do
-          end do
         end do
+
       end select
 #endif /* NDIMS == 3 */
+
     case default
-      call print_warning("boundaries::bnd_spec", "Boundary flag unsupported!")
+      call print_warning("boundaries::boundary_specific"                       &
+                       , "Wrong direction or side of the boundary condition!")
+
     end select
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine bnd_spec
+  end subroutine boundary_specific
 
 !===============================================================================
 !
