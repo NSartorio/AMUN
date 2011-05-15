@@ -879,6 +879,7 @@ module boundaries
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
     use config   , only : maxlev
+    use config   , only : ibl, ie, jbl, je, kbl, ke
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
@@ -892,13 +893,14 @@ module boundaries
 ! local variables
 !
     integer :: idir, iside, iface
+    integer :: is, js, ks
 #ifdef MPI
     integer :: irecv, isend, nblocks, itag, l
 
 ! local arrays
 !
-    integer     , dimension(0:ncpus-1,0:ncpus-1) :: block_counter
-    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: rbuf
+    integer     , dimension(NDIMS,0:ncpus-1,0:ncpus-1) :: block_counter
+    real(kind=8), dimension(:,:,:,:), allocatable      :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -909,7 +911,7 @@ module boundaries
 
 ! local pointer arrays
 !
-    type(pointer_info), dimension(0:ncpus-1,0:ncpus-1) :: block_array
+    type(pointer_info), dimension(NDIMS,0:ncpus-1,0:ncpus-1) :: block_array
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -925,13 +927,15 @@ module boundaries
 #ifdef MPI
 ! reset the block counter
 !
-    block_counter(:,:) = 0
+    block_counter(:,:,:) = 0
 
 ! nullify info pointers
 !
     do irecv = 0, ncpus - 1
       do isend = 0, ncpus - 1
-        nullify(block_array(irecv,isend)%ptr)
+        do idir = 1, NDIMS
+          nullify(block_array(idir,irecv,isend)%ptr)
+        end do
       end do
     end do
 #endif /* MPI */
@@ -971,15 +975,50 @@ module boundaries
 
 ! update directional flux from the neighbor
 !
-                    call correct_flux(pmeta%data, pneigh%data%f                &
-                                                         , idir, iside, iface)
+                    select case(idir)
+                    case(1)
+
+                      if (iside .eq. 1) then
+                        is = ie
+                      else
+                        is = ibl
+                      end if
+
+                      call correct_flux(pmeta%data                             &
+                           , pneigh%data%f(idir,:,is,:,:), idir, iside, iface)
+
+                    case(2)
+
+                      if (iside .eq. 1) then
+                        js = je
+                      else
+                        js = jbl
+                      end if
+
+                      call correct_flux(pmeta%data                             &
+                           , pneigh%data%f(idir,:,:,js,:), idir, iside, iface)
+
+#if NDIMS == 3
+                    case(3)
+
+                      if (iside .eq. 1) then
+                        ks = ke
+                      else
+                        ks = kbl
+                      end if
+
+                      call correct_flux(pmeta%data                             &
+                           , pneigh%data%f(idir,:,:,:,ks), idir, iside, iface)
+#endif /* NDIMS == 3 */
+                    end select
+
 #ifdef MPI
                   else
 
 ! increase the counter for number of blocks to exchange
 !
-                    block_counter(pmeta%cpu,pneigh%cpu) =                      &
-                                       block_counter(pmeta%cpu,pneigh%cpu) + 1
+                    block_counter(idir,pmeta%cpu,pneigh%cpu) =                 &
+                                  block_counter(idir,pmeta%cpu,pneigh%cpu) + 1
 
 ! allocate new info object
 !
@@ -1001,14 +1040,14 @@ module boundaries
 
 ! if the list is not emply append the created block
 !
-                    if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr)) then
-                      pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
+                    if (associated(block_array(idir,pmeta%cpu,pneigh%cpu)%ptr)) then
+                      pinfo%prev => block_array(idir,pmeta%cpu,pneigh%cpu)%ptr
                       nullify(pinfo%next)
                     end if
 
 ! point the list to the last created block
 !
-                    block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                    block_array(idir,pmeta%cpu,pneigh%cpu)%ptr => pinfo
 
                   end if ! pmeta and pneigh on local cpu
 #endif /* MPI */
@@ -1031,109 +1070,223 @@ module boundaries
 !
     do irecv = 0, ncpus - 1
       do isend = 0, ncpus - 1
+        do idir = 1, NDIMS
 
 ! process only pairs which have boundaries to exchange
 !
-        if (block_counter(irecv,isend) .gt. 0) then
+          if (block_counter(idir,irecv,isend) .gt. 0) then
 
 ! obtain the number of blocks to exchange
 !
-          nblocks = block_counter(irecv,isend)
+            nblocks = block_counter(idir,irecv,isend)
 
 ! prepare the tag for communication
 !
-          itag = irecv * ncpus + isend + ncpus + 1
+            itag = (irecv * ncpus + isend) * ncpus + idir
 
 ! allocate space for variables
 !
-          allocate(rbuf(nblocks,NDIMS,nqt,im,jm,km))
+            select case(idir)
+            case(1)
+              allocate(rbuf(nblocks,nqt,jm,km))
+            case(2)
+              allocate(rbuf(nblocks,nqt,im,km))
+#if NDIMS == 3
+            case(3)
+              allocate(rbuf(nblocks,nqt,im,jm))
+#endif /* NDIMS == 3 */
+            end select
 
 ! if isend == ncpu we are sending data
 !
-          if (isend .eq. ncpu) then
+            if (isend .eq. ncpu) then
 
 ! fill out the buffer with block data
 !
-            l = 1
+              l = 1
 
-            pinfo => block_array(irecv,isend)%ptr
-            do while(associated(pinfo))
+              select case(idir)
+              case(1)
 
-              rbuf(l,:,:,:,:,:) = pinfo%neigh%data%f(:,:,:,:,:)
+                pinfo => block_array(idir,irecv,isend)%ptr
+                do while(associated(pinfo))
 
-              pinfo => pinfo%prev
-              l = l + 1
-            end do
+                  if (pinfo%side .eq. 1) then
+                    is = ie
+                  else
+                    is = ibl
+                  end if
+
+                  rbuf(l,:,:,:) = pinfo%neigh%data%f(idir,:,is,:,:)
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+
+              case(2)
+
+                pinfo => block_array(idir,irecv,isend)%ptr
+                do while(associated(pinfo))
+
+                  if (pinfo%side .eq. 1) then
+                    js = je
+                  else
+                    js = jbl
+                  end if
+
+                  rbuf(l,:,:,:) = pinfo%neigh%data%f(idir,:,:,js,:)
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+
+#if NDIMS == 3
+              case(3)
+
+                pinfo => block_array(idir,irecv,isend)%ptr
+                do while(associated(pinfo))
+
+                  if (pinfo%side .eq. 1) then
+                    ks = ke
+                  else
+                    ks = kbl
+                  end if
+
+                  rbuf(l,:,:,:) = pinfo%neigh%data%f(idir,:,:,:,ks)
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+#endif /* NDIMS == 3 */
+              end select
 
 ! send data buffer
 !
-            call msendf(size(rbuf(:,:,:,:,:,:)), irecv, itag, rbuf(:,:,:,:,:,:))
+              call msendf(size(rbuf(:,:,:,:)), irecv, itag, rbuf(:,:,:,:))
 
-          end if
+            end if ! isend = ncpu
 
 ! if irecv == ncpu we are receiving data
 !
-          if (irecv .eq. ncpu) then
+            if (irecv .eq. ncpu) then
 
 ! receive data
 !
-            call mrecvf(size(rbuf(:,:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:,:))
+              call mrecvf(size(rbuf(:,:,:,:)), isend, itag, rbuf(:,:,:,:))
 
-! iterate over all received blocks and update boundaries
+! iterate over all received blocks and update fluxes
 !
-            l = 1
+              l = 1
 
-            pinfo => block_array(irecv,isend)%ptr
-            do while(associated(pinfo))
+              select case(idir)
+              case(1)
+
+                pinfo => block_array(idir,irecv,isend)%ptr
+
+                do while(associated(pinfo))
 
 ! set indices
 !
-              idir  = pinfo%direction
-              iside = pinfo%side
-              iface = pinfo%face
+                  iside = pinfo%side
+                  iface = pinfo%face
 
-! update boundaries
+! set pointers
 !
-              if (pinfo%level_difference .eq. -1) then
+                  pmeta  => pinfo%block
+                  pneigh => pmeta%neigh(idir,iside,iface)%ptr
 
-                pmeta  => pinfo%block
-                pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! update directional flux from the neighbor
+! update fluxes
 !
-                call correct_flux(pmeta%data, rbuf(l,:,:,:,:,:)                &
+                  call correct_flux(pmeta%data, rbuf(l,:,:,:)                  &
                                                          , idir, iside, iface)
 
+                  pinfo => pinfo%prev
 
-              end if
+                  l = l + 1
 
-              pinfo => pinfo%prev
-              l = l + 1
-            end do
+                end do
 
-          end if
+              case(2)
+
+                pinfo => block_array(idir,irecv,isend)%ptr
+
+                do while(associated(pinfo))
+
+! set indices
+!
+                  iside = pinfo%side
+                  iface = pinfo%face
+
+! set pointers
+!
+                  pmeta  => pinfo%block
+                  pneigh => pmeta%neigh(idir,iside,iface)%ptr
+
+! update fluxes
+!
+                  call correct_flux(pmeta%data, rbuf(l,:,:,:)                  &
+                                                         , idir, iside, iface)
+
+                  pinfo => pinfo%prev
+
+                  l = l + 1
+
+                end do
+
+#if NDIMS == 3
+              case(3)
+
+                pinfo => block_array(idir,irecv,isend)%ptr
+
+                do while(associated(pinfo))
+
+! set indices
+!
+                  iside = pinfo%side
+                  iface = pinfo%face
+
+! set pointers
+!
+                  pmeta  => pinfo%block
+                  pneigh => pmeta%neigh(idir,iside,iface)%ptr
+
+! update fluxes
+!
+                  call correct_flux(pmeta%data, rbuf(l,:,:,:)                  &
+                                                         , idir, iside, iface)
+
+                  pinfo => pinfo%prev
+
+                  l = l + 1
+
+                end do
+#endif /* NDIMS == 3 */
+              end select
+
+            end if ! irecv = ncpu
 
 ! deallocate buffers
 !
-          deallocate(rbuf)
+            deallocate(rbuf)
 
 ! deallocate info blocks
 !
-          pinfo => block_array(irecv,isend)%ptr
-          do while(associated(pinfo))
-            block_array(irecv,isend)%ptr => pinfo%prev
+            pinfo => block_array(idir,irecv,isend)%ptr
+            do while(associated(pinfo))
+              block_array(idir,irecv,isend)%ptr => pinfo%prev
 
-            nullify(pinfo%prev)
-            nullify(pinfo%next)
-            nullify(pinfo%block)
-            nullify(pinfo%neigh)
+              nullify(pinfo%prev)
+              nullify(pinfo%next)
+              nullify(pinfo%block)
+              nullify(pinfo%neigh)
 
-            deallocate(pinfo)
+              deallocate(pinfo)
 
-            pinfo => block_array(irecv,isend)%ptr
-          end do
+              pinfo => block_array(idir,irecv,isend)%ptr
+            end do
 
-        end if ! if block_count > 0
+          end if ! if block_count > 0
+        end do ! idir
       end do ! isend
     end do ! irecv
 #endif /* MPI */
@@ -1162,17 +1315,17 @@ module boundaries
 
 ! local variables
 !
-    integer :: i, ip, is, it, ih, il, iu, i1, i2
-    integer :: j, jp, js, jt, jh, jl, ju, j1, j2
+    integer :: i, ip, it, ih, il, iu, i1, i2
+    integer :: j, jp, jt, jh, jl, ju, j1, j2
 #if NDIMS == 3
-    integer :: k, kp, ks, kt, kh, kl, ku, k1, k2
+    integer :: k, kp, kt, kh, kl, ku, k1, k2
 #endif /* NDIMS == 3 */
 
 ! arguments
 !
-    type(block_data), pointer             , intent(inout) :: pdata
-    real            , dimension(:,:,:,:,:), intent(in)    :: f
-    integer                               , intent(in)    :: idir, iside, iface
+    type(block_data), pointer         , intent(inout) :: pdata
+    real            , dimension(:,:,:), intent(in)    :: f
+    integer                           , intent(in)    :: idir, iside, iface
 !
 !-------------------------------------------------------------------------------
 !
@@ -1185,10 +1338,8 @@ module boundaries
 ! index of the slice which will be updated
 !
       if (iside .eq. 1) then ! left side
-        is = ie
         it = ibl
       else ! right side
-        is = ibl
         it = ie
       end if
 
@@ -1217,7 +1368,7 @@ module boundaries
         j1 = 2 * (j - jl) + jb
         j2 = j1 + 1
 
-        pdata%f(idir,:,it,j,:) = 0.5d0 * (f(idir,:,is,j1,:) + f(idir,:,is,j2,:))
+        pdata%f(idir,:,it,j,:) = 0.5d0 * (f(:,j1,:) + f(:,j2,:))
       end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
@@ -1228,8 +1379,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,it,j,k) = (f(idir,:,is,j1,k1) + f(idir,:,is,j2,k1)    &
-                           + f(idir,:,is,j1,k2) + f(idir,:,is,j2,k2)) / 0.25d0
+          pdata%f(idir,:,it,j,k) = 0.25d0 * (f(:,j1,k1) + f(:,j2,k1)           &
+                                           + f(:,j1,k2) + f(:,j2,k2))
         end do
       end do
 #endif /* NDIMS == 3 */
@@ -1241,10 +1392,8 @@ module boundaries
 ! index of the slice which will be updated
 !
       if (iside .eq. 1) then ! left side
-        js = je
         jt = jbl
       else ! right side
-        js = jbl
         jt = je
       end if
 
@@ -1273,7 +1422,7 @@ module boundaries
         i1 = 2 * (i - il) + ib
         i2 = i1 + 1
 
-        pdata%f(idir,:,i,jt,:) = 0.5d0 * (f(idir,:,i1,js,:) + f(idir,:,i2,js,:))
+        pdata%f(idir,:,i,jt,:) = 0.5d0 * (f(:,i1,:) + f(:,i2,:))
       end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
@@ -1285,8 +1434,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,i,jt,k) = (f(idir,:,i1,js,k1) + f(idir,:,i2,js,k1)    &
-                           + f(idir,:,i1,js,k2) + f(idir,:,i2,js,k2)) * 0.25d0
+          pdata%f(idir,:,i,jt,k) = 0.25d0 * (f(:,i1,k1) + f(:,i2,k1)           &
+                                           + f(:,i1,k2) + f(:,i2,k2))
         end do
       end do
 #endif /* NDIMS == 3 */
@@ -1299,10 +1448,8 @@ module boundaries
 ! index of the slice which will be updated
 !
       if (iside .eq. 1) then ! left side
-        ks = ke
         kt = kbl
       else ! right side
-        ks = kbl
         kt = ke
       end if
 
@@ -1330,8 +1477,8 @@ module boundaries
           j1 = 2 * (j - jl) + jb
           j2 = j1 + 1
 
-          pdata%f(idir,:,i,j,kt) = (f(idir,:,i1,j1,ks) + f(idir,:,i2,j1,ks)    &
-                           + f(idir,:,i1,j2,ks) + f(idir,:,i2,j2,ks)) * 0.25d0
+          pdata%f(idir,:,i,j,kt) = 0.25d0 * (f(:,i1,j1) + f(:,i2,j1)           &
+                                           + f(:,i1,j2) + f(:,i2,j2))
         end do
       end do
 
