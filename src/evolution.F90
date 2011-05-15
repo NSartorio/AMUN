@@ -230,15 +230,6 @@ module evolution
     cmax   = 1.0d-16
     lev    = 1
 
-! initiate the smallest spacial step
-!
-#if NDIMS == 2
-    dxmin = min(adx(lev), ady(lev))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    dxmin = min(adx(lev), ady(lev), adz(lev))
-#endif /* NDIMS == 3 */
-
 ! if maxlev > 1, find the highest level
 !
     if (maxlev .gt. 1) then
