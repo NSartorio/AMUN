@@ -44,6 +44,7 @@ module boundaries
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
     use config   , only : periodic
+    use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
     use config   , only : im, jm, km
@@ -203,7 +204,28 @@ module boundaries
 
 ! update the boundaries of the current block
 !
-                        call bnd_copy(pdata, pneigh%data%u, idir, iside)
+                        select case(idir)
+                        case(1)
+                          if (iside .eq. 1) then
+                            call boundary_copy(pdata, pneigh%data%u(:,iel:ie,:,:), idir, iside)
+                          else
+                            call boundary_copy(pdata, pneigh%data%u(:,ib:ibu,:,:), idir, iside)
+                          end if
+                        case(2)
+                          if (iside .eq. 1) then
+                            call boundary_copy(pdata, pneigh%data%u(:,:,jel:je,:), idir, iside)
+                          else
+                            call boundary_copy(pdata, pneigh%data%u(:,:,jb:jbu,:), idir, iside)
+                          end if
+#if NDIMS == 3
+                        case(3)
+                          if (iside .eq. 1) then
+                            call boundary_copy(pdata, pneigh%data%u(:,:,:,kel:ke), idir, iside)
+                          else
+                            call boundary_copy(pdata, pneigh%data%u(:,:,:,kb:kbu), idir, iside)
+                          end if
+#endif /* NDIMS == 3 */
+                        end select
 
 #ifdef MPI
                       end if ! pmeta on the current cpu
@@ -1638,6 +1660,63 @@ module boundaries
 !
   end subroutine correct_flux
 #endif /* CONSERVTIVE */
+!
+!===============================================================================
+!
+! boundary_copy: subroutine copies the interior of neighbor to update
+!                a boundary of the current block
+!
+!===============================================================================
+!
+  subroutine boundary_copy(pdata, u, idir, iside)
+
+    use blocks   , only : block_data
+    use config   , only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
+    use variables, only : nqt
+
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer  , intent(inout) :: pdata
+    real   , dimension(:,:,:,:), intent(in)    :: u
+    integer                    , intent(in)    :: idir, iside
+!
+!-------------------------------------------------------------------------------
+!
+    select case(idir)
+
+    case(1)
+
+      if (iside .eq. 1) then
+        pdata%u(1:nqt,  1:ibl,1:jm,1:km) = u(1:nqt,1:ng,1:jm,1:km)
+      else
+        pdata%u(1:nqt,ieu:im ,1:jm,1:km) = u(1:nqt,1:ng,1:jm,1:km)
+      end if
+
+    case(2)
+
+      if (iside .eq. 1) then
+        pdata%u(1:nqt,1:im,  1:jbl,1:km) = u(1:nqt,1:im,1:ng,1:km)
+      else
+        pdata%u(1:nqt,1:im,jeu:jm ,1:km) = u(1:nqt,1:im,1:ng,1:km)
+      end if
+
+#if NDIMS == 3
+    case(3)
+
+      if (iside .eq. 1) then
+        pdata%u(1:nqt,1:im,1:jm,  1:kbl) = u(1:nqt,1:im,1:jm,1:ng)
+      else
+        pdata%u(1:nqt,1:im,1:jm,keu:km ) = u(1:nqt,1:im,1:jm,1:ng)
+      end if
+#endif /* NDIMS == 3 */
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_copy
 !
 !===============================================================================
 !
