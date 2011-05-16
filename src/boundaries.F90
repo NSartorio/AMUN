@@ -43,7 +43,7 @@ module boundaries
     use blocks   , only : ndims, nsides, nfaces
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
-    use config   , only : periodic
+    use config   , only : periodic, ng
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
@@ -207,22 +207,28 @@ module boundaries
                         select case(idir)
                         case(1)
                           if (iside .eq. 1) then
-                            call boundary_copy(pdata, pneigh%data%u(:,iel:ie,:,:), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,iel:ie,:,:), idir, iside)
                           else
-                            call boundary_copy(pdata, pneigh%data%u(:,ib:ibu,:,:), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,ib:ibu,:,:), idir, iside)
                           end if
                         case(2)
                           if (iside .eq. 1) then
-                            call boundary_copy(pdata, pneigh%data%u(:,:,jel:je,:), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,:,jel:je,:), idir, iside)
                           else
-                            call boundary_copy(pdata, pneigh%data%u(:,:,jb:jbu,:), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,:,jb:jbu,:), idir, iside)
                           end if
 #if NDIMS == 3
                         case(3)
                           if (iside .eq. 1) then
-                            call boundary_copy(pdata, pneigh%data%u(:,:,:,kel:ke), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,:,:,kel:ke), idir, iside)
                           else
-                            call boundary_copy(pdata, pneigh%data%u(:,:,:,kb:kbu), idir, iside)
+                            call boundary_copy(pdata                           &
+                                   , pneigh%data%u(:,:,:,kb:kbu), idir, iside)
                           end if
 #endif /* NDIMS == 3 */
                         end select
@@ -372,30 +378,78 @@ module boundaries
 
 ! allocate space for variables
 !
-            allocate(rbuf(nblocks,nqt,im,jm,km))
+            select case(idir)
+            case(1)
+              allocate(rbuf(nblocks,nqt,ng,jm,km))
+            case(2)
+              allocate(rbuf(nblocks,nqt,im,ng,km))
+#if NDIMS == 3
+            case(3)
+              allocate(rbuf(nblocks,nqt,im,jm,ng))
+#endif /* NDIMS == 3 */
+            end select
 
 ! if isend == ncpu we are sending data
 !
             if (isend .eq. ncpu) then
 
-! fill out the buffer with block data
+! iterate over exchange blocks along the current direction and fill out
+! the buffer with the block data
 !
-              l = 1
+              select case(idir)
+              case(1)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
 
-              pinfo => block_array(1,irecv,isend)%ptr
-              do while(associated(pinfo))
+                  if (pinfo%side .eq. 1) then
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,iel:ie,:,:)
+                  else
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,ib:ibu,:,:)
+                  end if
 
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,:)
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
 
-                pinfo => pinfo%prev
-                l = l + 1
-              end do
+              case(2)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
 
-! send data buffer
+                  if (pinfo%side .eq. 1) then
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jel:je,:)
+                  else
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jb:jbu,:)
+                  end if
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+
+#if NDIMS == 3
+              case(3)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
+
+                  if (pinfo%side .eq. 1) then
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kel:ke)
+                  else
+                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kb:kbu)
+                  end if
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+#endif /* NDIMS == 3 */
+              end select
+
+! send the data buffer
 !
               call msendf(size(rbuf), irecv, itag, rbuf(:,:,:,:,:))
 
-            end if
+            end if ! isend = ncpu
 
 ! if irecv == ncpu we are receiving data
 !
@@ -405,32 +459,59 @@ module boundaries
 !
               call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
 
-! iterate over all received blocks and update boundaries
+! update boundaries using the data received in the buffer
 !
-              l = 1
+              select case(idir)
+              case(1)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
 
-              pinfo => block_array(1,irecv,isend)%ptr
-              do while(associated(pinfo))
+                  iside =  pinfo%side
+                  pdata => pinfo%block%data
 
-! set indices
-!
-                iside = pinfo%side
-                iface = pinfo%face
+                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
 
-! update boundaries
-!
-                if (pinfo%level_difference .eq. 0 .and. iface .eq. 1)          &
-                  call bnd_copy(pinfo%block%data, rbuf(l,:,:,:,:), idir, iside)
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
 
-                pinfo => pinfo%prev
-                l = l + 1
-              end do
+              case(2)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
 
-            end if
+                  iside =  pinfo%side
+                  pdata => pinfo%block%data
+
+                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+
+#if NDIMS == 3
+              case(3)
+                l = 1
+                pinfo => block_array(1,irecv,isend)%ptr
+                do while(associated(pinfo))
+
+                  iside =  pinfo%side
+                  pdata => pinfo%block%data
+
+                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
+
+                  pinfo => pinfo%prev
+                  l = l + 1
+                end do
+#endif /* NDIMS == 3 */
+              end select
+
+            end if ! irecv = ncpu
 
 ! deallocate buffers
 !
-            deallocate(rbuf)
+            if (allocated(rbuf)) deallocate(rbuf)
 
 ! deallocate info blocks
 !
@@ -450,6 +531,8 @@ module boundaries
 
           end if ! if block_count > 0
 
+!! process blocks with the neighbors at higher levels
+!!
 ! process only pairs which have boundaries to exchange
 !
           if (block_counter(2,irecv,isend) .gt. 0) then
