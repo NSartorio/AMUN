@@ -781,7 +781,7 @@ module problem
 
 ! angular speed and triginometric functions
 !
-      om     = dpi / tsat
+      om     = dpi / tsat / (1.0d0 - esat)
       sn     = 0.0d0
       cs     = 1.0d0
 
