@@ -596,7 +596,14 @@ module boundaries
 
 ! allocate space for variables
 !
-            allocate(rbuf(nblocks,nqt,im,jm,km))
+            select case(idir)
+            case(1)
+              allocate(rbuf(nblocks,nqt,nd,jm,km))
+            case(2)
+              allocate(rbuf(nblocks,nqt,im,nd,km))
+            case(3)
+              allocate(rbuf(nblocks,nqt,im,jm,nd))
+            end select
 
 ! if isend == ncpu we are sending data
 !
@@ -609,7 +616,42 @@ module boundaries
               pinfo => block_array(2,irecv,isend)%ptr
               do while(associated(pinfo))
 
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,:)
+! prepare indices of the neighbor array
+!
+                select case(idir)
+                case(1)
+                  if (pinfo%side .eq. 1) then
+                    il = ie - nd + 1
+                    iu = ie
+                  else
+                    il = ib
+                    iu = ib + nd - 1
+                  end if
+
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+
+                case(2)
+                  if (pinfo%side .eq. 1) then
+                    jl = je - nd + 1
+                    ju = je
+                  else
+                    jl = jb
+                    ju = jb + nd - 1
+                  end if
+
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+
+                case(3)
+                  if (pinfo%side .eq. 1) then
+                    kl = ke - nd + 1
+                    ku = ke
+                  else
+                    kl = kb
+                    ku = kb + nd - 1
+                  end if
+
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+                end select
 
                 pinfo => pinfo%prev
                 l = l + 1
@@ -641,11 +683,25 @@ module boundaries
                 iside = pinfo%side
                 iface = pinfo%face
 
-! update boundaries
+! assign a pointer to the data structure of the current block
 !
-                if (pinfo%level_difference .eq. -1)                            &
-                  call bnd_rest(pinfo%block%data, rbuf(l,:,:,:,:), idir, iside &
-                                                                       , iface)
+                pdata => pinfo%block%data
+
+! update the boundaries of the current block
+!
+                select case(idir)
+                case(1)
+                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
+                                                         , idir, iside, iface)
+
+                case(2)
+                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
+                                                         , idir, iside, iface)
+
+                case(3)
+                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
+                                                         , idir, iside, iface)
+                end select
 
                 pinfo => pinfo%prev
                 l = l + 1
@@ -655,7 +711,7 @@ module boundaries
 
 ! deallocate buffers
 !
-            deallocate(rbuf)
+            if (allocated(rbuf)) deallocate(rbuf)
 
 ! deallocate info blocks
 !
