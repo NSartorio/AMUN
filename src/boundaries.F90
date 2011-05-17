@@ -627,53 +627,27 @@ module boundaries
 !
               call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
 
-! update boundaries using the data received in the buffer
+! iterate over all received blocks and update boundaries
 !
-              select case(idir)
-              case(1)
-                l = 1
-                pinfo => block_array(1,irecv,isend)%ptr
-                do while(associated(pinfo))
+              l = 1
+              pinfo => block_array(1,irecv,isend)%ptr
+              do while(associated(pinfo))
 
-                  iside =  pinfo%side
-                  pdata => pinfo%block%data
+! set indices
+!
+                iside =  pinfo%side
 
-                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
+! assign a pointer to the data structure of the current block
+!
+                pdata => pinfo%block%data
 
-                  pinfo => pinfo%prev
-                  l = l + 1
-                end do
+! update the boundaries of the current block
+!
+                call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
 
-              case(2)
-                l = 1
-                pinfo => block_array(1,irecv,isend)%ptr
-                do while(associated(pinfo))
-
-                  iside =  pinfo%side
-                  pdata => pinfo%block%data
-
-                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
-
-                  pinfo => pinfo%prev
-                  l = l + 1
-                end do
-
-#if NDIMS == 3
-              case(3)
-                l = 1
-                pinfo => block_array(1,irecv,isend)%ptr
-                do while(associated(pinfo))
-
-                  iside =  pinfo%side
-                  pdata => pinfo%block%data
-
-                  call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
-
-                  pinfo => pinfo%prev
-                  l = l + 1
-                end do
-#endif /* NDIMS == 3 */
-              end select
+                pinfo => pinfo%prev
+                l = l + 1
+              end do
 
             end if ! irecv = ncpu
 
@@ -808,19 +782,8 @@ module boundaries
 
 ! update the boundaries of the current block
 !
-                select case(idir)
-                case(1)
-                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
+                call boundary_restrict(pdata, rbuf(l,:,:,:,:)                  &
                                                          , idir, iside, iface)
-
-                case(2)
-                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
-                                                         , idir, iside, iface)
-
-                case(3)
-                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
-                                                         , idir, iside, iface)
-                end select
 
                 pinfo => pinfo%prev
                 l = l + 1
