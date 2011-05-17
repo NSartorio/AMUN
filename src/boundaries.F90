@@ -43,7 +43,7 @@ module boundaries
     use blocks   , only : ndims, nsides, nfaces
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
-    use config   , only : periodic, ng
+    use config   , only : periodic, ng, nd
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
@@ -61,6 +61,7 @@ module boundaries
     integer :: idir, iside, iface, nside, nface
 #ifdef MPI
     integer :: isend, irecv, nblocks, itag, l
+    integer :: il, jl, kl, iu, ju, ku
 
 ! local arrays
 !
@@ -293,13 +294,61 @@ module boundaries
                     if (pmeta%cpu .eq. ncpu) then
 #endif /* MPI */
 
+! prepare indices of the neighbor array
+!
+                      select case(idir)
+                      case(1)
+                        if (iside .eq. 1) then
+                          il = ie - nd + 1
+                          iu = ie
+                        else
+                          il = ib
+                          iu = ib + nd - 1
+                        end if
+                        jl = 1
+                        ju = jm
+                        kl = 1
+                        ku = km
+
+                      case(2)
+                        if (iside .eq. 1) then
+                          jl = je - nd + 1
+                          ju = je
+                        else
+                          jl = jb
+                          ju = jb + nd - 1
+                        end if
+                        il = 1
+                        iu = im
+                        kl = 1
+                        ku = km
+
+#if NDIMS == 3
+                      case(3)
+                        if (iside .eq. 1) then
+                          kl = ke - nd + 1
+                          ku = ke
+                        else
+                          kl = kb
+                          ku = kb + nd - 1
+                        end if
+                        il = 1
+                        iu = im
+                        jl = 1
+                        ju = jm
+#endif /* NDIMS == 3 */
+
+                      end select
+
 ! assign a pointer to the data structure of the current block
 !
-                        pdata  => pmeta%data
+                      pdata  => pmeta%data
 
 ! update the boundaries of the current block
 !
-                      call bnd_rest(pdata, pneigh%data%u, idir, iside, iface)
+                      call boundary_restrict(pdata                             &
+                                         , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
+                                                        , idir, iside, iface)
 
 #ifdef MPI
                     end if ! pmeta on the current cpu
