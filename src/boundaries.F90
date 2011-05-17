@@ -2088,6 +2088,166 @@ module boundaries
 !
 !===============================================================================
 !
+! boundary_prolong: subroutine copies the prolongated interior of a neighbor in
+!                   order to update a boundary of the current block
+!
+!===============================================================================
+!
+  subroutine boundary_prolong(pdata, u, idir, iside, iface)
+
+    use blocks   , only : block_data
+    use config   , only : ng, im, ih, ib, ie, ieu           &
+                        , nd, jm, jh, jb, je, jeu           &
+                        , nh, km, kh, kb, ke, keu
+
+    implicit none
+
+! arguments
+!
+    type(block_data), pointer  , intent(inout) :: pdata
+    real   , dimension(:,:,:,:), intent(in)    :: u
+    integer                    , intent(in)    :: idir, iside, iface
+
+! local variables
+!
+    integer :: i, j, k
+    integer :: ic, jc, kc, ip, jp, kp
+    integer :: il, jl, kl, iu, ju, ku
+    integer :: is, js, ks, it, jt, kt
+!
+!-------------------------------------------------------------------------------
+!
+! prepare indices
+!
+    select case(idir)
+
+    case(1)
+
+! X indices
+!
+      if (iside .eq. 1) then
+        is = 1
+      else
+        is = ieu
+      end if
+
+      il = 1
+      iu = nh
+
+! Y indices
+!
+      jc = mod(iface - 1, 2)
+      js = 1
+      jl = jb - nh + (jh - 1) * jc
+      ju = jh - nh + (jh - 1) * jc
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = 1
+      kl = kb - nh + (kh - 1) * kc
+      ku = kh - nh + (kh - 1) * kc
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = 1
+      il = ib - nh + (ih - 1) * ic
+      iu = ih - nh + (ih - 1) * ic
+
+! Y indices
+!
+      if (iside .eq. 1) then
+        js = 1
+      else
+        js = jeu
+      end if
+
+      jl = 1
+      ju = nh
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = 1
+      kl = kb - nh + (kh - 1) * kc
+      ku = kh - nh + (kh - 1) * kc
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = 1
+      il = ib - nh + (ih - 1) * ic
+      iu = ih - nh + (ih - 1) * ic
+
+! Y indices
+!
+      jc =    (iface - 1) / 2
+      js = 1
+      jl = jb - nh + (jh - 1) * jc
+      ju = jh - nh + (jh - 1) * jc
+
+! Z indices
+!
+      if (iside .eq. 1) then
+        ks = 1
+      else
+        ks = keu
+      end if
+
+      kl = 1
+      ku = nh
+#endif /* NDIMS == 3 */
+
+    end select
+
+! update variable boundaries
+!
+#if NDIMS == 2
+    do k = 1, km
+      kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = kl, ku
+      kt = 2 * (k - kl) + ks
+      kp = kt + 1
+#endif /* NDIMS == 3 */
+      do j = jl, ju
+        jt = 2 * (j - jl) + js
+        jp = jt + 1
+        do i = il, iu
+          it = 2 * (i - il) + is
+          ip = it + 1
+
+          pdata%u(:,it,jt,kt) = u(:,i,j,k)
+          pdata%u(:,ip,jt,kt) = u(:,i,j,k)
+          pdata%u(:,it,jp,kt) = u(:,i,j,k)
+          pdata%u(:,ip,jp,kt) = u(:,i,j,k)
+#if NDIMS == 3
+          pdata%u(:,it,jt,kp) = u(:,i,j,k)
+          pdata%u(:,ip,jt,kp) = u(:,i,j,k)
+          pdata%u(:,it,jp,kp) = u(:,i,j,k)
+          pdata%u(:,ip,jp,kp) = u(:,i,j,k)
+#endif /* NDIMS == 3 */
+        end do
+      end do
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_prolong
+!
+!===============================================================================
+!
 ! bnd_prol: subroutine copies the prolongated interior of the neighbor to update
 !           the boundaries the of current block
 !
