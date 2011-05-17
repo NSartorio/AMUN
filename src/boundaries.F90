@@ -1803,6 +1803,186 @@ module boundaries
 !
 !===============================================================================
 !
+! boundary_restrict: subroutine copies the restricted interior of the neighbor
+!                    in order to update a boundary of the current block
+!
+!===============================================================================
+!
+  subroutine boundary_restrict(pdata, u, idir, iside, iface)
+
+    use blocks   , only : block_data
+    use config   , only : ng, im, ih, ib, ie, ieu           &
+                        , nd, jm, jh, jb, je, jeu           &
+                        , nh, km, kh, kb, ke, keu
+    use variables, only : nqt, nfl
+
+    implicit none
+
+! arguments
+!
+    type(block_data), pointer  , intent(inout) :: pdata
+    real   , dimension(:,:,:,:), intent(in)    :: u
+    integer                    , intent(in)    :: idir, iside, iface
+
+! local variables
+!
+    integer :: ic, jc, kc, ip, jp, kp
+    integer :: il, jl, kl, iu, ju, ku
+    integer :: is, js, ks, it, jt, kt
+!
+!-------------------------------------------------------------------------------
+!
+! prepare indices
+!
+    select case(idir)
+
+    case(1)
+
+! X indices
+!
+      if (iside .eq. 1) then
+        is = 1
+        it = ng
+      else
+        is = ieu
+        it = im
+      end if
+
+      il = 1
+      iu = nd
+      ip = il + 1
+
+! Y indices
+!
+      jc = mod(iface - 1, 2)
+
+      js = jb - nh + (jh - nh) * jc
+      jt = jh      + (jh - nh) * jc
+
+      jl =  1 + ng * jc
+      ju = je + ng * jc
+      jp = jl + 1
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+
+      ks = kb - nh + (kh - nh) * kc
+      kt = kh      + (kh - nh) * kc
+
+      kl =  1 + ng * kc
+      ku = ke + ng * kc
+      kp = kl + 1
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+
+      is = ib - nh + (ih - nh) * ic
+      it = ih      + (ih - nh) * ic
+
+      il =  1 + ng * ic
+      iu = ie + ng * ic
+      ip = il + 1
+
+! Y indices
+!
+      if (iside .eq. 1) then
+        js = 1
+        jt = ng
+      else
+        js = jeu
+        jt = jm
+      end if
+
+      jl = 1
+      ju = nd
+      jp = jl + 1
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+
+      ks = kb - nh + (kh - nh) * kc
+      kt = kh      + (kh - nh) * kc
+
+      kl =  1 + ng * kc
+      ku = ke + ng * kc
+      kp = kl + 1
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+
+      is = ib - nh + (ih - nh) * ic
+      it = ih      + (ih - nh) * ic
+
+      il =  1 + ng * ic
+      iu = ie + ng * ic
+      ip = il + 1
+
+! Y indices
+!
+      jc =    (iface - 1) / 2
+
+      js = jb - nh + (jh - nh) * jc
+      jt = jh      + (jh - nh) * jc
+
+      jl =  1 + ng * jc
+      ju = je + ng * jc
+      jp = jl + 1
+
+! Z indices
+!
+      if (iside .eq. 1) then
+        ks = 1
+        kt = ng
+      else
+        ks = keu
+        kt = km
+      end if
+
+      kl = 1
+      ku = nd
+      kp = kl + 1
+#endif /* NDIMS == 3 */
+
+    end select
+
+! update variable boundaries
+!
+#if NDIMS == 2
+    pdata%u(:,is:it,js:jt,:) = 0.25d0 * (u(:,il:iu:2,jl:ju:2,:)                &
+                                       + u(:,ip:iu:2,jl:ju:2,:)                &
+                                       + u(:,il:iu:2,jp:ju:2,:)                &
+                                       + u(:,ip:iu:2,jp:ju:2,:))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    pdata%u(:,is:it,js:jt,ks:kt) = 0.125d0 * (u(:,il:iu:2,jl:ju:2,kl:ku:2)     &
+                                            + u(:,ip:iu:2,jl:ju:2,kl:ku:2)     &
+                                            + u(:,il:iu:2,jp:ju:2,kl:ku:2)     &
+                                            + u(:,ip:iu:2,jp:ju:2,kl:ku:2)     &
+                                            + u(:,il:iu:2,jl:ju:2,kp:ku:2)     &
+                                            + u(:,ip:iu:2,jl:ju:2,kp:ku:2)     &
+                                            + u(:,il:iu:2,jp:ju:2,kp:ku:2)     &
+                                            + u(:,ip:iu:2,jp:ju:2,kp:ku:2))
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_restrict
+!
+!===============================================================================
+!
 ! bnd_rest: subroutine copies the restricted interior of the neighbor to update
 !           the boundaries of the current block
 !
