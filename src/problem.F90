@@ -709,7 +709,7 @@ module problem
     use config   , only : im, jm, km
     use config   , only : dens, pres, csnd2, gamma
     use config   , only : dnfac, dnrat
-    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat
+    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
     use constants, only : dpi
     use coords   , only : ax, ay, az, adr
     use scheme   , only : prim2cons
@@ -731,14 +731,14 @@ module problem
 
 ! local variables
 !
-    integer :: i, j, k
-    real    :: dr
-    real    :: dnamb, pramb
-    real    :: dnstar, prstar, vrstar, rc
-    real    :: dnsat , prsat , vrsat , rs, xs, ys
-    real    :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
-    real    :: asat, bsat, xsat
-    real    :: xsh, ysh, xvl, yvl
+    integer    :: i, j, k
+    real       :: dr, rc, rs, xs, ys
+    real       :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
+    real, save :: dnamb, pramb
+    real, save :: dnstar, prstar, vrstar
+    real, save :: dnsat , prsat , vrsat
+    real, save :: asat, bsat = - 1.0d0
+    real, save :: xsh, ysh, xvl, yvl
 
 ! local arrays
 !
@@ -749,32 +749,49 @@ module problem
 !
 !-------------------------------------------------------------------------------
 !
+! calculate the interior and orbit parameters only once
+!
+    if (bsat .le. 0.0d0) then
+
 ! calculate pressure from sound speed
 !
 #ifdef ISO
-    pres = csnd2 * dens
+      pres   = csnd2 * dens
 #endif /* ISO */
 #ifdef ADI
-    pres = csnd2 * dens / gamma
+      pres   = csnd2 * dens / gamma
 #endif /* ADI */
 
-! calculate parameters
+! calculate star interior parameters
 !
-    dnamb   = dens
-    pramb   = pres
-    dnstar  = dnamb * dnfac * dnrat
-    dnsat   = dnamb * dnfac
-    prstar  = pramb * dnfac
-    prsat   = pramb * dnfac / dnrat
-    vrstar  = vstar / rstar
-    vrsat   = vsat  / rsat
-    if (tsat .gt. 0.0d0) then
-      om      = dpi / tsat
-      sn      = 0.0d0
-      cs      = 1.0d0
+      dnamb  = dens
+      pramb  = pres
+      dnstar = dnamb * dnfac * dnrat
+      dnsat  = dnamb * dnfac
+      prstar = pramb * dnfac
+      prsat  = pramb * dnfac / dnrat
+      vrstar = vstar / rstar
+      vrsat  = vsat  / rsat
+
+! calculate orbit parameters
+!
+      asat   = dsat / (1.0d0 - esat)
+      bsat   = asat * sqrt(1.0d0 - esat * esat)
+
+! angular speed and triginometric functions
+!
+      sn     = 0.0d0
+      cs     = 1.0d0
+      om     = dpi / tsat / (1.0d0 - esat * cs)
+
+! calculate satellite initial position and speed
+!
+      xsh    =   asat * (cs - esat)
+      ysh    =   bsat * sn
+      xvl    = - asat * sn * om
+      yvl    =   bsat * cs * om
+
     end if
-    xvl     = - asat * om * sn
-    yvl     =   bsat * om * cs
 
 ! obtain the diagonal size of a cell at the current level
 !
@@ -1385,20 +1402,23 @@ module problem
 
 ! local variables
 !
-    integer :: i, j, k
-    real    :: dr
-    real    :: dnamb, pramb
-    real    :: dnstar, vrstar, prstar, rc
-    real    :: dnsat , vrsat , prsat , rs, xs, ys
+    integer    :: i, j, k
+    real       :: dr, rs, xs, ys, rc
+    real       :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
+    real       :: rhs, res
+    real, save :: dnamb, pramb
+    real, save :: dnstar, vrstar, prstar
+    real, save :: dnsat , vrsat , prsat
 #ifdef ADI
-    real    :: ekin, ekstar, eksat
+    real, save :: ekstar, eksat
+    real       :: ekin
 #ifdef MHD
-    real    :: emag
+    real       :: emag
 #endif /* MHD */
 #endif /* ADI */
-    real    :: om = 0.0d0, ang = 0.0d0, sn = 0.0d0, cs = 1.0d0
-    real    :: asat, bsat, xsat
-    real    :: xsh, ysh, xvl, yvl
+    real, save :: asat, bsat = -1.0d0
+    real, save :: xsh, ysh, xvl, yvl
+    real, save :: tpre = -1.0d0, ang = 0.0d0
 
 ! local arrays
 !
@@ -1408,39 +1428,75 @@ module problem
 !
 !-------------------------------------------------------------------------------
 !
-! calculate parameters
+! calculate the star and satellite orbit parameters only once
+!
+    if (bsat .lt. 0.0d0) then
+
+! calculate parameters for the star interiors
 !
 #ifdef ISO
-    pres = csnd2 * dens
+      pres   = csnd2 * dens
 #endif /* ISO */
 #ifdef ADI
-    pres = csnd2 * dens / gamma
+      pres   = csnd2 * dens / gamma
 #endif /* ADI */
-    dnamb   = dens
-    pramb   = pres
-    dnstar  = dnamb * dnfac * dnrat
-    dnsat   = dnamb * dnfac
-    prstar  = pramb * dnfac
-    prsat   = pramb * dnfac / dnrat
-    vrstar  = vstar / rstar
-    vrsat   = vsat  / rsat
+      dnamb  = dens
+      pramb  = pres
+      dnstar = dnamb * dnfac * dnrat
+      dnsat  = dnamb * dnfac
+      prstar = pramb * dnfac
+      prsat  = pramb * dnfac / dnrat
+      vrstar = vstar / rstar
+      vrsat  = vsat  / rsat
 #ifdef ADI
-    ekstar  = 0.5d0 * dnstar * vstar * vstar
-    eksat   = 0.5d0 * dnsat  * vsat  * vsat
+      ekstar = 0.5d0 * dnstar * vstar * vstar
+      eksat  = 0.5d0 * dnsat  * vsat  * vsat
 #endif /* ADI */
-    if (tsat .gt. 0.0d0) then
-      om      = dpi / tsat
-      ang     = om * t
-      sn      = sin(ang)
-      cs      = cos(ang)
+
+! calculate orbit parameters
+!
+      asat   = dsat / (1.0d0 - esat)
+      bsat   = asat * sqrt(1.0d0 - esat * esat)
+
     end if
-    asat    = dsat / (1.0d0 - esat)
-    xsat    = asat * esat
-    bsat    = sqrt(asat * asat - xsat * xsat)
-    xsh     = asat * cs - xsat
-    ysh     = bsat * sn
-    xvl     = - asat * om * sn
-    yvl     =   bsat * om * cs
+
+! recalculate the angles and coordinates
+!
+    if (t .gt. tpre) then
+
+! calculate the new value of eccentric anomaly
+!
+      rhs = dpi * t / tsat
+      res = 1.0d0
+      i   = 1
+      do while(res .ge. 1.0e-15 .and. i .le. 100)
+        sn  = esat * sin(ang)
+        ang = rhs + sn
+        res = abs((ang - sn) - rhs)
+        i   = i + 1
+      end do
+
+! calculate trigonometric functions
+!
+      sn = sin(ang)
+      cs = cos(ang)
+
+! calculate the angular velocity
+!
+      om = dpi / tsat / (1.0d0 - esat * cs)
+
+! calculate position coordinates and velocity components
+!
+      xsh  =   asat * (cs - esat)
+      ysh  =   bsat * sn
+      xvl  = - asat * sn * om
+      yvl  =   bsat * cs * om
+
+! substitute the previous time
+!
+      tpre = t
+
+    end if
 
 ! obtain the diagonal size of a cell at the current level
 !

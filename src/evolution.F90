@@ -249,16 +249,16 @@ module evolution
 
       end do ! meta blocks
 
+    end if ! maxlev > 1
+
 ! find the smallest spacial step
 !
 #if NDIMS == 2
-      dxmin = min(adx(lev), ady(lev))
+    dxmin = min(adx(lev), ady(lev))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      dxmin = min(adx(lev), ady(lev), adz(lev))
+    dxmin = min(adx(lev), ady(lev), adz(lev))
 #endif /* NDIMS == 3 */
-
-    end if ! maxlev > 1
 
 ! iterate over all data blocks in order to find the maximum speed among them
 !
