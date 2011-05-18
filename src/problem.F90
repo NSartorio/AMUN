@@ -737,7 +737,7 @@ module problem
     real, save :: dnamb, pramb
     real, save :: dnstar, prstar, vrstar
     real, save :: dnsat , prsat , vrsat
-    real, save :: asat, bsat, xsat = - 1.0d0
+    real, save :: asat, bsat = - 1.0d0
     real, save :: xsh, ysh, xvl, yvl
 
 ! local arrays
@@ -751,7 +751,7 @@ module problem
 !
 ! calculate the interior and orbit parameters only once
 !
-    if (xsat .le. 0.0d0) then
+    if (bsat .le. 0.0d0) then
 
 ! calculate pressure from sound speed
 !
@@ -776,18 +776,17 @@ module problem
 ! calculate orbit parameters
 !
       asat   = dsat / (1.0d0 - esat)
-      xsat   = asat * esat
-      bsat   = sqrt(asat * asat - xsat * xsat)
+      bsat   = asat * sqrt(1.0d0 - esat * esat)
 
 ! angular speed and triginometric functions
 !
-      om     = dpi / tsat / (1.0d0 - esat)
       sn     = 0.0d0
       cs     = 1.0d0
+      om     = dpi / tsat / (1.0d0 - esat * cs)
 
 ! calculate satellite initial position and speed
 !
-      xsh    =   asat * cs - xsat
+      xsh    =   asat * (cs - esat)
       ysh    =   bsat * sn
       xvl    = - asat * sn * om
       yvl    =   bsat * cs * om
@@ -1417,7 +1416,7 @@ module problem
     real       :: emag
 #endif /* MHD */
 #endif /* ADI */
-    real, save :: asat, bsat, xsat = -1.0d0
+    real, save :: asat, bsat = -1.0d0
     real, save :: xsh, ysh, xvl, yvl
     real, save :: tpre = -1.0d0, ang = 0.0d0
 
@@ -1431,7 +1430,7 @@ module problem
 !
 ! calculate the star and satellite orbit parameters only once
 !
-    if (xsat .lt. 0.0d0) then
+    if (bsat .lt. 0.0d0) then
 
 ! calculate parameters for the star interiors
 !
@@ -1457,8 +1456,7 @@ module problem
 ! calculate orbit parameters
 !
       asat   = dsat / (1.0d0 - esat)
-      xsat   = asat * esat
-      bsat   = sqrt(asat * asat - xsat * xsat)
+      bsat   = asat * sqrt(1.0d0 - esat * esat)
 
     end if
 
@@ -1471,7 +1469,7 @@ module problem
       rhs = dpi * t / tsat
       res = 1.0d0
       i   = 1
-      do while(res .ge. 1.0e-14 .and. i .le. 1000)
+      do while(res .ge. 1.0e-15 .and. i .le. 100)
         sn  = esat * sin(ang)
         ang = rhs + sn
         res = abs((ang - sn) - rhs)
@@ -1489,7 +1487,7 @@ module problem
 
 ! calculate position coordinates and velocity components
 !
-      xsh  =   asat * cs - xsat
+      xsh  =   asat * (cs - esat)
       ysh  =   bsat * sn
       xvl  = - asat * sn * om
       yvl  =   bsat * cs * om
