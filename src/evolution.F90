@@ -488,28 +488,31 @@ module evolution
 
 ! perform update along the X direction
 !
-    do i = 1, im
-      im1 = max(1, i - 1)
+    do i = 2, im
+      im1 = i - 1
 
       du(:,i,:,:) = du(:,i,:,:) + dhx * (f(inx,:,im1,:,:) - f(inx,:,i,:,:))
     end do
+    du(:,1,:,:) = du(:,1,:,:) - dhx *  f(inx,:,1,:,:)
 
 ! perform update along the Y direction
 !
-    do j = 1, jm
-      jm1 = max(1, j - 1)
+    do j = 2, jm
+      jm1 = j - 1
 
       du(:,:,j,:) = du(:,:,j,:) + dhy * (f(iny,:,:,jm1,:) - f(iny,:,:,j,:))
     end do
-#if NDIMS == 3
+    du(:,:,1,:) = du(:,:,1,:) - dhy * f(iny,:,:,1,:)
 
+#if NDIMS == 3
 ! perform update along the Z direction
 !
-    do k = 1, km
-      km1 = max(1, k - 1)
+    do k = 2, km
+      km1 = k - 1
 
       du(:,:,:,k) = du(:,:,:,k) + dhz * (f(inz,:,:,:,km1) - f(inz,:,:,:,k))
     end do
+    du(:,:,:,1) = du(:,:,:,1) - dhz * f(inz,:,:,:,1)
 #endif /* NDIMS == 3 */
 
 ! update the solution for the fluid variables
