@@ -1422,16 +1422,17 @@ module boundaries
   subroutine correct_flux(pdata, f, idir, iside, iface)
 
     use blocks   , only : block_data
-    use config   , only : ng, in, jn, kn, ib, ie, ibl, jb, je, jbl, kb, ke, kbl
+    use config   , only : ng, in, jn, kn, ih, jh, kh                           &
+                        , ib, ie, ibl, jb, je, jbl, kb, ke, kbl
 
     implicit none
 
 ! local variables
 !
-    integer :: i, ip, it, ih, il, iu, i1, i2
-    integer :: j, jp, jt, jh, jl, ju, j1, j2
+    integer :: i, ic, it, il, iu, i1, i2
+    integer :: j, jc, jt, jl, ju, j1, j2
 #if NDIMS == 3
-    integer :: k, kp, kt, kh, kl, ku, k1, k2
+    integer :: k, kc, kt, kl, ku, k1, k2
 #endif /* NDIMS == 3 */
 
 ! arguments
@@ -1452,42 +1453,36 @@ module boundaries
 !
       if (iside .eq. 1) then ! left side
         it = ibl
-      else ! right side
+      else                   ! right side
         it = ie
       end if
 
 ! convert face number to index
 !
-      jp = mod(iface - 1, 2)
+      jc = mod(iface - 1, 2)
 #if NDIMS == 3
-      kp = (iface - 1) / 2
+      kc =    (iface - 1) / 2
 #endif /* NDIMS == 3 */
 
 ! bounds for the perpendicular update
 !
-      jh = jn / 2
-      jl = jb + jh * jp
-      ju = jl + jh - 1
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
 #if NDIMS == 3
-      kh = kn / 2
-      kl = kb + kh * kp
-      ku = kl + kh - 1
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
 #endif /* NDIMS == 3 */
 
 ! iterate over perpendicular direction
 !
-#if NDIMS == 2
       do j = jl, ju
         j1 = 2 * (j - jl) + jb
         j2 = j1 + 1
 
+#if NDIMS == 2
         pdata%f(idir,:,it,j,:) = 0.5d0 * (f(:,j1,:) + f(:,j2,:))
-      end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      do j = jl, ju
-        j1 = 2 * (j - jl) + jb
-        j2 = j1 + 1
         do k = kl, ku
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
@@ -1495,8 +1490,8 @@ module boundaries
           pdata%f(idir,:,it,j,k) = 0.25d0 * (f(:,j1,k1) + f(:,j2,k1)           &
                                            + f(:,j1,k2) + f(:,j2,k2))
         end do
-      end do
 #endif /* NDIMS == 3 */
+      end do
 
 ! Y direction
 !
@@ -1506,43 +1501,36 @@ module boundaries
 !
       if (iside .eq. 1) then ! left side
         jt = jbl
-      else ! right side
+      else                   ! right side
         jt = je
       end if
 
 ! convert face number to index
 !
-      ip = mod(iface - 1, 2)
+      ic = mod(iface - 1, 2)
 #if NDIMS == 3
-      kp = (iface - 1) / 2
+      kc =    (iface - 1) / 2
 #endif /* NDIMS == 3 */
 
 ! bounds for the perpendicular update
 !
-      ih = in / 2
-      il = ib + ih * ip
-      iu = il + ih - 1
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
 #if NDIMS == 3
-      kh = kn / 2
-      kl = kb + kh * kp
-      ku = kl + kh - 1
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
 #endif /* NDIMS == 3 */
 
 ! iterate over perpendicular direction
 !
-#if NDIMS == 2
       do i = il, iu
         i1 = 2 * (i - il) + ib
         i2 = i1 + 1
 
+#if NDIMS == 2
         pdata%f(idir,:,i,jt,:) = 0.5d0 * (f(:,i1,:) + f(:,i2,:))
-      end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      do i = il, iu
-        i1 = 2 * (i - il) + ib
-        i2 = i1 + 1
-
         do k = kl, ku
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
@@ -1550,8 +1538,8 @@ module boundaries
           pdata%f(idir,:,i,jt,k) = 0.25d0 * (f(:,i1,k1) + f(:,i2,k1)           &
                                            + f(:,i1,k2) + f(:,i2,k2))
         end do
-      end do
 #endif /* NDIMS == 3 */
+      end do
 
 #if NDIMS == 3
 ! Z direction
@@ -1562,23 +1550,21 @@ module boundaries
 !
       if (iside .eq. 1) then ! left side
         kt = kbl
-      else ! right side
+      else                   ! right side
         kt = ke
       end if
 
 ! convert face number to index
 !
-      ip = mod(iface - 1, 2)
-      jp = (iface - 1) / 2
+      ic = mod(iface - 1, 2)
+      jc =    (iface - 1) / 2
 
 ! bounds for the perpendicular update
 !
-      ih = in / 2
-      il = ib + ih * ip
-      iu = il + ih - 1
-      jh = jn / 2
-      jl = jb + jh * jp
-      ju = jl + jh - 1
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
 
 ! iterate over perpendicular direction
 !
@@ -1594,8 +1580,8 @@ module boundaries
                                            + f(:,i1,j2) + f(:,i2,j2))
         end do
       end do
-
 #endif /* NDIMS == 3 */
+
     end select
 
 !-------------------------------------------------------------------------------
