@@ -378,7 +378,8 @@ module evolution
 
 ! perform update of conserved variables of the given block using its fluxes
 !
-    call advance_solution(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+    call advance_solution(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:)               &
+                                                          , dt, dxi, dyi, dzi)
 #if defined MHD && defined GLM
 
 ! evolve Psi due to the source term
@@ -439,7 +440,7 @@ module evolution
 !
 !===============================================================================
 !
-  subroutine advance_solution(u, f, dxi, dyi, dzi)
+  subroutine advance_solution(u, f, dh, dxi, dyi, dzi)
 
     use config   , only : im, jm, km
     use variables, only : nqt, nfl
@@ -458,7 +459,7 @@ module evolution
 !
     real, dimension(      nqt,im,jm,km), intent(inout) :: u
     real, dimension(NDIMS,nqt,im,jm,km), intent(in)    :: f
-    real                                               :: dxi, dyi, dzi
+    real                                               :: dh, dxi, dyi, dzi
 
 ! local variables
 !
@@ -476,10 +477,10 @@ module evolution
 !
 ! prepare dxi, dyi, and dzi
 !
-    dhx = dt * dxi
-    dhy = dt * dyi
+    dhx = dh * dxi
+    dhy = dh * dyi
 #if NDIMS == 3
-    dhz = dt * dzi
+    dhz = dh * dzi
 #endif /* NDIMS == 3 */
 
 ! reset the increment array du
@@ -491,7 +492,7 @@ module evolution
     do i = 2, im
       im1 = i - 1
 
-      du(:,i,:,:) = du(:,i,:,:) + dhx * (f(inx,:,im1,:,:) - f(inx,:,i,:,:))
+      du(:,i,:,:) = du(:,i,:,:) - dhx * (f(inx,:,i,:,:) - f(inx,:,im1,:,:))
     end do
     du(:,1,:,:) = du(:,1,:,:) - dhx *  f(inx,:,1,:,:)
 
@@ -500,7 +501,7 @@ module evolution
     do j = 2, jm
       jm1 = j - 1
 
-      du(:,:,j,:) = du(:,:,j,:) + dhy * (f(iny,:,:,jm1,:) - f(iny,:,:,j,:))
+      du(:,:,j,:) = du(:,:,j,:) - dhy * (f(iny,:,:,j,:) - f(iny,:,:,jm1,:))
     end do
     du(:,:,1,:) = du(:,:,1,:) - dhy * f(iny,:,:,1,:)
 
@@ -510,7 +511,7 @@ module evolution
     do k = 2, km
       km1 = k - 1
 
-      du(:,:,:,k) = du(:,:,:,k) + dhz * (f(inz,:,:,:,km1) - f(inz,:,:,:,k))
+      du(:,:,:,k) = du(:,:,:,k) - dhz * (f(inz,:,:,:,k) - f(inz,:,:,:,km1))
     end do
     du(:,:,:,1) = du(:,:,:,1) - dhz * f(inz,:,:,:,1)
 #endif /* NDIMS == 3 */
@@ -629,7 +630,7 @@ module evolution
 
 ! advance the solution to (t + dt) using computed fluxes in this substep
 !
-    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dt, dxi, dyi, dzi)
 
 ! calculate fluxes at the moment (t + dt)
 !
@@ -693,7 +694,7 @@ module evolution
 
 ! advance the solution to (t + dt) using computed fluxes in this substep
 !
-    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dt, dxi, dyi, dzi)
 
 ! calculate fluxes at the moment (t + dt)
 !
@@ -709,7 +710,7 @@ module evolution
 
 ! advance the solution to (t + dt/2) using computed flux
 !
-    call advance_solution(u(:,:,:,:), f2(:,:,:,:,:), dxi, dyi, dzi)
+    call advance_solution(u(:,:,:,:), f2(:,:,:,:,:), dt, dxi, dyi, dzi)
 
 ! calculate fluxes at the moment (t + dt/2)
 !
