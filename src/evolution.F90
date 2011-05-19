@@ -539,6 +539,130 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine advance_solution
+!
+!===============================================================================
+!
+! advance_solution_1d: subroutine performs an one step update of the conserved
+!                      variables array using the numerical fluxes passed as an
+!                      argument along one selected direction only
+!
+!===============================================================================
+!
+  subroutine advance_solution_1d(idir, dh, dxi, u, f)
+
+    use config   , only : im, jm, km
+    use variables, only : nqt, nfl
+    use variables, only : inx, iny, inz
+#ifdef MHD
+    use variables, only : ibx, ibz
+#ifdef GLM
+    use scheme   , only : cmax
+    use variables, only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+    implicit none
+
+! input arguments
+!
+    integer                      , intent(in)    :: idir
+    real                         , intent(in)    :: dh, dxi
+    real, dimension(nqt,im,jm,km), intent(inout) :: u
+    real, dimension(nqt,im,jm,km), intent(in)    :: f
+
+! local variables
+!
+    integer :: i, j, k, im1, jm1, km1
+    real    :: dhx, dhy, dhz
+#if defined MHD && defined GLM
+    real    :: ch2
+#endif /* MHD & GLM */
+
+! local arrays
+!
+    real, dimension(nqt,im,jm,km) :: du
+!
+!-------------------------------------------------------------------------------
+!
+! reset the increment array du
+!
+    du(:,:,:,:) = 0.0d0
+
+! calculate the conserved variables increment
+!
+    select case(idir)
+    case(1)
+
+! prepare dxi
+!
+      dhx = dh * dxi
+
+! perform update along the X direction
+!
+      do i = 2, im
+        im1 = i - 1
+
+        du(:,i,:,:) = du(:,i,:,:) - dhx * (f(:,i,:,:) - f(:,im1,:,:))
+      end do
+      du(:,1,:,:) = du(:,1,:,:) - dhx *  f(:,1,:,:)
+
+    case(2)
+
+! prepare dxi
+!
+      dhy = dh * dxi
+
+! perform update along the Y direction
+!
+      do j = 2, jm
+        jm1 = j - 1
+
+        du(:,:,j,:) = du(:,:,j,:) - dhy * (f(:,:,j,:) - f(:,:,jm1,:))
+      end do
+      du(:,:,1,:) = du(:,:,1,:) - dhy * f(:,:,1,:)
+
+#if NDIMS == 3
+    case(3)
+
+! prepare dxi
+!
+      dhz = dh * dxi
+
+! perform update along the Z direction
+!
+      do k = 2, km
+        km1 = k - 1
+
+        du(:,:,:,k) = du(:,:,:,k) - dhz * (f(:,:,:,k) - f(:,:,:,km1))
+      end do
+      du(:,:,:,1) = du(:,:,:,1) - dhz * f(:,:,:,1)
+#endif /* NDIMS == 3 */
+
+    end select
+
+! update the solution for the fluid variables
+!
+    u(  1:nfl,:,:,:) = u(  1:nfl,:,:,:) + du(  1:nfl,:,:,:)
+
+#ifdef MHD
+! update the solution for the magnetic variables
+!
+    u(ibx:ibz,:,:,:) = u(ibx:ibz,:,:,:) + du(ibx:ibz,:,:,:)
+
+#ifdef GLM
+! calculate c_h^2
+!
+    ch2 = cmax * cmax
+
+! update the solution for the scalar potential Psi
+!
+    u(iph,:,:,:) = u(iph,:,:,:) + ch2 * du(iph,:,:,:)
+#endif /* GLM */
+#endif /* MHD */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine advance_solution_1d
 #ifdef EULER
 !
 !===============================================================================
