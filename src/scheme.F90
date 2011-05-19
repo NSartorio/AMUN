@@ -43,11 +43,10 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine update_flux(u, f, dxi, dyi, dzi)
+  subroutine update_flux(idir, dh, u, f)
 
     use config       , only : im, jm, km
-    use variables    , only : nvr, nqt, nfl
-    use variables    , only : inx, iny, inz
+    use variables    , only : nqt, nfl
     use variables    , only : idn, imx, imy, imz
 #ifdef ADI
     use variables    , only : ien
@@ -63,254 +62,254 @@ module scheme
 
 ! input arguments
 !
-    real, dimension(      nqt,im,jm,km)      , intent(in)  :: u
-    real, dimension(NDIMS,nqt,im,jm,km)      , intent(out) :: f
-    real                                     , intent(in)  :: dxi, dyi, dzi
+    integer                      , intent(in)  :: idir
+    real                         , intent(in)  :: dh
+    real, dimension(nqt,im,jm,km), intent(in)  :: u
+    real, dimension(nqt,im,jm,km), intent(out) :: f
 
 ! local variables
 !
     integer :: i, j, k
-    real    :: dx, dy, dz
 
 ! local temporary arrays
 !
-    real, dimension(nvr,im)       :: ux
-    real, dimension(nqt,im)       :: fx
-    real, dimension(nvr,jm)       :: uy
-    real, dimension(nqt,jm)       :: fy
+    real, dimension(nqt,im)       :: ux, fx
+    real, dimension(nqt,jm)       :: uy, fy
 #if NDIMS == 3
-    real, dimension(nvr,km)       :: uz
-    real, dimension(nqt,km)       :: fz
+    real, dimension(nqt,km)       :: uz, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
 ! reset the flux array
 !
-    f(:,:,:,:,:) = 0.0d0
+    f(:,:,:,:) = 0.0d0
 
-! prepare the spacial increment
+! select the directional flux to compute
 !
-    dx = 1.0d0 / dxi
-    dy = 1.0d0 / dyi
+    select case(idir)
+    case(1)
+
+!  calculate the flux along the X-direction
+!
+      do k = 1, km
+        do j = 1, jm
+
+! copy directional vectors of variables for the one dimensional solver
+!
+          do i = 1, im
+            ux(idn,i) = u(idn,i,j,k)
+            ux(imx,i) = u(imx,i,j,k)
+            ux(imy,i) = u(imy,i,j,k)
+            ux(imz,i) = u(imz,i,j,k)
+#ifdef ADI
+            ux(ien,i) = u(ien,i,j,k)
+#endif /* ADI */
+#ifdef MHD
+            ux(ibx,i) = u(ibx,i,j,k)
+            ux(iby,i) = u(iby,i,j,k)
+            ux(ibz,i) = u(ibz,i,j,k)
+#ifdef GLM
+            ux(iph,i) = u(iph,i,j,k)
+#endif /* GLM */
+#endif /* MHD */
+          end do
+
+! execute solver (returns fluxes for the update)
+!
+#ifdef HLL
+          call hll (im, dh, ux(:,:), fx(:,:))
+#endif /* HLL */
+#ifdef HLLC
+          call hllc(im, dh, ux(:,:), fx(:,:))
+#endif /* HLLC */
+#ifdef HLLD
+          call hlld(im, dh, ux(:,:), fx(:,:))
+#endif /* HLLD */
+#ifdef ROE
+          call roe (im, dh, ux(:,:), fx(:,:))
+#endif /* ROE */
+
+! insert the flux for a given stencil
+!
+          do i = 1, im
+
+! fluid variable fluxes
+!
+            f(idn,i,j,k) = fx(idn,i)
+            f(imx,i,j,k) = fx(imx,i)
+            f(imy,i,j,k) = fx(imy,i)
+            f(imz,i,j,k) = fx(imz,i)
+#ifdef ADI
+            f(ien,i,j,k) = fx(ien,i)
+#endif /* ADI */
+#ifdef MHD
+
+! magnetic field fluxes
+!
+            f(ibx,i,j,k) = fx(ibx,i)
+            f(iby,i,j,k) = fx(iby,i)
+            f(ibz,i,j,k) = fx(ibz,i)
+#ifdef GLM
+
+! scalar potential flux
+!
+            f(iph,i,j,k) = fx(iph,i)
+#endif /* GLM */
+#endif /* MHD */
+          end do
+        end do
+      end do
+
+    case(2)
+
+!  calculate the flux along the Y direction
+!
+      do k = 1, km
+        do i = 1, im
+
+! copy directional vectors of variables for the one dimensional solver
+!
+          do j = 1, jm
+            uy(idn,j) = u(idn,i,j,k)
+            uy(imx,j) = u(imy,i,j,k)
+            uy(imy,j) = u(imz,i,j,k)
+            uy(imz,j) = u(imx,i,j,k)
+#ifdef ADI
+            uy(ien,j) = u(ien,i,j,k)
+#endif /* ADI */
+#ifdef MHD
+            uy(ibx,j) = u(iby,i,j,k)
+            uy(iby,j) = u(ibz,i,j,k)
+            uy(ibz,j) = u(ibx,i,j,k)
+#ifdef GLM
+            uy(iph,j) = u(iph,i,j,k)
+#endif /* GLM */
+#endif /* MHD */
+          end do
+
+! execute solver (returns fluxes for the update)
+!
+#ifdef HLL
+          call hll (jm, dh, uy(:,:), fy(:,:))
+#endif /* HLL */
+#ifdef HLLC
+          call hllc(jm, dh, uy(:,:), fy(:,:))
+#endif /* HLLC */
+#ifdef HLLD
+          call hlld(jm, dh, uy(:,:), fy(:,:))
+#endif /* HLLD */
+#ifdef ROE
+          call roe (jm, dh, uy(:,:), fy(:,:))
+#endif /* ROE */
+
+! insert the flux for a given stencil
+!
+          do j = 1, jm
+
+! fluid variable fluxes
+!
+            f(idn,i,j,k) = fy(idn,j)
+            f(imx,i,j,k) = fy(imz,j)
+            f(imy,i,j,k) = fy(imx,j)
+            f(imz,i,j,k) = fy(imy,j)
+#ifdef ADI
+            f(ien,i,j,k) = fy(ien,j)
+#endif /* ADI */
+#ifdef MHD
+
+! magnetic field fluxes
+!
+            f(ibx,i,j,k) = fy(ibz,j)
+            f(iby,i,j,k) = fy(ibx,j)
+            f(ibz,i,j,k) = fy(iby,j)
+#ifdef GLM
+
+! scalar potential flux
+!
+            f(iph,i,j,k) = fy(iph,j)
+#endif /* GLM */
+#endif /* MHD */
+          end do
+        end do
+      end do
+
 #if NDIMS == 3
-    dz = 1.0d0 / dzi
-#endif /* NDIMS == 3 */
+    case(3)
 
-!  update along X-direction
+!  calculate the flux along the Z direction
 !
-    do k = 1, km
       do j = 1, jm
-
-! copy directional vectors of variables for the one dimensional solver
-!
-        do i = 1, im
-          ux(idn,i) = u(idn,i,j,k)
-          ux(imx,i) = u(imx,i,j,k)
-          ux(imy,i) = u(imy,i,j,k)
-          ux(imz,i) = u(imz,i,j,k)
-#ifdef ADI
-          ux(ien,i) = u(ien,i,j,k)
-#endif /* ADI */
-#ifdef MHD
-          ux(ibx,i) = u(ibx,i,j,k)
-          ux(iby,i) = u(iby,i,j,k)
-          ux(ibz,i) = u(ibz,i,j,k)
-#ifdef GLM
-          ux(iph,i) = u(iph,i,j,k)
-#endif /* GLM */
-#endif /* MHD */
-        end do
-
-! execute solver (returns fluxes for the update)
-!
-#ifdef HLL
-        call hll (im, dx, ux(:,:), fx(:,:))
-#endif /* HLL */
-#ifdef HLLC
-        call hllc(im, dx, ux(:,:), fx(:,:))
-#endif /* HLLC */
-#ifdef HLLD
-        call hlld(im, dx, ux(:,:), fx(:,:))
-#endif /* HLLD */
-#ifdef ROE
-        call roe (im, dx, ux(:,:), fx(:,:))
-#endif /* ROE */
-
-! update the arrays of increments
-!
         do i = 1, im
 
-! update fluid variables
-!
-          f(inx,idn,i,j,k) = fx(idn,i)
-          f(inx,imx,i,j,k) = fx(imx,i)
-          f(inx,imy,i,j,k) = fx(imy,i)
-          f(inx,imz,i,j,k) = fx(imz,i)
-#ifdef ADI
-          f(inx,ien,i,j,k) = fx(ien,i)
-#endif /* ADI */
-#ifdef MHD
-
-! update magnetic variables
-!
-          f(inx,ibx,i,j,k) = fx(ibx,i)
-          f(inx,iby,i,j,k) = fx(iby,i)
-          f(inx,ibz,i,j,k) = fx(ibz,i)
-#ifdef GLM
-
-! update scalar potential
-!
-          f(inx,iph,i,j,k) = fx(iph,i)
-#endif /* GLM */
-#endif /* MHD */
-        end do
-      end do
-    end do
-
-!  update along Y-direction
-!
-    do k = 1, km
-      do i = 1, im
-
 ! copy directional vectors of variables for the one dimensional solver
 !
-        do j = 1, jm
-          uy(idn,j) = u(idn,i,j,k)
-          uy(imx,j) = u(imy,i,j,k)
-          uy(imy,j) = u(imz,i,j,k)
-          uy(imz,j) = u(imx,i,j,k)
+          do k = 1, km
+            uz(idn,k) = u(idn,i,j,k)
+            uz(imx,k) = u(imz,i,j,k)
+            uz(imy,k) = u(imx,i,j,k)
+            uz(imz,k) = u(imy,i,j,k)
 #ifdef ADI
-          uy(ien,j) = u(ien,i,j,k)
+            uz(ien,k) = u(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-          uy(ibx,j) = u(iby,i,j,k)
-          uy(iby,j) = u(ibz,i,j,k)
-          uy(ibz,j) = u(ibx,i,j,k)
+            uz(ibx,k) = u(ibz,i,j,k)
+            uz(iby,k) = u(ibx,i,j,k)
+            uz(ibz,k) = u(iby,i,j,k)
 #ifdef GLM
-          uy(iph,j) = u(iph,i,j,k)
+            uz(iph,k) = u(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
-        end do
+          end do
 
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-        call hll (jm, dy, uy(:,:), fy(:,:))
+          call hll (km, dh, uz(:,:), fz(:,:))
 #endif /* HLL */
 #ifdef HLLC
-        call hllc(jm, dy, uy(:,:), fy(:,:))
+          call hllc(km, dh, uz(:,:), fz(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-        call hlld(jm, dy, uy(:,:), fy(:,:))
+          call hlld(km, dh, uz(:,:), fz(:,:))
 #endif /* HLLD */
 #ifdef ROE
-        call roe (jm, dy, uy(:,:), fy(:,:))
+          call roe (km, dh, uz(:,:), fz(:,:))
 #endif /* ROE */
 
-! update the arrays of increments
+! insert the flux for a given stencil
 !
-        do j = 1, jm
+          do k = 1, km
 
-! update fluid variables
+! fluid variable fluxes
 !
-          f(iny,idn,i,j,k) = fy(idn,j)
-          f(iny,imx,i,j,k) = fy(imz,j)
-          f(iny,imy,i,j,k) = fy(imx,j)
-          f(iny,imz,i,j,k) = fy(imy,j)
+            f(idn,i,j,k) = fz(idn,k)
+            f(imx,i,j,k) = fz(imy,k)
+            f(imy,i,j,k) = fz(imz,k)
+            f(imz,i,j,k) = fz(imx,k)
 #ifdef ADI
-          f(iny,ien,i,j,k) = fy(ien,j)
+            f(ien,i,j,k) = fz(ien,k)
 #endif /* ADI */
 #ifdef MHD
 
-! update magnetic variables
+! magnetic field fluxes
 !
-          f(iny,ibx,i,j,k) = fy(ibz,j)
-          f(iny,iby,i,j,k) = fy(ibx,j)
-          f(iny,ibz,i,j,k) = fy(iby,j)
+            f(ibx,i,j,k) = fz(iby,k)
+            f(iby,i,j,k) = fz(ibz,k)
+            f(ibz,i,j,k) = fz(ibx,k)
 #ifdef GLM
 
-! update scalar potential
+! scalar potential flux
 !
-          f(iny,iph,i,j,k) = fy(iph,j)
+            f(iph,i,j,k) = fz(iph,k)
 #endif /* GLM */
 #endif /* MHD */
+          end do
         end do
       end do
-    end do
-
-#if NDIMS == 3
-!  update along Z-direction
-!
-    do j = 1, jm
-      do i = 1, im
-
-! copy directional vectors of variables for the one dimensional solver
-!
-        do k = 1, km
-          uz(idn,k) = u(idn,i,j,k)
-          uz(imx,k) = u(imz,i,j,k)
-          uz(imy,k) = u(imx,i,j,k)
-          uz(imz,k) = u(imy,i,j,k)
-#ifdef ADI
-          uz(ien,k) = u(ien,i,j,k)
-#endif /* ADI */
-#ifdef MHD
-          uz(ibx,k) = u(ibz,i,j,k)
-          uz(iby,k) = u(ibx,i,j,k)
-          uz(ibz,k) = u(iby,i,j,k)
-#ifdef GLM
-          uz(iph,k) = u(iph,i,j,k)
-#endif /* GLM */
-#endif /* MHD */
-        end do
-
-! execute solver (returns fluxes for the update)
-!
-#ifdef HLL
-        call hll (km, dz, uz(:,:), fz(:,:))
-#endif /* HLL */
-#ifdef HLLC
-        call hllc(km, dz, uz(:,:), fz(:,:))
-#endif /* HLLC */
-#ifdef HLLD
-        call hlld(km, dz, uz(:,:), fz(:,:))
-#endif /* HLLD */
-#ifdef ROE
-        call roe (km, dz, uz(:,:), fz(:,:))
-#endif /* ROE */
-
-! update the arrays of increments
-!
-        do k = 1, km
-
-! update fluid variables
-!
-          f(inz,idn,i,j,k) = fz(idn,k)
-          f(inz,imx,i,j,k) = fz(imy,k)
-          f(inz,imy,i,j,k) = fz(imz,k)
-          f(inz,imz,i,j,k) = fz(imx,k)
-#ifdef ADI
-          f(inz,ien,i,j,k) = fz(ien,k)
-#endif /* ADI */
-#ifdef MHD
-
-! update magnetic variables
-!
-          f(inz,ibx,i,j,k) = fz(iby,k)
-          f(inz,iby,i,j,k) = fz(ibz,k)
-          f(inz,ibz,i,j,k) = fz(ibx,k)
-#ifdef GLM
-
-! update scalar potential
-!
-          f(inz,iph,i,j,k) = fz(iph,k)
-#endif /* GLM */
-#endif /* MHD */
-        end do
-      end do
-    end do
 #endif /* NDIMS == 3 */
+
+    end select
 
 !-------------------------------------------------------------------------------
 !

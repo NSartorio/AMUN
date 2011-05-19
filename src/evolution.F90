@@ -551,7 +551,7 @@ module evolution
   subroutine flux_euler(pblock)
 
     use blocks   , only : block_data
-    use coords   , only : adxi, adyi, adzi
+    use coords   , only : adx, ady, adz
     use scheme   , only : update_flux
 
     implicit none
@@ -562,19 +562,23 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi
+    real :: dx, dy, dz
 !
 !-------------------------------------------------------------------------------
 !
 ! prepare dxi, dyi, and dzi
 !
-    dxi = adxi(pblock%meta%level)
-    dyi = adyi(pblock%meta%level)
-    dzi = adzi(pblock%meta%level)
+    dx = adx(pblock%meta%level)
+    dy = ady(pblock%meta%level)
+    dz = adz(pblock%meta%level)
 
 ! 1st step of integration
 !
-    call update_flux(pblock%u(:,:,:,:), pblock%f(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, pblock%u(:,:,:,:), pblock%f(1,:,:,:,:))
+    call update_flux(2, dy, pblock%u(:,:,:,:), pblock%f(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, pblock%u(:,:,:,:), pblock%f(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !
@@ -593,7 +597,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use coords   , only : adxi, adyi, adzi
+    use coords   , only : adx, ady, adz, adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -605,17 +609,20 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi
+    real :: dx, dy, dz, dxi, dyi, dzi
 
 ! local arrays
 !
     real, dimension(      nqt,im,jm,km) :: u
-    real, dimension(NDIMS,nqt,im,jm,km) :: f0, f1
+    real, dimension(NDIMS,nqt,im,jm,km) :: f0, f1, f2
 !
 !-------------------------------------------------------------------------------
 !
-! prepare dxi, dyi, and dzi
+! prepare dx, dy, dz, dxi, dyi, and dzi
 !
+    dx  = adx (pblock%meta%level)
+    dy  = ady (pblock%meta%level)
+    dz  = adz (pblock%meta%level)
     dxi = adxi(pblock%meta%level)
     dyi = adyi(pblock%meta%level)
     dzi = adzi(pblock%meta%level)
@@ -626,7 +633,11 @@ module evolution
 
 ! calculate fluxes at the moment t
 !
-    call update_flux(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, u(:,:,:,:), f0(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f0(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f0(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! advance the solution to (t + dt) using computed fluxes in this substep
 !
@@ -634,7 +645,11 @@ module evolution
 
 ! calculate fluxes at the moment (t + dt)
 !
-    call update_flux(u(:,:,:,:), f1(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, u(:,:,:,:), f1(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f1(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f1(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! calculate the time averaged flux
 !
@@ -657,7 +672,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use coords   , only : adxi, adyi, adzi
+    use coords   , only : adx, ady, adz, adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -669,7 +684,7 @@ module evolution
 
 ! local variables
 !
-    real    :: dxi, dyi, dzi
+    real :: dx, dy, dz, dxi, dyi, dzi
 
 ! local arrays
 !
@@ -690,7 +705,11 @@ module evolution
 
 ! calculate fluxes at the moment t
 !
-    call update_flux(u(:,:,:,:), f0(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, u(:,:,:,:), f0(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f0(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f0(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! advance the solution to (t + dt) using computed fluxes in this substep
 !
@@ -698,7 +717,11 @@ module evolution
 
 ! calculate fluxes at the moment (t + dt)
 !
-    call update_flux(u(:,:,:,:), f1(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, u(:,:,:,:), f1(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f1(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f1(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! copy the initial state to the local array u
 !
@@ -714,7 +737,11 @@ module evolution
 
 ! calculate fluxes at the moment (t + dt/2)
 !
-    call update_flux(u(:,:,:,:), f2(:,:,:,:,:), dxi, dyi, dzi)
+    call update_flux(1, dx, u(:,:,:,:), f2(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f2(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f2(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! calculate the time averaged flux using Gauss formula
 !
