@@ -485,7 +485,7 @@ module interpolation
       do j = 1, cm(2)
         x(1:cm(1)) = u(1:cm(1),j,k)
 
-        call expand_1d(cm(1), dm(1), ng, x(1:cm(1)), y(1:dm(1)))
+        call expand_1d_const(cm(1), dm(1), ng, x(1:cm(1)), y(1:dm(1)))
 
         w(1:dm(1),j,k) = y(1:dm(1))
       end do
@@ -497,7 +497,7 @@ module interpolation
       do i = 1, dm(1)
         x(1:cm(2)) = w(i,1:cm(2),k)
 
-        call expand_1d(cm(2), dm(2), ng, x(1:cm(2)), y(1:dm(2)))
+        call expand_1d_const(cm(2), dm(2), ng, x(1:cm(2)), y(1:dm(2)))
 
         z(i,1:dm(2),k) = y(1:dm(2))
       end do
@@ -510,7 +510,7 @@ module interpolation
         do i = 1, dm(1)
           x(1:cm(3)) = z(i,j,1:cm(3))
 
-          call expand_1d(cm(3), dm(3), ng, x(1:cm(3)), y(1:dm(3)))
+          call expand_1d_const(cm(3), dm(3), ng, x(1:cm(3)), y(1:dm(3)))
 
           v(i,j,1:dm(3)) = y(1:dm(3))
         end do
@@ -691,6 +691,45 @@ module interpolation
 !-------------------------------------------------------------------------------
 !
   end subroutine expand_1d
+!
+!===============================================================================
+!
+! expand_1d_const: one dimensional expansion using the constant interpolation
+!
+!===============================================================================
+!
+  subroutine expand_1d_const(nu, nv, ng, u, v)
+
+    implicit none
+
+! input parameters
+!
+    integer                    , intent(in)    :: nu, nv, ng
+    real        , dimension(nu), intent(in)    :: u
+    real        , dimension(nv), intent(inout) :: v
+
+! local variables
+!
+    integer  :: i, ib, ie, il, ir
+!
+!-------------------------------------------------------------------------------
+!
+    ib =  1 + ng
+    ie = nu - ng
+
+    do i = ib, ie
+
+      ir = 2 * (i - ng)
+      il = ir - 1
+
+      v(il) = u(i)
+      v(ir) = u(i)
+
+    end do
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine expand_1d_const
 !
 !===============================================================================
 !
