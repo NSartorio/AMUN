@@ -808,65 +808,76 @@ module evolution
 
 ! local variables
 !
-    integer :: lev, idir
-    real    :: dth
+    integer :: lev
+    real    :: dth, dx, dy, dz, dxi, dyi, dzi
 
 ! local arrays
 !
-    real, dimension(3)                  :: dr, dri
     real, dimension(      nqt,im,jm,km) :: u
     real, dimension(NDIMS,nqt,im,jm,km) :: f0, f1, f2
 !
 !-------------------------------------------------------------------------------
 !
-! prepare dx, dy, dz, dxi, dyi, and dzi
+! obtain the block level
 !
     lev    = pblock%meta%level
-    dr (:) = (/ adx (lev), ady (lev), adz (lev) /)
-    dri(:) = (/ adxi(lev), adyi(lev), adzi(lev) /)
 
-! calculate half time step
+! calculate the half time step
 !
     dth = 0.5d0 * dt
 
-! iterate over directional fluxes
+! prepare dx, dy, dz, dxi, dyi, and dzi
 !
-    do idir = 1, NDIMS
-
-! calculate fluxes at the moment t
-!
-      call update_flux(idir, dr(idir), pblock%u(:,:,:,:), f0(idir,:,:,:,:))
-
-! copy the initial state to the local array u
-!
-      u(:,:,:,:) = pblock%u(:,:,:,:)
-
-! advance the solution along the X direction to (t + dt) using the computed
-! fluxes
-!
-      call advance_solution_1d(idir, dt, dri(idir), u(:,:,:,:), f0(idir,:,:,:,:))
-
-! calculate fluxes along the X direction at the moment (t + dt)
-!
-      call update_flux(idir, dr(idir), u(:,:,:,:), f1(idir,:,:,:,:))
-
-! average fluxes from t and t + dt and prepare for half step update
-!
-      f2(idir,:,:,:,:) = 0.5d0 * (f0(idir,:,:,:,:) + f1(idir,:,:,:,:))
+    dx     = adx (lev)
+    dy     = ady (lev)
+    dz     = adz (lev)
+    dxi    = adxi(lev)
+    dyi    = adyi(lev)
+    dzi    = adzi(lev)
 
 ! copy the initial state to the local array u
 !
-      u(:,:,:,:) = pblock%u(:,:,:,:)
+    u(:,:,:,:) = pblock%u(:,:,:,:)
 
-! advance the solution to (t + dt/2) using computed flux
+! calculate fluxes at time t
 !
-      call advance_solution_1d(idir, dth, dri(idir), u(:,:,:,:), f2(idir,:,:,:,:))
+    call update_flux(1, dx, u(:,:,:,:), f0(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f0(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f0(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
-! calculate fluxes along the X direction at the moment (t + dt)
+! advance the solution to (t + dt) using the computed fluxes
 !
-      call update_flux(idir, dr(idir), u(:,:,:,:), f2(idir,:,:,:,:))
+    call advance_solution(u(:,:,:,:), f0(:,:,:,:,:), dt, dxi, dyi, dzi)
 
-    end do
+! calculate fluxes at time (t + dt)
+!
+    call update_flux(1, dx, u(:,:,:,:), f1(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f1(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f1(3,:,:,:,:))
+#endif /* NDIMS == 3 */
+
+! average fluxes at the time (t + dt / 2)
+!
+    f2(:,:,:,:,:) = 0.5d0 * (f0(:,:,:,:,:) + f1(:,:,:,:,:))
+
+! copy the initial state to the local array u
+!
+    u(:,:,:,:) = pblock%u(:,:,:,:)
+
+! advance the solution to (t + dt / 2) using the computed fluxes
+!
+    call advance_solution(u(:,:,:,:), f2(:,:,:,:,:), dth, dxi, dyi, dzi)
+
+! calculate fluxes at time (t + dt / 2)
+!
+    call update_flux(1, dx, u(:,:,:,:), f2(1,:,:,:,:))
+    call update_flux(2, dy, u(:,:,:,:), f2(2,:,:,:,:))
+#if NDIMS == 3
+    call update_flux(3, dz, u(:,:,:,:), f2(3,:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! calculate the time averaged flux using Gauss formula
 !
