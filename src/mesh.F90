@@ -1052,14 +1052,9 @@ module mesh
 
     use blocks       , only : block_meta, block_data, nchild
     use config       , only : ng, nh, in, jn, kn, im, jm, km
-    use interpolation, only : expand
-    use variables    , only : nfl, nqt
-#ifdef MHD
-    use variables    , only : ibx, iby, ibz
-#ifdef GLM
-    use variables    , only : iph
-#endif /* GLM */
-#endif /* MHD */
+    use config       , only : ib, ie, jb, je, kb, ke
+    use interpolation, only : minmod
+    use variables    , only : nqt
 
     implicit none
 
@@ -1069,13 +1064,14 @@ module mesh
 
 ! local variables
 !
-    integer :: q, p
+    integer :: i, j, k, q, p
     integer :: il, iu, jl, ju, kl, ku
-    integer :: is, js, ks
+    integer :: ic, jc, kc, ip, jp, kp
+    real    :: dul, dur, dux, duy, duz
 
 ! local arrays
 !
-    integer, dimension(3) :: dm, fm
+    integer, dimension(3) :: dm
 
 ! local allocatable arrays
 !
@@ -1094,38 +1090,82 @@ module mesh
 
 ! prepare dimensions
 !
-    dm(:) = (/ im, jm, km /)
-    fm(:) = 2 * (dm(:) - ng)
+    dm(:) = 2 * ((/ in, jn, kn /) + ng)
 #if NDIMS == 2
-    fm(3) = 1
-    ks    = 1
-    kl    = 1
-    ku    = 1
+    dm(3) = 1
 #endif /* NDIMS == 2 */
 
-! allocate array to the product of expansion
+! allocate array for the expanded arrays
 !
-    allocate(u(nqt, fm(1), fm(2), fm(3)))
+    allocate(u(nqt, dm(1), dm(2), dm(3)))
 
-! expand all variables and place them in the array u
+! prepare indices
 !
-    do q = 1, nfl
-      call expand(dm(:), fm(:), nh, pdata%u(q,:,:,:), u(q,:,:,:))
+    il = ib - nh
+    iu = ie + nh
+    jl = jb - nh
+    ju = je + nh
+#if NDIMS == 3
+    kl = kb - nh
+    ku = ke + nh
+#endif /* NDIMS == 3 */
+
+! expand the block variables
+!
+#if NDIMS == 2
+    do k = 1, km
+      kc = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = kl, ku
+      kc = 2 * (k - kl) + 1
+      kp = kc + 1
+#endif /* NDIMS == 3 */
+      do j = jl, ju
+        jc = 2 * (j - jl) + 1
+        jp = jc + 1
+        do i = il, iu
+          ic = 2 * (i - il) + 1
+          ip = ic + 1
+
+          do p = 1, nqt
+
+            dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
+            dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
+            dux = 0.125d0 * minmod(dur, dul)
+
+            dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
+            dul = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
+            duy = 0.125d0 * minmod(dur, dul)
+
+#if NDIMS == 3
+            dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
+            dul = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
+            duz = 0.125d0 * minmod(dur, dul)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 2
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - dux - duy
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + dux - duy
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - dux + duy
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + dux + duy
+#endif /* NDIMS == 2 */
+
+#if NDIMS == 3
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - dux - duy - duz
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + dux - duy - duz
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - dux + duy - duz
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + dux + duy - duz
+            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - dux - duy + duz
+            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + dux - duy + duz
+            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - dux + duy + duz
+            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + dux + duy + duz
+#endif /* NDIMS == 3 */
+          end do
+        end do
+      end do
     end do
 
-#ifdef MHD
-! expand the cell centered magnetic field components
-!
-    do q = ibx, ibz
-      call expand(dm(:), fm(:), nh, pdata%u(q,:,:,:), u(q,:,:,:))
-    end do
-#ifdef GLM
-
-! expand the scalar potential Psi
-!
-    call expand(dm(:), fm(:), nh, pdata%u(iph,:,:,:), u(iph,:,:,:))
-#endif /* GLM */
-#endif /* MHD */
 ! iterate over all children
 !
     do p = 1, nchild
@@ -1136,18 +1176,18 @@ module mesh
 
 ! obtain the position of child in the parent block
 !
-      is = pchild%pos(1)
-      js = pchild%pos(2)
+      ic = pchild%pos(1)
+      jc = pchild%pos(2)
 #if NDIMS == 3
-      ks = pchild%pos(3)
+      kc = pchild%pos(3)
 #endif /* NDIMS == 3 */
 
 ! calculate indices of the current child subdomain
 !
-      il = 1 + is * in
-      jl = 1 + js * jn
+      il = 1 + ic * in
+      jl = 1 + jc * jn
 #if NDIMS == 3
-      kl = 1 + ks * kn
+      kl = 1 + kc * kn
 #endif /* NDIMS == 3 */
 
       iu = il + im - 1
@@ -1158,7 +1198,12 @@ module mesh
 
 ! copy data to the current child
 !
+#if NDIMS == 2
+      pchild%data%u(1:nqt,1:im,1:jm,1:km) = u(1:nqt,il:iu,jl:ju, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
       pchild%data%u(1:nqt,1:im,1:jm,1:km) = u(1:nqt,il:iu,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
 
     end do
 
