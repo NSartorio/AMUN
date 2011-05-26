@@ -2405,6 +2405,54 @@ module boundaries
       ku = kh + nh + (kh - ng) * kc
 #endif /* NDIMS == 3 */
 
+! update variable boundaries
+!
+#if NDIMS == 2
+      do k = 1, km
+        kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do k = kl, ku
+        kt = 2 * (k - kl) + ks
+        kp = kt + 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          jt = 2 * (j - jl) + js
+          jp = jt + 1
+          do i = il, iu
+            it = 2 * (i - il) + is
+            ip = it + 1
+
+            pdata%u(:,it,jt,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
+            pdata%u(:,it,jp,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
+#if NDIMS == 3
+            pdata%u(:,it,jt,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
+            pdata%u(:,it,jp,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
+#endif /* NDIMS == 3 */
+          end do
+        end do
+      end do
+
+! Y indices
+!
+      jc = mod(iface - 1, 2)
+      js = jb
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = kb
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
+#endif /* NDIMS == 3 */
+
     case(2)
 
 ! X indices
@@ -2434,6 +2482,54 @@ module boundaries
       ku = kh + nh + (kh - ng) * kc
 #endif /* NDIMS == 3 */
 
+! update variable boundaries
+!
+#if NDIMS == 2
+      do k = 1, km
+        kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do k = kl, ku
+        kt = 2 * (k - kl) + ks
+        kp = kt + 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          jt = 2 * (j - jl) + js
+          jp = jt + 1
+          do i = il, iu
+            it = 2 * (i - il) + is
+            ip = it + 1
+
+            pdata%u(:,it,jt,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
+            pdata%u(:,it,jp,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
+#if NDIMS == 3
+            pdata%u(:,it,jt,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
+            pdata%u(:,it,jp,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
+#endif /* NDIMS == 3 */
+          end do
+        end do
+      end do
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = ib
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = kb
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
+#endif /* NDIMS == 3 */
+
 #if NDIMS == 3
     case(3)
 
@@ -2461,11 +2557,57 @@ module boundaries
 
       kl = 2
       ku = 1 + nh
+
+! update variable boundaries
+!
+#if NDIMS == 2
+      do k = 1, km
+        kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do k = kl, ku
+        kt = 2 * (k - kl) + ks
+        kp = kt + 1
+#endif /* NDIMS == 3 */
+        do j = jl, ju
+          jt = 2 * (j - jl) + js
+          jp = jt + 1
+          do i = il, iu
+            it = 2 * (i - il) + is
+            ip = it + 1
+
+            pdata%u(:,it,jt,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
+            pdata%u(:,it,jp,kt) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
+#if NDIMS == 3
+            pdata%u(:,it,jt,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
+            pdata%u(:,it,jp,kp) = u(:,i,j,k)
+            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
+#endif /* NDIMS == 3 */
+          end do
+        end do
+      end do
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = ib
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
+
+! Y indices
+!
+      jc =    (iface - 1) / 2
+      js = jb
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
 #endif /* NDIMS == 3 */
 
     end select
 
-! update variable boundaries
+! update variable boundaries  with the linear interpolation
 !
 #if NDIMS == 2
     do k = 1, km
