@@ -168,8 +168,8 @@ module mesh
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta_block, pneigh, pnext
-    type(block_data), pointer :: pdata_block
+    type(block_meta), pointer :: pmeta, pneigh, pnext
+    type(block_data), pointer :: pdata
 
 ! local variables
 !
@@ -208,17 +208,17 @@ module mesh
 
 ! iterate over all data blocks at the current level and initialize the problem
 !
-      pdata_block => list_data
-      do while (associated(pdata_block))
+      pdata => list_data
+      do while (associated(pdata))
 
 ! set the initial conditions at the current block
 !
-        if (pdata_block%meta%level .le. l) &
-          call init_problem(pdata_block)
+        if (pdata%meta%level .le. l) &
+          call init_problem(pdata)
 
 ! assign pointer to the next block
 !
-        pdata_block => pdata_block%next
+        pdata => pdata%next
       end do
 
 ! at the maximum level we only initialize the problem (without checking the
@@ -229,22 +229,22 @@ module mesh
 ! iterate over all data blocks at the current level and check the refinement
 ! criterion; do not allow for derefinement
 !
-        pdata_block => list_data
-        do while (associated(pdata_block))
+        pdata => list_data
+        do while (associated(pdata))
 
-          if (pdata_block%meta%level .eq. l) then
-            pdata_block%meta%refine = max(0, check_ref(pdata_block))
+          if (pdata%meta%level .eq. l) then
+            pdata%meta%refine = max(0, check_ref(pdata))
 
 ! if there is only one block, and it is set not to be refined, refine it anyway
 ! because the resolution for the problem initiation may be too small
 !
             if (get_mblocks() .eq. 1 .and. l .eq. 1) &
-              pdata_block%meta%refine = 1
+              pdata%meta%refine = 1
           end if
 
 ! assign pointer to the next block
 !
-          pdata_block => pdata_block%next
+          pdata => pdata%next
         end do
 
 ! walk through all levels down from the current level and check if select all
@@ -257,15 +257,15 @@ module mesh
 ! selected for the refinement and its neighbors are at lower levels select them
 ! for refinement too;
 !
-          pmeta_block => list_meta
-          do while (associated(pmeta_block))
+          pmeta => list_meta
+          do while (associated(pmeta))
 
 ! check if the current block is at the level n, is a leaf, and selected for
 ! refinement
 !
-            if (pmeta_block%level .eq. n) then
-              if (pmeta_block%leaf) then
-                if (pmeta_block%refine .eq. 1) then
+            if (pmeta%level .eq. n) then
+              if (pmeta%leaf) then
+                if (pmeta%refine .eq. 1) then
 
 ! iterate over all neighbors
 !
@@ -275,7 +275,7 @@ module mesh
 
 ! assign pointer to the neighbor
 !
-                        pneigh => pmeta_block%neigh(i,j,k)%ptr
+                        pneigh => pmeta%neigh(i,j,k)%ptr
 
 ! check if the neighbor is associated
 !
@@ -287,7 +287,7 @@ module mesh
 
 ! if the neighbor has lower level, select it to be refined too
 !
-                            if (pneigh%level .lt. pmeta_block%level) &
+                            if (pneigh%level .lt. pmeta%level) &
                               pneigh%refine = 1
 
                           else
@@ -305,7 +305,7 @@ module mesh
 
 ! assign pointer to the next block
 !
-            pmeta_block => pmeta_block%next
+            pmeta => pmeta%next
 
           end do
         end do
@@ -318,23 +318,23 @@ module mesh
 
 ! iterate over all meta blocks
 !
-          pmeta_block => list_meta
-          do while (associated(pmeta_block))
+          pmeta => list_meta
+          do while (associated(pmeta))
 
 ! check if the current block is at the level n and, if it is selected for
 ! refinement and if so, perform the refinement on this block
 !
-            if (pmeta_block%level .eq. n .and. pmeta_block%refine .eq. 1) then
+            if (pmeta%level .eq. n .and. pmeta%refine .eq. 1) then
 
 ! perform the refinement
 !
-              call refine_block(pmeta_block, res(pmeta_block%level + 1,:), .true.)
+              call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
 
             end if
 
 ! assign pointer to the next block
 !
-            pmeta_block => pmeta_block%next
+            pmeta => pmeta%next
           end do
         end do
       end if
@@ -344,15 +344,15 @@ module mesh
 
 ! deallocate data blocks of non leafs
 !
-    pmeta_block => list_meta
-    do while (associated(pmeta_block))
+    pmeta => list_meta
+    do while (associated(pmeta))
 
-      if (.not. pmeta_block%leaf) &
-        call deallocate_datablock(pmeta_block%data)
+      if (.not. pmeta%leaf) &
+        call deallocate_datablock(pmeta%data)
 
 ! assign pointer to the next block
 !
-      pmeta_block => pmeta_block%next
+      pmeta => pmeta%next
     end do
 
 #ifdef MPI
@@ -367,17 +367,17 @@ module mesh
     n = 0
     l = 0
 
-    pmeta_block => list_meta
-    do while (associated(pmeta_block))
+    pmeta => list_meta
+    do while (associated(pmeta))
 
 ! assign the cpu to the current block
 !
-      pmeta_block%cpu = n
+      pmeta%cpu = n
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
-      if (pmeta_block%leaf) then
+      if (pmeta%leaf) then
         l = l + 1
         if (l .ge. lb(n)) then
           n = min(ncpus - 1, n + 1)
@@ -387,24 +387,24 @@ module mesh
 
 ! assign pointer to the next block
 !
-      pmeta_block => pmeta_block%next
+      pmeta => pmeta%next
     end do
 
 ! remove all data blocks which do not belong to the current process
 !
-    pmeta_block => list_meta
-    do while (associated(pmeta_block))
-      pnext => pmeta_block%next
+    pmeta => list_meta
+    do while (associated(pmeta))
+      pnext => pmeta%next
 
 ! if the current block belongs to another process and its data field is
 ! associated, deallocate its data field
 !
-      if (pmeta_block%cpu .ne. ncpu .and. associated(pmeta_block%data)) &
-        call deallocate_datablock(pmeta_block%data)
+      if (pmeta%cpu .ne. ncpu .and. associated(pmeta%data)) &
+        call deallocate_datablock(pmeta%data)
 
 ! assign pointer to the next block
 !
-      pmeta_block => pnext
+      pmeta => pnext
     end do
 #endif /* MPI */
 
