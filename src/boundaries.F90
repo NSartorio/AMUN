@@ -312,7 +312,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 4
+              itag = 10 * (irecv * ncpus + isend + 1) + 1
 
 ! allocate space for variables
 !
@@ -450,7 +450,7 @@ module boundaries
       end do ! directions
 
 !!
-!! then RESTRICT blocks from the higher level
+!! then RESTRICT blocks from higher levels
 !!
 ! iterate over all directions
 !
@@ -640,7 +640,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 3
+              itag = 10 * (irecv * ncpus + isend + 1) + 2
 
 ! allocate space for variables
 !
@@ -781,7 +781,7 @@ module boundaries
     do level = 1, maxlev
 
 !!
-!! PROLONG blocks from lower level
+!! then PROLONG blocks from lower levels
 !!
 ! iterate over all directions
 !
@@ -974,7 +974,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 2
+              itag = 10 * (irecv * ncpus + isend + 1) + 3
 
 ! allocate space for variables
 !
@@ -1119,7 +1119,7 @@ module boundaries
       end do ! directions
 
 !!
-!! first COPY blocks between the same levels
+!! finally COPY blocks between the same levels once again
 !!
 ! iterate over all directions
 !
