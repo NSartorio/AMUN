@@ -1221,27 +1221,27 @@ module boundaries
                           select case(idir)
                           case(1)
                             if (iside .eq. 1) then
-                              il = ie - nh + 1
-                              iu = ie
+                              il = ie - nh
+                              iu = ie + 1
                             else
-                              il = ib
-                              iu = ib + nh - 1
+                              il = ib - 1
+                              iu = ib + nh
                             end if
                           case(2)
                             if (iside .eq. 1) then
-                              jl = je - nh + 1
-                              ju = je
+                              jl = je - nh
+                              ju = je + 1
                             else
-                              jl = jb
-                              ju = jb + nh - 1
+                              jl = jb - 1
+                              ju = jb + nh
                             end if
                           case(3)
                             if (iside .eq. 1) then
-                              kl = ke - nh + 1
-                              ku = ke
+                              kl = ke - nh
+                              ku = ke + 1
                             else
-                              kl = kb
-                              ku = kb + nh - 1
+                              kl = kb - 1
+                              ku = kb + nh
                             end if
                           end select
 
@@ -1334,11 +1334,11 @@ module boundaries
 !
               select case(idir)
               case(1)
-                allocate(rbuf(nblocks,nqt,nh,jm,km))
+                allocate(rbuf(nblocks,nqt,nh+2,jm,km))
               case(2)
-                allocate(rbuf(nblocks,nqt,im,nh,km))
+                allocate(rbuf(nblocks,nqt,im,nh+2,km))
               case(3)
-                allocate(rbuf(nblocks,nqt,im,jm,nh))
+                allocate(rbuf(nblocks,nqt,im,jm,nh+2))
               end select
 
 ! if isend == ncpu we are sending data
@@ -1357,33 +1357,33 @@ module boundaries
                   select case(idir)
                   case(1)
                     if (pinfo%side .eq. 1) then
-                      il = ie - nh + 1
-                      iu = ie
+                      il = ie - nh
+                      iu = ie + 1
                     else
-                      il = ib
-                      iu = ib + nh - 1
+                      il = ib - 1
+                      iu = ib + nh
                     end if
 
                     rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
 
                   case(2)
                     if (pinfo%side .eq. 1) then
-                      jl = je - nh + 1
-                      ju = je
+                      jl = je - nh
+                      ju = je + 1
                     else
-                      jl = jb
-                      ju = jb + nh - 1
+                      jl = jb - 1
+                      ju = jb + nh
                     end if
 
                     rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
 
                   case(3)
                     if (pinfo%side .eq. 1) then
-                      kl = ke - nh + 1
-                      ku = ke
+                      kl = ke - nh
+                      ku = ke + 1
                     else
-                      kl = kb
-                      ku = kb + nh - 1
+                      kl = kb - 1
+                      ku = kb + nh
                     end if
 
                     rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
@@ -2701,10 +2701,12 @@ module boundaries
 !
   subroutine boundary_prolong(pdata, u, idir, iside, iface)
 
-    use blocks   , only : block_data
-    use config   , only : ng, im, ih, ib, ie, ieu           &
-                        , nd, jm, jh, jb, je, jeu           &
-                        , nh, km, kh, kb, ke, keu
+    use blocks       , only : block_data
+    use config       , only : ng, im, ih, ib, ie, ieu                          &
+                            , nd, jm, jh, jb, je, jeu                          &
+                            , nh, km, kh, kb, ke, keu
+    use interpolation, only : minmod
+    use variables    , only : nqt
 
     implicit none
 
@@ -2716,10 +2718,11 @@ module boundaries
 
 ! local variables
 !
-    integer :: i, j, k
+    integer :: i, j, k, q
     integer :: ic, jc, kc, ip, jp, kp
     integer :: il, jl, kl, iu, ju, ku
     integer :: is, js, ks, it, jt, kt
+    real    :: dul, dur, dux, duy, duz
 !
 !-------------------------------------------------------------------------------
 !
@@ -2737,8 +2740,8 @@ module boundaries
         is = ieu
       end if
 
-      il = 1
-      iu = nh
+      il = 2
+      iu = 1 + nh
 
 ! Y indices
 !
@@ -2773,8 +2776,8 @@ module boundaries
         js = jeu
       end if
 
-      jl = 1
-      ju = nh
+      jl = 2
+      ju = 1 + nh
 
 #if NDIMS == 3
 ! Z indices
@@ -2810,8 +2813,8 @@ module boundaries
         ks = keu
       end if
 
-      kl = 1
-      ku = nh
+      kl = 2
+      ku = 1 + nh
 #endif /* NDIMS == 3 */
 
     end select
@@ -2834,16 +2837,39 @@ module boundaries
           it = 2 * (i - il) + is
           ip = it + 1
 
-          pdata%u(:,it,jt,kt) = u(:,i,j,k)
-          pdata%u(:,ip,jt,kt) = u(:,i,j,k)
-          pdata%u(:,it,jp,kt) = u(:,i,j,k)
-          pdata%u(:,ip,jp,kt) = u(:,i,j,k)
+          do q = 1, nqt
+
+            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
+            dul = u(q,i  ,j,k) - u(q,i-1,j,k)
+            dux = 0.25d0 * minmod(dur, dul)
+
+            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
+            dul = u(q,i,j  ,k) - u(q,i,j-1,k)
+            duy = 0.25d0 * minmod(dur, dul)
+
 #if NDIMS == 3
-          pdata%u(:,it,jt,kp) = u(:,i,j,k)
-          pdata%u(:,ip,jt,kp) = u(:,i,j,k)
-          pdata%u(:,it,jp,kp) = u(:,i,j,k)
-          pdata%u(:,ip,jp,kp) = u(:,i,j,k)
+            dur = u(q,i,j,k+1) - u(q,i,j,k  )
+            dul = u(q,i,j,k  ) - u(q,i,j,k-1)
+            duz = 0.25d0 * minmod(dur, dul)
 #endif /* NDIMS == 3 */
+
+#if NDIMS == 2
+            pdata%u(q,it,jt,kt) = u(q,i,j,k) - dux - duy
+            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + dux - duy
+            pdata%u(q,it,jp,kt) = u(q,i,j,k) - dux + duy
+            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + dux + duy
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            pdata%u(q,it,jt,kt) = u(q,i,j,k) - dux - duy - duz
+            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + dux - duy - duz
+            pdata%u(q,it,jp,kt) = u(q,i,j,k) - dux + duy - duz
+            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + dux + duy - duz
+            pdata%u(q,it,jt,kp) = u(q,i,j,k) - dux - duy + duz
+            pdata%u(q,ip,jt,kp) = u(q,i,j,k) + dux - duy + duz
+            pdata%u(q,it,jp,kp) = u(q,i,j,k) - dux + duy + duz
+            pdata%u(q,ip,jp,kp) = u(q,i,j,k) + dux + duy + duz
+#endif /* NDIMS == 3 */
+          end do
         end do
       end do
     end do
