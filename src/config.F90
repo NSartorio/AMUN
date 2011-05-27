@@ -140,6 +140,7 @@ module config
 ! coefficient controlling the decay of scalar potential Psi
 !
   real               , save :: alpha_p = 0.5d0
+  real               , save :: decay   = 1.0d0
 #endif /* GLM */
 #endif /* MHD */
 #ifdef LIMO3
@@ -482,6 +483,12 @@ module config
     if (zlbndry .ne. 'periodic' .or. zubndry .ne. 'periodic')  &
       periodic(3) = .false.
 #endif /* NDIMS == 3 */
+
+#if defined MHD && defined GLM
+! calculate decay factor for magnetic field divergence scalar
+!
+    decay = exp(- alpha_p * cfl)
+#endif /* MHD & GLM */
 
 ! return before error messages
 !

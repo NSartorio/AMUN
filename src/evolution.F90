@@ -328,7 +328,7 @@ module evolution
     use config   , only : im, jm, km
     use coords   , only : adxi, adyi, adzi
 #if defined MHD && defined GLM
-    use config   , only : alpha_p
+    use config   , only : decay
     use scheme   , only : cmax
     use variables, only : iph
 #endif /* MHD & GLM */
@@ -353,9 +353,6 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi
-#if defined MHD && defined GLM
-    real    :: decay
-#endif /* MHD & GLM */
 #ifdef FORCE
 
 ! local arrays
@@ -384,7 +381,6 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* MHD & GLM */
 #ifdef FORCE
@@ -913,7 +909,7 @@ module evolution
 #ifdef MHD
     use variables, only : ibx, ibz
 #ifdef GLM
-    use config   , only : alpha_p
+    use config   , only : decay
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -933,9 +929,6 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi, ch2
-#if defined MHD && defined GLM
-    real    :: decay
-#endif /* MHD & GLM */
 
 ! local arrays
 !
@@ -979,7 +972,6 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
@@ -1049,7 +1041,7 @@ module evolution
 #ifdef MHD
     use variables, only : ibx, ibz
 #ifdef GLM
-    use config   , only : alpha_p
+    use config   , only : decay
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -1069,9 +1061,6 @@ module evolution
 ! local variables
 !
     real    :: dxi, dyi, dzi, ch2
-#if defined MHD && defined GLM
-    real    :: decay
-#endif /* MHD & GLM */
 
 ! local arrays
 !
@@ -1138,7 +1127,6 @@ module evolution
 
 ! evolve Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 
 #endif /* GLM */
@@ -1210,7 +1198,7 @@ module evolution
 #ifdef MHD
     use variables, only : ibx, ibz
 #ifdef GLM
-    use config   , only : alpha_p
+    use config   , only : decay
     use variables, only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -1231,7 +1219,7 @@ module evolution
 !
     real    :: dxi, dyi, dzi
 #if defined MHD && defined GLM
-    real    :: decay, ch2
+    real    :: ch2
 #endif /* MHD & GLM */
 
 ! local arrays
@@ -1326,7 +1314,6 @@ module evolution
 
 ! evolve analytically Psi due to the source term
 !
-    decay = exp(- alpha_p * cmax * dt / dxmin)
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
