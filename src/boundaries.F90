@@ -2171,7 +2171,7 @@ module boundaries
     use config   , only : ng, im, ih, ib, ie, ieu           &
                         , nd, jm, jh, jb, je, jeu           &
                         , nh, km, kh, kb, ke, keu
-    use variables, only : nqt, nfl
+    use variables, only : nqt
 
     implicit none
 
