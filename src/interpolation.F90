@@ -125,15 +125,17 @@ module interpolation
 ! interpolate the values at i-1/2 and i+1/2
 !
     do i = 1, n
-      ds = dfr(i) * dfl(i)
-
-      if (ds .gt. 0.0d0) then
 #ifdef MINMOD
-        df = sign(0.5d0, dfr(i)) * min(abs(dfr(i)), abs(dfl(i)))
+      df = 0.5d0 * minmod(dfr(i), dfl(i))
+
+      fl(i) = f(i) + df
+      fr(i) = f(i) - df
 #endif /* MINMOD */
 #ifdef LF
+      ds = dfr(i) * dfl(i)
+
+      if (ds .gt. eps) then
         df  = ds / (dfr(i) + dfl(i))
-#endif /* LF */
 
         fl(i) = f(i) + df
         fr(i) = f(i) - df
@@ -141,6 +143,7 @@ module interpolation
         fl(i) = f(i)
         fr(i) = f(i)
       end if
+#endif /* LF */
     end do
 
 ! shift i-1/2 to the left
