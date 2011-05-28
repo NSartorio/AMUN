@@ -216,7 +216,7 @@ module interpolation
 ! reconstruct: subroutine for the reconstruction of the values at the right and
 !              left interfaces of cells from their cell centered representation;
 !              the subroutine implements the improved 3rd order WENO scheme as
-!              described in Yamaleev & Carpenter, 2000, Journal of Computational
+!              described in Yamaleev & Carpenter, 2009, Journal of Computational
 !              Physics, 228, 3025
 !
 !===============================================================================
