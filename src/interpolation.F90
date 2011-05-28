@@ -40,11 +40,12 @@ module interpolation
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
+    use config, only : eps
 #ifdef LIMO3
-    use config, only : eps, rad
+    use config, only : rad
 #endif /* LIMO3 */
 #ifdef MP
-    use config, only : eps, alpha
+    use config, only : alpha
 #endif /* MP */
 
     implicit none
@@ -63,6 +64,12 @@ module interpolation
 #ifdef TVD
     real, dimension(n) :: dfl, dfr
 #endif /* TVD */
+#ifdef CENO3
+    integer               :: im1, ip1
+    integer, dimension(1) :: loc
+    real, dimension(3)    :: ql, qr, dl
+    real, dimension(n)    :: dfl, dfr, dfc, df2
+#endif /* CENO3 */
 #ifdef LIMO3
     integer            :: im1, ip1
     real               :: rdx, rdx2, dfr, dfl, th, et, f0, f1, f2, ft, xi
@@ -143,6 +150,65 @@ module interpolation
     end do
     fr(n) = f(n)
 #endif /* TVD */
+#ifdef CENO3
+!! third order CENO interpolation
+!!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      dfr(i  ) = f(i+1) - f(i)
+      dfl(i+1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
+    dfc(:) = (dfr(:) + dfl(:)) / 2.0d0
+    df2(:) = (dfr(:) - dfl(:))
+
+! interpolate the values at i-1/2 and i+1/2
+!
+    do i = 1, n
+
+      im1   = max(1, i - 1)
+      ip1   = min(n, i + 1)
+
+      df    = 0.5d0 * minmod(dfr(i), dfl(i))
+
+      fl(i) = f(i) + df
+      fr(i) = f(i) - df
+
+      ql(1) = f(im1) + 1.5d0 * dfc(im1) + 1.125d0 * df2(im1)
+      ql(2) = f(i  ) + 0.5d0 * dfc(i  ) + 0.125d0 * df2(i  )
+      ql(3) = f(ip1) - 0.5d0 * dfc(ip1) + 0.125d0 * df2(ip1)
+
+      qr(1) = f(ip1) - 1.5d0 * dfc(ip1) + 1.125d0 * df2(ip1)
+      qr(2) = f(i  ) - 0.5d0 * dfc(i  ) + 0.125d0 * df2(i  )
+      qr(3) = f(im1) + 0.5d0 * dfc(im1) + 0.125d0 * df2(im1)
+
+! select the closest stencil
+!
+      dl(:) = ql(:) - (/ fl(i), fl(i), fl(i) /)
+      if(minval(dl) * maxval(dl) .gt. eps) then
+        dl(2) = 0.7d0 * dl(2)
+        loc   = minloc(abs(dl))
+        fl(i) = ql(loc(1))
+      end if
+
+      dl(:) = qr(:) - (/ fr(i), fr(i), fr(i) /)
+      if(minval(dl) * maxval(dl) .gt. eps) then
+        dl(2) = 0.7d0 * dl(2)
+        loc   = minloc(abs(dl))
+        fr(i) = qr(loc(1))
+      end if
+
+    end do
+
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
+#endif /* CENO3 */
 #ifdef LIMO3
 !! third order interpolation
 !!

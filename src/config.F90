@@ -143,18 +143,19 @@ module config
   real               , save :: decay   = 1.0d0
 #endif /* GLM */
 #endif /* MHD */
+! parameters for reconstruction
+!
+  real               , save :: eps = 1.0d-10
 #ifdef LIMO3
 
 ! parameters for the LIMO3 reconstruction
 !
-  real               , save :: eps = 1.0d-12
   real               , save :: rad = 1.0d0
 #endif /* LIMO3 */
 #ifdef MP
 
 ! parameters for the monitonicity preserving reconstruction
 !
-  real               , save :: eps   = 1.0d-10
   real               , save :: alpha = 4.0d0
 #endif /* MP */
 
@@ -388,15 +389,13 @@ module config
       read(value,        *) alpha_p
 #endif /* GLM */
 #endif /* MHD */
-#ifdef LIMO3
     case("eps")
       read(value,        *) eps
+#ifdef LIMO3
     case("rad")
       read(value,        *) rad
 #endif /* LIMO3 */
 #ifdef MP
-    case("eps")
-      read(value,        *) eps
     case("alpha")
       read(value,        *) alpha
 #endif /* MP */
