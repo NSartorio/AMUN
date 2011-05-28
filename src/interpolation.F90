@@ -31,6 +31,7 @@ module interpolation
 
   contains
 !
+#ifdef TVD
 !===============================================================================
 !
 ! reconstruct: subroutine for the reconstruction of the values at the right and
@@ -41,12 +42,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-#ifdef LIMO3
-    use config, only : rad
-#endif /* LIMO3 */
-#ifdef MP
-    use config, only : alpha
-#endif /* MP */
 
     implicit none
 
@@ -61,56 +56,10 @@ module interpolation
 !
     integer            :: i
     real               :: df, ds
-#ifdef TVD
     real, dimension(n) :: dfl, dfr
-#endif /* TVD */
-#ifdef CENO3
-    integer               :: im1, ip1
-    integer, dimension(1) :: loc
-    real, dimension(3)    :: ql, qr, dl
-    real, dimension(n)    :: dfl, dfr, dfc, df2
-#endif /* CENO3 */
-#ifdef LIMO3
-    integer            :: im1, ip1
-    real               :: rdx, rdx2, dfr, dfl, th, et, f0, f1, f2, ft, xi
-#endif /* LIMO3 */
-#ifdef MP
-    integer            :: im2, im1, ip1, ip2
-#ifndef MP5
-    integer            :: im3, ip3
-#endif /* !MP5 */
-#ifdef MP9
-    integer            :: im4, ip4
-#endif /* MP9 */
-    real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
-    real               :: dl, dr, dm1, dc0, dp1, dml, dmr
-
-! parameters
-!
-    real, parameter    :: ac =   4.0d0 / 3.0d0
-#ifdef MP5
-    real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
-                        , a3 =   47.0d0 / 60.0d0, a4 =   27.0d0 / 60.0d0       &
-                        , a5 = -  3.0d0 / 60.0d0
-#endif /* MP5 */
-#ifdef MP7
-    real, parameter    :: a1 = -  3.0d0 / 42.0d1, a2 =   25.0d0 / 42.0d1       &
-                        , a3 = - 10.1d1 / 42.0d1, a4 =   31.9d1 / 42.0d1       &
-                        , a5 =   21.4d1 / 42.0d1, a6 = - 38.0d0 / 42.0d1       &
-                        , a7 =    4.0d0 / 42.0d1
-#endif /* MP7 */
-#ifdef MP9
-    real, parameter    :: a1 =    4.0d0 / 25.2d2, a2 = - 41.0d0 / 25.2d2       &
-                        , a3 =   19.9d1 / 25.2d2, a4 = - 64.1d1 / 25.2d2       &
-                        , a5 =  187.9d1 / 25.2d2, a6 =  137.5d1 / 25.2d2       &
-                        , a7 = - 30.5d1 / 25.2d2, a8 =   55.0d0 / 25.2d2       &
-                        , a9 = -  5.0d0 / 25.2d2
-#endif /* MP9 */
-#endif /* MP */
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef TVD
 !! second order TVD interpolation
 !!
 ! calculate the left and right derivatives
@@ -152,8 +101,44 @@ module interpolation
       fr(i) = fr(i+1)
     end do
     fr(n) = f(n)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct
+!
 #endif /* TVD */
 #ifdef CENO3
+!===============================================================================
+!
+! reconstruct: subroutine for the reconstruction of the values at the right and
+!              left interfaces of cells from their cell centered representation
+!
+!===============================================================================
+!
+  subroutine reconstruct(n, h, f, fl, fr)
+
+    use config, only : eps
+
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)  :: n
+    real              , intent(in)  :: h
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer               :: i
+    real                  :: df, ds
+    integer               :: im1, ip1
+    integer, dimension(1) :: loc
+    real, dimension(3)    :: ql, qr, dl
+    real, dimension(n)    :: dfl, dfr, dfc, df2
+!
+!-------------------------------------------------------------------------------
+!
 !! third order CENO interpolation
 !!
 ! calculate the left and right derivatives
@@ -189,14 +174,14 @@ module interpolation
 
 ! select the closest stencil
 !
-      dl(:) = ql(:) - (/ fl(i), fl(i), fl(i) /)
+      dl(:) = ql(:) - fl(i)
       if(minval(dl) * maxval(dl) .gt. eps) then
         dl(2) = 0.7d0 * dl(2)
         loc   = minloc(abs(dl))
         fl(i) = ql(loc(1))
       end if
 
-      dl(:) = qr(:) - (/ fr(i), fr(i), fr(i) /)
+      dl(:) = qr(:) - fr(i)
       if(minval(dl) * maxval(dl) .gt. eps) then
         dl(2) = 0.7d0 * dl(2)
         loc   = minloc(abs(dl))
@@ -211,8 +196,43 @@ module interpolation
       fr(i) = fr(i+1)
     end do
     fr(n) = f(n)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct
+!
 #endif /* CENO3 */
 #ifdef LIMO3
+!===============================================================================
+!
+! reconstruct: subroutine for the reconstruction of the values at the right and
+!              left interfaces of cells from their cell centered representation
+!
+!===============================================================================
+!
+  subroutine reconstruct(n, h, f, fl, fr)
+
+    use config, only : eps
+    use config, only : rad
+
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)  :: n
+    real              , intent(in)  :: h
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer            :: i
+    real               :: df, ds
+    integer            :: im1, ip1
+    real               :: rdx, rdx2, dfr, dfl, th, et, f0, f1, f2, ft, xi
+!
+!-------------------------------------------------------------------------------
+!
 !! third order interpolation
 !!
 ! prepare parameters
@@ -281,8 +301,72 @@ module interpolation
 !
     fl(1) = f(1)
     fr(n) = f(n)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct
+!
 #endif /* LIMO3 */
 #ifdef MP
+!===============================================================================
+!
+! reconstruct: subroutine for the reconstruction of the values at the right and
+!              left interfaces of cells from their cell centered representation
+!
+!===============================================================================
+!
+  subroutine reconstruct(n, h, f, fl, fr)
+
+    use config, only : eps
+    use config, only : alpha
+
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)  :: n
+    real              , intent(in)  :: h
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer            :: i
+    real               :: df, ds
+    integer            :: im2, im1, ip1, ip2
+#ifndef MP5
+    integer            :: im3, ip3
+#endif /* !MP5 */
+#ifdef MP9
+    integer            :: im4, ip4
+#endif /* MP9 */
+    real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
+    real               :: dl, dr, dm1, dc0, dp1, dml, dmr
+
+! parameters
+!
+    real, parameter    :: ac =   4.0d0 / 3.0d0
+#ifdef MP5
+    real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
+                        , a3 =   47.0d0 / 60.0d0, a4 =   27.0d0 / 60.0d0       &
+                        , a5 = -  3.0d0 / 60.0d0
+#endif /* MP5 */
+#ifdef MP7
+    real, parameter    :: a1 = -  3.0d0 / 42.0d1, a2 =   25.0d0 / 42.0d1       &
+                        , a3 = - 10.1d1 / 42.0d1, a4 =   31.9d1 / 42.0d1       &
+                        , a5 =   21.4d1 / 42.0d1, a6 = - 38.0d0 / 42.0d1       &
+                        , a7 =    4.0d0 / 42.0d1
+#endif /* MP7 */
+#ifdef MP9
+    real, parameter    :: a1 =    4.0d0 / 25.2d2, a2 = - 41.0d0 / 25.2d2       &
+                        , a3 =   19.9d1 / 25.2d2, a4 = - 64.1d1 / 25.2d2       &
+                        , a5 =  187.9d1 / 25.2d2, a6 =  137.5d1 / 25.2d2       &
+                        , a7 = - 30.5d1 / 25.2d2, a8 =   55.0d0 / 25.2d2       &
+                        , a9 = -  5.0d0 / 25.2d2
+#endif /* MP9 */
+!
+!-------------------------------------------------------------------------------
+!
 !! fifth or higher order monotonicity preserving interpolation
 !!
 ! iterate over all positions
@@ -402,11 +486,11 @@ module interpolation
       fr(i) = fr(i+1)
     end do
     fr(n) = f(n)
-#endif /* MP */
 !
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
+#endif /* MP */
 !
 !===============================================================================
 !
