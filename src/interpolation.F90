@@ -130,61 +130,69 @@ module interpolation
 
 ! local variables
 !
-    integer               :: i
-    real                  :: df, ds
-    integer               :: im1, ip1
+    integer               :: i, im1, ip1, im2, ip2
     integer, dimension(1) :: loc
+    real                  :: dfl, dfr, df
     real, dimension(3)    :: ql, qr, dl
-    real, dimension(n)    :: dfl, dfr, dfc, df2
+
+! interpolation coefficients
+!
+    real, parameter    :: a11 =   0.375d0, a12 = - 1.250d0, a13 =   1.875d0    &
+                        , a21 = - 0.125d0, a22 =   0.750d0, a23 =   0.375d0    &
+                        , a31 =   0.375d0, a32 =   0.750d0, a33 = - 0.125d0
 !
 !-------------------------------------------------------------------------------
 !
 !! third order CENO interpolation
 !!
-! calculate the left and right derivatives
-!
-    do i = 1, n - 1
-      dfr(i  ) = f(i+1) - f(i)
-      dfl(i+1) = dfr(i)
-    end do
-    dfl(1) = dfr(1)
-    dfr(n) = dfl(n)
-    dfc(:) = (dfr(:) + dfl(:)) / 2.0d0
-    df2(:) = (dfr(:) - dfl(:))
-
 ! interpolate the values at i-1/2 and i+1/2
 !
     do i = 1, n
 
+! prepare indices
+!
+      im2   = max(1, i - 2)
       im1   = max(1, i - 1)
       ip1   = min(n, i + 1)
+      ip2   = min(n, i + 2)
 
-      df    = 0.5d0 * minmod(dfr(i), dfl(i))
+! calculate left and right derivatives
+!
+      dfr   = f(ip1) - f(i  )
+      dfl   = f(i  ) - f(im1)
 
+! calculate limited derivative
+!
+      df    = 0.5d0 * minmod(dfr, dfl)
+
+! obtain the states with the linear interpolation
+!
       fl(i) = f(i) + df
       fr(i) = f(i) - df
 
-      ql(1) = f(im1) + 1.5d0 * dfc(im1) + 1.125d0 * df2(im1)
-      ql(2) = f(i  ) + 0.5d0 * dfc(i  ) + 0.125d0 * df2(i  )
-      ql(3) = f(ip1) - 0.5d0 * dfc(ip1) + 0.125d0 * df2(ip1)
+! calculate the second order interpolations of the left and right states
+!
+      ql(1) = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      ql(2) = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      ql(3) = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
 
-      qr(1) = f(ip1) - 1.5d0 * dfc(ip1) + 1.125d0 * df2(ip1)
-      qr(2) = f(i  ) - 0.5d0 * dfc(i  ) + 0.125d0 * df2(i  )
-      qr(3) = f(im1) + 0.5d0 * dfc(im1) + 0.125d0 * df2(im1)
+      qr(1) = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr(2) = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr(3) = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
-! select the closest stencil
+! select the second order interpolation the closest to the linear one
 !
       dl(:) = ql(:) - fl(i)
       if(minval(dl) * maxval(dl) .gt. eps) then
         dl(2) = 0.7d0 * dl(2)
-        loc   = minloc(abs(dl))
+        loc   = minloc(abs(dl(:)))
         fl(i) = ql(loc(1))
       end if
 
       dl(:) = qr(:) - fr(i)
       if(minval(dl) * maxval(dl) .gt. eps) then
         dl(2) = 0.7d0 * dl(2)
-        loc   = minloc(abs(dl))
+        loc   = minloc(abs(dl(:)))
         fr(i) = qr(loc(1))
       end if
 
