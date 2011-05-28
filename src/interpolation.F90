@@ -324,6 +324,140 @@ module interpolation
   end subroutine reconstruct
 !
 #endif /* WENO3 */
+#ifdef WENOZ
+!===============================================================================
+!
+! reconstruct: subroutine for the reconstruction of the values at the right and
+!              left interfaces of cells from their cell centered representation;
+!              the subroutine implements the improved 5rd order WENO scheme
+!              called WENO-Z as described by Borges et al. 2008, Journal of
+!              Computational Physics, 227, 3191
+!
+!===============================================================================
+!
+  subroutine reconstruct(n, h, f, fl, fr)
+
+    use config, only : eps
+
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)  :: n
+    real              , intent(in)  :: h
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer            :: i, im1, ip1, im2, ip2
+    real               :: bl, bc, br, al, ac, ar, ww, wl, wc, wr
+    real, dimension(3) :: ql, qr
+    real, dimension(n) :: dfl, dfr, df2
+
+! weight coefficients
+!
+    real, parameter :: c1 = 13.0d0 / 12.0d0, c2 = 0.25d0
+    real, parameter :: dl = 0.1d0, dc = 0.6d0, dr = 0.3d0
+
+! interpolation coefficients
+!
+    real, parameter :: a11 =  2.0d0/6.0d0, a12 = -7.0d0/6.0d0, a13 = 11.0d0/6.0d0 &
+                     , a21 = -1.0d0/6.0d0, a22 =  5.0d0/6.0d0, a23 =  2.0d0/6.0d0 &
+                     , a31 =  2.0d0/6.0d0, a32 =  5.0d0/6.0d0, a33 = -1.0d0/6.0d0
+!
+!-------------------------------------------------------------------------------
+!
+!! fifth order WENO-Z interpolation
+!!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      dfr(i  ) = f(i+1) - f(i)
+      dfl(i+1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
+    df2(:) = dfr(:) - dfl(:)
+
+! interpolate the values at i-1/2 and i+1/2
+!
+    do i = 1, n
+
+! prepare indices
+!
+      im2   = max(1, i - 2)
+      im1   = max(1, i - 1)
+      ip1   = min(n, i + 1)
+      ip2   = min(n, i + 2)
+
+! calculate betas
+!
+      bl    = c1 * df2(im1)**2 + c2 * (3.0d0 * dfl(i  ) - dfl(im1))**2
+      bc    = c1 * df2(i  )**2 + c2 * (        dfr(i  ) + dfl(i  ))**2
+      br    = c1 * df2(ip1)**2 + c2 * (3.0d0 * dfr(i  ) - dfr(ip1))**2
+      ww    = abs(bl - br)
+
+! calculate alphas
+!
+      al    = 1.0d0 + ww / (bl + eps)
+      ac    = 1.0d0 + ww / (bc + eps)
+      ar    = 1.0d0 + ww / (br + eps)
+
+! calculate weights
+!
+      wl    = dl * al
+      wc    = dc * ac
+      wr    = dr * ar
+      ww    = wl + wc + wr
+      wl    = wl / ww
+      wc    = wc / ww
+      wr    = wr / ww
+
+! calculate the second order interpolations of the left state
+!
+      ql(1) = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      ql(2) = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      ql(3) = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = wl * ql(1) + wc * ql(2) + wr * ql(3)
+
+! calculate weights
+!
+      wl    = dl * ar
+      wc    = dc * ac
+      wr    = dr * al
+      ww    = wl + wc + wr
+      wl    = wl / ww
+      wc    = wc / ww
+      wr    = wr / ww
+
+! calculate the second order interpolations of the right state
+!
+      qr(1) = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr(2) = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr(3) = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(i) = wl * qr(1) + wc * qr(2) + wr * qr(3)
+
+    end do
+
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct
+!
+#endif /* WENOZ */
 #ifdef LIMO3
 !===============================================================================
 !
