@@ -210,6 +210,120 @@ module interpolation
   end subroutine reconstruct
 !
 #endif /* CENO3 */
+#ifdef WENO3
+!===============================================================================
+!
+! reconstruct: subroutine for the reconstruction of the values at the right and
+!              left interfaces of cells from their cell centered representation;
+!              the subroutine implements the improved 3rd order WENO scheme as
+!              described in Yamaleev & Carpenter, 2000, Journal of Computational
+!              Physics, 228, 3025
+!
+!===============================================================================
+!
+  subroutine reconstruct(n, h, f, fl, fr)
+
+    use config, only : eps
+
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)  :: n
+    real              , intent(in)  :: h
+    real, dimension(n), intent(in)  :: f
+    real, dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer         :: i, im1, ip1
+    real            :: h2, dfp, dfm, fp, fm, bp, bm, ap, am, wp, wm, ww
+
+! weight coefficients
+!
+    real, parameter :: dp = 2.0d0 / 3.0d0, dm = 1.0d0 / 3.0d0
+!
+!-------------------------------------------------------------------------------
+!
+! prepare fixed parameters
+!
+    h2 = h * h
+
+!! third order WENO interpolation
+!!
+! interpolate the values at i-1/2 and i+1/2
+!
+    do i = 1, n
+
+! prepare indices
+!
+      im1   = max(1, i - 1)
+      ip1   = min(n, i + 1)
+
+! calculate left and right derivatives
+!
+      dfp    = f(ip1) - f(i  )
+      dfm    = f(i  ) - f(im1)
+      ww    = abs(dfp - dfm)**2
+
+! calculate corresponding betas
+!
+      bp    = dfp * dfp
+      bm    = dfm * dfm
+
+! calculate improved alphas
+!
+      ap    = (1.0d0 + ww / (bp + h2))
+      am    = (1.0d0 + ww / (bm + h2))
+
+! calculate weights
+!
+      wp    = dp * ap
+      wm    = dm * am
+      ww    = wp + wm
+      wp    = wp / ww
+      wm    = wm / ww
+
+! calculate right and left sides interpolations
+!
+      fp    = 0.5d0 * (  f(i  ) +         f(ip1))
+      fm    = 0.5d0 * (- f(im1) + 3.0d0 * f(i  ))
+
+! calculate the left state
+!
+      fl(i) = wp * fp + wm * fm
+
+! calculate weights
+!
+      wp    = dp * am
+      wm    = dm * ap
+      ww    = wp + wm
+      wp    = wp / ww
+      wm    = wm / ww
+
+! calculate right and left sides interpolations
+!
+      fp    = 0.5d0 * (  f(i  ) +         f(im1))
+      fm    = 0.5d0 * (- f(ip1) + 3.0d0 * f(i  ))
+
+! calculate the left state
+!
+      fr(i) = wp * fp + wm * fm
+
+    end do
+
+! shift i-1/2 to the left
+!
+    do i = 1, n - 1
+      fr(i) = fr(i+1)
+    end do
+    fr(n) = f(n)
+!
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct
+!
+#endif /* WENO3 */
 #ifdef LIMO3
 !===============================================================================
 !
