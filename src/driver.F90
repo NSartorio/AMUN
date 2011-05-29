@@ -371,12 +371,15 @@ program amun
 
     write (*,*)
     write(*,"(1x,a)") "Job timings:"
-    write (*,fmt) "Initialization        : ", get_timer(1), per * get_timer(1)
-    write (*,fmt) "Evolution             : ", get_timer(2), per * get_timer(2)
-    write (*,fmt) "Data output           : ", get_timer(3), per * get_timer(3)
-    write (*,fmt) "Boundary update       : ", get_timer(4), per * get_timer(4)
-    write (*,fmt) "Mesh update           : ", get_timer(5), per * get_timer(5)
-    write (*,fmt) "Maximum speed estim.  : ", get_timer(6), per * get_timer(6)
+    write (*,fmt) "Initialization        : ", get_timer(1) , per * get_timer(1)
+    write (*,fmt) "Evolution             : ", get_timer(2) , per * get_timer(2)
+    write (*,fmt) " - reconstruction     : ", get_timer(15), per * get_timer(15)
+    write (*,fmt) " - Riemann solver     : ", get_timer(16) - get_timer(15)    &
+                                         , per * (get_timer(16) - get_timer(15))
+    write (*,fmt) " - boundary update    : ", get_timer(4) , per * get_timer(4)
+    write (*,fmt) "Data output           : ", get_timer(3) , per * get_timer(3)
+    write (*,fmt) "Mesh update           : ", get_timer(5) , per * get_timer(5)
+    write (*,fmt) "Maximum speed estim.  : ", get_timer(6) , per * get_timer(6)
 #ifdef FORCE
     write (*,fmt) "External forcing      : ", get_timer(10), per * get_timer(10)
     write (*,fmt) " - initialization     : ", get_timer(11), per * get_timer(11)
