@@ -202,8 +202,8 @@ module interpolation
 ! select the second order interpolation the closest to the linear one
 !
       dl(:) = ql(:) - fl(i)
-      if (dl(2) * dl(1) .gt. 0.0d0) then
-        if (dl(2) * dl(3) .gt. 0.0d0) then
+      if (dl(2) * dl(1) .gt. eps) then
+        if (dl(2) * dl(3) .gt. eps) then
           dl(:) = abs(dl(:))
           dl(2) = 0.7d0 * dl(2)
           if (dl(2) .lt. dl(1) .and. dl(2) .lt. dl(3)) then
@@ -217,8 +217,8 @@ module interpolation
       end if
 
       dl(:) = qr(:) - fr(im1)
-      if (dl(2) * dl(1) .gt. 0.0d0) then
-        if (dl(2) * dl(3) .gt. 0.0d0) then
+      if (dl(2) * dl(1) .gt. eps) then
+        if (dl(2) * dl(3) .gt. eps) then
           dl(:) = abs(dl(:))
           dl(2) = 0.7d0 * dl(2)
           if (dl(2) .lt. dl(1) .and. dl(2) .lt. dl(3)) then
