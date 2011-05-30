@@ -288,7 +288,13 @@ module interpolation
 
 ! prepare fixed parameters
 !
-    h2 = h * h
+    h2    = h * h
+
+! prepare initial left derivative
+!
+    dfp   = f(2) - f(1)
+    fp    = f(1)
+    fr(n) = f(n)
 
 !! third order WENO interpolation
 !!
@@ -298,67 +304,55 @@ module interpolation
 
 ! prepare indices
 !
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
+      im1     = max(1, i - 1)
+      ip1     = min(n, i + 1)
 
 ! calculate left and right derivatives
 !
-      dfp    = f(ip1) - f(i  )
-      dfm    = f(i  ) - f(im1)
-      ww    = abs(dfp - dfm)**2
+      dfm     = dfp
+      dfp     = f(ip1) - f(i  )
+      ww      = (dfp - dfm)**2
 
 ! calculate corresponding betas
 !
-      bp    = dfp * dfp
-      bm    = dfm * dfm
+      bp      = dfp * dfp
+      bm      = dfm * dfm
 
 ! calculate improved alphas
 !
-      ap    = (1.0d0 + ww / (bp + h2))
-      am    = (1.0d0 + ww / (bm + h2))
+      ap      = 1.0d0 + ww / (bp + h2)
+      am      = 1.0d0 + ww / (bm + h2)
 
 ! calculate weights
 !
-      wp    = dp * ap
-      wm    = dm * am
-      ww    = wp + wm
-      wp    = wp / ww
-      wm    = wm / ww
+      wp      = dp * am
+      wm      = dm * ap
+      ww      = 2.0d0 * (wp + wm)
 
 ! calculate right and left sides interpolations
 !
-      fp    = 0.5d0 * (  f(i  ) +         f(ip1))
-      fm    = 0.5d0 * (- f(im1) + 3.0d0 * f(i  ))
+      fm      = - f(ip1) + 3.0d0 * f(i  )
 
 ! calculate the left state
 !
-      fl(i) = wp * fp + wm * fm
+      fr(im1) = (wp * fp + wm * fm) / ww
 
 ! calculate weights
 !
-      wp    = dp * am
-      wm    = dm * ap
-      ww    = wp + wm
-      wp    = wp / ww
-      wm    = wm / ww
+      wp      = dp * ap
+      wm      = dm * am
+      ww      = 2.0d0 * (wp + wm)
 
 ! calculate right and left sides interpolations
 !
-      fp    = 0.5d0 * (  f(i  ) +         f(im1))
-      fm    = 0.5d0 * (- f(ip1) + 3.0d0 * f(i  ))
+      fp      =   f(i  ) +         f(ip1)
+      fm      = - f(im1) + 3.0d0 * f(i  )
 
 ! calculate the left state
 !
-      fr(i) = wp * fp + wm * fm
+      fl(i  ) = (wp * fp + wm * fm) / ww
 
     end do
-
-! shift i-1/2 to the left
-!
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
-    fr(n) = f(n)
 
 ! stop the reconstruction timer
 !
