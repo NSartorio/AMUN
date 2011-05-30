@@ -424,7 +424,8 @@ module interpolation
     end do
     dfl(1) = dfr(1)
     dfr(n) = dfl(n)
-    df2(:) = dfr(:) - dfl(:)
+    df2(:) = c1 * (dfr(:) - dfl(:))**2
+    fr (n) = f(n)
 
 ! interpolate the values at i-1/2 and i+1/2
 !
@@ -432,72 +433,59 @@ module interpolation
 
 ! prepare indices
 !
-      im2   = max(1, i - 2)
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
-      ip2   = min(n, i + 2)
+      im2     = max(1, i - 2)
+      im1     = max(1, i - 1)
+      ip1     = min(n, i + 1)
+      ip2     = min(n, i + 2)
 
 ! calculate betas
 !
-      bl    = c1 * df2(im1)**2 + c2 * (3.0d0 * dfl(i  ) - dfl(im1))**2
-      bc    = c1 * df2(i  )**2 + c2 * (        dfr(i  ) + dfl(i  ))**2
-      br    = c1 * df2(ip1)**2 + c2 * (3.0d0 * dfr(i  ) - dfr(ip1))**2
-      ww    = abs(bl - br)
+      bl      = df2(im1) + c2 * (3.0d0 * dfl(i  ) - dfl(im1))**2
+      bc      = df2(i  ) + c2 * (        dfr(i  ) + dfl(i  ))**2
+      br      = df2(ip1) + c2 * (3.0d0 * dfr(i  ) - dfr(ip1))**2
+      ww      = abs(bl - br)
 
 ! calculate alphas
 !
-      al    = 1.0d0 + ww / (bl + eps)
-      ac    = 1.0d0 + ww / (bc + eps)
-      ar    = 1.0d0 + ww / (br + eps)
+      al      = 1.0d0 + ww / (bl + eps)
+      ac      = 1.0d0 + ww / (bc + eps)
+      ar      = 1.0d0 + ww / (br + eps)
 
 ! calculate weights
 !
-      wl    = dl * al
-      wc    = dc * ac
-      wr    = dr * ar
-      ww    = wl + wc + wr
-      wl    = wl / ww
-      wc    = wc / ww
-      wr    = wr / ww
+      wl      = dl * al
+      wc      = dc * ac
+      wr      = dr * ar
+      ww      = wl + wc + wr
 
 ! calculate the second order interpolations of the left state
 !
-      ql(1) = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      ql(2) = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      ql(3) = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+      ql(1)   = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      ql(2)   = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      ql(3)   = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
 
 ! calculate the left state
 !
-      fl(i) = wl * ql(1) + wc * ql(2) + wr * ql(3)
+      fl(i)   = (wl * ql(1) + wc * ql(2) + wr * ql(3)) / ww
 
 ! calculate weights
 !
-      wl    = dl * ar
-      wc    = dc * ac
-      wr    = dr * al
-      ww    = wl + wc + wr
-      wl    = wl / ww
-      wc    = wc / ww
-      wr    = wr / ww
+      wl      = dl * ar
+      wc      = dc * ac
+      wr      = dr * al
+      ww      = wl + wc + wr
 
 ! calculate the second order interpolations of the right state
 !
-      qr(1) = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qr(2) = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr(3) = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+      qr(1)   = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr(2)   = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr(3)   = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
 ! calculate the right state
 !
-      fr(i) = wl * qr(1) + wc * qr(2) + wr * qr(3)
+      fr(im1) = (wl * qr(1) + wc * qr(2) + wr * qr(3)) / ww
 
     end do
-
-! shift i-1/2 to the left
-!
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
-    fr(n) = f(n)
 
 ! stop the reconstruction timer
 !
