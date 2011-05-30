@@ -140,10 +140,9 @@ module interpolation
 
 ! local variables
 !
-    integer               :: i, im1, ip1, im2, ip2
-    integer, dimension(1) :: loc
-    real                  :: dfl, dfr, df
-    real, dimension(3)    :: ql, qr, dl
+    integer            :: i, im1, ip1, im2, ip2
+    real               :: dfl, dfr, df
+    real, dimension(3) :: ql, qr, dl
 
 ! interpolation coefficients
 !
@@ -161,6 +160,10 @@ module interpolation
 
 !! third order CENO interpolation
 !!
+! calculate the initial right derivative
+!
+    dfr = f(2) - f(1)
+
 ! interpolate the values at i-1/2 and i+1/2
 !
     do i = 1, n
@@ -174,8 +177,8 @@ module interpolation
 
 ! calculate left and right derivatives
 !
+      dfl   = dfr
       dfr   = f(ip1) - f(i  )
-      dfl   = f(i  ) - f(im1)
 
 ! calculate limited derivative
 !
@@ -183,8 +186,8 @@ module interpolation
 
 ! obtain the states with the linear interpolation
 !
-      fl(i) = f(i) + df
-      fr(i) = f(i) - df
+      fl(i  ) = f(i) + df
+      fr(im1) = f(i) - df
 
 ! calculate the second order interpolations of the left and right states
 !
@@ -199,26 +202,39 @@ module interpolation
 ! select the second order interpolation the closest to the linear one
 !
       dl(:) = ql(:) - fl(i)
-      if(minval(dl) * maxval(dl) .gt. eps) then
-        dl(2) = 0.7d0 * dl(2)
-        loc   = minloc(abs(dl(:)))
-        fl(i) = ql(loc(1))
+      if (dl(2) * dl(1) .gt. 0.0d0) then
+        if (dl(2) * dl(3) .gt. 0.0d0) then
+          dl(:) = abs(dl(:))
+          dl(2) = 0.7d0 * dl(2)
+          if (dl(2) .lt. dl(1) .and. dl(2) .lt. dl(3)) then
+            fl(i) = ql(2)
+          else if (dl(1) .lt. dl(2) .and. dl(1) .lt. dl(3)) then
+            fl(i) = ql(1)
+          else if (dl(3) .lt. dl(1) .and. dl(3) .lt. dl(2)) then
+            fl(i) = ql(3)
+          end if
+        end if
       end if
 
-      dl(:) = qr(:) - fr(i)
-      if(minval(dl) * maxval(dl) .gt. eps) then
-        dl(2) = 0.7d0 * dl(2)
-        loc   = minloc(abs(dl(:)))
-        fr(i) = qr(loc(1))
+      dl(:) = qr(:) - fr(im1)
+      if (dl(2) * dl(1) .gt. 0.0d0) then
+        if (dl(2) * dl(3) .gt. 0.0d0) then
+          dl(:) = abs(dl(:))
+          dl(2) = 0.7d0 * dl(2)
+          if (dl(2) .lt. dl(1) .and. dl(2) .lt. dl(3)) then
+            fr(im1) = qr(2)
+          else if (dl(1) .lt. dl(2) .and. dl(1) .lt. dl(3)) then
+            fr(im1) = qr(1)
+          else if (dl(3) .lt. dl(1) .and. dl(3) .lt. dl(2)) then
+            fr(im1) = qr(3)
+          end if
+        end if
       end if
 
     end do
 
-! shift i-1/2 to the left
+! insert the last right state
 !
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
     fr(n) = f(n)
 
 ! stop the reconstruction timer
