@@ -619,8 +619,7 @@ module interpolation
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps
-    use config, only : alpha
+    use config, only : eps, alpha
     use timer , only : start_timer, stop_timer
 
     implicit none
@@ -644,11 +643,13 @@ module interpolation
     integer            :: im4, ip4
 #endif /* MP9 */
     real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
-    real               :: dl, dr, dm1, dc0, dp1, dml, dmr
+    real               :: dm1, dc0, dp1, dc4, dml, dmr, alpha2
+    real, dimension(n) :: dfl, dfr
+    logical            :: flag = .true.
 
 ! parameters
 !
-    real, parameter    :: ac =   4.0d0 / 3.0d0
+    real, parameter    :: ac =   8.0d0 / 3.0d0
 #ifdef MP5
     real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
                         , a3 =   47.0d0 / 60.0d0, a4 =   27.0d0 / 60.0d0       &
@@ -676,6 +677,18 @@ module interpolation
 
 !! fifth or higher order monotonicity preserving interpolation
 !!
+! calculate the left and right derivatives
+!
+    do i = 1, n-1
+      ip1 = i + 1
+      dfr(i  ) = 0.5d0 * (f(ip1) - f(i))
+      dfl(ip1) = dfr(i)
+    end do
+    dfl(1) = dfr(1)
+    dfr(n) = dfl(n)
+    fr (n) = f(n)
+    alpha2 = 2.0d0 * alpha
+
 ! iterate over all positions
 !
     do i = 1, n
@@ -703,33 +716,36 @@ module interpolation
 #endif /* MP5 */
 #ifdef MP7
       fh = a1 * f(im3) + a2 * f(im2) + a3 * f(im1) + a4 * f(i  ) + a5 * f(ip1) &
-         + a5 * f(ip2) + a5 * f(ip3)
+         + a6 * f(ip2) + a7 * f(ip3)
 #endif /* MP7 */
 #ifdef MP9
       fh = a1 * f(im4) + a2 * f(im3) + a3 * f(im2) + a4 * f(im1) + a5 * f(i  ) &
          + a6 * f(ip1) + a7 * f(ip2) + a8 * f(ip3) + a9 * f(ip4)
 #endif /* MP9 */
 
-      dl  = f(i  ) - f(im1)
-      dr  = f(ip1) - f(i  )
-      fmp = f(i) + minmod(dr, alpha * dl)
-      ds = (fh - f(i)) * (fh - fmp)
+      fmp = f(i) + minmod(2.0d0 * dfr(i), alpha2 * dfl(i))
+      ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
         fl(i) = fh
       else
-        dm1 = f(i) + f(im2) - 2.0d0 * f(im1)
-        dc0 = dr - dl
-        dp1 = f(i) + f(ip2) - 2.0d0 * f(ip1)
+        dm1   = dfr(im1) - dfl(im1)
+        dc0   = dfr(i  ) - dfl(i  )
+        dp1   = dfr(ip1) - dfl(ip1)
+        dc4   = 4.0d0 * dc0
 
-        dml = minmod4(4.0d0 * dm1 - dc0, 4.0d0 * dc0 - dm1, dm1, dc0)
-        dmr = minmod4(4.0d0 * dc0 - dp1, 4.0d0 * dp1 - dc0, dc0, dp1)
+        dml   = minmod4(4.0d0 * dm1 - dc0, dc4 - dm1, dm1, dc0)
+        dmr   = minmod4(4.0d0 * dp1 - dc0, dc4 - dp1, dp1, dc0)
 
-        ful = f(i) + alpha * dl
-        fav = 0.5d0 * (f(i) + f(ip1))
-        fmd = fav - 0.5d0 * dmr
-        flc = f(i) + 0.5d0 * dl + ac * dml
-        fmn = max(min(f(i),f(ip1),fmd), min(f(i),ful,flc))
-        fmx = min(max(f(i),f(ip1),fmd), max(f(i),ful,flc))
+        flag  = .false.
+
+        ful   = f(i) + alpha2 * dfl(i)
+        fav   = 0.5d0 * (f(i) + f(ip1))
+        fmd   = fav - dmr
+        flc   = f(i) + dfl(i) + ac * dml
+
+        fmn   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmx   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
         fl(i) = median(fh, fmn, fmx)
       end if
 
@@ -740,59 +756,43 @@ module interpolation
 #endif /* MP5 */
 #ifdef MP7
       fh = a1 * f(ip3) + a2 * f(ip2) + a3 * f(ip1) + a4 * f(i  ) + a5 * f(im1) &
-         + a5 * f(im2) + a5 * f(im3)
+         + a6 * f(im2) + a7 * f(im3)
 #endif /* MP7 */
 #ifdef MP9
       fh = a1 * f(ip4) + a2 * f(ip3) + a3 * f(ip2) + a4 * f(ip1) + a5 * f(i  ) &
          + a6 * f(im1) + a7 * f(im2) + a8 * f(im3) + a9 * f(im4)
 #endif /* MP9 */
 
-      dl  = f(i  ) - f(ip1)
-      dr  = f(im1) - f(i  )
-      fmp = f(i) + minmod(dr, alpha * dl)
-      ds = (fh - f(i)) * (fh - fmp)
+      fmp = f(i) - minmod(2.0d0 * dfl(i), alpha2 * dfr(i))
+      ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
-        fr(i) = fh
+        fr(im1) = fh
       else
-        dm1 = f(i) + f(ip2) - 2.0d0 * f(ip1)
-        dc0 = dr - dl
-        dp1 = f(i) + f(im2) - 2.0d0 * f(im1)
+        if (flag) then
+          dm1   = dfr(im1) - dfl(im1)
+          dc0   = dfr(i  ) - dfl(i  )
+          dp1   = dfr(ip1) - dfl(ip1)
+          dc4   = 4.0d0 * dc0
 
-        dml = minmod4(4.0d0 * dm1 - dc0, 4.0d0 * dc0 - dm1, dm1, dc0)
-        dmr = minmod4(4.0d0 * dc0 - dp1, 4.0d0 * dp1 - dc0, dc0, dp1)
+          dml   = minmod4(4.0d0 * dm1 - dc0, dc4 - dm1, dm1, dc0)
+          dmr   = minmod4(4.0d0 * dp1 - dc0, dc4 - dp1, dp1, dc0)
+        end if
 
-        ful = f(i) + alpha * dl
-        fav = 0.5d0 * (f(i) + f(im1))
-        fmd = fav - 0.5d0 * dmr
-        flc = f(i) + 0.5d0 * dl + ac * dml
-        fmn = max(min(f(i),f(im1),fmd), min(f(i),ful,flc))
-        fmx = min(max(f(i),f(im1),fmd), max(f(i),ful,flc))
-        fr(i) = median(fh, fmn, fmx)
+        ful   = f(i) - alpha2 * dfr(i)
+        fav   = 0.5d0 * (f(i) + f(im1))
+        fmd   = fav - dml
+        flc   = f(i) - dfr(i) + ac * dmr
+
+        fmn   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmx   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(im1) = median(fh, fmn, fmx)
       end if
 
-! if the left state creates a local extremum, limit both states to the zeroth
-! interpolation
-!
-      if ((f(ip1) - fl(i)) * (fl(i) - f(i)) .le. eps) then
-        fl(i) = f(i)
-        fr(i) = f(i)
-      end if
+      flag = .true.
 
-! if the right state creates a local extremum, limit both states to the zeroth
-! interpolation
-!
-      if ((f(i) - fr(i)) * (fr(i) - f(im1)) .le. eps) then
-        fl(i) = f(i)
-        fr(i) = f(i)
-      end if
     end do
 
-! shift i-1/2 to the left
-!
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
-    fr(n) = f(n)
 
 ! stop the reconstruction timer
 !
