@@ -383,9 +383,6 @@ module io
       if (rncpus .lt. ncpus) then
         lcpu = min(rncpus - 1, ncpu)
       end if
-      if (rncpus .gt. ncpus) then
-        call print_error("io::read_data_h5", "This is not supported yet!")
-      end if
 
 ! prepare the filename
 !
@@ -424,10 +421,6 @@ module io
 ! read data blocks
 !
               if (lcpu .eq. ncpu) call read_datablocks_h5(fid)
-
-! deallocate the array of block pointers
-!
-              if (allocated(block_array)) deallocate(block_array)
 
 ! terminate access to the current file
 !
@@ -476,6 +469,112 @@ module io
         call print_error("io::read_data_h5", "File " // trim(fl)               &
                                                      // " does not exist!")
       end if
+
+! if the number of files is larger than the number of processors read the
+! remaining files and allocate data blocks in the last processor
+!
+      if (rncpus .gt. ncpus) then
+
+! perform the rest only on the last processor
+!
+        if (ncpu .eq. (ncpus - 1)) then
+
+! iterate over the remaining files
+!
+          do lcpu = ncpus, rncpus - 1
+
+! prepare the filename
+!
+            write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
+
+! check if the HDF5 file exists
+!
+            inquire(file = fl, exist = info)
+
+! check if the file exists
+!
+            if (info) then
+
+! check if this is an HDF5 file
+!
+              call h5fis_hdf5_f(fl, info, err)
+
+              if (err .ge. 0) then
+
+                if (info) then
+
+! opent the current HDF5 file
+!
+                  call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! check if the file has been opened successfuly
+!
+                  if (err .ge. 0) then
+
+! read data blocks
+!
+                    call read_datablocks_h5(fid)
+
+! terminate access to the current file
+!
+                    call h5fclose_f(fid, err)
+
+! check if the file has been closed successfully
+!
+                    if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+                      call print_error("io::read_data_h5"                      &
+                                          , "Cannot close file: " // trim(fl))
+
+                    end if
+
+                  else
+
+! print error about the problem with opening the HDF5 file
+!
+                    call print_error("io::read_data_h5"                        &
+                                           , "Cannot open file: " // trim(fl))
+
+                  end if
+
+                else
+
+! print error about the wrong file format
+!
+                  call print_error("io::read_data_h5"                          &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
+                end if
+
+              else
+
+! print error about the problem with checking the file format
+!
+                call print_error("io::read_data_h5"                            &
+                                            , "Cannot check the file format!")
+
+              end if
+
+
+            else
+
+! print error since the file does not exist
+!
+              call print_error("io::read_data_h5"                              &
+                                  , "File " // trim(fl) // " does not exist!")
+
+            end if
+
+          end do
+
+        end if
+
+      end if
+
+! deallocate the array of block pointers
+!
+      if (allocated(block_array)) deallocate(block_array)
 
 ! close the FORTRAN interface
 !
@@ -2082,6 +2181,7 @@ module io
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f
+    use mpitools, only : ncpus
 
 ! declare variables
 !
@@ -2094,7 +2194,7 @@ module io
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: l, p, i, j, k
+    integer(kind=4)                :: l, p, i, j, k, lcpu
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
@@ -2115,6 +2215,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! prepare last cpu index
+!
+    lcpu = ncpus - 1
+
 ! open metablock group
 !
     call h5gopen_f(fid, 'metablocks', gid, err)
@@ -2199,7 +2303,7 @@ module io
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id      (pmeta, id (l))
-        call metablock_set_cpu     (pmeta, cpu(l))
+        call metablock_set_cpu     (pmeta, min(lcpu, cpu(l)))
         call metablock_set_refine  (pmeta, ref(l))
         call metablock_set_config  (pmeta, cfg(l))
         call metablock_set_level   (pmeta, lev(l))
