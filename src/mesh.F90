@@ -157,7 +157,7 @@ module mesh
     use blocks  , only : refine_block, deallocate_datablock
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
-    use config  , only : maxlev, rdims
+    use config  , only : minlev, maxlev, rdims
     use coords  , only : res
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
@@ -240,6 +240,12 @@ module mesh
 !
             if (get_mblocks() .eq. 1 .and. l .eq. 1) &
               pdata%meta%refine = 1
+
+! if the level is lower then the minimum level set the block to be refined
+! anyway
+!
+            if (l .lt. minlev) pdata%meta%refine = 1
+
           end if
 
 ! assign pointer to the next block
@@ -437,7 +443,7 @@ module mesh
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
     use blocks   , only : get_nleafs
-    use config   , only : maxlev, im, jm, km
+    use config   , only : minlev, maxlev, im, jm, km
     use coords   , only : res
     use error    , only : print_info, print_error
 #ifdef MPI
@@ -512,8 +518,10 @@ module mesh
 
 ! correct the refinement of the block for the base and top levels
 !
-          if (pmeta%level .eq. 1)      pmeta%refine = max(0, pmeta%refine)
+          if (pmeta%level .lt. minlev) pmeta%refine =  1
+          if (pmeta%level .eq. minlev) pmeta%refine = max(0, pmeta%refine)
           if (pmeta%level .eq. maxlev) pmeta%refine = min(0, pmeta%refine)
+          if (pmeta%level .gt. maxlev) pmeta%refine = -1
 
         end if ! pmeta is a leaf
       end if ! pmeta associated
