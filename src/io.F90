@@ -39,12 +39,12 @@ module io
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
-  integer(kind=4), save :: rmaxlev = 1, rncpus = 1
+  integer(kind=4), save :: rtoplev = 1, rncpus = 1
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
 !
-  integer(kind=4), save :: fcor = 1
+  integer(kind=4), save :: ucor = 1, dcor = 1
 
 ! array of pointer used during job restart
 !
@@ -702,17 +702,17 @@ module io
 
             end if
 
-! read attribute 'maxlev'
+! read attribute 'toplev'
 !
-            call h5aopen_by_name_f(fid, "/attributes", "maxlev", aid, err)
+            call h5aopen_by_name_f(fid, "/attributes", "toplev", aid, err)
 
 ! check if the attribute has been opened successfully
 !
             if (err .ge. 0) then
 
-! read the attribute maxlev
+! read the attribute toplev
 !
-              call read_attribute_integer_h5(aid, "maxlev", rmaxlev)
+              call read_attribute_integer_h5(aid, "toplev", rtoplev)
 
 ! close the attribute
 !
@@ -725,7 +725,7 @@ module io
 ! print error about the problem with closing the current file
 !
                 call print_error("io::read_restart_params_h5"                  &
-                                       , "Cannot close the attribute maxlev!")
+                                       , "Cannot close the attribute toplev!")
 
               end if
 
@@ -734,7 +734,7 @@ module io
 ! print error about the problem with opening the attribute
 !
               call print_error("io::read_restart_params_h5"                    &
-                                        , "Cannot open the attribute maxlev!")
+                                        , "Cannot open the attribute toplev!")
 
             end if
 
@@ -811,7 +811,7 @@ module io
     use blocks   , only : get_last_id
     use config   , only : ncells, nghost
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use config   , only : in, jn, kn, rdims, maxlev
+    use config   , only : in, jn, kn, rdims, minlev, maxlev, toplev
     use error    , only : print_error
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t
@@ -857,7 +857,9 @@ module io
       call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs())
       call write_attribute_integer_h5(gid, 'ncells' , ncells)
       call write_attribute_integer_h5(gid, 'nghost' , nghost)
+      call write_attribute_integer_h5(gid, 'minlev' , minlev)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
+      call write_attribute_integer_h5(gid, 'toplev' , toplev)
       call write_attribute_integer_h5(gid, 'ncpus'  , ncpus)
       call write_attribute_integer_h5(gid, 'ncpu'   , ncpu)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
@@ -952,8 +954,9 @@ module io
     use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
                         , get_nleafs
     use config   , only : ncells, nghost
-    use config   , only : in, jn, kn, rdims, maxlev
+    use config   , only : in, jn, kn, rdims, maxlev, toplev
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coords   , only : init_coords, clear_coords
     use error    , only : print_error, print_warning
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t, hsize_t
@@ -1039,11 +1042,26 @@ module io
               end if
             case('maxlev')
               call read_attribute_integer_h5(aid, aname, lmaxlev)
-              if (lmaxlev .gt. maxlev) then
-                call print_warning("io::read_attributes_h5"                    &
-                         , "The maximum refinement level has been decreased!")
+              if (lmaxlev .gt. toplev) then
+
+! subtitute the new value of toplev
+!
+                toplev = lmaxlev
+
+! regenerate coordinates
+!
+                call clear_coords()
+                call init_coords(.false.)
+
+! calculate a factor to rescale the block coordinates
+!
+                dcor = 2**(toplev - maxlev)
+
               else
-                fcor = 2**(maxlev - lmaxlev)
+
+! calculate a factor to rescale the block coordinates
+!
+                ucor = 2**(maxlev - lmaxlev)
               end if
             case('ncpu')
               call read_attribute_integer_h5(aid, aname, lncpu)
@@ -2290,8 +2308,11 @@ module io
 
 ! check if the maximum level has been changed, is so, rescale block coordinates
 !
-      if (fcor .gt. 1) then
-        cor(:,:) = cor(:,:) * fcor
+      if (dcor .gt. 1) then
+        cor(:,:) = cor(:,:) / dcor
+      end if
+      if (ucor .gt. 1) then
+        cor(:,:) = cor(:,:) * ucor
       end if
 
 ! prepare the array of pointers to metablocks
@@ -2681,7 +2702,7 @@ module io
     use blocks, only : block_meta, block_data, list_data
     use blocks, only : nsides
     use blocks, only : get_dblocks
-    use config, only : maxlev
+    use config, only : maxlev, toplev
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
@@ -2784,12 +2805,12 @@ module io
 !
         call write_vector_integer_h5(gid, 'levels', cm(1), lev)
         call write_vector_integer_h5(gid, 'refine', cm(1), ref)
-        call write_array2_integer_h5(gid, 'blkres', rm(:), res(:,1:NDIMS))
+        call write_array2_integer_h5(gid, 'blkres', rm(:), res(1:maxlev,1:NDIMS))
         call write_array2_integer_h5(gid, 'coords', cm(:), cor)
         call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
-        call write_vector_double_h5 (gid, 'dx'    , am(1), adx)
-        call write_vector_double_h5 (gid, 'dy'    , am(1), ady)
-        call write_vector_double_h5 (gid, 'dz'    , am(1), adz)
+        call write_vector_double_h5 (gid, 'dx'    , am(1), adx(1:maxlev))
+        call write_vector_double_h5 (gid, 'dy'    , am(1), ady(1:maxlev))
+        call write_vector_double_h5 (gid, 'dz'    , am(1), adz(1:maxlev))
 
 ! deallocate temporary arrays
 !

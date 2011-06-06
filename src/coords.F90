@@ -54,7 +54,7 @@ module coords
 !
   subroutine init_coords(flag)
 
-    use config, only : toplev, ng, in, jn, kn, im, jm, km, rdims
+    use config, only : maxlev, toplev, ng, in, jn, kn, im, jm, km, rdims
     use config, only : xmin, xmax, ymin, ymax, zmin, zmax
     use timer , only : start_timer, stop_timer
 
@@ -156,10 +156,10 @@ module coords
 
 ! calculate the effective block resolution at each level
 !
-      res(l,1)  = in * 2**(toplev - l)
-      res(l,2)  = jn * 2**(toplev - l)
+      res(l,1)  = max(1, in * 2**(maxlev - l))
+      res(l,2)  = max(1, jn * 2**(maxlev - l))
 #if NDIMS == 3
-      res(l,3)  = kn * 2**(toplev - l)
+      res(l,3)  = max(1, kn * 2**(maxlev - l))
 #endif /* NDIMS == 3 */
 
     end do
