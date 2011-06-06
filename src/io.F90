@@ -849,7 +849,7 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data
-    use blocks   , only : append_metablock, append_datablock
+    use blocks   , only : append_metablock
     use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
                         , get_nleafs
     use config   , only : ncells, nghost
@@ -879,8 +879,8 @@ module io
     integer(hsize_t)  :: alen = 16
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
-    integer           :: nattrs, lndims, llast_id, lmblocks, ldblocks          &
-                       , lnleafs, lncells, lnghost, lnseeds, lmaxlev, lncpu
+    integer           :: nattrs, lndims, llast_id, lmblocks, lnleafs           &
+                       , lncells, lnghost, lnseeds, lmaxlev, lncpu
 
 ! local pointers
 !
@@ -952,8 +952,6 @@ module io
               call read_attribute_integer_h5(aid, aname, llast_id)
             case('mblocks')
               call read_attribute_integer_h5(aid, aname, lmblocks)
-            case('dblocks')
-              call read_attribute_integer_h5(aid, aname, ldblocks)
             case('nleafs')
               call read_attribute_integer_h5(aid, aname, lnleafs)
             case('ncells')
@@ -1062,23 +1060,6 @@ module io
                                         , "Number of metablocks doesn't match!")
         end if
 
-! allocate all datablocks
-!
-        if (lncpu .eq. ncpu) then
-          do l = 1, ldblocks
-            call append_datablock(pdata)
-          end do
-        else
-          ldblocks = 0
-        end if
-
-! check if the number of created datablocks is equal to the ldblocks
-!
-        if (ldblocks .ne. get_dblocks()) then
-          call print_error("io::read_attributes_h5"                            &
-                                        , "Number of datablocks doesn't match!")
-        end if
-
 ! allocate an array of pointers with the size llast_id
 !
         allocate(block_array(llast_id))
@@ -1118,6 +1099,185 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_attributes_h5
+!
+!===============================================================================
+!
+! read_datablock_dims_h5: subroutine reads the data block dimensions from the
+!                         attributes group of the file given by the file
+!                         identificator
+!
+! arguments:
+!   fid - the HDF5 file identificator
+!   dm  - the data block dimensions
+!
+!===============================================================================
+!
+  subroutine read_datablock_dims_h5(fid, dm)
+
+! references to other modules
+!
+    use error    , only : print_error
+    use hdf5     , only : hid_t, hsize_t
+    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
+                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
+    use variables, only : nqt
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                , intent(in) :: fid
+    integer(hsize_t), dimension(5), intent(out) :: dm
+
+! local variables
+!
+    character(len=16) :: aname
+    integer(hid_t)    :: gid, aid
+    integer(hsize_t)  :: alen = 16
+    integer           :: err, i
+    integer           :: nattrs, ldblocks, lnghost
+
+! local arrays
+!
+    integer(kind=4), dimension(3) :: lm
+!
+!-------------------------------------------------------------------------------
+!
+! initiate the output vector
+!
+    dm(:) = 0
+    dm(2) = nqt
+
+! open the global attributes group
+!
+    call h5gopen_f(fid, 'attributes', gid, err)
+
+! check if the group has been opened successfuly
+!
+    if (err .ge. 0) then
+
+! read the number of global attributes
+!
+      call h5aget_num_attrs_f(gid, nattrs, err)
+
+! check if the number of attributes has been read successfuly
+!
+      if (err .ge. 0) then
+
+! iterate over all attributes
+!
+        do i = 0, nattrs - 1
+
+! open the current attribute
+!
+          call h5aopen_idx_f(gid, i, aid, err)
+
+! check if the attribute has been opened successfuly
+!
+          if (err .ge. 0) then
+
+! obtain the attribute name
+!
+            call h5aget_name_f(aid, alen, aname, err)
+
+! check if the attribute name has been read successfuly
+!
+              if (err .ge. 0) then
+
+! depending on the attribute name use proper subroutine to read its value
+!
+              select case(trim(aname))
+              case('dblocks')
+
+! obtain the number of data blocks
+!
+                call read_attribute_integer_h5(aid, aname, ldblocks)
+
+              case('dims')
+
+! obtain the block dimensions
+!
+                call read_attribute_vector_integer_h5(aid, aname, 3, lm(:))
+
+              case('nghost')
+
+! obtain the number of data blocks
+!
+                call read_attribute_integer_h5(aid, aname, lnghost)
+
+              case default
+              end select
+
+            else
+
+! print error about the problem with reading the attribute name
+!
+              call print_error("io::read_datablock_dims_h5",                   &
+                                    "Cannot read the current attribute name!")
+
+            end if
+
+! close the current attribute
+!
+            call h5aclose_f(aid, err)
+
+          else
+
+! print error about the problem with opening the current attribute
+!
+            call print_error("io::read_datablock_dims_h5",                     &
+                                         "Cannot open the current attribute!")
+
+          end if
+
+        end do ! i = 0, nattrs - 1
+
+! prepare the output array
+!
+        dm(1) = ldblocks
+        do i = 1, 3
+          if (lm(i) .gt. 1) lm(i) = lm(i) + 2 * lnghost
+        end do
+        dm(3:5) = lm(1:3)
+
+      else
+
+! print error about the problem with obtaining the number of attributes
+!
+        call print_error("io::read_datablock_dims_h5",                         &
+                                "Cannot get the number of global attributes!")
+
+      end if
+
+! close the group
+!
+      call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the group
+!
+        call print_error("io::read_datablock_dims_h5"                          &
+                                       , "Cannot close the attributes group!")
+
+      end if
+
+    else
+
+! print error about the problem with creating the group
+!
+      call print_error("io::read_datablock_dims_h5"                            &
+                                        , "Cannot open the attributes group!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_datablock_dims_h5
 !
 !===============================================================================
 !
@@ -2287,13 +2447,11 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : associate_blocks
-    use blocks   , only : get_dblocks
+    use blocks   , only : append_datablock, associate_blocks
     use config   , only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f
-    use variables, only : nqt
 
 ! declare variables
 !
@@ -2308,7 +2466,6 @@ module io
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
     integer                        :: err
-    integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
@@ -2322,6 +2479,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! get datablock array dimensions
+!
+    call read_datablock_dims_h5(fid, dm(:))
+
 ! open the datablock group
 !
     call h5gopen_f(fid, 'datablocks', gid, err)
@@ -2332,39 +2493,34 @@ module io
 
 ! restore all data blocks
 !
-      if (get_dblocks() .gt. 0) then
-
-! prepate dimensions
-!
-        am(1) = get_dblocks()
-        dm(1) = get_dblocks()
-        dm(2) = nqt
-        dm(3) = im
-        dm(4) = jm
-        dm(5) = km
+      if (dm(1) .gt. 0) then
 
 ! allocate array to restore datablocks data
 !
-        allocate(m(am(1)))
+        allocate(m(dm(1)))
         allocate(u(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
 ! read datablocks from the HDF5 file
 !
-        call read_vector_integer_h5(gid, 'meta', am(:), m(:))
-        call read_array5_double_h5 (gid, 'u'   , dm(:), u(:,:,:,:,:))
+        call read_vector_integer_h5(gid, 'meta', dm(1:1), m(:))
+        call read_array5_double_h5 (gid, 'u'   , dm(1:5), u(:,:,:,:,:))
 
-! iterate over all data blocks and fill their U arrays
+! iterate over all data blocks, allocate them and fill their U arrays
 !
-        l = 1
-        pdata => list_data
-        do while(associated(pdata))
+        do l = 1, dm(1)
 
+! allocate and append to the end of the list a new datablock
+!
+          call append_datablock(pdata)
+
+! associate a meta block with the current data block
+!
           call associate_blocks(block_array(m(l))%ptr, pdata)
 
+! fill out the array of conservative variables
+!
           pdata%u(:,:,:,:) = u(l,:,:,:,:)
 
-          l = l + 1
-          pdata => pdata%next
         end do
 
 ! deallocate allocatable arrays
