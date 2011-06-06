@@ -50,7 +50,7 @@ module config
 
 ! mesh refinement control
 !
-  integer(kind=4), save :: minlev  = 1, maxlev  = 1
+  integer(kind=4), save :: minlev  = 1, maxlev  = 1, toplev = 1
   real           , save :: crefmin = 0.2
   real           , save :: crefmax = 0.5
   real           , save :: epsref  = 0.01
@@ -412,6 +412,10 @@ module config
 !
 20  continue
     close(1)
+
+! reset the top level to maximum level
+!
+    toplev = maxlev
 
 ! compute additional parameters
 !

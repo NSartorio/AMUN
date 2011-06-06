@@ -49,7 +49,7 @@ module mesh
   subroutine init_mesh(flag)
 
     use blocks   , only : datablock_set_dims
-    use config   , only : maxlev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
+    use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : is_master, ncpus
     use timer    , only : start_timer, stop_timer
@@ -109,7 +109,7 @@ module mesh
         write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'," //        &
                                               "6x,'efficiency')",advance='no')
         write(funit,"(1x,a12)",advance="no") 'level = 1'
-        do l = 2, maxlev
+        do l = 2, toplev
           write(funit,"(2x,i6)",advance="no") l
         end do
 #ifdef MPI
@@ -443,7 +443,7 @@ module mesh
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
     use blocks   , only : get_nleafs
-    use config   , only : minlev, maxlev, im, jm, km
+    use config   , only : minlev, maxlev, toplev, im, jm, km
     use coords   , only : res
     use error    , only : print_info, print_error
 #ifdef MPI
@@ -578,7 +578,7 @@ module mesh
 #endif /* MPI */
 ! iterate over all levels starting from top and correct the refinement of blocks
 !
-    do l = maxlev, 1, -1
+    do l = toplev, 1, -1
 
 ! iterate over all meta blocks
 !
@@ -828,7 +828,7 @@ module mesh
 
 ! perform the actual derefinement
 !
-    do l = maxlev, 2, -1
+    do l = toplev, 2, -1
 
       pmeta => list_meta
       do while (associated(pmeta))
@@ -868,7 +868,7 @@ module mesh
 
 ! perform the actual refinement
 !
-    do l = 1, maxlev - 1
+    do l = 1, toplev - 1
 
       pmeta => list_meta
       do while (associated(pmeta))
@@ -1434,7 +1434,7 @@ module mesh
 
     use blocks  , only : block_meta, list_meta
     use blocks  , only : get_mblocks, get_nleafs
-    use config  , only : ncells, nghost, maxlev
+    use config  , only : ncells, nghost, toplev
     use coords  , only : effres
     use mpitools, only : is_master, ncpus
 
@@ -1452,7 +1452,7 @@ module mesh
 
 ! local arrays
 !
-    integer(kind=4), dimension(maxlev) :: ldist
+    integer(kind=4), dimension(toplev) :: ldist
 #ifdef MPI
     integer(kind=4), dimension(ncpus)  :: cdist
 #endif /* MPI */
@@ -1506,7 +1506,7 @@ module mesh
         write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8))",advance="no")  &
                                                         n, t, nl, nm, cov, eff
         write(funit,"('   ')",advance="no")
-        do l = 1, maxlev
+        do l = 1, toplev
           write(funit,"(2x,i6)",advance="no") ldist(l)
         end do
 #ifdef MPI

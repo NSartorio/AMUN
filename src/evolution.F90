@@ -49,7 +49,7 @@ module evolution
     use boundaries, only : boundary_correct_fluxes
 #endif /* CONSERVATIVE */
 #ifdef REFINE
-    use config    , only : maxlev
+    use config    , only : toplev
 #endif /* REFINE */
     use mesh      , only : update_mesh
     use timer     , only : start_timer, stop_timer
@@ -158,7 +158,7 @@ module evolution
 #ifdef REFINE
 ! chec if we need to perform the refinement step
 !
-    if (maxlev .gt. 1) then
+    if (toplev .gt. 1) then
 
 ! check refinement and refine
 !
@@ -168,7 +168,7 @@ module evolution
 !
       call boundary_variables()
 
-    end if ! maxlev > 1
+    end if ! toplev > 1
 #endif /* REFINE */
 
 ! find new time step
@@ -193,7 +193,7 @@ module evolution
   subroutine find_new_timestep()
 
     use blocks  , only : block_meta, block_data, list_meta, list_data
-    use config  , only : maxlev
+    use config  , only : toplev
 #ifdef MPI
     use mpitools, only : mallreducemaxr
 #endif /* MPI */
@@ -230,9 +230,9 @@ module evolution
     cmax   = 1.0d-16
     lev    = 1
 
-! if maxlev > 1, find the highest level
+! if toplev > 1, find the highest level
 !
-    if (maxlev .gt. 1) then
+    if (toplev .gt. 1) then
 
 ! iterate over all meta blocks and find the highest level with leafs
 !
@@ -249,7 +249,7 @@ module evolution
 
       end do ! meta blocks
 
-    end if ! maxlev > 1
+    end if ! toplev > 1
 
 ! find the smallest spacial step
 !
@@ -269,7 +269,7 @@ module evolution
 !
       if (pdata%meta%leaf) then
 
-! find the maximum level occupied by blocks (can be smaller than maxlev)
+! find the maximum level occupied by blocks (can be smaller than toplev)
 !
 
 

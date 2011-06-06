@@ -54,7 +54,7 @@ module coords
 !
   subroutine init_coords(flag)
 
-    use config, only : maxlev, ng, in, jn, kn, im, jm, km, rdims
+    use config, only : toplev, ng, in, jn, kn, im, jm, km, rdims
     use config, only : xmin, xmax, ymin, ymax, zmin, zmax
     use timer , only : start_timer, stop_timer
 
@@ -82,18 +82,18 @@ module coords
 
 ! allocate space for coordinate variables and resolutions
 !
-    allocate(ax   (maxlev, im))
-    allocate(ay   (maxlev, jm))
-    allocate(az   (maxlev, km))
-    allocate(adx  (maxlev))
-    allocate(ady  (maxlev))
-    allocate(adz  (maxlev))
-    allocate(adr  (maxlev))
-    allocate(adxi (maxlev))
-    allocate(adyi (maxlev))
-    allocate(adzi (maxlev))
-    allocate(advol(maxlev))
-    allocate(res  (maxlev, 3))
+    allocate(ax   (toplev, im))
+    allocate(ay   (toplev, jm))
+    allocate(az   (toplev, km))
+    allocate(adx  (toplev))
+    allocate(ady  (toplev))
+    allocate(adz  (toplev))
+    allocate(adr  (toplev))
+    allocate(adxi (toplev))
+    allocate(adyi (toplev))
+    allocate(adzi (toplev))
+    allocate(advol(toplev))
+    allocate(res  (toplev, 3))
 
 ! reset all coordinate variables to initial values
 !
@@ -112,7 +112,7 @@ module coords
 
 ! generate the coordinate variables for each level
 !
-    do l = 1, maxlev
+    do l = 1, toplev
 
 ! calculate the block resolution at each level
 !
@@ -156,10 +156,10 @@ module coords
 
 ! calculate the effective block resolution at each level
 !
-      res(l,1)  = in * 2**(maxlev - l)
-      res(l,2)  = jn * 2**(maxlev - l)
+      res(l,1)  = in * 2**(toplev - l)
+      res(l,2)  = jn * 2**(toplev - l)
 #if NDIMS == 3
-      res(l,3)  = kn * 2**(maxlev - l)
+      res(l,3)  = kn * 2**(toplev - l)
 #endif /* NDIMS == 3 */
 
     end do
@@ -180,7 +180,7 @@ module coords
 
       write(*,*)
       write(*,"(1x,a)"         ) "Geometry:"
-      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", maxlev
+      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", toplev
       write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
       write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))

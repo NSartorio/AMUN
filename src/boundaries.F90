@@ -43,7 +43,7 @@ module boundaries
     use blocks   , only : ndims, nsides, nfaces
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
-    use config   , only : periodic, ng, nd, nh, maxlev
+    use config   , only : periodic, ng, nd, nh, toplev
     use config   , only : im, jm, km
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
     use timer    , only : start_timer, stop_timer
@@ -86,7 +86,7 @@ module boundaries
 
 ! start from the top level and go down
 !
-    do level = maxlev, 1, -1
+    do level = toplev, 1, -1
 
 !!
 !! first COPY blocks between the same levels
@@ -778,7 +778,7 @@ module boundaries
 
 ! go from the first level up and prolong the boundaries
 !
-    do level = 1, maxlev
+    do level = 1, toplev
 
 !!
 !! then PROLONG blocks from lower levels
@@ -1503,7 +1503,7 @@ module boundaries
 
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
-    use config   , only : maxlev
+    use config   , only : toplev
     use config   , only : ibl, ie, jbl, je, kbl, ke
     use timer    , only : start_timer, stop_timer
 #ifdef MPI
@@ -1543,7 +1543,7 @@ module boundaries
 !
 ! do not correct fluxes if we do not use adaptive mesh
 !
-    if (maxlev .eq. 1) return
+    if (toplev .eq. 1) return
 
 ! start the boundary timer
 !
