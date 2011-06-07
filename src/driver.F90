@@ -48,7 +48,7 @@ program amun
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
   use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
-                      , get_timer_total
+                      , get_timer_total, timer_to_time
 !
 !-------------------------------------------------------------------------------
 !
@@ -387,7 +387,19 @@ program amun
     write (*,fmt) " - real to fourier    : ", get_timer(13), per * get_timer(13)
     write (*,fmt) " - fourier to real    : ", get_timer(14), per * get_timer(14)
 #endif /* FORCE */
-    write (*,fmt) "EXECUTION TIME        : ", tall        , 100.0
+
+! convert the total execution time to days, hours, minutes, and seconds
+!
+    call timer_to_time(tall, ed, eh, em, per)
+
+! print the final execution time
+!
+    es = max(1, nint(alog10(tall))) + 5
+    write(fmt,"(a,i2,a)") "(a27,1f", es, ".3,' secs = ')"
+    write (*,fmt) "EXECUTION TIME        : ", tall
+    es = es + 25
+    write(fmt,"(a1,i2,a)") "(", es, "x,i4.1,'d',i2.2,'h',i2.2,'m',f6.3,'s')"
+    write (*,fmt) ed, eh, em, per
     write (*,*)
   end if
 

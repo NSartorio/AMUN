@@ -161,6 +161,41 @@ module timer
 !-------------------------------------------------------------------------------
 !
   end function get_timer_total
+!
+!===============================================================================
+!
+! timer_to_time: subroutine converts a real timer to days, hours, minutes and
+!                seconds
+!
+!===============================================================================
+!
+  subroutine timer_to_time(timer, days, hour, mins, secs)
+
+    implicit none
+
+! input/output arguments
+!
+    real           , intent(in)  :: timer
+    integer(kind=4), intent(out) :: days, hour, mins
+    real           , intent(out) :: secs
+
+! local variables
+!
+    integer(kind=4) :: isecs
+!
+!-------------------------------------------------------------------------------
+!
+    isecs = int(timer, kind=4)
+    secs  = max(0.0, mod(timer, 60.0))
+    mins  = int(mod(isecs / 60, 60))
+    hour  = int(isecs / 3600)
+    days  = int(hour / 24)
+    hour  = int(mod(hour, 24))
+    days  = min(365, days)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine timer_to_time
 
 !===============================================================================
 !
