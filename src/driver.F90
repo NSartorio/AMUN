@@ -471,7 +471,7 @@ integer(kind=4) function terminate(sig_num)
 !-------------------------------------------------------------------------------
 !
 #ifdef GNU
-  iterm     = 9
+  iterm     = 15
 #endif /* GNU */
 #ifdef INTEL
   iterm     = sig_num
