@@ -56,7 +56,7 @@ program amun
 !
   character(len=60) :: fmt
   integer(kind=4)   :: iterm = 0
-  integer           :: ed, eh, em, es, ec
+  integer           :: ed, eh, em, es, ec, ln
   real              :: tall, tcur, tpre, per
 
 #ifdef SIGNALS
@@ -390,16 +390,17 @@ program amun
 
 ! convert the total execution time to days, hours, minutes, and seconds
 !
-    call timer_to_time(tall, ed, eh, em, per)
+    call timer_to_time(tall, ed, eh, em, es, ec)
 
 ! print the final execution time
 !
-    es = max(1, nint(alog10(tall))) + 5
-    write(fmt,"(a,i2,a)") "(a27,1f", es, ".3,' secs = ')"
+    ln = max(1, nint(alog10(tall))) + 5
+    write(fmt,"(a,i2,a)") "(a27,1f", ln, ".3,' secs = ')"
     write (*,fmt) "EXECUTION TIME        : ", tall
-    es = es + 25
-    write(fmt,"(a1,i2,a)") "(", es, "x,i4.1,'d',i2.2,'h',i2.2,'m',f6.3,'s')"
-    write (*,fmt) ed, eh, em, per
+    ln = ln + 26
+    write(fmt,"(a1,i2,a)") "(", ln, "x,i4.1,'d',i2.2,'h',i2.2,'m'" //          &
+                                                         ",i2.2,'.',i2.2,'s')"
+    write (*,fmt) ed, eh, em, es, ec
     write (*,*)
   end if
 
