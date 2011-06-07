@@ -54,6 +54,10 @@ endif
 #
 # pass additional flags to the compiler
 #
+# compiler
+#
+FFLAGS  += -D${COMPILER}
+
 # number of dimensions
 #
 FFLAGS  += -DNDIMS=${NDIMS}
