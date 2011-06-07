@@ -62,7 +62,10 @@ program amun
 #ifdef SIGNALS
 ! references to functions handling signals
 !
+  integer(kind=4) :: iret
+#ifdef GNU
   intrinsic signal
+#endif /* GNU */
   external  terminate
 
 ! signal definitions
@@ -75,9 +78,16 @@ program amun
 #ifdef SIGNALS
 ! assign function terminate with signals
 !
-  call signal(SIGINT , terminate)
-  call signal(SIGABRT, terminate)
-  call signal(SIGTERM, terminate)
+#ifdef GNU
+  iret = signal(SIGINT , terminate)
+  iret = signal(SIGABRT, terminate)
+  iret = signal(SIGTERM, terminate)
+#endif /* GNU */
+#ifdef INTEL
+  iret = signal(SIGINT , terminate, -1)
+  iret = signal(SIGABRT, terminate, -1)
+  iret = signal(SIGTERM, terminate, -1)
+#endif /* INTEL */
 
 #endif /* SIGNALS */
 ! initialize MPI
@@ -236,9 +246,16 @@ program amun
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
+#ifdef GNU
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",a1)',advance="no")                                     &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+#endif /* GNU */
+#ifdef INTEL
+    write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
+            ',1i2.2,"s",a1,$)')                                                &
+                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+#endif /* INTEL */
   end if
 
 ! set the previous time needed to estimate the execution time
@@ -296,9 +313,16 @@ program amun
 ! print progress information
 !
     if (is_master())                                                           &
+#ifdef GNU
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",a1)',advance="no")                                   &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+#endif /* GNU */
+#ifdef INTEL
+      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
+              ',1i2.2,"s",a1,$)')                                              &
+                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+#endif /* INTEL */
 
 ! obtain the time in hours
 !
@@ -361,8 +385,15 @@ program amun
   if (is_master()) then
     if (iterm .eq. 1) then
       write(*,*)
-      write(*,"(1x,a)") "Program terminated after receiving a signal."
       write(*,"(1x,a)") "Restart files have been successfully written."
+      write(*,"(1x,a)") "Terminating program after exceeding the" //           &
+                                                            " execution time."
+    end if
+    if (iterm .ge. 2) then
+      write(*,*)
+      write(*,"(1x,a)") "Restart files have been successfully written."
+      write(*,"(1x,a,i2)") "Terminating program after receiving a" //          &
+                                             " termination signal no. ", iterm
     end if
   end if
 #endif /* SIGNALS */
@@ -427,15 +458,25 @@ end program
 !
 !===============================================================================
 !
-subroutine terminate()
+integer(kind=4) function terminate(sig_num)
 
   use config, only : iterm
 
   implicit none
 
+! input arguments
+!
+  integer(kind=4), intent(in) :: sig_num
+
 !-------------------------------------------------------------------------------
 !
-  iterm = 1
+#ifdef GNU
+  iterm     = 9
+#endif /* GNU */
+#ifdef INTEL
+  iterm     = sig_num
+#endif /* INTEL */
+  terminate = 1
 
 !-------------------------------------------------------------------------------
 !
