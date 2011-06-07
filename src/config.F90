@@ -29,6 +29,10 @@ module config
 
   implicit none
 
+! termination flag
+!
+  integer(kind=4), save :: iterm = 0
+
 ! dimensional variables
 !
   integer(kind=4), save :: iblocks = 1, jblocks = 1, kblocks = 1

@@ -31,7 +31,7 @@ program amun
 !
   use blocks   , only : init_blocks, get_nleafs
   use config   , only : read_config
-  use config   , only : nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
+  use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
@@ -56,15 +56,10 @@ program amun
 ! local variables
 !
   character(len=60) :: fmt
-  integer(kind=4)   :: iterm = 0
   integer           :: ed, eh, em, es, ec, ln
   real              :: tall, tcur, tpre, thrs, per
 
 #ifdef SIGNALS
-! commons required to share iterm flag
-!
-  common /signals/ iterm
-
 ! references to functions handling signals
 !
   intrinsic signal
@@ -366,7 +361,7 @@ program amun
   if (is_master()) then
     if (iterm .eq. 1) then
       write(*,*)
-      write(*,"(1x,a)") "Program terminated due to received signal."
+      write(*,"(1x,a)") "Program terminated after receiving a signal."
       write(*,"(1x,a)") "Restart files have been successfully written."
     end if
   end if
@@ -428,30 +423,19 @@ end program
 !
 !===============================================================================
 !
-! terminate: function handles properly the signals sent to the program
+! terminate: subroutine sets the iterm variable after receiving a signal
 !
 !===============================================================================
 !
-function terminate(snum)
+subroutine terminate()
+
+  use config, only : iterm
 
   implicit none
 
-! input arguments
-!
-  integer(4), intent(in) :: snum
-
-! local and shared variables
-!
-  integer(4)             :: terminate, iterm
-
-! commons to declate shared variables
-!
-  common /signals/ iterm
-!
 !-------------------------------------------------------------------------------
 !
-  iterm     = 1
-  terminate = 1
+  iterm = 1
 
 !-------------------------------------------------------------------------------
 !
