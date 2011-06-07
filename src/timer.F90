@@ -169,14 +169,14 @@ module timer
 !
 !===============================================================================
 !
-  subroutine timer_to_time(timer, days, hours, mins, secs, msecs)
+  subroutine timer_to_time(timer, days, hours, mins, secs, csecs)
 
     implicit none
 
 ! input/output arguments
 !
     real           , intent(in)  :: timer
-    integer(kind=4), intent(out) :: days, hours, mins, secs, msecs
+    integer(kind=4), intent(out) :: days, hours, mins, secs, csecs
 
 ! local variables
 !
@@ -185,7 +185,7 @@ module timer
 !-------------------------------------------------------------------------------
 !
     isecs = int(timer, kind=4)
-    msecs = nint(100 * (timer - real(isecs)))
+    csecs = nint(100 * (timer - real(isecs)))
     secs  = mod(isecs, 60)
     mins  = int(mod(isecs / 60, 60))
     hours = int(isecs / 3600)
