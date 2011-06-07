@@ -118,7 +118,7 @@ module blocks
 
                                  ! the block coordinates in the physical units
                                  !
-    real(kind=8)                :: xmin, xmax, ymin, ymax, zmin, zmax
+    real                        :: xmin, xmax, ymin, ymax, zmin, zmax
 
   end type block_meta
 
