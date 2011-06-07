@@ -30,7 +30,8 @@ program amun
 ! modules
 !
   use blocks   , only : init_blocks, get_nleafs
-  use config   , only : read_config, nmax, tmax, dtini, dtout, cfl, nres
+  use config   , only : read_config
+  use config   , only : nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
@@ -57,7 +58,7 @@ program amun
   character(len=60) :: fmt
   integer(kind=4)   :: iterm = 0
   integer           :: ed, eh, em, es, ec, ln
-  real              :: tall, tcur, tpre, per
+  real              :: tall, tcur, tpre, thrs, per
 
 #ifdef SIGNALS
 ! commons required to share iterm flag
@@ -296,7 +297,6 @@ program amun
     ed   = int(eh/24)
     eh   = int(mod(eh, 24))
     ed   = min(9999,ed)
-    tpre = tcur
 
 ! print progress information
 !
@@ -304,6 +304,19 @@ program amun
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s\r")',advance="no")                                    &
                                         n, t, dt, get_nleafs(), ed, eh, em, es
+
+! obtain the time in hours
+!
+    thrs = ((2.0 * tcur - tpre) / 60.0 + tsav) / 60.0
+
+! terminate if the (thrs + tsav) > trun
+!
+    if (thrs .gt. trun) iterm = 1
+
+! update the previous time
+!    
+    tpre = tcur
+
 #if defined SIGNALS && defined MPI
 ! reduce termination flag over all processors
 !

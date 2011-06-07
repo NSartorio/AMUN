@@ -69,6 +69,11 @@ module config
 !
   real           , save :: tmax = 1.0, dtini = 1.0e-8
 
+! the maximum execution time in hours, and the number of minutes before the
+! execution time passes to terminate the job
+!
+  real           , save :: trun = 8766.0, tsav = 20.0
+
 ! data file type
 !
   character      , save :: ftype = 'r'
@@ -284,6 +289,10 @@ module config
       read(value, "(i9.9)") nmax
     case("tmax")
       read(value,        *) tmax
+    case("trun")
+      read(value,        *) trun
+    case("tsav")
+      read(value,        *) tsav
     case("dtini")
       read(value,        *) dtini
     case("gamma")
