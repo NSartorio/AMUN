@@ -4315,6 +4315,160 @@ module io
 !
 !===============================================================================
 !
+! write_array4_float_h5: subroutine stores a 4D single precision array
+!
+! arguments:
+!   gid   - the HDF5 group identificator where the dataset should be located
+!   name  - the string name representing the dataset
+!   dm    - the dataset dimensions
+!   value - the dataset values
+!
+!===============================================================================
+!
+  subroutine write_array4_float_h5(gid, name, dm, var)
+
+! references to other modules
+!
+    use error, only : print_error, print_warning
+    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_REAL
+    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
+                    , h5dcreate_f, h5dwrite_f, h5dclose_f
+    use hdf5 , only : H5P_DATASET_CREATE_F
+    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5 , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5 , only : H5_SZIP_NN_OM_F
+    use hdf5 , only : h5pset_szip_f
+#endif /* SZIP */
+
+! define default variables
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)                      , intent(in) :: gid
+    character(len=*)                    , intent(in) :: name
+    integer(hsize_t), dimension(4)      , intent(in) :: dm
+    real(kind=4)    , dimension(:,:,:,:), intent(in) :: var
+
+! local variables
+!
+    integer(hid_t) :: sid, pid, did
+    integer        :: err
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the dataset dimensions
+!
+    call h5screate_simple_f(4, dm(:), sid, err)
+
+! print an error, if the space for dimensions couldn't be created
+!
+    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
+                    , "Cannot create a space for the dataset: " // trim(name))
+
+! prepare the compression properties
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+
+! if the compression properties could be created properly, set the compression
+! algorithm and strength
+!
+    if (err .eq. 0) then
+
+! set the chunk size
+!
+      call h5pset_chunk_f(pid, 4, dm(:), err)
+
+! print a warning, if the chunk size couldn't be set properly
+!
+      if (err .eq. -1) call print_warning("io::write_array4_float_h5"          &
+                                            , "Cannot set the size of chunk!")
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+      call h5pset_deflate_f(pid, 9, err)
+#endif /* DEFLATE */
+#ifdef SZIP
+      if (product(dm) .ge. 32)                                                 &
+        call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+#endif /* SZIP */
+
+! print a warning, if the compression algorithm couldn't be set
+!
+      if (err .eq. -1) call print_warning("io::write_array4_float_h5"          &
+                                       , "Cannot set the compression method!")
+
+    else
+
+! print a warning, if the property list couldn't be created
+!
+      call print_warning("io::write_array4_float_h5"                           &
+                                           , "Cannot create a property list!")
+
+    end if
+
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_REAL, sid, did, err, pid)
+
+! print an error, if the dataset couldn't be created
+!
+    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
+                                , "Cannot create the dataset: " // trim(name))
+
+! write the dataset values
+!
+    call h5dwrite_f(did, H5T_NATIVE_REAL, var(:,:,:,:), dm, err, sid)
+
+! print an error, if the dataset couldn't be written successfuly
+!
+    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
+                                 , "Cannot write the dataset: " // trim(name))
+
+! close the dataset
+!
+    call h5dclose_f(did, err)
+
+! print an error, if the dataset couldn't be closed
+!
+    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
+                                 , "Cannot close the dataset: " // trim(name))
+
+! if the property list is created
+!
+    if (pid .ne. -1) then
+
+! terminate access to the property list
+!
+      call h5pclose_f(pid, err)
+
+! print a warning, if the property list couldn't be closed
+!
+      if (err .eq. -1)  call print_warning("io::write_array4_float_h5"         &
+                                          , "Cannot close the property list!")
+
+    end if
+
+! release the dataspace of the current dataset
+!
+    call h5sclose_f(sid, err)
+
+! print an error, if the space couldn't be released successfuly
+!
+    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
+                   , "Cannot close the space for the dataset: " // trim(name))
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_array4_float_h5
+!
+!===============================================================================
+!
 ! write_array3_double_h5: subroutine stores a 3D double precision array
 !
 ! arguments:
