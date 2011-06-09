@@ -3116,6 +3116,9 @@ module io
 #endif /* ADI */
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
+#ifdef GLM
+    use variables    , only : iph
+#endif /* GLM */
 #endif /* MHD */
 
 ! declare variables
@@ -3145,6 +3148,9 @@ module io
 #endif /* ADI */
 #ifdef MHD
     real(kind=4), dimension(:,:,:,:), allocatable :: magx, magy, magz
+#ifdef GLM
+    real(kind=4), dimension(:,:,:,:), allocatable :: bpsi
+#endif /* GLM */
 #endif /* MHD */
 
 ! local pointers
@@ -3192,6 +3198,9 @@ module io
       allocate(magx(dm(1),dm(2),dm(3),dm(4)))
       allocate(magy(dm(1),dm(2),dm(3),dm(4)))
       allocate(magz(dm(1),dm(2),dm(3),dm(4)))
+#ifdef GLM
+      allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
+#endif /* GLM */
 #endif /* MHD */
 
 ! iterate over the data blocks on current processor
@@ -3225,6 +3234,9 @@ module io
         magx(l,1:in,1:jn,1:kn) = real(q(ibx,ib:ie,jb:je,kb:ke),kind=4)
         magy(l,1:in,1:jn,1:kn) = real(q(iby,ib:ie,jb:je,kb:ke),kind=4)
         magz(l,1:in,1:jn,1:kn) = real(q(ibz,ib:ie,jb:je,kb:ke),kind=4)
+#ifdef GLM
+        bpsi(l,1:in,1:jn,1:kn) = real(q(iph,ib:ie,jb:je,kb:ke),kind=4)
+#endif /* GLM */
 #endif /* MHD */
 
 ! increase the block number
@@ -3250,6 +3262,9 @@ module io
       call write_array4_float_h5(gid, 'magx', dm(:), magx(:,:,:,:))
       call write_array4_float_h5(gid, 'magy', dm(:), magy(:,:,:,:))
       call write_array4_float_h5(gid, 'magz', dm(:), magz(:,:,:,:))
+#ifdef GLM
+      call write_array4_float_h5(gid, 'bpsi', dm(:), bpsi(:,:,:,:))
+#endif /* GLM */
 #endif /* MHD */
 
 ! deallocate the temporary arrays
