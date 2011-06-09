@@ -851,18 +851,26 @@ module interpolation
 !
     real, intent(in) :: a, b, c, d
 
-! local variables
+! local parameters
 !
-    real :: sb, sc, sd, s
+    real, parameter  :: epsp = epsilon(a), epsm = - epsilon(a)
 !
 !-------------------------------------------------------------------------------
 !
-    sb      = sign(1.0d0, a) + sign(1.0d0, b)
-    sc      = sign(1.0d0, a) + sign(1.0d0, c)
-    sd      = sign(1.0d0, a) + sign(1.0d0, d)
-    s       = 0.125d0 * sb * abs(sc * sd)
-    minmod4 = s * min(abs(a), abs(b), abs(c), abs(d))
+    minmod4 = 0.0d0
+
+    if (((a .gt. epsp) .and. (b .gt. epsp)) .and.                              &
+                                     ((c .gt. epsp) .and. (d .gt. epsp))) then
+      minmod4 = min(a, b, c, d)
+    else if (((a .lt. epsm) .and. (b .lt. epsm)) .and.                         &
+                                     ((c .lt. epsm) .and. (d .lt. epsm))) then
+      minmod4 = max(a, b, c, d)
+    end if
+
     return
+
+!-------------------------------------------------------------------------------
+!
   end function minmod4
 !
 !===============================================================================
