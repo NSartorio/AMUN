@@ -643,14 +643,13 @@ module interpolation
     integer            :: im4, ip4
 #endif /* MP9 */
     real               :: fh, fmp, fav, fmd, ful, flc, fmn, fmx
-    real               :: dm1, dc0, dp1, dc4, dml, dmr, alpha2
+    real               :: dm1, dc0, dp1, dc4, dml, dmr
     real, dimension(n) :: dfl, dfr
     logical            :: flag = .true.
 
 ! parameters
 !
     real, parameter    :: eps = epsilon(h)
-    real, parameter    :: ac =   8.0d0 / 3.0d0
 #ifdef MP5
     real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
                         , a3 =   47.0d0 / 60.0d0, a4 =   27.0d0 / 60.0d0       &
@@ -688,7 +687,6 @@ module interpolation
     dfl(1) = dfr(1)
     dfr(n) = dfl(n)
     fr (n) = f(n)
-    alpha2 = 2.0d0 * alpha
 
 ! iterate over all positions
 !
@@ -724,7 +722,7 @@ module interpolation
          + a6 * f(ip1) + a7 * f(ip2) + a8 * f(ip3) + a9 * f(ip4)
 #endif /* MP9 */
 
-      fmp = f(i) + minmod(2.0d0 * dfr(i), alpha2 * dfl(i))
+      fmp = f(i) + minmod(2.0d0 * dfr(i), alpha * dfl(i))
       ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
         fl(i) = fh
@@ -739,10 +737,10 @@ module interpolation
 
         flag  = .false.
 
-        ful   = f(i) + alpha2 * dfl(i)
+        ful   = f(i) + alpha * dfl(i)
         fav   = 0.5d0 * (f(i) + f(ip1))
         fmd   = fav - dmr
-        flc   = f(i) + dfl(i) + ac * dml
+        flc   = 0.5d0 * (f(i) + ful) + dml
 
         fmn   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
         fmx   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
@@ -764,7 +762,7 @@ module interpolation
          + a6 * f(im1) + a7 * f(im2) + a8 * f(im3) + a9 * f(im4)
 #endif /* MP9 */
 
-      fmp = f(i) - minmod(2.0d0 * dfl(i), alpha2 * dfr(i))
+      fmp = f(i) - minmod(2.0d0 * dfl(i), alpha * dfr(i))
       ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
         fr(im1) = fh
@@ -779,10 +777,10 @@ module interpolation
           dmr   = minmod4(4.0d0 * dp1 - dc0, dc4 - dp1, dp1, dc0)
         end if
 
-        ful   = f(i) - alpha2 * dfr(i)
+        ful   = f(i) - alpha * dfr(i)
         fav   = 0.5d0 * (f(i) + f(im1))
         fmd   = fav - dml
-        flc   = f(i) - dfr(i) + ac * dmr
+        flc   = 0.5d0 * (f(i) + ful) + dmr
 
         fmn   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
         fmx   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))

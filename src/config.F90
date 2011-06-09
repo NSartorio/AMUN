@@ -410,10 +410,6 @@ module config
     case("rad")
       read(value,        *) rad
 #endif /* LIMO3 */
-#ifdef MP
-    case("alpha")
-      read(value,        *) alpha
-#endif /* MP */
     case default
     end select
 
@@ -507,6 +503,12 @@ module config
 !
     decay = exp(- alpha_p * cfl)
 #endif /* MHD & GLM */
+
+#ifdef MP
+! monotonicity-preserving reconstruction parameters
+!
+    alpha  = 2.0d0 * (1.0d0 - cfl) / cfl
+#endif /* MP */
 
 ! return before error messages
 !
