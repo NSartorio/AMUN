@@ -816,11 +816,25 @@ module interpolation
 ! input arguments
 !
     real, intent(in) :: a, b
+
+! local parameters
+!
+    real, parameter  :: epsp = epsilon(a), epsm = - epsilon(a)
 !
 !-------------------------------------------------------------------------------
 !
-    minmod = (sign(0.5d0, a) + sign(0.5d0, b)) * min(abs(a), abs(b))
+    minmod = 0.0d0
+
+    if ((a .gt. epsp) .and. (b .gt. epsp)) then
+      minmod = min(a, b)
+    else if ((a .lt. epsm) .and. (b .lt. epsm)) then
+      minmod = max(a, b)
+    end if
+
     return
+
+!-------------------------------------------------------------------------------
+!
   end function minmod
 !
 !===============================================================================
