@@ -619,7 +619,7 @@ module interpolation
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps, alpha
+    use config, only : alpha
     use timer , only : start_timer, stop_timer
 
     implicit none
@@ -649,6 +649,7 @@ module interpolation
 
 ! parameters
 !
+    real, parameter    :: eps = epsilon(h)
     real, parameter    :: ac =   8.0d0 / 3.0d0
 #ifdef MP5
     real, parameter    :: a1 =    2.0d0 / 60.0d0, a2 = - 13.0d0 / 60.0d0       &
