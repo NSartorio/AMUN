@@ -3109,7 +3109,7 @@ module io
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
     use scheme       , only : cons2prim
-    use variables    , only : nvr, nqt
+    use variables    , only : nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI
     use variables    , only : ipr
@@ -3138,13 +3138,13 @@ module io
 
 ! local allocatable arrays
 !
-    real(kind=8), dimension(:,:,:,:), allocatable :: u, q
-    real(kind=8), dimension(:,:,:,:), allocatable :: dens, velx, vely, velz
+    real        , dimension(:,:,:,:), allocatable :: u, q
+    real(kind=4), dimension(:,:,:,:), allocatable :: dens, velx, vely, velz
 #ifdef ADI
-    real(kind=8), dimension(:,:,:,:), allocatable :: pres
+    real(kind=4), dimension(:,:,:,:), allocatable :: pres
 #endif /* ADI */
 #ifdef MHD
-    real(kind=8), dimension(:,:,:,:), allocatable :: magx, magy, magz
+    real(kind=4), dimension(:,:,:,:), allocatable :: magx, magy, magz
 #endif /* MHD */
 
 ! local pointers
@@ -3153,133 +3153,132 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! create a group to store global attributes
+! create a group to store primitive variables
 !
     call h5gcreate_f(fid, 'variables', gid, err)
 
-! check if the group has been created successfuly
+! print an error, if the group couldn't be created
 !
-    if (err .ge. 0) then
+    if (err .eq. -1) call print_error("io::write_variables_h5"                 &
+                                     , "Cannot create the group 'variables'!")
 
-! store variables only if there are some data blocks on the current processor
+! store variables only if there are at least one data block on the current
+! processor
 !
-      if (get_dblocks() .gt. 0) then
+    if (get_dblocks() .gt. 0) then
 
-! prepare dimensions
+! prepare the variable dimensions
 !
-        dm(1) = get_dblocks()
-        dm(2) = in
-        dm(3) = jn
-        dm(4) = kn
+      dm(1) = get_dblocks()
+      dm(2) = in
+      dm(3) = jn
+      dm(4) = kn
 
-! allocate arrays to store variables from all datablocks
+! allocate arrays for conservative and primitive variables
 !
-        allocate(u(nvr       ,im,jm,km))
-        allocate(q(nvr       ,im,jm,km))
+      allocate(u(nqt,im,jm,km))
+      allocate(q(nqt,im,jm,km))
 
-        allocate(dens(dm(1),dm(2),dm(3),dm(4)))
-        allocate(velx(dm(1),dm(2),dm(3),dm(4)))
-        allocate(vely(dm(1),dm(2),dm(3),dm(4)))
-        allocate(velz(dm(1),dm(2),dm(3),dm(4)))
+! allocate arrays to store the variables from current processor data blocks
+!
+      allocate(dens(dm(1),dm(2),dm(3),dm(4)))
+      allocate(velx(dm(1),dm(2),dm(3),dm(4)))
+      allocate(vely(dm(1),dm(2),dm(3),dm(4)))
+      allocate(velz(dm(1),dm(2),dm(3),dm(4)))
 #ifdef ADI
-        allocate(pres(dm(1),dm(2),dm(3),dm(4)))
+      allocate(pres(dm(1),dm(2),dm(3),dm(4)))
 #endif /* ADI */
 #ifdef MHD
-        allocate(magx(dm(1),dm(2),dm(3),dm(4)))
-        allocate(magy(dm(1),dm(2),dm(3),dm(4)))
-        allocate(magz(dm(1),dm(2),dm(3),dm(4)))
+      allocate(magx(dm(1),dm(2),dm(3),dm(4)))
+      allocate(magy(dm(1),dm(2),dm(3),dm(4)))
+      allocate(magz(dm(1),dm(2),dm(3),dm(4)))
 #endif /* MHD */
 
-! iterate over all data blocks and fill in the arrays
+! iterate over the data blocks on current processor
 !
-        l = 1
-        pdata => list_data
-        do while(associated(pdata))
+      l = 1
+      pdata => list_data
+      do while(associated(pdata))
 
 ! copy conserved variables from the current block to the temporary array
 !
-          u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
+        u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
 
-! obtain the primitive variables from the conserved ones
+! convert the conservative variables to their primitive representation
 !
-          do k = 1, km
-            do j = 1, jm
-              call cons2prim(im, u(:,:,j,k), q(:,:,j,k))
-            end do
+        do k = 1, km
+          do j = 1, jm
+            call cons2prim(im, u(1:nqt,1:im,j,k), q(1:nqt,1:im,j,k))
           end do
-
-          dens(l,1:in,1:jn,1:kn) = q(idn,ib:ie,jb:je,kb:ke)
-          velx(l,1:in,1:jn,1:kn) = q(ivx,ib:ie,jb:je,kb:ke)
-          vely(l,1:in,1:jn,1:kn) = q(ivy,ib:ie,jb:je,kb:ke)
-          velz(l,1:in,1:jn,1:kn) = q(ivz,ib:ie,jb:je,kb:ke)
-#ifdef ADI
-          pres(l,1:in,1:jn,1:kn) = q(ipr,ib:ie,jb:je,kb:ke)
-#endif /* ADI */
-#ifdef MHD
-          magx(l,1:in,1:jn,1:kn) = q(ibx,ib:ie,jb:je,kb:ke)
-          magy(l,1:in,1:jn,1:kn) = q(iby,ib:ie,jb:je,kb:ke)
-          magz(l,1:in,1:jn,1:kn) = q(ibz,ib:ie,jb:je,kb:ke)
-#endif /* MHD */
-
-          l = l + 1
-          pdata => pdata%next
         end do
 
-! write the variables to the HDF5 file
+! copy the primitive variables to the stored arrays
 !
-        call write_array4_double_h5(gid, 'dens', dm, dens)
-        call write_array4_double_h5(gid, 'velx', dm, velx)
-        call write_array4_double_h5(gid, 'vely', dm, vely)
-        call write_array4_double_h5(gid, 'velz', dm, velz)
+        dens(l,1:in,1:jn,1:kn) = real(q(idn,ib:ie,jb:je,kb:ke),kind=4)
+        velx(l,1:in,1:jn,1:kn) = real(q(ivx,ib:ie,jb:je,kb:ke),kind=4)
+        vely(l,1:in,1:jn,1:kn) = real(q(ivy,ib:ie,jb:je,kb:ke),kind=4)
+        velz(l,1:in,1:jn,1:kn) = real(q(ivz,ib:ie,jb:je,kb:ke),kind=4)
 #ifdef ADI
-        call write_array4_double_h5(gid, 'pres', dm, pres)
+        pres(l,1:in,1:jn,1:kn) = real(q(ipr,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* ADI */
 #ifdef MHD
-        call write_array4_double_h5(gid, 'magx', dm, magx)
-        call write_array4_double_h5(gid, 'magy', dm, magy)
-        call write_array4_double_h5(gid, 'magz', dm, magz)
+        magx(l,1:in,1:jn,1:kn) = real(q(ibx,ib:ie,jb:je,kb:ke),kind=4)
+        magy(l,1:in,1:jn,1:kn) = real(q(iby,ib:ie,jb:je,kb:ke),kind=4)
+        magz(l,1:in,1:jn,1:kn) = real(q(ibz,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* MHD */
 
-! deallocate allocatable arrays
+! increase the block number
 !
-        if (allocated(dens)) deallocate(dens)
-        if (allocated(velx)) deallocate(velx)
-        if (allocated(vely)) deallocate(vely)
-        if (allocated(velz)) deallocate(velz)
+        l = l + 1
+
+! associate the data block pointer with the next block
+!
+        pdata => pdata%next
+
+      end do
+
+! store the primitive variables in the HDF5 file
+!
+      call write_array4_float_h5(gid, 'dens', dm(:), dens(:,:,:,:))
+      call write_array4_float_h5(gid, 'velx', dm(:), velx(:,:,:,:))
+      call write_array4_float_h5(gid, 'vely', dm(:), vely(:,:,:,:))
+      call write_array4_float_h5(gid, 'velz', dm(:), velz(:,:,:,:))
 #ifdef ADI
-        if (allocated(pres)) deallocate(pres)
+      call write_array4_float_h5(gid, 'pres', dm(:), pres(:,:,:,:))
 #endif /* ADI */
 #ifdef MHD
-        if (allocated(magx)) deallocate(magx)
-        if (allocated(magy)) deallocate(magy)
-        if (allocated(magz)) deallocate(magz)
+      call write_array4_float_h5(gid, 'magx', dm(:), magx(:,:,:,:))
+      call write_array4_float_h5(gid, 'magy', dm(:), magy(:,:,:,:))
+      call write_array4_float_h5(gid, 'magz', dm(:), magz(:,:,:,:))
 #endif /* MHD */
-        if (allocated(u))    deallocate(u)
-        if (allocated(q))    deallocate(q)
 
-      end if ! dblocks > 0
-
-! close the attribute group
+! deallocate the temporary arrays
 !
-      call h5gclose_f(gid, err)
+      if (allocated(dens)) deallocate(dens)
+      if (allocated(velx)) deallocate(velx)
+      if (allocated(vely)) deallocate(vely)
+      if (allocated(velz)) deallocate(velz)
+#ifdef ADI
+      if (allocated(pres)) deallocate(pres)
+#endif /* ADI */
+#ifdef MHD
+      if (allocated(magx)) deallocate(magx)
+      if (allocated(magy)) deallocate(magy)
+      if (allocated(magz)) deallocate(magz)
+#endif /* MHD */
+      if (allocated(u))    deallocate(u)
+      if (allocated(q))    deallocate(q)
 
-! check if the group has been closed successfuly
+    end if ! dblocks > 0
+
+! close the variables group
 !
-      if (err .gt. 0) then
+    call h5gclose_f(gid, err)
 
-! print error about the problem with closing the group
+! print an error, if the group couldn't be closed
 !
-        call print_error("io::write_variables_h5", "Cannot close the group!")
-
-      end if
-
-    else
-
-! print error about the problem with creating the group
-!
-      call print_error("io::write_variables_h5", "Cannot create the group!")
-
-    end if
+    if (err .eq. -1) call print_error("io::write_variables_h5"                 &
+                                      , "Cannot close the group 'variables'!")
 
 !-------------------------------------------------------------------------------
 !
