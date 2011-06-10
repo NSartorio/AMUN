@@ -248,12 +248,12 @@ program amun
                                                  , 'blocks', 'ETA'
 #ifdef GNU
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
-            ',1i2.2,"s",a1)',advance="no")                                     &
+            ',1i2.2,"s",15x,a1)',advance="no")                                 &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* GNU */
 #ifdef INTEL
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
-            ',1i2.2,"s",a1,$)')                                                &
+            ',1i2.2,"s",15x,a1,$)')                                            &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL */
   end if
@@ -315,12 +315,12 @@ program amun
     if (is_master())                                                           &
 #ifdef GNU
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",a1)',advance="no")                                   &
+              ',1i2.2,"s",15x,a1)',advance="no")                               &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* GNU */
 #ifdef INTEL
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",a1,$)')                                              &
+              ',1i2.2,"s",15x,a1,$)')                                          &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL */
 
