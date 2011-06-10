@@ -422,7 +422,7 @@ module forcing
 
 ! calculate the number of forcing integration iteration for the current timestep
 !
-    ni = int(dt / fdt)
+    ni = max(1, int(dt / fdt))
 
 ! iterate over all perturbed Fourier components
 !
