@@ -54,6 +54,7 @@ module evolution
     use mesh      , only : update_mesh
     use timer     , only : start_timer, stop_timer
 #ifdef FORCE
+    use config    , only : tbfor
     use forcing   , only : fourier_transform, evolve_forcing
     use variables , only : idn, imz
 #endif /* FORCE */
@@ -72,23 +73,29 @@ module evolution
     call start_timer(2)
 
 #ifdef FORCE
+! perform forcing evolution only when t >= tbfor
+!
+    if (t .ge. tbfor) then
+
 ! perform the Fourier transform of the velocity field
 !
-    pblock => list_data
-    do while (associated(pblock))
+      pblock => list_data
+      do while (associated(pblock))
 
-      if (pblock%meta%leaf)                                                    &
-        call fourier_transform(pblock%meta%level                               &
-                       , pblock%meta%xmin, pblock%meta%ymin, pblock%meta%zmin  &
-                       , pblock%u(idn:imz,:,:,:))
+        if (pblock%meta%leaf)                                                  &
+          call fourier_transform(pblock%meta%level                             &
+                         , pblock%meta%xmin, pblock%meta%ymin                  &
+                         , pblock%meta%zmin, pblock%u(idn:imz,:,:,:))
 
-      pblock => pblock%next ! assign pointer to the next block
+        pblock => pblock%next ! assign pointer to the next block
 
-    end do
+      end do
 
 ! evolve the forcing source terms by the time interval dt
 !
-    call evolve_forcing(dt)
+      call evolve_forcing(t, dt)
+
+    end if ! t >= tbfor
 #endif /* FORCE */
 
 ! iterate over all data blocks and perform one step of time evolution
@@ -333,6 +340,7 @@ module evolution
     use variables, only : iph
 #endif /* MHD & GLM */
 #ifdef FORCE
+    use config   , only : tbfor
     use forcing  , only : real_forcing
     use variables, only : inx, iny, inz
     use variables, only : idn, imx, imy, imz
@@ -383,39 +391,45 @@ module evolution
 !
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* MHD & GLM */
+
 #ifdef FORCE
+! add forcing term only if t >= tbfor
+!
+    if (t .ge. tbfor) then
 
 ! obtain the forcing terms in real space
 !
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
-                                       , pblock%meta%zmin, f(:,:,:,:))
+      call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin  &
+                                         , pblock%meta%zmin, f(:,:,:,:))
 
 #ifdef ADI
 ! calculate kinetic energy before adding the forcing term
 !
-    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+      ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2     &
                                + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
 #endif /* ADI */
 
 ! update momenta due to the forcing terms
 !
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                  &
+      pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                &
                                           + pblock%u(idn,:,:,:) * f(inx,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                  &
+      pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                &
                                           + pblock%u(idn,:,:,:) * f(iny,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                  &
+      pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                &
                                           + pblock%u(idn,:,:,:) * f(inz,:,:,:)
 
 #ifdef ADI
 ! calculate kinetic energy after adding the forcing term
 !
-    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+      dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2    &
                    + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
 
 ! update total energy with the injected one
 !
-    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+      pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
+
+    end if ! t >= tbfor
 #endif /* FORCE */
 
 #ifdef SHAPE
@@ -898,6 +912,7 @@ module evolution
     use blocks   , only : block_data
     use config   , only : im, jm, km
 #ifdef FORCE
+    use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
     use coords   , only : adxi, adyi, adzi
@@ -975,35 +990,45 @@ module evolution
     pblock%u(iph,:,:,:) = decay * pblock%u(iph,:,:,:)
 #endif /* GLM */
 #endif /* MHD */
+
 #ifdef FORCE
+! add the forcing term only if t >= tbfor
+!
+    if (t .ge. tbfor) then
+
 ! obtain the forcing terms in real space
 !
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+      call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin  &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
 #ifdef ADI
 ! calculate kinetic energy before adding the forcing term
 !
-    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+      ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2     &
                                + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
 #endif /* ADI */
 
 ! update momenta due to the forcing terms
 !
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+      pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(1,:,:,:)
+      pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(2,:,:,:)
+      pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
 #ifdef ADI
 ! calculate kinetic energy after adding the forcing term
 !
-    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+      dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2    &
                    + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
 
 ! update total energy with the injected one
 !
-    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+      pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
 #endif /* ADI */
+
+    end if ! t >= tbfor
 #endif /* FORCE */
 
 #ifdef SHAPE
@@ -1030,6 +1055,7 @@ module evolution
     use blocks   , only : block_data
     use config   , only : im, jm, km
 #ifdef FORCE
+    use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
     use coords   , only : adxi, adyi, adzi
@@ -1131,34 +1157,44 @@ module evolution
 
 #endif /* GLM */
 #endif /* MHD */
+
 #ifdef FORCE
+! add the forcing term only if t >= tbfor
+!
+    if (t .ge. tbfor) then
+
 ! obtain the forcing terms in real space
 !
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+      call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin  &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
 #ifdef ADI
 ! calculate kinetic energy before adding the forcing term
 !
-    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+      ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2     &
                                + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
 #endif /* ADI */
 
 ! update momenta due to the forcing terms
 !
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+      pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(1,:,:,:)
+      pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(2,:,:,:)
+      pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
 #ifdef ADI
 ! calculate kinetic energy after adding the forcing term
 !
-    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+      dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2    &
                    + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
 
 ! update total energy with the injected one
 !
-    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+      pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+
+    end if ! t >= tbfor
 #endif /* ADI */
 #endif /* FORCE */
 
@@ -1187,6 +1223,7 @@ module evolution
     use blocks   , only : block_data
     use config   , only : im, jm, km
 #ifdef FORCE
+    use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
     use coords   , only : adxi, adyi, adzi
@@ -1319,33 +1356,42 @@ module evolution
 #endif /* MHD */
 
 #ifdef FORCE
+! add the forcing term only if t >= tbfor
+!
+    if (t .ge. tbfor) then
+
 ! obtain the forcing terms in real space
 !
-    call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin    &
+      call real_forcing(pblock%meta%level, pblock%meta%xmin, pblock%meta%ymin  &
                                        , pblock%meta%zmin, f(:,:,:,:))
 
 #ifdef ADI
 ! calculate kinetic energy before adding the forcing term
 !
-    ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2       &
+      ek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2     &
                                + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:)
 #endif /* ADI */
 
 ! update momenta due to the forcing terms
 !
-    pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:) + pblock%u(idn,:,:,:) * f(1,:,:,:)
-    pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:) + pblock%u(idn,:,:,:) * f(2,:,:,:)
-    pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:) + pblock%u(idn,:,:,:) * f(3,:,:,:)
+      pblock%u(imx,:,:,:) = pblock%u(imx,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(1,:,:,:)
+      pblock%u(imy,:,:,:) = pblock%u(imy,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(2,:,:,:)
+      pblock%u(imz,:,:,:) = pblock%u(imz,:,:,:)                                &
+                                            + pblock%u(idn,:,:,:) * f(3,:,:,:)
 
 #ifdef ADI
 ! calculate kinetic energy after adding the forcing term
 !
-    dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2      &
+      dek(:,:,:) = 0.5d0 * (pblock%u(imx,:,:,:)**2 + pblock%u(imy,:,:,:)**2    &
                    + pblock%u(imz,:,:,:)**2) / pblock%u(idn,:,:,:) - ek(:,:,:)
 
 ! update total energy with the injected one
 !
-    pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+      pblock%u(ien,:,:,:) = pblock%u(ien,:,:,:) + dek(:,:,:)
+
+    end if ! t >= tbfor
 #endif /* ADI */
 #endif /* FORCE */
 

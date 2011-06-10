@@ -372,10 +372,10 @@ module forcing
 !
 !===============================================================================
 !
-  subroutine evolve_forcing(dt)
+  subroutine evolve_forcing(t, dt)
 
-    use config   , only : fpow, fdt
-    use constants, only : dpi
+    use config   , only : fpow, fdt, tbfor, tefor
+    use constants, only : hpi, dpi
 #ifdef MPI
     use mpitools , only : mallreducesumc
 #endif /* MPI */
@@ -386,13 +386,14 @@ module forcing
 
 ! input arguments
 !
-    real, intent(in) :: dt
+    real, intent(in) :: t, dt
 
 ! local variables
 !
     integer :: l, n, ni
     complex :: aran, bran, xi1, xi2
     real    :: phi, psi, th1, th2, div, tanth1, fpw, fac
+    real    :: ts, fc, ft
 
 !-------------------------------------------------------------------------------
 !
@@ -405,8 +406,20 @@ module forcing
 ! reduce velocity fourier components from all processors
 !
     call mallreducesumc(nf, 3, vtab(:,:))
-
 #endif /* MPI */
+
+! calculate the amplitude increase factor
+!
+    if (t .gt. tefor) then
+      ft = 1.0d0
+    else if ((t + dt) .lt. tbfor) then
+      ft = 0.0d0
+    else
+      ts = t - tbfor + 0.5d0 * dt
+      fc = hpi / max(epsilon(t), (tefor - tbfor))
+      ft = sin(fc * ts)
+    end if
+
 ! calculate the number of forcing integration iteration for the current timestep
 !
     ni = int(dt / fdt)
@@ -471,7 +484,7 @@ module forcing
 ! normalize amplitudes to the correct input power
 !
     fpw       = abs(sum(ftab(:,:) * conjg(ftab(:,:))))
-    fac       = sqrt(4.0d0 * dt * fpow / fpw)
+    fac       = ft * sqrt(4.0d0 * dt * fpow / fpw)
     ftab(:,:) = fac * ftab(:,:)
 
 ! calculate the force-force correlation in Fourier space

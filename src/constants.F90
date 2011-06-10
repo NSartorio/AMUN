@@ -31,6 +31,7 @@ module constants
 
 ! number Pi and its multiplications
 !
+  real, parameter :: hpi =  1.5707963267948965579989817342721d0
   real, parameter ::  pi =  3.1415926535897931159979634685442d0
   real, parameter :: dpi =  6.2831853071795862319959269370884d0
   real, parameter :: qpi = 12.5663706143591724639918538741770d0

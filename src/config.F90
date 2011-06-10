@@ -133,6 +133,8 @@ module config
   real               , save :: ku    = 3.0d+0 ! the maximum cut-off wave number
   real               , save :: kc    = 0.1d+0 ! the spectrum width
   integer            , save :: kd    = 1      ! the wave number increment
+  real               , save :: tbfor = 0.0d+0 ! the moment when the forcing is initiated
+  real               , save :: tefor = 0.0d+0 ! the moment when the forcing is reached full power
 #endif /* FORCE */
 #ifdef VISCOSITY
 ! viscous terms parameters
@@ -389,6 +391,10 @@ module config
       read(value,*) kc
     case("kd")
       read(value,*) kd
+    case("tbfor")
+      read(value,*) tbfor
+    case("tefor")
+      read(value,*) tefor
 #endif /* FORCE */
 #ifdef VISCOSITY
     case("visc")
