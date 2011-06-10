@@ -2681,7 +2681,7 @@ module boundaries
                             , jbl, je, jeu, kb, kbl, ke, keu
     use error        , only : print_warning
     use interpolation, only : limiter
-    use variables    , only : nvr, nfl, imx, imy, imz
+    use variables    , only : nvr, nfl, idn, imx, imy, imz
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
@@ -2938,6 +2938,22 @@ module boundaries
         end do
 #endif /* MHD */
 
+      case("fixed")
+
+        do j = 1, ng
+          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
+          pdata%u(idn,:,j,:) =  1.0d0
+          pdata%u(imx,:,j,:) =  0.0d0
+#ifdef MHD
+          pdata%u(ibx,:,j,:) = -1.0d0
+          pdata%u(iby,:,j,:) =  0.0d0
+          pdata%u(ibz,:,j,:) =  0.0d0
+#ifdef GLM
+          pdata%u(iph,:,j,:) =  0.0d0
+#endif /* GLM */
+#endif /* MHD */
+        end do
+
       case default ! "open" as default boundary conditions
 
         do j = 1, ng
@@ -3014,6 +3030,22 @@ module boundaries
           end do
         end do
 #endif /* MHD */
+
+      case("fixed")
+
+        do j = jeu, jm
+          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
+          pdata%u(idn,:,j,:) =  1.0d0
+          pdata%u(imx,:,j,:) =  0.0d0
+#ifdef MHD
+          pdata%u(ibx,:,j,:) =  1.0d0
+          pdata%u(iby,:,j,:) =  0.0d0
+          pdata%u(ibz,:,j,:) =  0.0d0
+#ifdef GLM
+          pdata%u(iph,:,j,:) =  0.0d0
+#endif /* GLM */
+#endif /* MHD */
+        end do
 
       case default ! "open" as default boundary conditions
 
