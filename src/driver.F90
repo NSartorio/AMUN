@@ -313,6 +313,11 @@ program amun
 ! print progress information
 !
     if (is_master())                                                           &
+#ifdef EKO
+      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
+              ',1i2.2,"s",15x,a1,$)')                                          &
+                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+#endif /* EKO */
 #ifdef GNU
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1)',advance="no")                               &

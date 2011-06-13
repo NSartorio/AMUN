@@ -200,11 +200,11 @@ module config
 !
     integer            :: iargc
 
-#ifdef PGI
-    external           :: iargc, getarg
-#else /* PGI */
+#ifdef GNU
     intrinsic          :: iargc, getarg
-#endif /* PGI */
+#else /* GNU */
+    external           :: iargc, getarg
+#endif /* GNU */
 !
 !-------------------------------------------------------------------------------
 !
