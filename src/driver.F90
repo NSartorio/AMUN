@@ -82,14 +82,13 @@ program amun
   iret = signal(SIGINT , terminate)
   iret = signal(SIGABRT, terminate)
   iret = signal(SIGTERM, terminate)
-#endif /* GNU */
-#ifdef INTEL
+#else /* GNU */
   iret = signal(SIGINT , terminate, -1)
   iret = signal(SIGABRT, terminate, -1)
   iret = signal(SIGTERM, terminate, -1)
-#endif /* INTEL */
-
+#endif /* GNU */
 #endif /* SIGNALS */
+
 ! initialize MPI
 !
   call init_mpi()
@@ -468,11 +467,10 @@ integer(kind=4) function terminate(sig_num)
 
 !-------------------------------------------------------------------------------
 !
-#ifdef GNU
-  iterm     = 15
-#endif /* GNU */
 #ifdef INTEL
   iterm     = sig_num
+#else /* INTEL */
+  iterm     = 15
 #endif /* INTEL */
   terminate = 1
 
