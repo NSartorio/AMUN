@@ -245,15 +245,15 @@ program amun
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
-#if defined EKO || defined INTEL
+#if defined INTEL || defined PATHSCALE
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* EKO | INTEL */
+#else /* INTEL | PATHSCALE */
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* EKO | INTEL */
+#endif /* INTEL | PATHSCALE */
   end if
 
 ! set the previous time needed to estimate the execution time
@@ -311,15 +311,15 @@ program amun
 ! print progress information
 !
     if (is_master())                                                           &
-#if defined EKO || defined INTEL
+#if defined INTEL || defined PATHSCALE
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* EKO | INTEL */
+#else /* INTEL | PATHSCALE */
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1)',advance="no")                               &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* EKO | INTEL */
+#endif /* INTEL | PATHSCALE */
 
 ! obtain the time in hours
 !
@@ -330,7 +330,7 @@ program amun
     if (thrs .gt. trun) iterm = 1
 
 ! update the previous time
-!    
+!
     tpre = tcur
 
 #if defined SIGNALS && defined MPI
