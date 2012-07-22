@@ -162,11 +162,12 @@ default: $(name).x
 
 sources = blocks.F90 boundaries.F90 config.F90 constants.F90 coords.F90        \
           driver.F90 error.F90 evolution.F90 forcing.F90 integrals.F90         \
-          interpolation.F90 io.F90 mesh.F90 mpitools.F90 problem.F90           \
-          random.F90 scheme.F90 timers.F90 variables.F90
+          interpolation.F90 io.F90 mesh.F90 mpitools.F90 parameters.F90        \
+          problem.F90 random.F90 scheme.F90 timers.F90 variables.F90
 objects = blocks.o boundaries.o config.o constants.o coords.o driver.o error.o \
           evolution.o forcing.o integrals.o interpolation.o io.o mesh.o        \
-          mpitools.o problem.o random.o scheme.o timers.o variables.o
+          mpitools.o parameters.o problem.o random.o scheme.o timers.o         \
+          variables.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
 $(name).x: $(objects)
@@ -222,6 +223,7 @@ io.o            : io.F90 blocks.o coords.o error.o evolution.o mpitools.o      \
 mesh.o          : mesh.F90 blocks.o config.o coords.o error.o interpolation.o  \
                   mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90 timers.o
+parameters.o    : parameters.F90 mpitools.o
 problem.o       : problem.F90 blocks.o constants.o coords.o mpitools.o         \
                   random.o scheme.o variables.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
