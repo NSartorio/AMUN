@@ -1,18 +1,15 @@
 !!******************************************************************************
 !!
-!! module: IO - handling the data input and output for storing the snapshots
-!!              and restarting the jobs
+!!  This file is part of the AMUN source code, a program to perform
+!!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
+!!  adaptive mesh.
 !!
-!! Copyright (C) 2008-2011 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2012 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
-!!******************************************************************************
-!!
-!!  This file is part of the AMUN code.
-!!
-!!  This program is free software; you can redistribute it and/or
-!!  modify it under the terms of the GNU General Public License
-!!  as published by the Free Software Foundation; either version 2
-!!  of the License, or (at your option) any later version.
+!!  This program is free software: you can redistribute it and/or modify
+!!  it under the terms of the GNU General Public License as published by
+!!  the Free Software Foundation, either version 3 of the License, or
+!!  (at your option) any later version.
 !!
 !!  This program is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,11 +17,14 @@
 !!  GNU General Public License for more details.
 !!
 !!  You should have received a copy of the GNU General Public License
-!!  along with this program; if not, write to the Free Software Foundation,
-!!  Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+!!  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !!
 !!******************************************************************************
 !!
+!! module: IO - handling the data input and output for storing the snapshots
+!!              and restarting the jobs
+!!
+!!******************************************************************************
 !
 module io
 

@@ -1,19 +1,17 @@
 !!******************************************************************************
 !!
-!! module: variables - module handling the variable indices
+!!  This file is part of the AMUN source code, a program to perform
+!!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
+!!  adaptive mesh.
 !!
-!! Copyright (C) 2010,2011 Grzegorz Kowal <grzegorz@gkowal.info>
+!!  Copyright (C) 2008-2012 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
-!!******************************************************************************
-!!
-!!  This file is part of AMUN.
-!!
-!!  AMUN is free software; you can redistribute it and/or modify
+!!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
-!!  the Free Software Foundation; either version 3 of the License, or
+!!  the Free Software Foundation, either version 3 of the License, or
 !!  (at your option) any later version.
 !!
-!!  AMUN is distributed in the hope that it will be useful,
+!!  This program is distributed in the hope that it will be useful,
 !!  but WITHOUT ANY WARRANTY; without even the implied warranty of
 !!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !!  GNU General Public License for more details.
@@ -23,6 +21,9 @@
 !!
 !!******************************************************************************
 !!
+!! module: variables - module handling the variable indices
+!!
+!!******************************************************************************
 !
 module variables
 
