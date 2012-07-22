@@ -213,11 +213,11 @@ module config
 !
   do l = 1, iargc()
     call getarg(l, line)
-    if (trim(line) .eq. '-c' .or. trim(line) .eq. '--config') then
+    if (trim(line) .eq. '-i' .or. trim(line) .eq. '--input') then
       call getarg(l + 1, line)
       if (trim(line) .eq. '') then
         call print_error("config::read_config", "Command line arguments" //    &
-                                       " --config or -c require a file name!")
+                                       " --input or -i require a file name!")
       else
         write(fl,'(a)') trim(line)
       end if

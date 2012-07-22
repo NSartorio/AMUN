@@ -48,9 +48,14 @@ program amun
 #endif /* MPI */
   use mpitools , only : initialize_mpi, finalize_mpi
 #ifdef MPI
-  use mpitools , only : reduce_maximum_integer
+  use mpitools      , only : bcast_integer_variable
+  use mpitools      , only : reduce_maximum_integer
 #endif /* MPI */
   use mpitools , only : master, nprocs
+  use parameters    , only : read_parameters, finalize_parameters
+#ifdef MPI
+  use parameters    , only : redistribute_parameters
+#endif /* MPI */
   use random   , only : init_generator
   use timers   , only : initialize_timers, start_timer, stop_timer             &
                       , set_timer, get_timer, get_timer_total                  &
@@ -153,6 +158,32 @@ program amun
     write (*,"(4x,a,1x,a)"    ) "geometry               =",                    &
     "rectangular"
   end if
+
+! initialize and read parameters from the parameter file
+!
+  if (master) call read_parameters(iterm)
+
+#ifdef MPI
+! broadcast the termination flag
+!
+  call bcast_integer_variable(iterm, iret)
+
+! check if the termination flag was broadcaster successfully
+!
+  if (iterm .gt. 0) go to 20
+
+! reset the termination flag
+!
+  iterm = 0
+
+! redistribute parameters among all processors
+!
+  call redistribute_parameters(iterm)
+
+! reduce the termination flag over all processors to check if everything is fine
+!
+  call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
 
 ! read configuration file
 !
@@ -466,31 +497,54 @@ program amun
 
   end if
 
-#ifdef SIGNALS
+! a label to go to if there are any problems
+!
+20 continue
+
+  if (master) then
+
 ! print info about termination due to a signal
 !
-  if (master) then
-    if (iterm .eq. 1) then
-      write(*,*)
-      write(*,"(1x,a)") "Restart files have been successfully written."
-      write(*,"(1x,a)") "Terminating program after exceeding the" //           &
-                                                            " execution time."
+    if (iterm .ge. 1 .and. iterm .le. 32) then
+      write (*,'(a)') ''
+      write (*,"(1x,a,i2)") "Terminating program after receiving a" //         &
+                                         " termination signal no. ", iterm
+      write (*,"(1x,a)") "Restart files have been successfully written."
     end if
-    if (iterm .ge. 2) then
-      write(*,*)
-      write(*,"(1x,a)") "Restart files have been successfully written."
-      write(*,"(1x,a,i2)") "Terminating program after receiving a" //          &
-                                             " termination signal no. ", iterm
+    if (iterm .eq. 100) then
+      write (*,'(a)') ''
+      write (*,"(1x,a)") "Terminating program after exceeding the" //          &
+                                                            " execution time."
+      write (*,"(1x,a)") "Restart files have been successfully written."
+    end if
+    if (iterm .ge. 101) then
+      write (*,'(a)') ''
+      write (*,"(1x,a)") "The initial conditions for the selected problem" //  &
+                         " could not be set."
+      write (*,"(1x,a)") "Program has been terminated."
+    end if
+    if (iterm .ge. 120 .and. iterm .lt. 125) then
+      write (*,'(a)') ''
+      write (*,"(1x,a)") "Problem with restarting job from restart snapshots."
+      write (*,"(1x,a)") "Program has been terminated."
+    end if
+    if (iterm .ge. 125 .and. iterm .lt. 130) then
+      write (*,'(a)') ''
+      write (*,"(1x,a)") "Problem with storing snapshots."
+      write (*,"(1x,a)") "Program has been terminated."
     end if
 
-! print an empty line
+! print one empty line
 !
     write (*,'(a)') ''
 
   end if
-#endif /* SIGNALS */
 
-! close access to the MPI
+! finalize parameters
+!
+  call finalize_parameters()
+
+! finalize module mpitools
 !
   call finalize_mpi()
 
