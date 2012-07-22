@@ -36,29 +36,60 @@ module timers
 
 ! module variables
 !
-  integer        , parameter                :: ntimers = 32
-  integer(kind=8), dimension(ntimers), save :: times, tstart, tstop
-  integer(kind=8)                    , save :: ticks, tbegin
+  integer          , parameter                :: ntimers = 128
+  integer                              , save :: ntimer
+  logical          , dimension(ntimers), save :: flag
+  character(len=32), dimension(ntimers), save :: description
+  integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
+  integer(kind=8)                      , save :: ticks, tbegin
+  real   (kind=8)                      , save :: conv
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines and variables
+!
+  public :: initialize_timers, set_timer, start_timer, stop_timer, get_timer   &
+          , get_timer_total, ntimers, timer_enabled, timer_description
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
 !
-! init_timers: subroutine initializes timers by creating an array of
-!              timers and resetting it
+! subroutine INITIALIZE_TIMERS:
+! ----------------------------
+!
+!   Subroutine initializes module TIMERS and allocates memory to store
+!   execution times.
 !
 !===============================================================================
 !
-  subroutine init_timers
+  subroutine initialize_timers()
 
+! local variables are not implicit by default
+!
     implicit none
-
 !
 !-------------------------------------------------------------------------------
 !
-! get current time and the number of ticks per second
+! get the current time and the number of ticks per second
 !
     call system_clock(count=tbegin, count_rate=ticks)
+
+! initialize the flags signifying that the counter is used
+!
+    flag(:)   = .false.
+
+! initialize flag  desciptions
+!
+    description(:) = ''
+
+! initialize the next available timer
+!
+    ntimer    = 1
 
 ! reset timers
 !
@@ -66,18 +97,84 @@ module timers
     tstart(:) = 0
     tstop(:)  = 0
 
+! prepare the conversion factor
+!
+    conv = 1.0d0 / ticks
+
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_timers
+  end subroutine initialize_timers
 !
 !===============================================================================
 !
-! start_timer: subroutine starts timing for a specified timer
+! subroutine SET_TIMER:
+! --------------------
+!
+!   Subroutine sets the timer by giving its desciption.
+!
+!   Arguments:
+!
+!     string - the timer description;
+!     timer  - the timer index;
+!
+!===============================================================================
+!
+  subroutine set_timer(string, timer)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    character(len=*), intent(in)  :: string
+    integer         , intent(out) :: timer
+!
+!-------------------------------------------------------------------------------
+!
+! increase the timer count
+!
+    ntimer = ntimer + 1
+
+! check if the timer didn't exceed the number of avalaible timers
+!
+    if (ntimer .le. ntimers) then
+
+! set the timer description
+!
+      description(ntimer) = trim(adjustl(string))
+
+! set the timer flag
+!
+      flag(ntimer)        = .true.
+
+! return the timer index
+!
+      timer               = ntimer
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_timer
+!
+!===============================================================================
+!
+! subroutine START_TIMER:
+! ----------------------
+!
+!   Subroutine starts accounting time for a specified timer.
+!
+!   Arguments:
+!
+!     timer - the timer index;
 !
 !===============================================================================
 !
   subroutine start_timer(timer)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -94,12 +191,21 @@ module timers
 !
 !===============================================================================
 !
-! stop_timer: subroutine stops timing for a specified timer
+! subroutine STOP_TIMER:
+! ---------------------
+!
+!   Subroutine stops accounting time of the specified timer.
+!
+!   Arguments:
+!
+!     timer - the timer index;
 !
 !===============================================================================
 !
   subroutine stop_timer(timer)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -118,25 +224,40 @@ module timers
 !
 !===============================================================================
 !
-! get_timer: function returns the value of specified timer
+! function GET_TIMER:
+! ------------------
+!
+!   Function returns accounted time of the specified timer.
+!
+!   Arguments:
+!
+!     timer - the timer index;
 !
 !===============================================================================
 !
   function get_timer(timer)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
 !
     integer, intent(in) :: timer
 
-! output arguments
+! return variable
 !
-    real                :: get_timer
+    real(kind=8)        :: get_timer
 !
 !-------------------------------------------------------------------------------
 !
-    get_timer = (1.0 * times(timer)) / ticks
+! estimate the accounted time for the specified timer
+!
+    get_timer = conv * max(0, times(timer))
+
+! return the value
+!
+    return
 
 !-------------------------------------------------------------------------------
 !
@@ -144,65 +265,126 @@ module timers
 !
 !===============================================================================
 !
-! get_timer_total: function returns the value of total execution time
+! function TIMER_ENABLED:
+! ----------------------
+!
+!   Function returns logical flag determining if the specified timer is enabled.
+!
+!   Arguments:
+!
+!     timer - the timer index;
+!
+!===============================================================================
+!
+  function timer_enabled(timer)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer, intent(in) :: timer
+
+! return variable
+!
+    logical             :: timer_enabled
+!
+!-------------------------------------------------------------------------------
+!
+! estimate the accounted time for the specified timer
+!
+    timer_enabled = flag(timer)
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function timer_enabled
+!
+!===============================================================================
+!
+! function TIMER_DESCRIPTION:
+! --------------------------
+!
+!   Function returns the the specified timer description.
+!
+!   Arguments:
+!
+!     timer - the timer index;
+!
+!===============================================================================
+!
+  function timer_description(timer)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer, intent(in) :: timer
+
+! return variable
+!
+    character(len=32)   :: timer_description
+!
+!-------------------------------------------------------------------------------
+!
+! estimate the accounted time for the specified timer
+!
+    timer_description = description(timer)
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function timer_description
+!
+!===============================================================================
+!
+! function GET_TIMER_TOTAL:
+! ------------------------
+!
+!   Function returns the total execution time.
 !
 !===============================================================================
 !
   function get_timer_total()
 
+! local variables are not implicit by default
+!
     implicit none
 
-! output arguments
+! return value
+!
+    real(kind=8)        :: get_timer_total
+
+! local variables
 !
     integer(kind=8)     :: tend
-    real                :: get_timer_total
 !
 !-------------------------------------------------------------------------------
 !
-! get the current time and the number of ticks per second
+! get the current time
 !
     call system_clock(count=tend)
 
-    get_timer_total = (1.0 * (tend - tbegin)) / ticks
+! estimate the total execution time
+!
+    get_timer_total = conv * max(1, tend - tbegin)
+
+! return the value
+!
+    return
 
 !-------------------------------------------------------------------------------
 !
   end function get_timer_total
-!
-!===============================================================================
-!
-! timer_to_time: subroutine converts a real timer to days, hours, minutes and
-!                seconds
-!
-!===============================================================================
-!
-  subroutine timer_to_time(timer, days, hours, mins, secs, csecs)
-
-    implicit none
-
-! input/output arguments
-!
-    real           , intent(in)  :: timer
-    integer(kind=4), intent(out) :: days, hours, mins, secs, csecs
-
-! local variables
-!
-    integer(kind=4) :: isecs
-!
-!-------------------------------------------------------------------------------
-!
-    isecs = int(timer, kind=4)
-    csecs = nint(100 * (timer - real(isecs)))
-    secs  = mod(isecs, 60)
-    mins  = int(mod(isecs / 60, 60))
-    hours = int(isecs / 3600)
-    days  = int(hours / 24)
-    hours = int(mod(hours, 24))
-    days  = min(365, days)
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine timer_to_time
 
 !===============================================================================
 !

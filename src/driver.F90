@@ -48,16 +48,27 @@ program amun
 #endif /* MPI */
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
-  use timers   , only : init_timers, start_timer, stop_timer, get_timer        &
-                      , get_timer_total, timer_to_time
+  use timers   , only : initialize_timers, start_timer, stop_timer             &
+                      , set_timer, get_timer, get_timer_total                  &
+                      , timer_enabled, timer_description, ntimers
 !
 !-------------------------------------------------------------------------------
 !
 ! local variables
 !
-  character(len=60) :: fmt
+  character(len=80) :: fmt, tmp
   integer           :: ed, eh, em, es, ec, ln
   real              :: tall, tcur, tpre, thrs, per
+
+! timer indices
+!
+  integer           :: nsteps = 1
+  integer           :: iin, iev, itm
+  real(kind=8)      :: tm_curr, tm_exec, tm_conv
+
+! an array to store execution times
+!
+  real(kind=8), dimension(ntimers) :: tm
 
 #ifdef SIGNALS
 ! references to functions handling signals
@@ -75,6 +86,20 @@ program amun
 !
 !-------------------------------------------------------------------------------
 !
+! initialize timers
+!
+  call initialize_timers()
+
+! set timer descriptions
+!
+  call set_timer('INITIALIZATION'   , iin)
+  call set_timer('EVOLUTION'        , iev)
+  call set_timer('TERMINATION'      , itm)
+
+! start time accounting for the initialization
+!
+  call start_timer(iin)
+
 #ifdef SIGNALS
 ! assign function terminate with signals
 !
@@ -139,14 +164,6 @@ program amun
   eh   = 23
   em   = 59
   es   = 59
-
-! initialize timers
-!
-  call init_timers()
-
-! start the initialization timer
-!
-  call start_timer(1)
 
 ! initialize random number generator
 !
@@ -234,9 +251,13 @@ program amun
   call init_forcing()
 #endif /* FORCE */
 
-! stop the initialization timer
+! stop time accounting for the initialization
 !
-  call stop_timer(1)
+  call stop_timer(iin)
+
+! start time accounting for the evolution
+!
+  call start_timer(iev)
 
 ! print information
 !
@@ -345,13 +366,17 @@ program amun
 !
   if (is_master()) write(*,*)
 
+! stop time accounting for the evolution
+!
+  call stop_timer(iev)
+
+! start time accounting for the termination
+!
+  call start_timer(itm)
+
 ! write down the restart dump
 !
   call write_restart_data()
-
-! start the initialization timer
-!
-  call start_timer(1)
 
 #ifdef FORCE
 ! finalize forcing module
@@ -371,10 +396,71 @@ program amun
 !
   call clear_coords()
 
+! stop time accounting for the termination
+!
+  call stop_timer(itm)
+
 ! get total time
 !
-  tall = get_timer_total()
-  per  = 100.0 / tall
+  tm(1) = get_timer_total()
+
+! get subtasks timers
+!
+  do i = 2, ntimers
+    tm(i) = get_timer(i)
+  end do
+
+! print timings only on master processor
+!
+  if (is_master()) then
+
+! print one empty line
+!
+    write (*,'(a)') ''
+
+! calculate the conversion factor
+!
+    tm_conv = 100.0 / tm(1)
+
+! get the execution time
+!
+    tm_exec = get_timer_total()
+
+! prepare the string formatting
+!
+    write (tmp,"(i64)") int(tm(1))
+    write (tmp,"(i64)") len_trim(adjustl(tmp)) + 6
+
+! print the execution times
+!
+    write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
+                      ".3,' secs = ',f6.2,' %')"
+
+    write (*,'(1x,a)') 'EXECUTION TIMINGS'
+    do i = 2, ntimers
+     if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
+                                                             , tm_conv * tm(i)
+    end do
+
+! print the CPU times
+!
+    write (tmp,"(a)") "(1x,a14,20x,':',1x,1f" // trim(adjustl(tmp)) //         &
+                      ".3,' secs = ',f6.2,' %')"
+    write (*,tmp) 'TOTAL CPU TIME', tm(1)         , 100.0
+    write (*,tmp) 'TIME PER STEP ', tm(1) / nsteps, 100.0 / nsteps
+#ifdef MPI
+    write (*,tmp) 'TIME PER CPU  ', tm(1) / nprocs, 100.0 / nprocs
+#endif /* MPI */
+
+! print the execution time
+
+    write (tmp,"(i64)") int(tm(1))
+    write (tmp,"(i64)") len_trim(adjustl(tmp)) + 6
+    write (tmp,"(a)") "(1x,a14,20x,':',1x,1f" // trim(adjustl(tmp)) //         &
+                      ".3,' secs')"
+    write (*,tmp) 'EXECUTION TIME', tm_exec
+
+  end if
 
 #ifdef SIGNALS
 ! print info about termination due to a signal
@@ -392,53 +478,13 @@ program amun
       write(*,"(1x,a,i2)") "Terminating program after receiving a" //          &
                                              " termination signal no. ", iterm
     end if
+
+! print an empty line
+!
+    write (*,'(a)') ''
+
   end if
 #endif /* SIGNALS */
-
-! stop the initialization timer
-!
-  call stop_timer(1)
-
-! print info about execution times
-!
-  if (is_master()) then
-    write(fmt,"(a,i2,a)") "(a27,1f", max(1, nint(alog10(tall))) + 5            &
-             , ".3,' secs = ',f6.2,' %')"
-
-    write (*,*)
-    write(*,"(1x,a)") "Job timings:"
-    write (*,fmt) "Initialization        : ", get_timer(1) , per * get_timer(1)
-    write (*,fmt) "Evolution             : ", get_timer(2) , per * get_timer(2)
-    write (*,fmt) " - reconstruction     : ", get_timer(15), per * get_timer(15)
-    write (*,fmt) " - Riemann solver     : ", get_timer(16) - get_timer(15)    &
-                                         , per * (get_timer(16) - get_timer(15))
-    write (*,fmt) " - boundary update    : ", get_timer(4) , per * get_timer(4)
-    write (*,fmt) "Data output           : ", get_timer(3) , per * get_timer(3)
-    write (*,fmt) "Mesh update           : ", get_timer(5) , per * get_timer(5)
-    write (*,fmt) "Maximum speed estim.  : ", get_timer(6) , per * get_timer(6)
-#ifdef FORCE
-    write (*,fmt) "External forcing      : ", get_timer(10), per * get_timer(10)
-    write (*,fmt) " - initialization     : ", get_timer(11), per * get_timer(11)
-    write (*,fmt) " - evolution          : ", get_timer(12), per * get_timer(12)
-    write (*,fmt) " - real to fourier    : ", get_timer(13), per * get_timer(13)
-    write (*,fmt) " - fourier to real    : ", get_timer(14), per * get_timer(14)
-#endif /* FORCE */
-
-! convert the total execution time to days, hours, minutes, and seconds
-!
-    call timer_to_time(tall, ed, eh, em, es, ec)
-
-! print the final execution time
-!
-    ln = max(1, nint(alog10(tall))) + 5
-    write(fmt,"(a,i2,a)") "(a27,1f", ln, ".3,' secs = ')"
-    write (*,fmt) "EXECUTION TIME        : ", tall
-    ln = ln + 26
-    write(fmt,"(a1,i2,a)") "(", ln, "x,i4.1,'d',i2.2,'h',i2.2,'m'" //          &
-                                                         ",i2.2,'.',i2.2,'s')"
-    write (*,fmt) ed, eh, em, es, ec
-    write (*,*)
-  end if
 
 ! close access to the MPI
 !

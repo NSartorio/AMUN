@@ -46,7 +46,6 @@ module boundaries
     use config   , only : periodic, ng, nd, nh, toplev
     use config   , only : im, jm, km
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
-    use timers   , only : start_timer, stop_timer
 #ifdef MPI
     use mpitools , only : ncpu, ncpus, is_master, msendf, mrecvf
     use variables, only : nqt
@@ -80,10 +79,6 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! start the boundary timer
-!
-    call start_timer(4)
-
 ! start from the top level and go down
 !
     do level = toplev, 1, -1
@@ -1481,10 +1476,6 @@ module boundaries
 
     end do ! level
 
-! stop the boundary timer
-!
-    call stop_timer(4)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine boundary_variables
@@ -1505,7 +1496,6 @@ module boundaries
     use blocks   , only : nsides, nfaces
     use config   , only : toplev
     use config   , only : ibl, ie, jbl, je, kbl, ke
-    use timers   , only : start_timer, stop_timer
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
     use config   , only : im, jm, km
@@ -1544,10 +1534,6 @@ module boundaries
 ! do not correct fluxes if we do not use adaptive mesh
 !
     if (toplev .eq. 1) return
-
-! start the boundary timer
-!
-    call start_timer(4)
 
 #ifdef MPI
 ! reset the block counter
@@ -1915,10 +1901,6 @@ module boundaries
       end do ! isend
     end do ! irecv
 #endif /* MPI */
-
-! stop the boundary timer
-!
-    call stop_timer(4)
 
 !-------------------------------------------------------------------------------
 !

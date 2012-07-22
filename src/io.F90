@@ -65,16 +65,11 @@ module io
   subroutine write_data()
 
     use config, only : ftype
-    use timers, only : start_timer, stop_timer
 
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! start the I/O timer
-!
-    call start_timer(3)
-
 ! increase the file counter
 !
     nfile = nfile + 1
@@ -84,10 +79,6 @@ module io
 !
     call write_data_h5(ftype)
 #endif /* HDF5 */
-
-! stop the I/O timer
-!
-    call stop_timer(3)
 
 !-------------------------------------------------------------------------------
 !
@@ -105,16 +96,10 @@ module io
 !
   subroutine write_restart_data()
 
-    use timers, only : start_timer, stop_timer
-
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! start the I/O timer
-!
-    call start_timer(3)
-
 ! increase the file counter
 !
     nrest = nrest + 1
@@ -124,10 +109,6 @@ module io
 !
     call write_data_h5('r')
 #endif /* HDF5 */
-
-! stop the I/O timer
-!
-    call stop_timer(3)
 
 !-------------------------------------------------------------------------------
 !
@@ -147,16 +128,11 @@ module io
   subroutine restart_job()
 
     use config, only : nres
-    use timers, only : start_timer, stop_timer
 
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! start the I/O timer
-!
-    call start_timer(3)
-
 ! set restart file number
 !
     nrest = nres
@@ -166,10 +142,6 @@ module io
 !
     call read_data_h5()
 #endif /* HDF5 */
-
-! stop the I/O timer
-!
-    call stop_timer(3)
 
 !-------------------------------------------------------------------------------
 !

@@ -56,7 +56,6 @@ module coords
 
     use config, only : maxlev, toplev, ng, in, jn, kn, im, jm, km, rdims
     use config, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -76,10 +75,6 @@ module coords
 !
 !-------------------------------------------------------------------------------
 !
-! start the coordinate timer
-!
-    call start_timer(7)
-
 ! allocate space for coordinate variables and resolutions
 !
     allocate(ax   (toplev, im))
@@ -189,10 +184,6 @@ module coords
 
     end if ! master
 
-! stop the coordinate timer
-!
-    call stop_timer(7)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine init_coords
@@ -205,16 +196,10 @@ module coords
 !
   subroutine clear_coords()
 
-    use timers, only : start_timer, stop_timer
-
     implicit none
 
 !-------------------------------------------------------------------------------
 !
-! start the coordinate timer
-!
-    call start_timer(7)
-
 ! deallocating coordinate variables
 !
     if (allocated(ax)   ) deallocate(ax)
@@ -229,10 +214,6 @@ module coords
     if (allocated(adzi) ) deallocate(adzi)
     if (allocated(advol)) deallocate(advol)
     if (allocated(res)  ) deallocate(res)
-
-! stop the coordinate timer
-!
-    call stop_timer(7)
 
 !-------------------------------------------------------------------------------
 !

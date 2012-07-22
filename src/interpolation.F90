@@ -42,7 +42,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -61,10 +60,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 !! second order TVD interpolation
 !!
 ! calculate the left and right derivatives
@@ -107,10 +102,6 @@ module interpolation
     end do
     fr(n) = f(n)
 
-! stop the reconstruction timer
-!
-    call stop_timer(15)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -127,7 +118,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -154,10 +144,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 !! third order CENO interpolation
 !!
 ! calculate the initial right derivative
@@ -237,10 +223,6 @@ module interpolation
 !
     fr(n) = f(n)
 
-! stop the reconstruction timer
-!
-    call stop_timer(15)
-!
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -260,7 +242,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -282,10 +263,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 ! prepare fixed parameters
 !
     h2    = h * h
@@ -354,10 +331,6 @@ module interpolation
 
     end do
 
-! stop the reconstruction timer
-!
-    call stop_timer(15)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -377,7 +350,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -410,10 +382,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 !! fifth order WENO-Z interpolation
 !!
 ! calculate the left and right derivatives
@@ -487,10 +455,6 @@ module interpolation
 
     end do
 
-! stop the reconstruction timer
-!
-    call stop_timer(15)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -507,7 +471,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps, rad
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -527,10 +490,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 !! third order interpolation
 !!
 ! prepare parameters
@@ -600,10 +559,6 @@ module interpolation
     fl(1) = f(1)
     fr(n) = f(n)
 
-! stop the reconstruction timer
-!
-    call stop_timer(15)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
@@ -620,7 +575,6 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : alpha
-    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -671,10 +625,6 @@ module interpolation
 !
 !-------------------------------------------------------------------------------
 !
-! start the reconstruction timer
-!
-    call start_timer(15)
-
 !! fifth or higher order monotonicity preserving interpolation
 !!
 ! calculate the left and right derivatives
@@ -791,11 +741,6 @@ module interpolation
       flag = .true.
 
     end do
-
-
-! stop the reconstruction timer
-!
-    call stop_timer(15)
 
 !-------------------------------------------------------------------------------
 !

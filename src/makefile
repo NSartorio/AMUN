@@ -202,21 +202,21 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 blocks.o        : blocks.F90 error.o
 boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
-                  mpitools.o variables.o timers.o
+                  mpitools.o variables.o
 config.o        : config.F90 error.o
 constants.o     : constants.F90
-coords.o        : coords.F90 config.o timers.o
+coords.o        : coords.F90 config.o
 driver.o        : driver.F90 blocks.o config.o coords.o evolution.o forcing.o  \
                   integrals.o io.o mesh.o mpitools.o random.o timers.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o coords.o        \
                   forcing.o interpolation.o mesh.o mpitools.o problem.o        \
-                  scheme.o timers.o variables.o
+                  scheme.o variables.o
 forcing.o       : forcing.F90 config.o constants.o coords.o mpitools.o         \
-                  random.o timers.o variables.o
+                  random.o variables.o
 integrals.o     : integrals.F90 blocks.o config.o coords.o evolution.o         \
                   mpitools.o variables.o
-interpolation.o : interpolation.F90 blocks.o config.o variables.o timers.o
+interpolation.o : interpolation.F90 blocks.o config.o variables.o
 io.o            : io.F90 blocks.o coords.o error.o evolution.o mpitools.o      \
                   random.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o coords.o error.o interpolation.o  \
@@ -224,8 +224,7 @@ mesh.o          : mesh.F90 blocks.o config.o coords.o error.o interpolation.o  \
 mpitools.o      : mpitools.F90
 problem.o       : problem.F90 blocks.o constants.o coords.o mpitools.o         \
                   random.o scheme.o variables.o
-scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o     \
-                  timers.o
+scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
 random.o        : random.F90 mpitools.o
 timers.o        : timers.F90
 variables.o     : variables.F90

@@ -52,7 +52,6 @@ module evolution
     use config    , only : toplev
 #endif /* REFINE */
     use mesh      , only : update_mesh
-    use timers    , only : start_timer, stop_timer
 #ifdef FORCE
     use config    , only : tbfor
     use forcing   , only : fourier_transform, evolve_forcing
@@ -68,10 +67,6 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-! start the evolution timer
-!
-    call start_timer(2)
-
 #ifdef FORCE
 ! perform forcing evolution only when t >= tbfor
 !
@@ -182,10 +177,6 @@ module evolution
 !
     call find_new_timestep()
 
-! stop the evolution timer
-!
-    call stop_timer(2)
-!
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve
@@ -206,7 +197,6 @@ module evolution
 #endif /* MPI */
     use coords  , only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
-    use timers  , only : start_timer, stop_timer
 #ifdef VISCOSITY
     use config  , only : visc
 #endif /* VISCOSITY */
@@ -228,10 +218,6 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-! start the evolution timer
-!
-    call start_timer(6)
-
 ! reset the maximum speed, and highest level
 !
     cmax   = 1.0d-16
@@ -312,10 +298,6 @@ module evolution
     dtn = min(dtn, 0.5d0 * dxmin * dxmin / max(1.0d-16, ueta))
 #endif /* MHD & RESISTIVITY */
 
-! stop the evolution timer
-!
-    call stop_timer(6)
-!
 !-------------------------------------------------------------------------------
 !
   end subroutine find_new_timestep

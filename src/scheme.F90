@@ -606,7 +606,6 @@ module scheme
   subroutine hll(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx, ivy, ivz
 #ifdef ADI
@@ -650,10 +649,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! start the Riemann solver timer
-!
-    call start_timer(16)
-
 ! usefull parameters
 !
 #ifdef VISCOSITY
@@ -785,10 +780,6 @@ module scheme
 #endif /* MHD */
 #endif /* CONSERVATIVE */
 
-! stop the Riemann solver timer
-!
-    call stop_timer(16)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine hll
@@ -805,7 +796,6 @@ module scheme
   subroutine hllc(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
 #ifdef VISCOSITY
@@ -836,10 +826,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! start the Riemann solver timer
-!
-    call start_timer(16)
-
 #ifdef VISCOSITY
 ! usefull parameters
 !
@@ -1032,10 +1018,6 @@ module scheme
     f(:,2:n) = - fn(:,2:n) + fn(:,1:n-1)
 #endif /* CONSERVATIVE */
 
-! stop the Riemann solver timer
-!
-    call stop_timer(16)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine hllc
@@ -1054,7 +1036,6 @@ module scheme
   subroutine hlld(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
     use variables    , only : ibx, iby, ibz
@@ -1095,10 +1076,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! start the Riemann solver timer
-!
-    call start_timer(16)
-
 ! usefull parameters
 !
 #ifdef VISCOSITY
@@ -1349,10 +1326,6 @@ module scheme
 #endif /* GLM */
 #endif /* CONSERVATIVE */
 
-! stop the Riemann solver timer
-!
-    call stop_timer(16)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine hlld
@@ -1370,7 +1343,6 @@ module scheme
 
     use config       , only : gamma
     use interpolation, only : reconstruct
-    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
     use variables    , only : ibx, iby, ibz
@@ -1412,10 +1384,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! start the Riemann solver timer
-!
-    call start_timer(16)
-
 ! usefull parameters
 !
 #ifdef VISCOSITY
@@ -1766,10 +1734,6 @@ module scheme
 #endif /* GLM */
 #endif /* CONSERVATIVE */
 
-! stop the Riemann solver timer
-!
-    call stop_timer(16)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine hlld
@@ -1792,7 +1756,6 @@ module scheme
 
     use config       , only : gamma
     use interpolation, only : reconstruct
-    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI
@@ -1842,10 +1805,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! start the Riemann solver timer
-!
-    call start_timer(16)
-
 ! usefull parameters
 !
 #ifdef VISCOSITY
@@ -2059,10 +2018,6 @@ module scheme
 #endif /* GLM */
 #endif /* MHD */
 #endif /* CONSERVATIVE */
-
-! stop the Riemann solver timer
-!
-    call stop_timer(16)
 
 !-------------------------------------------------------------------------------
 !

@@ -52,7 +52,6 @@ module mesh
     use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : is_master, ncpus
-    use timers   , only : start_timer, stop_timer
     use variables, only : nqt, nvr
 
     implicit none
@@ -72,10 +71,6 @@ module mesh
 !
 !-------------------------------------------------------------------------------
 !
-! start the mesh timer
-!
-    call start_timer(5)
-
 ! set data block dimensions
 !
     call datablock_set_dims(nqt, nvr, im, jm, km)
@@ -135,10 +130,6 @@ module mesh
 
     end if ! master
 
-! stop the mesh timer
-!
-    call stop_timer(5)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine init_mesh
@@ -162,7 +153,6 @@ module mesh
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
-    use timers  , only : start_timer, stop_timer
 
     implicit none
 
@@ -180,10 +170,6 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! start the mesh timer
-!
-    call start_timer(5)
-
 ! allocate the initial structure of blocks according to the problem
 !
     call init_domain(res(1,:))
@@ -420,10 +406,6 @@ module mesh
       write(*,*)
     end if
 
-! stop the mesh timer
-!
-    call stop_timer(5)
-
 !-------------------------------------------------------------------------------
 !
   end subroutine generate_mesh
@@ -450,7 +432,6 @@ module mesh
     use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
 #endif /* MPI */
     use problem  , only : check_ref
-    use timers   , only : start_timer, stop_timer
     use variables, only : nqt
 
     implicit none
@@ -485,10 +466,6 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! start the mesh timer
-!
-    call start_timer(5)
-
 #ifdef DEBUG
 ! check mesh
 !
@@ -906,10 +883,6 @@ module mesh
 !
     call check_mesh('after update_mesh')
 #endif /* DEBUG */
-
-! stop the mesh timer
-!
-    call stop_timer(5)
 
 !-------------------------------------------------------------------------------
 !
@@ -1398,16 +1371,11 @@ module mesh
     use blocks  , only : clear_blocks
     use error   , only : print_info
     use mpitools, only : is_master
-    use timers  , only : start_timer, stop_timer
 
     implicit none
 
 !-------------------------------------------------------------------------------
 !
-! start the mesh timer
-!
-    call start_timer(5)
-
 ! deallocate block structure
 !
     call clear_blocks
@@ -1415,10 +1383,6 @@ module mesh
 ! close the handler of the mesh statistics file
 !
     if (is_master()) close(funit)
-
-! stop the mesh timer
-!
-    call stop_timer(5)
 
 !-------------------------------------------------------------------------------
 !
