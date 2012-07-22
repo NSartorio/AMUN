@@ -21,314 +21,427 @@
 !!
 !!******************************************************************************
 !!
-!! module: RANDOM - handles random number generators by Marsaglia & Tsang
+!! module: RANDOM
 !!
-!! references:
-!! Marsaglia, G. & Tsang, W.W. (2000) `The ziggurat method for generating
-!! random variables', J. Statist. Software, v5(8).
+!!  This module provides subroutines to random number generators.
 !!
-!! Copyright (C) 2000 George Marsaglia, Wai Wan Tsang
-!! Copyright (C) 2008 John Burkardt
+!!  References:
+!!
+!!    [1] Marsaglia, G. & Tsang, W.W. (2000) `The ziggurat method for generating
+!!        random variables', J. Statist. Software, v5(8)
 !!
 !!******************************************************************************
 !
 module random
 
+#ifdef PROFILE
+! include external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
+! declare all module variables as implicit
+!
   implicit none
 
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: iri, irc
+#endif /* PROFILE */
+
+! random generator type
+!
+  character(len = 32), save :: gentype = "same"
+
+! variables to store seeds for random generator
+!
+  integer                                   , save :: kp = 0
+  integer                                   , save :: nseeds, lseed
+  integer(kind=4), dimension(:), allocatable, save :: seeds
+
+! by default everything is private
+!
   private
 
-  integer                                   , save :: nseeds
-  integer(kind=4), dimension(:), allocatable, save :: seeds
-  integer(kind=4), dimension(128)           , save :: kn
-  real   (kind=4), dimension(128)           , save :: fn, wn
-
-  public :: init_generator, nseeds, get_seeds, set_seeds                       &
-          , randomu, randomz, randomn
+! declare public subroutines
+!
+  public :: initialize_random, finalize_random
+  public :: nseeds, set_seeds, get_seeds, randomu, randomz, randomn
 
   contains
 !
 !===============================================================================
 !
-! init_generator: subroutine initializes the random number generator
+! subroutine INITIALIZE_RANDOM:
+! ----------------------------
+!
+!   subroutine initializes random number generator;
 !
 !===============================================================================
 !
-  subroutine init_generator()
+  subroutine initialize_random(nprocs, nproc)
 
+! obtain required variables from other modules
+!
+    use parameters, only : get_parameter_string
+
+! declare all variables as implicit
+!
     implicit none
+
+! subroutine arguments
+!
+    integer, intent(in) :: nprocs, nproc
 
 ! local variables
 !
-    integer(kind=4) :: i
-    real(kind=8)    :: dn, tn, q
-
-! parameters
-!
-    real(kind=8), parameter :: m1 = 2.14748364800000d+09
-    real(kind=8), parameter :: vn = 9.91256303526217d-03
-
-! OpenMP functions
-!
-!$  integer :: omp_get_num_threads, omp_get_thread_num
+    integer :: i
+    real    :: r
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the seeds required by all subroutines
+#ifdef PROFILE
+! set timer descriptions
 !
-    nseeds = 1
-!$omp parallel
-!$  nseeds = omp_get_num_threads()
-!$omp end parallel
+    call set_timer('random generator initialization', iri)
+    call set_timer('random number generation'       , irc)
 
-! allocate array for seeds
+! start accounting time for the random number generator
 !
-    allocate(seeds(0:nseeds-1))
+    call start_timer(iri)
+#endif /* PROFILE */
 
-! fill seeds with random numbers
+! set the processor number
 !
-    do i = 0, nseeds - 1
-      call random_number(q)
-      seeds(i) = 123456789 * q
-    end do
+    kp = nproc
 
-! prepare the arrays used by nonunifor distribution generators
+! obtain the generator type
 !
-    dn = 3.442619855899d+00
-    tn = 3.442619855899d+00
+    call get_parameter_string("gentype", gentype)
 
-    q  = vn / exp(-0.5d+00 * dn * dn)
+! calculate the number of seeds
+!
+    nseeds = 2 * nprocs
+    lseed  = nseeds - 1
 
-    kn(1)   = int((dn / q) * m1)
-    kn(2)   = 0
+! allocate seeds for random number generator
+!
+    allocate(seeds(0:lseed))
 
-    wn(1)   = real(q  / m1, kind=4)
-    wn(128) = real(dn / m1, kind=4)
+! prepare the seeds depending on the type of generator
+!
+    select case(gentype)
+    case('random')
+      do i = 0, lseed
+        call random_number(r)
+        seeds(i) = 123456789 * r
+      end do
+    case default
+      call random_number(r)
+      do i = 0, nprocs - 1
+        seeds(i) = 123456789 * r
+      end do
+      call random_number(r)
+      do i = nprocs, lseed
+        seeds(i) = 123456789 * r
+      end do
+    end select
 
-    fn(1)   = 1.0e+00
-    fn(128) = real(exp(-0.5d+00 * dn * dn), kind=4)
+#ifdef PROFILE
+! stop accounting time for the random number generator
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
 
-    do i = 127, 2, -1
-      dn      = sqrt(-2.0d+00 * log(vn / dn + exp(-0.5d+00 * dn * dn)))
-      kn(i+1) = int((dn / tn) * m1)
-      tn      = dn
-      fn(i)   = real(exp(-0.5d+00*dn*dn), kind=4)
-      wn(i)   = real(dn / m1, kind=4)
-    end do
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_random
+!
+!===============================================================================
+!
+! subroutine FINALIZE_RANDOM:
+! --------------------------
+!
+!   subroutine releases memory allocated by random number generator variables;
+!
+!===============================================================================
+!
+  subroutine finalize_random()
+
+! declare all variables as implicit
+!
+    implicit none
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_generator
+#ifdef PROFILE
+! start accounting time for the random number generator
 !
-!===============================================================================
-!
-! get_seeds: subroutine returns the generator seeds
-!
-!===============================================================================
-!
-  subroutine get_seeds(seed)
+    call start_timer(iri)
+#endif /* PROFILE */
 
+! deallocate seeds if they are allocated
+!
+    if (allocated(seeds)) deallocate(seeds)
+
+#ifdef PROFILE
+! stop accounting time for the random number generator
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_random
+!
+!===============================================================================
+!
+! subroutine SET_SEEDS:
+! --------------------
+!
+!   subroutine sets the seeds from the given array;
+!
+!===============================================================================
+!
+  subroutine set_seeds(np, seed)
+
+! declare all variables as implicit
+!
     implicit none
 
-! subroutine arguments
+! input arguments
 !
-    integer(kind=4), dimension(0:nseeds-1), intent(out) :: seed
-!
-!-------------------------------------------------------------------------------
-!
-    seed(:) = seeds(:)
+    integer                           , intent(in) :: np
+    integer(kind=4), dimension(0:np-1), intent(in) :: seed
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine get_seeds
+#ifdef PROFILE
+! start accounting time for the random number generator
 !
-!===============================================================================
-!
-! set_seeds: subroutine sets the generator seeds
-!
-!===============================================================================
-!
-  subroutine set_seeds(seed)
+    call start_timer(iri)
+#endif /* PROFILE */
 
-    implicit none
+! set the seeds only if the input array and seeds have the same sizes
+!
+    if (np .eq. nseeds) then
 
-! subroutine arguments
+      seeds(0:lseed) = seed(0:lseed)
+
+    end if
+
+#ifdef PROFILE
+! stop accounting time for the random number generator
 !
-    integer(kind=4), dimension(0:nseeds-1), intent(in) :: seed
-!
-!-------------------------------------------------------------------------------
-!
-    seeds(:) = seed(:)
-!
+    call stop_timer(iri)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine set_seeds
 !
 !===============================================================================
 !
-! shr3: subroutine evaluates the SHR3 generator for integers
+! subroutine GET_SEEDS:
+! --------------------
 !
-! input arguments:
-!
-!   np - the process number (for parallel operations)
+!   subroutine returns the seeds through an array;
 !
 !===============================================================================
 !
-  function shr3(np) result(jr)
+  subroutine get_seeds(seed)
 
+! declare all variables as implicit
+!
     implicit none
 
-    integer(kind=4) :: np, jp, jt, jr
+! output arguments
+!
+    integer(kind=4), dimension(0:lseed), intent(out) :: seed
 !
 !-------------------------------------------------------------------------------
 !
-    jp = seeds(np)
-    jt = jp
-
-    jt = ieor(jt, ishft(jt,  13))
-    jt = ieor(jt, ishft(jt, -17))
-    jt = ieor(jt, ishft(jt,   5))
-
-    seeds(np) = jt
-
-    jr = jp + jt
-
-    return
+#ifdef PROFILE
+! start accounting time for the random number generator
 !
+    call start_timer(iri)
+#endif /* PROFILE */
+
+    seed(0:lseed) = seeds(0:lseed)
+
+#ifdef PROFILE
+! stop accounting time for the random number generator
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
-  end function shr3
+  end subroutine get_seeds
 !
 !===============================================================================
 !
-! randomu: function generates uniformly distributed random numbers from the
-!          range 0.0...1.0
+! function RANDOMU:
+! ----------------
 !
-! input arguments:
-!
-!   np - the process number (for parallel operations)
+!   function generates uniformly distributed random numbers in range 0.0..1.0;
 !
 !===============================================================================
 !
-  function randomu(np) result(val)
+  function randomu() result(val)
 
-    integer(kind=4) :: np
+! declare all variables as implicit
+!
+    implicit none
+
+! output variables
+!
     real            :: val
+
+! local variables
+!
+    integer(kind=4) :: jz, jsr
 !
 !-------------------------------------------------------------------------------
 !
-    val = 0.5 + 0.23283064365e-9 * shr3(np)
+#ifdef PROFILE
+! start accounting time for the random number generation
+!
+    call start_timer(irc)
+#endif /* PROFILE */
+
+    jsr = seeds(kp)
+    jz  = jsr
+
+    jsr = ieor( jsr, ishft( jsr,  13 ) )
+    jsr = ieor( jsr, ishft( jsr, -17 ) )
+    jsr = ieor( jsr, ishft( jsr,   5 ) )
+
+    seeds(kp) = jsr
+
+    val = 0.5 + 0.23283064365e-9 * (jz + jsr)
+
+#ifdef PROFILE
+! stop accounting time for the random number generation
+!
+    call stop_timer(irc)
+#endif /* PROFILE */
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function randomu
 !
 !===============================================================================
 !
-! randomz: function generates uniformly distributed random numbers from the
-!          range -1.0...1.0
+! function RANDOMZ:
+! ----------------
 !
-! input arguments:
-!
-!   np - the process number (for parallel operations)
+!   function generates uniformly distributed random numbers in range -0.5..0.5;
 !
 !===============================================================================
 !
-  function randomz(np) result(val)
+  function randomz() result(val)
 
-    integer(kind=4) :: np
+! declare all variables as implicit
+!
+    implicit none
+
+! output variables
+!
     real            :: val
+
+! local variables
+!
+    integer(kind=4) :: jz, jsr
 !
 !-------------------------------------------------------------------------------
 !
-    val = 0.46566128730e-9 * shr3(np)
+#ifdef PROFILE
+! start accounting time for the random number generation
+!
+    call start_timer(irc)
+#endif /* PROFILE */
+
+    jsr = seeds(kp)
+    jz  = jsr
+
+    jsr = ieor( jsr, ishft( jsr,  13 ) )
+    jsr = ieor( jsr, ishft( jsr, -17 ) )
+    jsr = ieor( jsr, ishft( jsr,   5 ) )
+
+    seeds(kp) = jsr
+
+    val = 0.23283064365e-9 * (jz + jsr)
+
+#ifdef PROFILE
+! stop accounting time for the random number generation
+!
+    call stop_timer(irc)
+#endif /* PROFILE */
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function randomz
 !
 !===============================================================================
 !
-! randomn: function generates normally distributed random numbers
+! function RANDOMN:
+! ----------------
 !
-! input arguments:
-!
-!   np - the process number (for parallel operations)
+!   function generates uniformly distributed random numbers in range -1.0..1.0;
 !
 !===============================================================================
 !
-  function randomn(np) result(val)
+  function randomn() result(val)
 
+! declare all variables as implicit
+!
     implicit none
 
-! input/output arguments
+! output variables
 !
-    integer(kind=4) :: np
     real            :: val
 
 ! local variables
 !
-    integer(kind=4) :: hz, iz
-    real(kind=4)    :: x, y, z, t
-
-! parameters
-!
-    real(kind=4), parameter :: r = 3.442620e+00
+    integer(kind=4) :: jz, jsr
 !
 !-------------------------------------------------------------------------------
 !
-    hz = shr3(np)
-    iz = iand(hz, 127)
+#ifdef PROFILE
+! start accounting time for the random number generation
+!
+    call start_timer(irc)
+#endif /* PROFILE */
 
-    if (abs(hz) .lt. kn(iz+1)) then
-      val = real(hz, kind=4) * wn(iz+1)
-    else
-      do
-        if (iz .eq. 0) then
-          do
-            x = - 0.2904764e+00 * log(randomu(np))
-            y = - log(randomu(np))
-            if ((x * x) .le. (y + y)) then
-              exit
-            end if
-          end do
+    jsr = seeds(kp)
+    jz  = jsr
 
-          if (hz .le. 0) then
-            val = - r - x
-          else
-            val = + r + x
-          end if
+    jsr = ieor( jsr, ishft( jsr,  13 ) )
+    jsr = ieor( jsr, ishft( jsr, -17 ) )
+    jsr = ieor( jsr, ishft( jsr,   5 ) )
 
-          exit
-        end if
+    seeds(kp) = jsr
 
-        x = real(hz, kind=4) * wn(iz+1)
-        z = fn(iz+1) + randomu(np) * (fn(iz) - fn(iz+1))
-        t = exp(-0.5e+00 * x * x)
+    val = 0.46566128730e-9 * (jz + jsr)
 
-        if (z .lt. t) then
-          val = x
-          exit
-        end if
-
-        hz = shr3(np)
-        iz = iand(hz, 127)
-
-        if (abs(hz) .lt. kn(iz+1)) then
-          val = real(hz, kind=4) * wn(iz+1)
-          exit
-        end if
-      end do
-    end if
+#ifdef PROFILE
+! stop accounting time for the random number generation
+!
+    call stop_timer(irc)
+#endif /* PROFILE */
 
     return
-!
+
 !-------------------------------------------------------------------------------
 !
   end function randomn
+
+!===============================================================================
 !
 end module random

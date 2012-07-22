@@ -56,7 +56,7 @@ program amun
 #ifdef MPI
   use parameters    , only : redistribute_parameters
 #endif /* MPI */
-  use random   , only : init_generator
+  use random        , only : initialize_random, finalize_random
   use timers   , only : initialize_timers, start_timer, stop_timer             &
                       , set_timer, get_timer, get_timer_total                  &
                       , timer_enabled, timer_description, ntimers
@@ -200,9 +200,9 @@ program amun
   em   = 59
   es   = 59
 
-! initialize random number generator
+! initialize the random number generator
 !
-  call init_generator()
+  call initialize_random(nprocs, nproc)
 
 ! initialize block module
 !
@@ -430,6 +430,10 @@ program amun
 ! finalize the coordinate module
 !
   call clear_coords()
+
+! finalize the random number generator
+!
+  call finalize_random()
 
 ! stop time accounting for the termination
 !

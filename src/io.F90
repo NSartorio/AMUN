@@ -1111,7 +1111,7 @@ module io
 
 ! set the seed values
 !
-                call set_seeds(seeds(:))
+                call set_seeds(nseeds, seeds(:))
 
 ! deallocate seed array
 !
