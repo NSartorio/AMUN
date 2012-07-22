@@ -47,7 +47,8 @@ module boundaries
     use config   , only : im, jm, km
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
 #ifdef MPI
-    use mpitools , only : ncpu, ncpus, is_master, msendf, mrecvf
+    use mpitools , only : send_real_array, receive_real_array
+    use mpitools , only : nproc, nprocs
     use variables, only : nqt
 #endif /* MPI */
 
@@ -58,13 +59,14 @@ module boundaries
 ! local variables
 !
     integer :: idir, iside, iface, nside, nface, level
+    integer :: iret
     integer :: il, jl, kl, iu, ju, ku
 #ifdef MPI
     integer :: isend, irecv, nblocks, itag, l
 
 ! local arrays
 !
-    integer     , dimension(0:ncpus-1,0:ncpus-1)    :: block_counter
+    integer     , dimension(0:nprocs-1,0:nprocs-1)    :: block_counter
     real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
 #endif /* MPI */
 
@@ -74,7 +76,7 @@ module boundaries
     type(block_data), pointer :: pdata
 #ifdef MPI
     type(block_info), pointer :: pinfo
-    type(pointer_info), dimension(0:ncpus-1,0:ncpus-1) :: block_array
+    type(pointer_info), dimension(0:nprocs-1,0:nprocs-1) :: block_array
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -109,7 +111,7 @@ module boundaries
 #ifdef MPI
 ! check if the current block belongs to the current processor
 !
-              if (pmeta%cpu .eq. ncpu) then
+              if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! iterate over all neighbors
@@ -147,8 +149,8 @@ module boundaries
 
 ! nullify the info pointers
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
             nullify(block_array(irecv,isend)%ptr)
           end do
         end do
@@ -194,7 +196,7 @@ module boundaries
 
 ! check if the current meta block lays on the current processors
 !
-                        if (pmeta%cpu .eq. ncpu) then
+                        if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! assign a pointer to the data structure of the current block
@@ -294,8 +296,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processors
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
 
 ! process only pairs which have boundaries to exchange
 !
@@ -307,7 +309,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 1
+              itag = 10 * (irecv * nprocs + isend + 1) + 1
 
 ! allocate space for variables
 !
@@ -322,9 +324,9 @@ module boundaries
 #endif /* NDIMS == 3 */
               end select
 
-! if isend == ncpu we are sending data
+! if isend == nproc we are sending data
 !
-              if (isend .eq. ncpu) then
+              if (isend .eq. nproc) then
 
 ! iterate over exchange blocks along the current direction and fill out
 ! the buffer with the block data
@@ -380,17 +382,17 @@ module boundaries
 
 ! send the data buffer
 !
-                call msendf(size(rbuf), irecv, itag, rbuf(:,:,:,:,:))
+                call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
 
-              end if ! isend = ncpu
+              end if ! isend = nproc
 
-! if irecv == ncpu we are receiving data
+! if irecv == nproc we are receiving data
 !
-              if (irecv .eq. ncpu) then
+              if (irecv .eq. nproc) then
 
 ! receive data
 !
-                call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
+                call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:), iret)
 
 ! iterate over all received blocks and update boundaries
 !
@@ -414,7 +416,7 @@ module boundaries
                   l = l + 1
                 end do
 
-              end if ! irecv = ncpu
+              end if ! irecv = nproc
 
 ! deallocate buffers
 !
@@ -458,8 +460,8 @@ module boundaries
 
 ! nullify the info pointers
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
             nullify(block_array(irecv,isend)%ptr)
           end do
         end do
@@ -501,7 +503,7 @@ module boundaries
 
 ! check if the current meta block lays on the current processors
 !
-                      if (pmeta%cpu .eq. ncpu) then
+                      if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! prepare indices of the neighbor array
@@ -620,8 +622,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processors
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
 
 !! process blocks with the neighbors at higher levels
 !!
@@ -635,7 +637,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 2
+              itag = 10 * (irecv * nprocs + isend + 1) + 2
 
 ! allocate space for variables
 !
@@ -648,9 +650,9 @@ module boundaries
                 allocate(rbuf(nblocks,nqt,im,jm,nd))
               end select
 
-! if isend == ncpu we are sending data
+! if isend == nproc we are sending data
 !
-              if (isend .eq. ncpu) then
+              if (isend .eq. nproc) then
 
 ! fill out the buffer with block data
 !
@@ -702,17 +704,17 @@ module boundaries
 
 ! send data buffer
 !
-                call msendf(size(rbuf), irecv, itag, rbuf(:,:,:,:,:))
+                call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
 
               end if
 
-! if irecv == ncpu we are receiving data
+! if irecv == nproc we are receiving data
 !
-              if (irecv .eq. ncpu) then
+              if (irecv .eq. nproc) then
 
 ! receive data
 !
-                call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
+                call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:), iret)
 
 ! iterate over all received blocks and update boundaries
 !
@@ -789,8 +791,8 @@ module boundaries
 
 ! nullify the info pointers
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
             nullify(block_array(irecv,isend)%ptr)
           end do
         end do
@@ -836,7 +838,7 @@ module boundaries
 
 ! check if the current meta block lays on the current processors
 !
-                        if (pmeta%cpu .eq. ncpu) then
+                        if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! find the face of the current block which the neighbor belongs to
@@ -956,8 +958,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processors
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
 
 ! process only pairs which have boundaries to exchange
 !
@@ -969,7 +971,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 3
+              itag = 10 * (irecv * nprocs + isend + 1) + 3
 
 ! allocate space for variables
 !
@@ -982,9 +984,9 @@ module boundaries
                 allocate(rbuf(nblocks,nqt,im,jm,nh+2))
               end select
 
-! if isend == ncpu we are sending data
+! if isend == nproc we are sending data
 !
-              if (isend .eq. ncpu) then
+              if (isend .eq. nproc) then
 
 ! fill out the buffer with block data
 !
@@ -1036,17 +1038,17 @@ module boundaries
 
 ! send data buffer
 !
-                call msendf(size(rbuf), irecv, itag, rbuf(:,:,:,:,:))
+                call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
 
               end if
 
-! if irecv == ncpu we are receiving data
+! if irecv == nproc we are receiving data
 !
-              if (irecv .eq. ncpu) then
+              if (irecv .eq. nproc) then
 
 ! receive data
 !
-                call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
+                call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:), iret)
 
 ! iterate over all received blocks and update boundaries
 !
@@ -1139,7 +1141,7 @@ module boundaries
 #ifdef MPI
 ! check if the current block belongs to the current processor
 !
-              if (pmeta%cpu .eq. ncpu) then
+              if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! iterate over all neighbors
@@ -1177,8 +1179,8 @@ module boundaries
 
 ! nullify the info pointers
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
             nullify(block_array(irecv,isend)%ptr)
           end do
         end do
@@ -1224,7 +1226,7 @@ module boundaries
 
 ! check if the current meta block lays on the current processors
 !
-                        if (pmeta%cpu .eq. ncpu) then
+                        if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! assign a pointer to the data structure of the current block
@@ -1324,8 +1326,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processors
 !
-        do irecv = 0, ncpus - 1
-          do isend = 0, ncpus - 1
+        do irecv = 0, nprocs - 1
+          do isend = 0, nprocs - 1
 
 ! process only pairs which have boundaries to exchange
 !
@@ -1337,7 +1339,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * ncpus + isend + 1) + 4
+              itag = 10 * (irecv * nprocs + isend + 1) + 4
 
 ! allocate space for variables
 !
@@ -1352,9 +1354,9 @@ module boundaries
 #endif /* NDIMS == 3 */
               end select
 
-! if isend == ncpu we are sending data
+! if isend == nproc we are sending data
 !
-              if (isend .eq. ncpu) then
+              if (isend .eq. nproc) then
 
 ! iterate over exchange blocks along the current direction and fill out
 ! the buffer with the block data
@@ -1410,17 +1412,17 @@ module boundaries
 
 ! send the data buffer
 !
-                call msendf(size(rbuf), irecv, itag, rbuf(:,:,:,:,:))
+                call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
 
-              end if ! isend = ncpu
+              end if ! isend = nproc
 
-! if irecv == ncpu we are receiving data
+! if irecv == nproc we are receiving data
 !
-              if (irecv .eq. ncpu) then
+              if (irecv .eq. nproc) then
 
 ! receive data
 !
-                call mrecvf(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:))
+                call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:), iret)
 
 ! iterate over all received blocks and update boundaries
 !
@@ -1444,7 +1446,7 @@ module boundaries
                   l = l + 1
                 end do
 
-              end if ! irecv = ncpu
+              end if ! irecv = nproc
 
 ! deallocate buffers
 !
@@ -1499,7 +1501,8 @@ module boundaries
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
     use config   , only : im, jm, km
-    use mpitools , only : ncpus, ncpu, msendf, mrecvf
+    use mpitools , only : send_real_array, receive_real_array
+    use mpitools , only : nprocs, nproc
     use variables, only : nqt
 #endif /* MPI */
 
@@ -1514,7 +1517,7 @@ module boundaries
 
 ! local arrays
 !
-    integer     , dimension(NDIMS,0:ncpus-1,0:ncpus-1) :: block_counter
+    integer     , dimension(NDIMS,0:nprocs-1,0:nprocs-1) :: block_counter
     real(kind=8), dimension(:,:,:,:), allocatable      :: rbuf
 #endif /* MPI */
 
@@ -1526,7 +1529,7 @@ module boundaries
 
 ! local pointer arrays
 !
-    type(pointer_info), dimension(NDIMS,0:ncpus-1,0:ncpus-1) :: block_array
+    type(pointer_info), dimension(NDIMS,0:nprocs-1,0:nprocs-1) :: block_array
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -1542,8 +1545,8 @@ module boundaries
 
 ! nullify info pointers
 !
-    do irecv = 0, ncpus - 1
-      do isend = 0, ncpus - 1
+    do irecv = 0, nprocs - 1
+      do isend = 0, nprocs - 1
         do idir = 1, NDIMS
           nullify(block_array(idir,irecv,isend)%ptr)
         end do
@@ -1581,7 +1584,7 @@ module boundaries
 #ifdef MPI
 ! check if the block and neighbor are on the local processors
 !
-                  if (pmeta%cpu .eq. ncpu .and. pneigh%cpu .eq. ncpu) then
+                  if (pmeta%cpu .eq. nproc .and. pneigh%cpu .eq. nproc) then
 #endif /* MPI */
 
 ! update directional flux from the neighbor
@@ -1679,8 +1682,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processors
 !
-    do irecv = 0, ncpus - 1
-      do isend = 0, ncpus - 1
+    do irecv = 0, nprocs - 1
+      do isend = 0, nprocs - 1
         do idir = 1, NDIMS
 
 ! process only pairs which have boundaries to exchange
@@ -1693,7 +1696,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-            itag = (irecv * ncpus + isend) * ncpus + idir
+            itag = (irecv * nprocs + isend) * nprocs + idir
 
 ! allocate space for variables
 !
@@ -1708,9 +1711,9 @@ module boundaries
 #endif /* NDIMS == 3 */
             end select
 
-! if isend == ncpu we are sending data
+! if isend == nproc we are sending data
 !
-            if (isend .eq. ncpu) then
+            if (isend .eq. nproc) then
 
 ! fill out the buffer with block data
 !
@@ -1773,17 +1776,17 @@ module boundaries
 
 ! send data buffer
 !
-              call msendf(size(rbuf(:,:,:,:)), irecv, itag, rbuf(:,:,:,:))
+              call send_arra_real(size(rbuf(:,:,:,:)), irecv, itag, rbuf(:,:,:,:), iret)
 
-            end if ! isend = ncpu
+            end if ! isend = nproc
 
-! if irecv == ncpu we are receiving data
+! if irecv == nproc we are receiving data
 !
-            if (irecv .eq. ncpu) then
+            if (irecv .eq. nproc) then
 
 ! receive data
 !
-              call mrecvf(size(rbuf(:,:,:,:)), isend, itag, rbuf(:,:,:,:))
+              call receive_real_array(size(rbuf(:,:,:,:)), isend, itag, rbuf(:,:,:,:), iret)
 
 ! iterate over all received blocks and update fluxes
 !
@@ -1874,7 +1877,7 @@ module boundaries
 #endif /* NDIMS == 3 */
               end select
 
-            end if ! irecv = ncpu
+            end if ! irecv = nproc
 
 ! deallocate buffers
 !

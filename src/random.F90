@@ -56,10 +56,6 @@ module random
 !
   subroutine init_generator()
 
-#ifdef MPI
-    use mpitools, only : is_master, mbcasti
-#endif /* MPI */
-
     implicit none
 
 ! local variables
@@ -91,22 +87,10 @@ module random
 
 ! fill seeds with random numbers
 !
-#ifdef MPI
-    if (is_master()) then
-#endif /* MPI */
-      do i = 0, nseeds - 1
-        call random_number(q)
-        seeds(i) = 123456789 * q
-      end do
-#ifdef MPI
-    end if
-#endif /* MPI */
-
-#ifdef MPI
-! redistribute seeds
-!
-    call mbcasti(nseeds, seeds)
-#endif /* MPI */
+    do i = 0, nseeds - 1
+      call random_number(q)
+      seeds(i) = 123456789 * q
+    end do
 
 ! prepare the arrays used by nonunifor distribution generators
 !

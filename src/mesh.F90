@@ -51,7 +51,7 @@ module mesh
     use blocks   , only : datablock_set_dims
     use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
-    use mpitools , only : is_master, ncpus
+    use mpitools , only : master, nprocs
     use variables, only : nqt, nvr
 
     implicit none
@@ -77,7 +77,7 @@ module mesh
 
 ! print general information about resolutions
 !
-    if (is_master()) then
+    if (master) then
 
 ! prepare the file for logging mesh statistics; only the master process handles
 ! this part
@@ -109,7 +109,7 @@ module mesh
         end do
 #ifdef MPI
         write(funit,"(1x,a10)",advance="no") 'cpu = 1'
-        do n = 2, ncpus
+        do n = 2, nprocs
           write(funit,"(2x,i6)",advance="no") n
         end do
 #endif /* MPI */
@@ -151,7 +151,7 @@ module mesh
     use config  , only : minlev, maxlev, rdims
     use coords  , only : res
     use error   , only : print_info, print_error
-    use mpitools, only : is_master, ncpu, ncpus
+    use mpitools, only : master, nproc, nprocs
     use problem , only : init_domain, init_problem, check_ref
 
     implicit none
@@ -165,7 +165,7 @@ module mesh
 !
     integer(kind=4)                       :: i, j, k, l, n
 #ifdef MPI
-    integer(kind=4), dimension(0:ncpus-1) :: lb
+    integer(kind=4), dimension(0:nprocs-1) :: lb
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -178,7 +178,7 @@ module mesh
 ! according to the defined geometry is already created; no refinement
 ! is done yet; we fill out the coarse blocks with the initial condition
 !
-    if (is_master()) then
+    if (master) then
       write(*,*)
       write(*,"(1x,a)"             ) "Generating the initial mesh:"
       write(*,"(4x,a)",advance="no") "generating level       =    "
@@ -189,7 +189,7 @@ module mesh
 
 ! print the level currently processed
 !
-      if (is_master()) &
+      if (master) &
         write(*,"(1x,i2)",advance="no") l
 
 ! iterate over all data blocks at the current level and initialize the problem
@@ -351,8 +351,8 @@ module mesh
 ! divide blocks between all processes, use the number of data blocks to do this,
 ! but keep blocks from the top level which have the same parent packed together
 !
-    l       = mod(get_nleafs(), ncpus) - 1
-    lb( : ) = get_nleafs() / ncpus
+    l       = mod(get_nleafs(), nprocs) - 1
+    lb( : ) = get_nleafs() / nprocs
     lb(0:l) = lb(0:l) + 1
 
 ! reset the processor and block numbers
@@ -372,7 +372,7 @@ module mesh
       if (pmeta%leaf) then
         l = l + 1
         if (l .ge. lb(n)) then
-          n = min(ncpus - 1, n + 1)
+          n = min(nprocs - 1, n + 1)
           l = 0
         end if
       end if
@@ -391,7 +391,7 @@ module mesh
 ! if the current block belongs to another process and its data field is
 ! associated, deallocate its data field
 !
-      if (pmeta%cpu .ne. ncpu .and. associated(pmeta%data)) &
+      if (pmeta%cpu .ne. nproc .and. associated(pmeta%data)) &
         call deallocate_datablock(pmeta%data)
 
 ! assign pointer to the next block
@@ -402,7 +402,7 @@ module mesh
 
 ! go to a new line after generating levels
 !
-    if (is_master()) then
+    if (master) then
       write(*,*)
     end if
 
@@ -429,7 +429,9 @@ module mesh
     use coords   , only : res
     use error    , only : print_info, print_error
 #ifdef MPI
-    use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
+    use mpitools , only : reduce_sum_integer_array
+    use mpitools , only : send_real_array, receive_real_array
+    use mpitools , only : master, nprocs, nproc
 #endif /* MPI */
     use problem  , only : check_ref
     use variables, only : nqt
@@ -440,6 +442,7 @@ module mesh
 !
     logical         :: flag
     integer(kind=4) :: i, j, k, l, n, p
+    integer         :: iret
 
 #ifdef MPI
 ! tag for the MPI data exchange
@@ -452,7 +455,7 @@ module mesh
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:ncpus-1)      :: lb
+    integer(kind=4), dimension(0:nprocs-1)      :: lb
 
 ! local buffer for data block exchange
 !
@@ -533,7 +536,7 @@ module mesh
 
 ! update refinement flags across all processors
 !
-    call mallreducesuml(get_nleafs(), ibuf(1:get_nleafs()))
+    call reduce_sum_integer_array(get_nleafs(), ibuf(1:get_nleafs()), iret)
 
 ! update non-local block refinement flags
 !
@@ -751,7 +754,7 @@ module mesh
 
 ! generate the tag for communication
 !
-              itag = pmeta%child(p)%ptr%cpu * ncpus + pmeta%cpu + ncpus + p + 1
+              itag = pmeta%child(p)%ptr%cpu * nprocs + pmeta%cpu + nprocs + p + 1
 
 ! if the current children is not on the same processor, then ...
 !
@@ -759,13 +762,13 @@ module mesh
 
 ! allocate data blocks for children on the processor which will receive data
 !
-                if (pmeta%cpu .eq. ncpu) then
+                if (pmeta%cpu .eq. nproc) then
                   call append_datablock(pdata)
                   call associate_blocks(pmeta%child(p)%ptr, pdata)
 
 ! receive the data
 !
-                  call mrecvf(size(rbuf), pmeta%child(p)%ptr%cpu, itag, rbuf)
+                  call receive_real_array(size(rbuf), pmeta%child(p)%ptr%cpu, itag, rbuf, iret)
 
 ! coppy buffer to data
 !
@@ -774,7 +777,7 @@ module mesh
 
 ! send data to the right processor and deallocate data block
 !
-                if (pmeta%child(p)%ptr%cpu .eq. ncpu) then
+                if (pmeta%child(p)%ptr%cpu .eq. nproc) then
 
 ! copy data to buffer
 !
@@ -782,7 +785,7 @@ module mesh
 
 ! send data
 !
-                  call msendf(size(rbuf), pmeta%cpu, itag, rbuf)
+                  call send_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
 
 ! deallocate data block
 !
@@ -817,7 +820,7 @@ module mesh
 
               if (associated(pparent)) then
 #ifdef MPI
-                if (pmeta%cpu .eq. ncpu) then
+                if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
                   if (.not. associated(pparent%data)) then
                     call append_datablock(pdata)
@@ -854,7 +857,7 @@ module mesh
             if (pmeta%refine .eq. 1) then
               pparent => pmeta
 #ifdef MPI
-              if (pmeta%cpu .eq. ncpu) then
+              if (pmeta%cpu .eq. nproc) then
 #endif /* MPI */
                 call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
                 call prolong_block(pparent)
@@ -902,13 +905,15 @@ module mesh
     use blocks   , only : get_nleafs, append_datablock, deallocate_datablock   &
                         , associate_blocks
     use config   , only : im, jm, km
-    use mpitools , only : ncpus, ncpu, msendf, mrecvf
+    use mpitools , only : send_real_array, receive_real_array
+    use mpitools , only : nprocs, nproc
     use variables, only : nqt
 
     implicit none
 
 ! local variables
 !
+    integer         :: iret
     integer(kind=4) :: l, n
 !
 ! tag for the MPI data exchange
@@ -917,7 +922,7 @@ module mesh
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:ncpus-1)      :: lb
+    integer(kind=4), dimension(0:nprocs-1)      :: lb
 
 ! local buffer for data block exchange
 !
@@ -934,8 +939,8 @@ module mesh
 !!
 ! calculate the new division
 !
-    l       = mod(get_nleafs(), ncpus) - 1
-    lb( : ) = get_nleafs() / ncpus
+    l       = mod(get_nleafs(), nprocs) - 1
+    lb( : ) = get_nleafs() / nprocs
     lb(0:l) = lb(0:l) + 1
 
 ! iterate over all metablocks and reassign the processor numbers
@@ -954,9 +959,9 @@ module mesh
 
 ! generate the tag for communication
 !
-          itag = pmeta%cpu * ncpus + n + ncpus + 1
+          itag = pmeta%cpu * nprocs + n + nprocs + 1
 
-          if (ncpu .eq. pmeta%cpu) then
+          if (nproc .eq. pmeta%cpu) then
 
 ! copy data to buffer
 !
@@ -964,7 +969,7 @@ module mesh
 
 ! send data
 !
-            call msendf(size(rbuf), n, itag, rbuf)
+            call send_real_array(size(rbuf), n, itag, rbuf, iret)
 
 ! deallocate data block
 !
@@ -974,7 +979,7 @@ module mesh
 !
           end if
 
-          if (ncpu .eq. n) then
+          if (nproc .eq. n) then
 
 ! allocate data block for the current block
 !
@@ -983,7 +988,7 @@ module mesh
 
 ! receive the data
 !
-            call mrecvf(size(rbuf), pmeta%cpu, itag, rbuf)
+            call receive_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
 
 ! coppy buffer to data
 !
@@ -1007,7 +1012,7 @@ module mesh
       if (pmeta%leaf) then
         l = l + 1
         if (l .ge. lb(n)) then
-          n = min(ncpus - 1, n + 1)
+          n = min(nprocs - 1, n + 1)
           l = 0
         end if
       end if
@@ -1370,7 +1375,7 @@ module mesh
 
     use blocks  , only : clear_blocks
     use error   , only : print_info
-    use mpitools, only : is_master
+    use mpitools, only : master
 
     implicit none
 
@@ -1382,7 +1387,7 @@ module mesh
 
 ! close the handler of the mesh statistics file
 !
-    if (is_master()) close(funit)
+    if (master) close(funit)
 
 !-------------------------------------------------------------------------------
 !
@@ -1400,7 +1405,7 @@ module mesh
     use blocks  , only : get_mblocks, get_nleafs
     use config  , only : ncells, nghost, toplev
     use coords  , only : effres
-    use mpitools, only : is_master, ncpus
+    use mpitools, only : master, nprocs
 
     implicit none
 
@@ -1418,7 +1423,7 @@ module mesh
 !
     integer(kind=4), dimension(toplev) :: ldist
 #ifdef MPI
-    integer(kind=4), dimension(ncpus)  :: cdist
+    integer(kind=4), dimension(nprocs)  :: cdist
 #endif /* MPI */
 
 ! local pointers
@@ -1433,7 +1438,7 @@ module mesh
 !
 ! store the statistics about mesh
 !
-    if (is_master()) then
+    if (master) then
 
       if (nm .ne. get_mblocks() .or. nl .ne. get_nleafs()) then
 
@@ -1475,7 +1480,7 @@ module mesh
         end do
 #ifdef MPI
         write(funit,"('   ')",advance="no")
-        do l = 1, ncpus
+        do l = 1, nprocs
           write(funit,"(2x,i6)",advance="no") cdist(l)
         end do
 #endif /* MPI */

@@ -168,7 +168,7 @@ module io
     use error   , only : print_error
     use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
     use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
-    use mpitools, only : ncpu
+    use mpitools, only : nproc
 
 ! declare variables
 !
@@ -197,9 +197,9 @@ module io
 ! prepare the filename
 !
       if (ftype .eq. 'r') then
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, ncpu, '.h5'
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
       else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, ncpu, '.h5'
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
       end if
 
 ! create the new HDF5 file
@@ -321,7 +321,7 @@ module io
     use hdf5    , only : H5F_ACC_RDONLY_F
     use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
                        , h5fclose_f
-    use mpitools, only : ncpus, ncpu
+    use mpitools, only : nprocs, nproc
 
 ! declare variables
 !
@@ -351,9 +351,9 @@ module io
 ! if the number of processors is larger then the number of files, use the last
 ! file for the remaining processors
 !
-      lcpu = ncpu
-      if (rncpus .lt. ncpus) then
-        lcpu = min(rncpus - 1, ncpu)
+      lcpu = nproc
+      if (rncpus .lt. nprocs) then
+        lcpu = min(rncpus - 1, nproc)
       end if
 
 ! prepare the filename
@@ -392,7 +392,7 @@ module io
 
 ! read data blocks
 !
-              if (lcpu .eq. ncpu) call read_datablocks_h5(fid)
+              if (lcpu .eq. nproc) call read_datablocks_h5(fid)
 
 ! terminate access to the current file
 !
@@ -445,15 +445,15 @@ module io
 ! if the number of files is larger than the number of processors read the
 ! remaining files and allocate data blocks in the last processor
 !
-      if (rncpus .gt. ncpus) then
+      if (rncpus .gt. nprocs) then
 
 ! perform the rest only on the last processor
 !
-        if (ncpu .eq. (ncpus - 1)) then
+        if (nproc .eq. (nprocs - 1)) then
 
 ! iterate over the remaining files
 !
-          do lcpu = ncpus, rncpus - 1
+          do lcpu = nprocs, rncpus - 1
 
 ! prepare the filename
 !
@@ -638,7 +638,7 @@ module io
 !
           if (err .ge. 0) then
 
-! read attribute 'ncpus'
+! read attribute 'nprocs'
 !
             call h5aopen_by_name_f(fid, "/attributes", "ncpus", aid, err)
 
@@ -646,7 +646,7 @@ module io
 !
             if (err .ge. 0) then
 
-! read the attribute ncpus
+! read the attribute nprocs
 !
               call read_attribute_integer_h5(aid, "ncpus", rncpus)
 
@@ -788,7 +788,7 @@ module io
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
-    use mpitools , only : ncpus, ncpu
+    use mpitools , only : nprocs, nproc
     use random   , only : nseeds, get_seeds
     use scheme   , only : cmax
 
@@ -832,8 +832,8 @@ module io
       call write_attribute_integer_h5(gid, 'minlev' , minlev)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'toplev' , toplev)
-      call write_attribute_integer_h5(gid, 'ncpus'  , ncpus)
-      call write_attribute_integer_h5(gid, 'ncpu'   , ncpu)
+      call write_attribute_integer_h5(gid, 'ncpus'  , nprocs)
+      call write_attribute_integer_h5(gid, 'ncpu'   , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'iter'   , n)
       call write_attribute_integer_h5(gid, 'nfile'  , nfile)
@@ -934,7 +934,7 @@ module io
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use mpitools , only : ncpus, ncpu
+    use mpitools , only : nprocs, nproc
     use random   , only : nseeds, set_seeds
     use scheme   , only : cmax
 
@@ -2171,7 +2171,7 @@ module io
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gopen_f, h5gclose_f
-    use mpitools, only : ncpus
+    use mpitools, only : nprocs
 
 ! declare variables
 !
@@ -2207,7 +2207,7 @@ module io
 !
 ! prepare last cpu index
 !
-    lcpu = ncpus - 1
+    lcpu = nprocs - 1
 
 ! open metablock group
 !

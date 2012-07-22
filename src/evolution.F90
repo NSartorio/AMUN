@@ -193,7 +193,7 @@ module evolution
     use blocks  , only : block_meta, block_data, list_meta, list_data
     use config  , only : toplev
 #ifdef MPI
-    use mpitools, only : mallreducemaxr
+    use mpitools, only : reduce_maximum_real
 #endif /* MPI */
     use coords  , only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
@@ -208,6 +208,7 @@ module evolution
 
 ! local variables
 !
+    integer                   :: iret
     real                      :: cm
     integer(kind=4)           :: lev
 
@@ -283,9 +284,9 @@ module evolution
     end do
 
 #ifdef MPI
-! reduce the maximum speed over all processes
+! find maximum speed in the system from all processors
 !
-    call mallreducemaxr(cmax)
+    call reduce_maximum_real(cmax, iret)
 #endif /* MPI */
 
 ! calcilate new time step

@@ -21,563 +21,1230 @@
 !!
 !!******************************************************************************
 !!
-!! module: MPITOOLS - subroutines for MPI communication
+!! module: MPITOOLS
+!!
+!!  This module provides wrapper subroutines handling the parallel execution
+!!  with the Message Passing Interface protocol.
 !!
 !!******************************************************************************
 !
 module mpitools
 
+! include external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+
+! module variables are not implicit by default
+!
   implicit none
+
+! timer indices
+!
+  integer        , save                 :: imi, imc
 
 ! MPI global variables
 !
-  integer        , save                 :: comm3d
-  integer(kind=4), save                 :: ncpu, ncpus
+  integer(kind=4), save                 :: comm3d
+  integer(kind=4), save                 :: nproc, nprocs
+  integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
+  integer(kind=4), save, dimension(3,2) :: pneighs
+  logical        , save, dimension(3)   :: periodic
+  logical        , save                 :: master = .true.
 
+! by default everything is public
+!
+  public
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
 !
-! init_mpi: subroutine initializes the MPI variables
+! subroutine INITIALIZE_MPI:
+! -------------------------
+!
+!   Subroutine initializes the MPITOOLS modules.
 !
 !===============================================================================
 !
-  subroutine init_mpi
+  subroutine initialize_mpi()
 
+! include external procedures and variables
+!
 #ifdef MPI
-    use mpi, only : mpi_comm_world
+    use mpi, only : mpi_comm_world, mpi_success
 #endif /* MPI */
 
+! local variables are not implicit by default
+!
     implicit none
-#ifdef MPI
+
 ! local variables
 !
-    integer :: err
+#ifdef MPI
+    integer :: iret
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
-    ncpu  = 0
-    ncpus = 1
+#ifdef MPI
+! set timer descriptions
+!
+    call set_timer('MPI initialization', imi)
+    call set_timer('MPI communication' , imc)
+
+! start time accounting for the MPI initialization
+!
+    call start_timer(imi)
+#endif /* MPI */
+
+! initialize parralel execution parameters
+!
+    nproc        =  0
+    nprocs       =  1
+    pdims(:)     =  1
+    pcoords(:)   =  0
+    pparity(:)   =  0
+    pneighs(:,:) = -1
+    periodic(:)  = .false.
 
 #ifdef MPI
-!  initialize the MPI interface
+! initialize the MPI interface
 !
-    call mpi_init(err)
+    call mpi_init(iret)
 
-! get the current process id and the total number of processes
+! check if the MPI interface was initialized successfully
 !
-    call mpi_comm_rank(mpi_comm_world, ncpu , err)
-    call mpi_comm_size(mpi_comm_world, ncpus, err)
+    if (iret .ne. mpi_success) then
+      write(*,*) 'The MPI interface could not be initializes! Exiting...'
+      write(*,*)
+      stop
+    end if
 
+! obtain the total number of processes
+!
+    call mpi_comm_size(mpi_comm_world, nprocs, iret)
+
+! check if the total number of processes could be obtained
+!
+    if (iret .ne. mpi_success) then
+      write(*,*) 'The MPI process ID could not be obtained! Exiting...'
+      write(*,*)
+      stop
+    end if
+
+! obtain the current process identificator
+!
+    call mpi_comm_rank(mpi_comm_world, nproc , iret)
+
+! check if the process ID was return successfully
+!
+    if (iret .ne. mpi_success) then
+      write(*,*) 'The MPI process ID could not be obtained! Exiting...'
+      write(*,*)
+      stop
+    end if
+
+! set the master flag
+!
+    master = (nproc .eq. 0)
+
+! store the MPI pool handles
+!
     comm3d = mpi_comm_world
 
+! stop time accounting for the MPI initialization
+!
+    call stop_timer(imi)
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_mpi
+  end subroutine initialize_mpi
 !
 !===============================================================================
 !
-! clear_mpi: subroutine clears the MPI variables
+! subroutine FINALIZE_MPI:
+! -----------------------
+!
+!   Subroutine finalizes the MPITOOLS modules.
 !
 !===============================================================================
 !
-  subroutine clear_mpi
+  subroutine finalize_mpi()
 
-    implicit none
+! include external procedures and variables
+!
 #ifdef MPI
+    use mpi, only : mpi_comm_world, mpi_success
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
 ! local variables
 !
-    integer :: err
+#ifdef MPI
+    integer :: iret
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef MPI
-!  finalize the MPI interface
+! start time accounting for the MPI initialization
 !
-    call mpi_finalize(err)
+    call start_timer(imi)
+
+! initialize the MPI interface
+!
+    call mpi_finalize(iret)
+
+! check if the MPI interface was finalizes successfully
+!
+    if (iret .ne. mpi_success) then
+      if (master) then
+        write(*,*) 'The MPI interface could not be finalized! Exiting...'
+        write(*,*)
+      end if
+      stop
+    end if
+
+! stop time accounting for the MPI initialization
+!
+    call stop_timer(imi)
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine clear_mpi
+  end subroutine finalize_mpi
 !
 !===============================================================================
 !
-! mbarrier: subroutine synchronizes processes
+! subroutine SETUP_MPI:
+! --------------------
+!
+!   Subroutine sets the MPI geometry.
 !
 !===============================================================================
 !
-  subroutine mbarrier
+  subroutine setup_mpi(div, per)
 
+! include external procedures and variables
+!
+#ifdef MPI
+    use mpi, only : mpi_comm_world, mpi_success
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
     implicit none
-#ifdef MPI
+
+! input arguments
+!
+    integer, dimension(3), intent(in) :: div
+    logical, dimension(3), intent(in) :: per
+
 ! local variables
 !
-    integer :: err
-#endif /* MPI */
+    integer :: iret
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef MPI
-!  finalize the MPI interface
+! start time accounting for the MPI initialization
 !
-    call mpi_barrier(comm3d, err)
+    call start_timer(imi)
+
+! check if the total number of chunks in division corresponds to the number of
+! processes, if not try to find the best division
+!
+    if (nprocs .ne. product(div(:))) then
+
+      if (master) then
+        write(*,*) 'The number of MPI processes does not correspond to'        &
+                                              // ' the number of domain chunks!'
+        write(*,*) 'Looking for the best division...'
+      end if
+
+! try to find the best division
+!
+      pdims(:) = 1
+      iret      = 0
+
+      do while(product(pdims(:)) .lt. nprocs)
+#ifdef R3D
+        iret = mod(iret, 3) + 1
+#else /* R3D */
+        iret = mod(iret, 2) + 1
+#endif /* R3D */
+        pdims(iret) = 2 * pdims(iret)
+      end do
+
+! check if the best division found
+!
+      if (product(pdims(:)) .ne. nprocs) then
+
+        if (master) then
+          write(*,*) 'Improssible to find the best domain division! Exiting...'
+          write(*,*)
+        end if
+
+        call finalize_mpi()
+        stop
+
+      end if
+
+      if (master) then
+        write(*,*) 'Found the best division:', pdims(:)
+        write(*,*)
+      end if
+
+    else
+
+! substitute div(:) to pdims(:)
+!
+      pdims(:) = div(:)
+
+    end if
+
+! set the periodic flag
+!
+    periodic(:) = per(:)
+
+! set up the Cartesian geometry
+!
+    call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)              &
+                                                       , .true., comm3d, iret)
+
+    if (iret .ne. mpi_success) then
+
+      if (master) then
+        write(*,*) 'The MPI could not create the Cartesian geometry! Exiting...'
+        write(*,*)
+      end if
+      stop
+
+    end if
+
+! assign process coordinate
+!
+    call mpi_cart_coords(comm3d, nproc, 3, pcoords(:), iret)
+
+    if (iret .ne. mpi_success) then
+
+      if (master) then
+        write(*,*) 'The MPI could not assign process coordinates! Exiting...'
+        write(*,*)
+      end if
+      stop
+
+    end if
+
+! set the neighbors
+!
+    if (pdims(1) .gt. 1) then
+      call mpi_cart_shift(comm3d, 0, 1, pneighs(1,1), pneighs(1,2), iret)
+    end if
+    if (pdims(2) .gt. 1) then
+      call mpi_cart_shift(comm3d, 1, 1, pneighs(2,1), pneighs(2,2), iret)
+    end if
+    if (pdims(3) .gt. 1) then
+      call mpi_cart_shift(comm3d, 2, 1, pneighs(3,1), pneighs(3,2), iret)
+    end if
+
+! set parity flag
+!
+    pparity(1) = mod(pcoords(1), 2)
+    pparity(2) = mod(pcoords(2), 2)
+    pparity(3) = mod(pcoords(3), 2)
+
+! stop time accounting for the MPI initialization
+!
+    call stop_timer(imi)
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine mbarrier
+  end subroutine setup_mpi
+#ifdef MPI
 !
 !===============================================================================
 !
-! is_master: function returns true if it is the master node, otherwise it
-!            returns false
+! subroutine BCAST_INTEGER_VARIABLE:
+! ---------------------------------
+!
+!   Subroutine broadcast an integer variable from the master process to all
+!   other processes.
 !
 !===============================================================================
 !
-  function is_master()
+  subroutine bcast_integer_variable(ibuf, iret)
 
+! include external procedures and variables
+!
+    use mpi, only : mpi_integer, mpi_success
+
+! local variables are not implicit by default
+!
     implicit none
 
-! return value
+! subroutine arguments
 !
-    logical :: is_master
+    integer, intent(inout) :: ibuf
+    integer, intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
-    is_master = ncpu .eq. 0
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_bcast(ibuf, 1, mpi_integer, 0, comm3d, iret)
+
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not broadcast an integer variable!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
 
 !-------------------------------------------------------------------------------
 !
-  end function is_master
+  end subroutine bcast_integer_variable
 !
 !===============================================================================
 !
-! msendi: subroutine sends an array
+! subroutine BCAST_REAL_VARIABLE:
+! ------------------------------
+!
+!   Subroutine broadcast a real variable from the master process to all
+!   other processes.
 !
 !===============================================================================
 !
-  subroutine msendi(n, dst, tag, buf)
+  subroutine bcast_real_variable(rbuf, iret)
 
-#ifdef MPI
-    use mpi, only : mpi_integer
-#endif /* MPI */
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_success
 
+! local variables are not implicit by default
+!
     implicit none
 
-! arguments
+! subroutine arguments
 !
-    integer              , intent(in) :: n, dst, tag
-    integer, dimension(n), intent(in) :: buf
+    real   , intent(inout) :: rbuf
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
 
-#ifdef MPI
+    call mpi_bcast(rbuf, 1, mpi_real8, 0, comm3d, iret)
+
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not broadcast an integer variable!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bcast_real_variable
+!
+!===============================================================================
+!
+! subroutine BCAST_STRING_VARIABLE:
+! --------------------------------
+!
+!   Subroutine broadcast a string variable from the master process to all
+!   other processes.
+!
+!===============================================================================
+!
+  subroutine bcast_string_variable(sbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_character, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    character(len=*), intent(inout) :: sbuf
+    integer         , intent(out)   :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm3d, iret)
+
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not broadcast a string variable!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine bcast_string_variable
+!
+!===============================================================================
+!
+! subroutine REDUCE_MINIMUM_INTEGER:
+! ---------------------------------
+!
+!   Subroutine finds the minimum value among the integer values from all
+!   processes.
+!
+!===============================================================================
+!
+  subroutine reduce_minimum_integer(ibuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_integer, mpi_min, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: ibuf
+    integer, intent(out)   :: iret
+
 ! local variables
 !
-    integer :: err
+    integer                :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
-    err = 0
-    call mpi_send(buf, n, mpi_integer, dst, tag, comm3d, err)
-    if (err .ne. 0) print *, 'msendi: error', err
-#endif /* MPI */
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm3d, iret)
+
+! substitute the result
+!
+    ibuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the minimum value!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine msendi
+  end subroutine reduce_minimum_integer
 !
 !===============================================================================
 !
-! mrecvi: subroutine receives an array
+! subroutine REDUCE_MINIMUM_REAL:
+! ------------------------------
+!
+!   Subroutine finds the minimum value among the real values from all processes.
 !
 !===============================================================================
 !
-  subroutine mrecvi(n, src, tag, buf)
+  subroutine reduce_minimum_real(rbuf, iret)
 
-#ifdef MPI
-    use mpi, only : mpi_status_size, mpi_integer
-#endif /* MPI */
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_min, mpi_success
 
-! arguments
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real   , intent(inout) :: rbuf
+    integer, intent(out)   :: iret
+
+! local variables
+!
+    real                   :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm3d, iret)
+
+! substitute the result
+!
+    rbuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the minimum value!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_minimum_real
+!
+!===============================================================================
+!
+! subroutine REDUCE_MAXIMUM_INTEGER:
+! ---------------------------------
+!
+!   Subroutine find the maximum value among the integer values from all
+!   processes.
+!
+!===============================================================================
+!
+  subroutine reduce_maximum_integer(ibuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_integer, mpi_max, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: ibuf
+    integer, intent(out)   :: iret
+
+! local variables
+!
+    integer                :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm3d, iret)
+
+! substitute the result
+!
+    ibuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maximum value!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_maximum_integer
+!
+!===============================================================================
+!
+! subroutine REDUCE_MAXIMUM_REAL:
+! ------------------------------
+!
+!   Subroutine find the maximum value among the values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_maximum_real(rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_max, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real   , intent(inout) :: rbuf
+    integer, intent(out)   :: iret
+
+! local variables
+!
+    real                   :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm3d, iret)
+
+! substitute the result
+!
+    rbuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maximum value!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_maximum_real
+!
+!===============================================================================
+!
+! subroutine REDUCE_SUM_INTEGER:
+! -----------------------------
+!
+!   Subroutine finds the sum from all integer values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_sum_integer(ibuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_integer, mpi_sum, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: ibuf
+    integer, intent(out)   :: iret
+
+! local variables
+!
+    integer                :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm3d, iret)
+
+! substitute the result
+!
+    ibuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maximum value!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_sum_integer
+!
+!===============================================================================
+!
+! subroutine REDUCE_SUM_REAL:
+! --------------------------
+!
+!   Subroutine sums the values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_sum_real(rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_sum, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real   , intent(inout) :: rbuf
+    integer, intent(out)   :: iret
+
+! local variables
+!
+    real                   :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm3d, iret)
+
+! substitute the result
+!
+    rbuf = tbuf
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not sum the values from all processes!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_sum_real
+!
+!===============================================================================
+!
+! subroutine REDUCE_MINIMUM_REAL_ARRAY:
+! ------------------------------------
+!
+!   Subroutine find the minimum value for each array element among the
+!   corresponding values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_minimum_real_array(n, rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_min, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)    :: n
+    real   , dimension(n), intent(inout) :: rbuf
+    integer              , intent(out)   :: iret
+
+! local variables
+!
+    real(kind=8), dimension(n)           :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm3d, iret)
+
+! substitute the result
+!
+    rbuf(:) = tbuf(:)
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the minima for all array elements!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_minimum_real_array
+!
+!===============================================================================
+!
+! subroutine REDUCE_MAXIMUM_REAL_ARRAY:
+! ------------------------------------
+!
+!   Subroutine find the maximum value for each array element among the
+!   corresponding values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_maximum_real_array(n, rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_max, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)    :: n
+    real   , dimension(n), intent(inout) :: rbuf
+    integer              , intent(out)   :: iret
+
+! local variables
+!
+    real(kind=8), dimension(n)           :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm3d, iret)
+
+! substitute the result
+!
+    rbuf(:) = tbuf(:)
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maxima for all array elements!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_maximum_real_array
+!
+!===============================================================================
+!
+! subroutine REDUCE_SUM_INTEGER_ARRAY:
+! -----------------------------------
+!
+!   Subroutine sums the values for each array element from the corresponding
+!   values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_sum_integer_array(n, ibuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_integer, mpi_sum, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)    :: n
+    integer, dimension(n), intent(inout) :: ibuf
+    integer              , intent(out)   :: iret
+
+! local variables
+!
+    integer, dimension(n)                :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm3d, iret)
+
+! substitute the result
+!
+    ibuf(:) = tbuf(:)
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maxima for all array elements!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_sum_integer_array
+!
+!===============================================================================
+!
+! subroutine REDUCE_SUM_REAL_ARRAY:
+! --------------------------------
+!
+!   Subroutine sums the values for each array element from the corresponding
+!   values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_sum_real_array(n, rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_sum, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)    :: n
+    real   , dimension(n), intent(inout) :: rbuf
+    integer              , intent(out)   :: iret
+
+! local variables
+!
+    real(kind=8), dimension(n)           :: tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+
+! substitute the result
+!
+    rbuf(:) = tbuf(:)
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maxima for all array elements!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_sum_real_array
+!
+!===============================================================================
+!
+! subroutine REDUCE_SUM_COMPLEX_ARRAY:
+! -----------------------------------
+!
+!   Subroutine sums the values for each array element from the corresponding
+!   complex values from all processes.
+!
+!===============================================================================
+!
+  subroutine reduce_sum_complex_array(n, cbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_sum, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)    :: n
+    complex, dimension(n), intent(inout) :: cbuf
+    integer              , intent(out)   :: iret
+
+! local variables
+!
+    real(kind=8), dimension(n)           :: rbuf, ibuf, tbuf
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    tbuf(:) = real(cbuf(:))
+    call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    tbuf(:) = aimag(cbuf(:))
+    call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm3d, iret)
+
+! substitute the result
+!
+    cbuf(1:n) = cmplx(rbuf(1:n), ibuf(1:n))
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not find the maxima for all array elements!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reduce_sum_complex_array
+!
+!===============================================================================
+!
+! subroutine SEND_REAL_ARRAY:
+! --------------------------
+!
+!   Subroutine sends an arrays of real values to another process.
+!
+!   Arguments:
+!
+!     n    - the number of array elements;
+!     dst  - the ID of the destination process;
+!     tag  - the tag identifying this operation;
+!     rbuf - the real array to send;
+!     iret - the result flag identifying if the operation was successful;
+!
+!===============================================================================
+!
+  subroutine send_real_array(n, dst, tag, rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_success
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer              , intent(in)  :: n, dst, tag
+    real   , dimension(n), intent(in)  :: rbuf
+    integer              , intent(out) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+    call mpi_send(rbuf, n, mpi_real8, dst, tag, comm3d, iret)
+
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not send the real array to another process!'
+      write(*,*)
+    end if
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine send_real_array
+!
+!===============================================================================
+!
+! subroutine RECEIVE_REAL_ARRAY:
+! -----------------------------
+!
+!   Subroutine receives an arrays of real values from another process.
+!
+!   Arguments:
+!
+!     n    - the number of array elements;
+!     src  - the ID of the source process;
+!     tag  - the tag identifying this operation;
+!     rbuf - the received real array;
+!     iret - the result flag identifying if the operation was successful;
+!
+!===============================================================================
+!
+  subroutine receive_real_array(n, src, tag, rbuf, iret)
+
+! include external procedures and variables
+!
+    use mpi, only : mpi_real8, mpi_success, mpi_status_size
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
 !
     integer              , intent(in)  :: n, src, tag
-    integer, dimension(n), intent(out) :: buf
+    real   , dimension(n), intent(out) :: rbuf
+    integer              , intent(out) :: iret
 
-#ifdef MPI
 ! local variables
 !
-    integer :: err, status(mpi_status_size)
-#endif /* MPI */
+    integer :: status(mpi_status_size)
 !
 !-------------------------------------------------------------------------------
 !
-    buf(:)    = 0
-#ifdef MPI
-    err       = 0
-    status(:) = 0
-    call mpi_recv(buf, n, mpi_integer, src, tag, comm3d, status, err)
-    if (err .ne. 0) print *, 'mrecvi: error', err
-#endif /* MPI */
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
 
-  end subroutine mrecvi
-!
-!===============================================================================
-!
-! msendf: subroutine sends an array
-!
-!===============================================================================
-!
-  subroutine msendf(n, dst, tag, buf)
+    call mpi_recv(rbuf, n, mpi_real8, src, tag, comm3d, status, iret)
 
-#ifdef MPI
-    use mpi, only : mpi_real8
-#endif /* MPI */
+! check if the operation was successful
+!
+    if (iret .ne. mpi_success .and. master) then
+      write(*,*) 'The MPI could not send the real array to another process!'
+      write(*,*)
+    end if
 
-    implicit none
-
-! arguments
+! stop time accounting for the MPI communication
 !
-    integer                   , intent(in)    :: n, dst, tag
-    real(kind=8), dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer :: err
-!
-!-------------------------------------------------------------------------------
-!
-    call mpi_send(buf, n, mpi_real8, dst, tag, comm3d, err)
-#endif /* MPI */
+    call stop_timer(imc)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine msendf
-!
+  end subroutine receive_real_array
+#endif /* MPI */
+
 !===============================================================================
 !
-! mrecvf: subroutine receives an array
-!
-!===============================================================================
-!
-  subroutine mrecvf(n, src, tag, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_status_size, mpi_real8
-#endif /* MPI */
-
-! arguments
-!
-    integer                   , intent(in)    :: n, src, tag
-    real(kind=8), dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer :: err, status(mpi_status_size)
-!
-!-------------------------------------------------------------------------------
-!
-    call mpi_recv(buf, n, mpi_real8, src, tag, comm3d, status, err)
-#endif /* MPI */
-
-  end subroutine mrecvf
-!
-!===============================================================================
-!
-! mallreducesuml: subroutine adds values over all proceeses
-!
-!===============================================================================
-!
-  subroutine mallreducesuml(n, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_integer, mpi_sum
-#endif /* MPI */
-
-! arguments
-!
-    integer              , intent(in)    :: n
-    integer, dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer, dimension(n) :: tbuf
-    integer               :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_sum, comm3d, err)
-    buf(1:n) = tbuf(1:n)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreducesuml
-!
-!===============================================================================
-!
-! mallreducesumd: subroutine sums double precision array from all processors
-!
-!===============================================================================
-!
-  subroutine mallreducesumd(n, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_real8, mpi_sum
-#endif /* MPI */
-
-! arguments
-!
-    integer                   , intent(in)    :: n
-    real(kind=8), dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    real(kind=8), dimension(n) :: tbuf
-    integer                    :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, n, mpi_real8, mpi_sum, comm3d, err)
-    buf(1:n) = tbuf(1:n)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreducesumd
-!
-!===============================================================================
-!
-! mallreducesumc: subroutine sums complex array from all processors
-!
-!===============================================================================
-!
-  subroutine mallreducesumc(n, m, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_real8, mpi_sum
-#endif /* MPI */
-
-! arguments
-!
-    integer                        , intent(in)    :: n, m
-    complex(kind=8), dimension(n,m), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    real(kind=8), dimension(n,m) :: rbuf, ibuf
-    integer                      :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce( real(buf), rbuf, n*m, mpi_real8, mpi_sum, comm3d, err)
-    call mpi_allreduce(aimag(buf), ibuf, n*m, mpi_real8, mpi_sum, comm3d, err)
-    buf(1:n,1:m) = cmplx(rbuf(1:n,1:m),ibuf(1:n,1:m))
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreducesumc
-!
-!===============================================================================
-!
-! mallreducesuml: subroutine adds values over all proceeses
-!
-!===============================================================================
-!
-  subroutine mallreduceprodl(n, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_integer, mpi_prod
-#endif /* MPI */
-
-! arguments
-!
-    integer              , intent(in)    :: n
-    integer, dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer, dimension(n) :: tbuf
-    integer               :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_prod, comm3d, err)
-    buf(1:n) = tbuf(1:n)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreduceprodl
-!
-!===============================================================================
-!
-! mallreducemaxl: subroutine finds maximum values over all proceeses
-!
-!===============================================================================
-!
-  subroutine mallreducemaxl(n, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_integer, mpi_max
-#endif /* MPI */
-
-! arguments
-!
-    integer              , intent(in)    :: n
-    integer, dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer, dimension(n) :: tbuf
-    integer               :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, n, mpi_integer, mpi_max, comm3d, err)
-    buf(1:n) = tbuf(1:n)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreducemaxl
-!
-!===============================================================================
-!
-! mallreduceminr: subroutine finds the minimum value over all proceeses
-!
-!===============================================================================
-!
-  subroutine mallreduceminr(buf)
-
-#ifdef MPI
-    use mpi, only : mpi_real8, mpi_min
-#endif /* MPI */
-
-! arguments
-!
-    real(kind=8), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    real(kind=8)        :: tbuf
-    integer             :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, 1, mpi_real8, mpi_min, comm3d, err)
-    buf = tbuf
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreduceminr
-!
-!===============================================================================
-!
-! mallreducemaxr: subroutine reduces the maximum value over all processes
-!
-!===============================================================================
-!
-  subroutine mallreducemaxr(buf)
-
-#ifdef MPI
-    use mpi, only : mpi_real8, mpi_max
-#endif /* MPI */
-
-! arguments
-!
-    real(kind=8), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    real(kind=8)        :: tbuf
-    integer             :: err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, 1, mpi_real8, mpi_max, comm3d, err)
-    buf = tbuf
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine mallreducemaxr
-!
-!===============================================================================
-!
-! mfindmaxi: subroutine finds the maximum integer value across all proceeses
-!
-!===============================================================================
-!
-  subroutine mfindmaxi(buf)
-
-#ifdef MPI
-    use mpi, only : mpi_integer, mpi_max
-#endif /* MPI */
-
-! arguments
-!
-    integer(kind=4), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer(kind=4)     :: tbuf, err
-!
-!-------------------------------------------------------------------------------
-!
-    err = 0
-    call mpi_allreduce(buf, tbuf, 1, mpi_integer, mpi_max, comm3d, err)
-    buf = tbuf
-#endif /* MPI */
-!-------------------------------------------------------------------------------
-!
-  end subroutine mfindmaxi
-!
-!=========================
-!
-  subroutine mbcasti(n, buf)
-
-#ifdef MPI
-    use mpi, only : mpi_integer
-#endif /* MPI */
-
-! arguments
-!
-    integer              , intent(in)    :: n
-    integer, dimension(n), intent(inout) :: buf
-
-#ifdef MPI
-! local variables
-!
-    integer :: ierr
-!
-!----------------------------------------------------------------------
-!
-    call mpi_bcast(buf, n, mpi_integer, 0, comm3d, ierr)
-#endif /* MPI */
-
-  end subroutine mbcasti
-
-end module
+end module mpitools

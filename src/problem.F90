@@ -1049,7 +1049,7 @@ module problem
 #endif /* ISO */
     use constants, only : dpi
     use coords   , only : ax, ay, az
-    use mpitools , only : ncpu
+    use mpitools , only : nproc
     use random   , only : randomn
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
@@ -1138,10 +1138,10 @@ module problem
 
 ! initialize random velocity field
 !
-          q(ivx,i) = vper * randomn(ncpu)
-          q(ivy,i) = vper * randomn(ncpu)
+          q(ivx,i) = vper * randomn(nproc)
+          q(ivy,i) = vper * randomn(nproc)
 #if NDIMS == 3
-          q(ivz,i) = vper * randomn(ncpu)
+          q(ivz,i) = vper * randomn(nproc)
 #endif /* NDIMS == 3 */
 
 ! initialize the magnetic field components

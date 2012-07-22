@@ -44,7 +44,7 @@ module integrals
 !
   subroutine init_integrals(flag)
 
-    use mpitools , only : is_master
+    use mpitools , only : master
 
     implicit none
 
@@ -60,7 +60,7 @@ module integrals
 !
 ! only master process creates the file
 !
-    if (is_master()) then
+    if (master) then
 
 ! check if the integrals file exists
 !
@@ -112,7 +112,7 @@ module integrals
 !
   subroutine clear_integrals()
 
-    use mpitools, only : is_master
+    use mpitools, only : master
 
     implicit none
 !
@@ -120,7 +120,7 @@ module integrals
 !
 ! close integrals.dat
 !
-    if (is_master()) close(funit)
+    if (master) close(funit)
 !
 !-------------------------------------------------------------------------------
 !
@@ -142,7 +142,10 @@ module integrals
     use forcing  , only : fcor, finp
 #endif /* FORCE */
     use coords   , only : advol
-    use mpitools , only : is_master, mallreducesumd
+    use mpitools , only : master
+#ifdef MPI
+    use mpitools , only : reduce_sum_real_array
+#endif /* MPI */
     use variables, only : idn, imx, imy, imz
 #ifdef ADI
     use variables, only : ien
@@ -159,6 +162,7 @@ module integrals
 
 ! local variables
 !
+    integer         :: iret
     real(kind=PREC) :: dvol
 
 ! local arrays
@@ -211,7 +215,7 @@ module integrals
 #ifdef MPI
 ! sum the integrals from all processors
 !
-    call mallreducesumd(narr, arr(:))
+    call reduce_sum_real_array(narr, arr(:), iret)
 
 #endif /* MPI */
 #ifdef ADI
@@ -228,7 +232,7 @@ module integrals
 #endif /* FORCE */
 ! close integrals.dat
 !
-    if (is_master()) then
+    if (master) then
       write(funit,"(i8,12(1x,1pe15.8))") n, t, dt, arr(1:10)
     end if
 !

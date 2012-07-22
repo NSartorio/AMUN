@@ -46,7 +46,11 @@ program amun
 #ifdef MPI
   use mesh     , only : redistribute_blocks
 #endif /* MPI */
-  use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
+  use mpitools , only : initialize_mpi, finalize_mpi
+#ifdef MPI
+  use mpitools , only : reduce_maximum_integer
+#endif /* MPI */
+  use mpitools , only : master, nprocs
   use random   , only : init_generator
   use timers   , only : initialize_timers, start_timer, stop_timer             &
                       , set_timer, get_timer, get_timer_total                  &
@@ -116,17 +120,17 @@ program amun
 
 ! initialize MPI
 !
-  call init_mpi()
+  call initialize_mpi()
 
 ! print info message
 !
-  if (is_master()) then
+  if (master) then
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),4x,a,4x,19('='))") '             A M U N             '
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
                                         'Copyright (C) 2008-2011 Grzegorz Kowal'
 #ifdef MPI
-    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', ncpus   &
+    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', nprocs   &
             , ' processors'
 #endif /* MPI */
     write (*,"(1x,78('-'))")
@@ -175,7 +179,7 @@ program amun
 
 ! initialize the coordinate module
 !
-  call init_coords(is_master())
+  call init_coords(master)
 
 ! check if we initiate new problem or restart previous job
 !
@@ -261,7 +265,7 @@ program amun
 
 ! print information
 !
-  if (is_master()) then
+  if (master) then
     write(*,*          )
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
@@ -331,7 +335,7 @@ program amun
 
 ! print progress information
 !
-    if (is_master())                                                           &
+    if (master)                                                           &
 #if defined INTEL || defined PATHSCALE
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
@@ -357,14 +361,14 @@ program amun
 #if defined SIGNALS && defined MPI
 ! reduce termination flag over all processors
 !
-    call mfindmaxi(iterm)
-
+    call reduce_maximum_integer(iterm, iret)
+    iterm = iret
 #endif /* SIGNALS & MPI */
   end do
 
 ! add one empty line
 !
-  if (is_master()) write(*,*)
+  if (master) write(*,*)
 
 ! stop time accounting for the evolution
 !
@@ -412,7 +416,7 @@ program amun
 
 ! print timings only on master processor
 !
-  if (is_master()) then
+  if (master) then
 
 ! print one empty line
 !
@@ -465,7 +469,7 @@ program amun
 #ifdef SIGNALS
 ! print info about termination due to a signal
 !
-  if (is_master()) then
+  if (master) then
     if (iterm .eq. 1) then
       write(*,*)
       write(*,"(1x,a)") "Restart files have been successfully written."
@@ -488,7 +492,7 @@ program amun
 
 ! close access to the MPI
 !
-  call clear_mpi()
+  call finalize_mpi()
 
 !-------------------------------------------------------------------------------
 !

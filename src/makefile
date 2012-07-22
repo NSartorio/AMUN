@@ -221,7 +221,7 @@ io.o            : io.F90 blocks.o coords.o error.o evolution.o mpitools.o      \
                   random.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o config.o coords.o error.o interpolation.o  \
                   mpitools.o problem.o variables.o
-mpitools.o      : mpitools.F90
+mpitools.o      : mpitools.F90 timers.o
 problem.o       : problem.F90 blocks.o constants.o coords.o mpitools.o         \
                   random.o scheme.o variables.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
