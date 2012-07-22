@@ -52,7 +52,7 @@ module evolution
     use config    , only : toplev
 #endif /* REFINE */
     use mesh      , only : update_mesh
-    use timer     , only : start_timer, stop_timer
+    use timers    , only : start_timer, stop_timer
 #ifdef FORCE
     use config    , only : tbfor
     use forcing   , only : fourier_transform, evolve_forcing
@@ -206,7 +206,7 @@ module evolution
 #endif /* MPI */
     use coords  , only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
-    use timer   , only : start_timer, stop_timer
+    use timers  , only : start_timer, stop_timer
 #ifdef VISCOSITY
     use config  , only : visc
 #endif /* VISCOSITY */

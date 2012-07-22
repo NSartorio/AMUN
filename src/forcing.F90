@@ -62,7 +62,7 @@ module forcing
     use config   , only : fpow, fani, fdt, kf, kl, ku, kc, kd
     use constants, only : pi
     use mpitools , only : is_master
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
 #endif /* FORCE */
 
     implicit none
@@ -333,7 +333,7 @@ module forcing
   subroutine clear_forcing()
 
 #ifdef FORCE
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
 #endif /* FORCE */
     implicit none
@@ -380,7 +380,7 @@ module forcing
     use mpitools , only : mallreducesumc
 #endif /* MPI */
     use random   , only : randomu
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
 
     implicit none
 
@@ -678,7 +678,7 @@ module forcing
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
     use coords   , only : ax, ay, az, advol
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
 
     implicit none
 

@@ -52,7 +52,7 @@ module mesh
     use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
                         , xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : is_master, ncpus
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
     use variables, only : nqt, nvr
 
     implicit none
@@ -162,7 +162,7 @@ module mesh
     use error   , only : print_info, print_error
     use mpitools, only : is_master, ncpu, ncpus
     use problem , only : init_domain, init_problem, check_ref
-    use timer   , only : start_timer, stop_timer
+    use timers  , only : start_timer, stop_timer
 
     implicit none
 
@@ -450,7 +450,7 @@ module mesh
     use mpitools , only : ncpus, ncpu, is_master, mallreducesuml, msendf, mrecvf
 #endif /* MPI */
     use problem  , only : check_ref
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
     use variables, only : nqt
 
     implicit none
@@ -1398,7 +1398,7 @@ module mesh
     use blocks  , only : clear_blocks
     use error   , only : print_info
     use mpitools, only : is_master
-    use timer   , only : start_timer, stop_timer
+    use timers  , only : start_timer, stop_timer
 
     implicit none
 

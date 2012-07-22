@@ -48,7 +48,7 @@ program amun
 #endif /* MPI */
   use mpitools , only : ncpu, ncpus, init_mpi, clear_mpi, is_master, mfindmaxi
   use random   , only : init_generator
-  use timer    , only : init_timers, start_timer, stop_timer, get_timer        &
+  use timers   , only : init_timers, start_timer, stop_timer, get_timer        &
                       , get_timer_total, timer_to_time
 !
 !-------------------------------------------------------------------------------

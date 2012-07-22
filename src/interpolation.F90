@@ -42,7 +42,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -127,7 +127,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -260,7 +260,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -377,7 +377,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -507,7 +507,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : eps, rad
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -620,7 +620,7 @@ module interpolation
   subroutine reconstruct(n, h, f, fl, fr)
 
     use config, only : alpha
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 

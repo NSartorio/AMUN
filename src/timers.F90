@@ -21,16 +21,23 @@
 !!
 !!******************************************************************************
 !!
-!! module: TIMER - handling the timing of the program execution
+!! module: TIMERS
+!!
+!!  This module handles the execution time counting for different parts of the
+!!  program.
 !!
 !!******************************************************************************
 !
-module timer
+module timers
 
+! module variables are not implicit by default
+!
   implicit none
 
+! module variables
+!
   integer        , parameter                :: ntimers = 32
-  integer(kind=8), dimension(ntimers), save :: timers, tstart, tstop
+  integer(kind=8), dimension(ntimers), save :: times, tstart, tstop
   integer(kind=8)                    , save :: ticks, tbegin
 
   contains
@@ -55,7 +62,7 @@ module timer
 
 ! reset timers
 !
-    timers(:) = 0
+    times(:)  = 0
     tstart(:) = 0
     tstop(:)  = 0
 
@@ -103,7 +110,7 @@ module timer
 !
     call system_clock(tstop(timer))
 
-    timers(timer) = timers(timer) + tstop(timer) - tstart(timer)
+    times(timer) = times(timer) + tstop(timer) - tstart(timer)
 
 !-------------------------------------------------------------------------------
 !
@@ -129,7 +136,7 @@ module timer
 !
 !-------------------------------------------------------------------------------
 !
-    get_timer = (1.0 * timers(timer)) / ticks
+    get_timer = (1.0 * times(timer)) / ticks
 
 !-------------------------------------------------------------------------------
 !

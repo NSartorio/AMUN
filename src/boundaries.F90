@@ -46,7 +46,7 @@ module boundaries
     use config   , only : periodic, ng, nd, nh, toplev
     use config   , only : im, jm, km
     use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
 #ifdef MPI
     use mpitools , only : ncpu, ncpus, is_master, msendf, mrecvf
     use variables, only : nqt
@@ -1505,7 +1505,7 @@ module boundaries
     use blocks   , only : nsides, nfaces
     use config   , only : toplev
     use config   , only : ibl, ie, jbl, je, kbl, ke
-    use timer    , only : start_timer, stop_timer
+    use timers   , only : start_timer, stop_timer
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
     use config   , only : im, jm, km

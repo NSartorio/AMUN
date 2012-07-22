@@ -606,7 +606,7 @@ module scheme
   subroutine hll(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timer        , only : start_timer, stop_timer
+    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : ivx, ivy, ivz
 #ifdef ADI
@@ -805,7 +805,7 @@ module scheme
   subroutine hllc(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timer        , only : start_timer, stop_timer
+    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
 #ifdef VISCOSITY
@@ -1054,7 +1054,7 @@ module scheme
   subroutine hlld(n, h, u, f)
 
     use interpolation, only : reconstruct
-    use timer        , only : start_timer, stop_timer
+    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
     use variables    , only : ibx, iby, ibz
@@ -1370,7 +1370,7 @@ module scheme
 
     use config       , only : gamma
     use interpolation, only : reconstruct
-    use timer        , only : start_timer, stop_timer
+    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
     use variables    , only : ibx, iby, ibz
@@ -1792,7 +1792,7 @@ module scheme
 
     use config       , only : gamma
     use interpolation, only : reconstruct
-    use timer        , only : start_timer, stop_timer
+    use timers       , only : start_timer, stop_timer
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI

@@ -56,7 +56,7 @@ module coords
 
     use config, only : maxlev, toplev, ng, in, jn, kn, im, jm, km, rdims
     use config, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 
@@ -205,7 +205,7 @@ module coords
 !
   subroutine clear_coords()
 
-    use timer, only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 

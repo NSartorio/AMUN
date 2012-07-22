@@ -65,7 +65,7 @@ module io
   subroutine write_data()
 
     use config, only : ftype
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 !
@@ -105,7 +105,7 @@ module io
 !
   subroutine write_restart_data()
 
-    use timer, only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 !
@@ -147,7 +147,7 @@ module io
   subroutine restart_job()
 
     use config, only : nres
-    use timer , only : start_timer, stop_timer
+    use timers, only : start_timer, stop_timer
 
     implicit none
 !
