@@ -476,7 +476,7 @@ module forcing
 
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
-    use coords   , only : ax, ay, az, advol
+    use coordinates, only : ax, ay, az, advol
     use variables, only : idn, imx, imy, imz
 
     implicit none
@@ -630,7 +630,7 @@ module forcing
 
     use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
-    use coords   , only : ax, ay, az, advol
+    use coordinates, only : ax, ay, az, advol
 
     implicit none
 

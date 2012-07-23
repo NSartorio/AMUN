@@ -35,7 +35,7 @@ program amun
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
-  use coords   , only : init_coords, clear_coords
+  use coordinates, only : init_coords, clear_coords
   use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing

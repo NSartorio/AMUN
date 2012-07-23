@@ -149,7 +149,7 @@ module mesh
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
     use config  , only : minlev, maxlev, rdims
-    use coords  , only : res
+    use coordinates, only : res
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
     use problem , only : init_domain, init_problem, check_ref
@@ -426,7 +426,7 @@ module mesh
                         , associate_blocks, deallocate_datablock
     use blocks   , only : get_nleafs
     use config   , only : minlev, maxlev, toplev, im, jm, km
-    use coords   , only : res
+    use coordinates, only : res
     use error    , only : print_info, print_error
 #ifdef MPI
     use mpitools , only : reduce_sum_integer_array
@@ -1404,7 +1404,7 @@ module mesh
     use blocks  , only : block_meta, list_meta
     use blocks  , only : get_mblocks, get_nleafs
     use config  , only : ncells, nghost, toplev
-    use coords  , only : effres
+    use coordinates, only : effres
     use mpitools, only : master, nprocs
 
     implicit none

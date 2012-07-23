@@ -21,11 +21,14 @@
 !!
 !!******************************************************************************
 !!
-!! module: COORDS - handles coordinates
+!! module: COORDINATES
+!!
+!!  This module provides variables and subroutines handling the coordinates
+!!  for all refinement levels.
 !!
 !!******************************************************************************
 !
-module coords
+module coordinates
 
   implicit none
 

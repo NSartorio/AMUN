@@ -195,7 +195,7 @@ module evolution
 #ifdef MPI
     use mpitools, only : reduce_maximum_real
 #endif /* MPI */
-    use coords  , only : adx, ady, adz
+    use coordinates, only : adx, ady, adz
     use scheme  , only : maxspeed, cmax
 #ifdef VISCOSITY
     use config  , only : visc
@@ -316,7 +316,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use coords   , only : adxi, adyi, adzi
+    use coordinates, only : adxi, adyi, adzi
 #if defined MHD && defined GLM
     use config   , only : decay
     use scheme   , only : cmax
@@ -668,7 +668,7 @@ module evolution
   subroutine flux_euler(pblock)
 
     use blocks   , only : block_data
-    use coords   , only : adx, ady, adz
+    use coordinates, only : adx, ady, adz
     use scheme   , only : update_flux
 
     implicit none
@@ -714,7 +714,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use coords   , only : adx, ady, adz, adxi, adyi, adzi
+    use coordinates, only : adx, ady, adz, adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -789,7 +789,7 @@ module evolution
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use coords   , only : adx, ady, adz, adxi, adyi, adzi
+    use coordinates, only : adx, ady, adz, adxi, adyi, adzi
     use scheme   , only : update_flux
     use variables, only : nqt
 
@@ -898,7 +898,7 @@ module evolution
     use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use coords   , only : adxi, adyi, adzi
+    use coordinates, only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -1041,7 +1041,7 @@ module evolution
     use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use coords   , only : adxi, adyi, adzi
+    use coordinates, only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */
@@ -1209,7 +1209,7 @@ module evolution
     use config   , only : tbfor
     use forcing  , only : real_forcing
 #endif /* FORCE */
-    use coords   , only : adxi, adyi, adzi
+    use coordinates, only : adxi, adyi, adzi
 #ifdef SHAPE
     use problem  , only : update_shapes
 #endif /* SHAPE */

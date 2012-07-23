@@ -141,7 +141,7 @@ module integrals
 #ifdef FORCE
     use forcing  , only : fcor, finp
 #endif /* FORCE */
-    use coords   , only : advol
+    use coordinates, only : advol
     use mpitools , only : master
 #ifdef MPI
     use mpitools , only : reduce_sum_real_array

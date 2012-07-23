@@ -488,7 +488,7 @@ module problem
     use blocks   , only : block_data
     use config   , only : im, jm, km
     use config   , only : gamma, dens, pres, ratio, rcut
-    use coords   , only : ax, ay, az
+    use coordinates, only : ax, ay, az
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt, idn, ivx, ivy, ivz
 #ifdef ADI
@@ -598,7 +598,7 @@ module problem
     use blocks   , only : block_data
     use config   , only : im, jm, km
     use config   , only : dens, pres, rmid, gammam1i
-    use coords   , only : ax, ay, adx, ady
+    use coordinates, only : ax, ay, adx, ady
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -711,7 +711,7 @@ module problem
     use config   , only : dnfac, dnrat
     use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
     use constants, only : dpi
-    use coords   , only : ax, ay, az, adr
+    use coordinates, only : ax, ay, az, adr
     use scheme   , only : prim2cons
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -904,7 +904,7 @@ module problem
     use config   , only : csnd2
 #endif /* ISO */
     use constants, only : dpi
-    use coords   , only : ax, ay, az
+    use coordinates, only : ax, ay, az
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -1048,7 +1048,7 @@ module problem
     use config   , only : csnd2
 #endif /* ISO */
     use constants, only : dpi
-    use coords   , only : ax, ay, az
+    use coordinates, only : ax, ay, az
     use mpitools , only : nproc
     use random   , only : randomn
     use scheme   , only : prim2cons
@@ -1276,7 +1276,7 @@ module problem
     use config   , only : csnd
 #endif /* ISO */
     use constants, only : dpi, qpi
-    use coords   , only : ax, ay
+    use coordinates, only : ax, ay
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -1383,7 +1383,7 @@ module problem
     use config   , only : gamma, gammam1i
 #endif /* ADI */
     use constants, only : dpi
-    use coords   , only : ax, ay, az, adr
+    use coordinates, only : ax, ay, az, adr
     use variables, only : idn, imx, imy, imz
 #ifdef ADI
     use variables, only : ien

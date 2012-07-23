@@ -928,7 +928,7 @@ module io
     use config   , only : ncells, nghost
     use config   , only : in, jn, kn, rdims, maxlev, toplev
     use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coords   , only : init_coords, clear_coords
+    use coordinates, only : init_coords, clear_coords
     use error    , only : print_error, print_warning
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t, hsize_t
@@ -2678,7 +2678,7 @@ module io
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
-    use coords, only : adx, ady, adz, res
+    use coordinates, only : adx, ady, adz, res
 
 ! declare variables
 !
