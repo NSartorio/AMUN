@@ -160,13 +160,13 @@ name = amun
 
 default: $(name).x
 
-sources = blocks.F90 boundaries.F90 config.F90 constants.F90 coords.F90        \
+sources = blocks.F90 boundaries.F90 config.F90 constants.F90 coordinates.F90   \
           driver.F90 error.F90 evolution.F90 forcing.F90 integrals.F90         \
           interpolation.F90 io.F90 mesh.F90 mpitools.F90 parameters.F90        \
           problem.F90 random.F90 scheme.F90 timers.F90 variables.F90
-objects = blocks.o boundaries.o config.o constants.o coords.o driver.o error.o \
-          evolution.o forcing.o integrals.o interpolation.o io.o mesh.o        \
-          mpitools.o parameters.o problem.o random.o scheme.o timers.o         \
+objects = blocks.o boundaries.o config.o constants.o coordinates.o driver.o    \
+          error.o evolution.o forcing.o integrals.o interpolation.o io.o       \
+          mesh.o mpitools.o parameters.o problem.o random.o scheme.o timers.o  \
           variables.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
@@ -206,25 +206,26 @@ boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
                   mpitools.o variables.o
 config.o        : config.F90 error.o
 constants.o     : constants.F90
-coords.o        : coords.F90 config.o
-driver.o        : driver.F90 blocks.o config.o coords.o evolution.o forcing.o  \
-                  integrals.o io.o mesh.o mpitools.o parameters.o random.o
+coordinates.o   : coordinates.F90 config.o
+driver.o        : driver.F90 blocks.o config.o coordinates.o evolution.o       \
+                  forcing.o integrals.o io.o mesh.o mpitools.o parameters.o    \
+                  random.o
 error.o         : error.F90
-evolution.o     : evolution.F90 blocks.o boundaries.o config.o coords.o        \
+evolution.o     : evolution.F90 blocks.o boundaries.o config.o coordinates.o   \
                   forcing.o interpolation.o mesh.o mpitools.o problem.o        \
                   scheme.o variables.o
-forcing.o       : forcing.F90 config.o constants.o coords.o mpitools.o         \
+forcing.o       : forcing.F90 config.o constants.o coordinates.o mpitools.o    \
                   random.o variables.o
-integrals.o     : integrals.F90 blocks.o config.o coords.o evolution.o         \
+integrals.o     : integrals.F90 blocks.o config.o coordinates.o evolution.o    \
                   mpitools.o variables.o
 interpolation.o : interpolation.F90 blocks.o config.o variables.o
-io.o            : io.F90 blocks.o coords.o error.o evolution.o mpitools.o      \
+io.o            : io.F90 blocks.o coordinates.o error.o evolution.o mpitools.o \
                   random.o scheme.o variables.o
-mesh.o          : mesh.F90 blocks.o config.o coords.o error.o interpolation.o  \
-                  mpitools.o problem.o variables.o
+mesh.o          : mesh.F90 blocks.o config.o coordinates.o error.o             \
+                  interpolation.o mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90 timers.o
 parameters.o    : parameters.F90 mpitools.o
-problem.o       : problem.F90 blocks.o constants.o coords.o mpitools.o         \
+problem.o       : problem.F90 blocks.o constants.o coordinates.o mpitools.o    \
                   random.o scheme.o variables.o
 scheme.o        : scheme.F90 blocks.o config.o interpolation.o variables.o
 random.o        : random.F90 mpitools.o parameters.o
