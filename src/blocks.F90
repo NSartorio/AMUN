@@ -21,17 +21,18 @@
 !!
 !!******************************************************************************
 !!
-!! module: BLOCKS - defines and handles the meta and data block structures
+!! module: BLOCKS
+!!
+!!  This module allocates, deallocates, and handles blocks of the adaptive mesh
+!!  structures.
 !!
 !!******************************************************************************
 !
 module blocks
 
-  implicit none
-
-! by default, all variables and subroutines are private
+! module variables are not implicit by default
 !
-  private
+  implicit none
 
 ! module parameters
 !
@@ -194,13 +195,17 @@ module blocks
 !
   integer(kind=4)     , save :: nx, ny, nz
 
+! all variables and subroutines are private by default
+!
+  private
+
 ! declare public subroutines
 !
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
   public :: list_meta, list_data
   public :: nchild, ndims, nsides, nfaces
-  public :: init_blocks, clear_blocks
+  public :: initialize_blocks, finalize_blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: append_metablock, associate_blocks, append_datablock               &
           , deallocate_datablock
@@ -222,12 +227,18 @@ module blocks
 !
 !===============================================================================
 !
-! init_blocks: subroutine initializes the BLOCK module variables
+! subroutine INITIALIZE_BLOCKS:
+! ----------------------------
+!
+!   Subroutine initializes the variables related to the elementary block of
+!   the adaptive structure.
 !
 !===============================================================================
 !
-  subroutine init_blocks()
+  subroutine initialize_blocks()
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
@@ -262,17 +273,22 @@ module blocks
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_blocks
+  end subroutine initialize_blocks
 !
 !===============================================================================
 !
-! clear_blocks: subroutine iterates over all meta blocks and deallocates them
-!               and associated data blocks
+! subroutine FINALIZE_BLOCKS:
+! --------------------------
+!
+!   Subroutine iterates over all meta blocks and first deallocates all
+!   associated with them data blocks, and then their metadata structure.
 !
 !===============================================================================
 !
-  subroutine clear_blocks()
+  subroutine finalize_blocks()
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! a pointer to the current meta block
@@ -299,7 +315,7 @@ module blocks
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine clear_blocks
+  end subroutine finalize_blocks
 !
 !!==============================================================================
 !!

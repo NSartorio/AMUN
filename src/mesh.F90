@@ -1373,7 +1373,6 @@ module mesh
 !
   subroutine clear_mesh()
 
-    use blocks  , only : clear_blocks
     use error   , only : print_info
     use mpitools, only : master
 
@@ -1381,10 +1380,6 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! deallocate block structure
-!
-    call clear_blocks
-
 ! close the handler of the mesh statistics file
 !
     if (master) close(funit)

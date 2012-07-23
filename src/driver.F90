@@ -29,7 +29,7 @@ program amun
 
 ! modules
 !
-  use blocks   , only : init_blocks, get_nleafs
+  use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use config   , only : read_config
   use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
 #ifdef FORCE
@@ -206,7 +206,7 @@ program amun
 
 ! initialize block module
 !
-  call init_blocks()
+  call initialize_blocks()
 
 ! initialize the coordinate module
 !
@@ -430,6 +430,10 @@ program amun
 ! finalize the coordinate module
 !
   call clear_coords()
+
+! deallocate block structure
+!
+  call finalize_blocks()
 
 ! finalize the random number generator
 !
