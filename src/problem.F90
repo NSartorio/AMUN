@@ -143,7 +143,8 @@ module problem
                      , metablock_set_coord, metablock_set_bounds               &
                      , nsides, nfaces
     use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , xmin, xmax, ymin, ymax, zmin, zmax, rdims
+                     , rdims
+    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
 
     implicit none
 
@@ -899,12 +900,12 @@ module problem
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use config   , only : xmin, xmax, dens, pres, bamp, bper, ydel, ycut
+    use config   , only : dens, pres, bamp, bper, ydel, ycut
 #ifdef ISO
     use config   , only : csnd2
 #endif /* ISO */
     use constants, only : dpi
-    use coordinates, only : ax, ay, az
+    use coordinates, only : xmin, xmax, ax, ay, az
     use scheme   , only : prim2cons
     use variables, only : nvr, nqt
     use variables, only : idn, ivx, ivy, ivz
@@ -1043,12 +1044,12 @@ module problem
 
     use blocks   , only : block_data
     use config   , only : im, jm, km
-    use config   , only : xmin, xmax, dens, pres, bamp, vper, ydel
+    use config   , only : dens, pres, bamp, vper, ydel
 #ifdef ISO
     use config   , only : csnd2
 #endif /* ISO */
     use constants, only : dpi
-    use coordinates, only : ax, ay, az
+    use coordinates, only : xmin, xmax, ax, ay, az
     use mpitools , only : nproc
     use random   , only : randomn
     use scheme   , only : prim2cons

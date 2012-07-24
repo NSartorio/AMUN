@@ -782,8 +782,8 @@ module io
     use blocks   , only : get_mblocks, get_dblocks, get_nleafs
     use blocks   , only : get_last_id
     use config   , only : ncells, nghost
-    use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
     use config   , only : in, jn, kn, rdims, minlev, maxlev, toplev
+    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t
@@ -927,8 +927,8 @@ module io
                         , get_nleafs
     use config   , only : ncells, nghost
     use config   , only : in, jn, kn, rdims, maxlev, toplev
-    use config   , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coordinates, only : init_coords, clear_coords
+    use coordinates, only : initialize_coordinates, finalize_coordinates
+    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error, print_warning
     use evolution, only : n, t, dt, dtn
     use hdf5     , only : hid_t, hsize_t
@@ -1022,8 +1022,8 @@ module io
 
 ! regenerate coordinates
 !
-                call clear_coords()
-                call init_coords(.false.)
+                call finalize_coordinates()
+                call initialize_coordinates(.false.)
 
 ! calculate a factor to rescale the block coordinates
 !

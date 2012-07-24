@@ -35,7 +35,7 @@ program amun
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
-  use coordinates, only : init_coords, clear_coords
+  use coordinates, only : initialize_coordinates, finalize_coordinates
   use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
@@ -208,9 +208,9 @@ program amun
 !
   call initialize_blocks()
 
-! initialize the coordinate module
+! initialize module COORDINATES
 !
-  call init_coords(master)
+  call initialize_coordinates(master)
 
 ! check if we initiate new problem or restart previous job
 !
@@ -427,9 +427,9 @@ program amun
 !
   call clear_mesh()
 
-! finalize the coordinate module
+! finalize module COORDINATES
 !
-  call clear_coords()
+  call finalize_coordinates()
 
 ! deallocate block structure
 !

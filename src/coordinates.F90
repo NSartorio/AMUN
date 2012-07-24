@@ -30,7 +30,21 @@
 !
 module coordinates
 
+! module variables are not implicit by default
+!
   implicit none
+
+! domain bounds
+!
+  real, save :: xmin = 0.0d0
+  real, save :: xmax = 1.0d0
+  real, save :: xlen = 1.0d0
+  real, save :: ymin = 0.0d0
+  real, save :: ymax = 1.0d0
+  real, save :: ylen = 1.0d0
+  real, save :: zmin = 0.0d0
+  real, save :: zmax = 1.0d0
+  real, save :: zlen = 1.0d0
 
 ! the effective resolution of the full domain
 !
@@ -47,18 +61,28 @@ module coordinates
 !
   integer(kind=4), dimension(:,:), allocatable, save :: res
 
+! by default everything is private
+!
+  public
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
 !
-! init_coords: subroutine allocates and initializes coordinates
+! subroutine INITIALIZE_COORDINATES:
+! ---------------------------------
+!
+!   Subroutine initializes mesh coordinates and other coordinate parameters.
 !
 !===============================================================================
 !
-  subroutine init_coords(flag)
+  subroutine initialize_coordinates(flag)
 
     use config, only : maxlev, toplev, ng, in, jn, kn, im, jm, km, rdims
-    use config, only : xmin, xmax, ymin, ymax, zmin, zmax
+    use parameters, only : get_parameter_integer, get_parameter_real           &
+                         , get_parameter_string
 
     implicit none
 
@@ -78,6 +102,15 @@ module coordinates
 !
 !-------------------------------------------------------------------------------
 !
+! first obtain all coordinate parameters from the parameter module
+!
+    call get_parameter_real   ("xmin" , xmin )
+    call get_parameter_real   ("xmax" , xmax )
+    call get_parameter_real   ("ymin" , ymin )
+    call get_parameter_real   ("ymax" , ymax )
+    call get_parameter_real   ("zmin" , zmin )
+    call get_parameter_real   ("zmax" , zmax )
+
 ! allocate space for coordinate variables and resolutions
 !
     allocate(ax   (toplev, im))
@@ -189,16 +222,21 @@ module coordinates
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_coords
+  end subroutine initialize_coordinates
 !
 !===============================================================================
 !
-! clears_coords: subroutine deallocates coordinate arrays
+! subroutine FINALIZE_MESH:
+! ------------------------
+!
+!   subroutine finalizes allocated mesh coordinates by deallocating them;
 !
 !===============================================================================
 !
-  subroutine clear_coords()
+  subroutine finalize_coordinates()
 
+! local variables are not implicit by default
+!
     implicit none
 
 !-------------------------------------------------------------------------------
@@ -220,7 +258,7 @@ module coordinates
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine clear_coords
+  end subroutine finalize_coordinates
 
 !===============================================================================
 !

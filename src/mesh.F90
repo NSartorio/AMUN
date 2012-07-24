@@ -49,8 +49,8 @@ module mesh
   subroutine init_mesh(flag)
 
     use blocks   , only : datablock_set_dims
-    use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng    &
-                        , xmin, xmax, ymin, ymax, zmin, zmax
+    use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng
+    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use mpitools , only : master, nprocs
     use variables, only : nqt, nvr
 

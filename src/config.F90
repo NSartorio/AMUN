@@ -63,12 +63,6 @@ module config
 !
   integer(kind=4), save :: nmax   = 1
 
-! domain bounds
-!
-  real           , save :: xmin = 0.0, xmax = 1.0  &
-                         , ymin = 0.0, ymax = 1.0  &
-                         , zmin = 0.0, zmax = 1.0
-
 ! the maximum time and initial time step
 !
   real           , save :: tmax = 1.0, dtini = 1.0e-8
@@ -278,18 +272,6 @@ module config
       read(value, "(i9.9)") minlev
     case("maxlev")
       read(value, "(i9.9)") maxlev
-    case("xmin")
-      read(value,        *) xmin
-    case("xmax")
-      read(value,        *) xmax
-    case("ymin")
-      read(value,        *) ymin
-    case("ymax")
-      read(value,        *) ymax
-    case("zmin")
-      read(value,        *) zmin
-    case("zmax")
-      read(value,        *) zmax
     case("ftype")
       l = len_trim(value)
       write(ftype, "(a1)") value(2:l-1)
