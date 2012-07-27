@@ -40,7 +40,7 @@ module coordinates
 
 ! the number of ghost zones
 !
-  integer, save :: ng =  2
+  integer, save :: ng =  2, nh =  1, nd = 4
 
 ! the domain block dimensions including the ghost zones
 !
@@ -53,6 +53,12 @@ module coordinates
 ! the limits of refinement level
 !
   integer, save :: minlev = 1, maxlev = 1, toplev = 1
+
+! block indices
+!
+  integer, save :: ih =  6, jh =  6, kh =  1
+  integer, save :: ib =  3, jb =  3, kb =  1
+  integer, save :: ie = 10, je = 10, ke =  1
 
 ! the domain bounds
 !
@@ -149,12 +155,31 @@ module coordinates
 !
     call get_parameter_integer("nghost", ng    )
 
+! calculate half and double of the number of ghose zones
+!
+    nh = ng / 2
+    nd = ng * 2
+
 ! calculate the block dimensions including ghost cells
 !
     im = in + 2 * ng
     jm = jn + 2 * ng
 #if NDIMS == 3
     km = kn + 2 * ng
+#endif /* NDIMS == 3 */
+
+! calculate block indices
+!
+    ih = im / 2
+    ib = ng +  1
+    ie = ng + in
+    jh = jm / 2
+    jb = ng +  1
+    je = ng + jn
+#if NDIMS == 3
+    kh = km / 2
+    kb = ng +  1
+    ke = ng + kn
 #endif /* NDIMS == 3 */
 
 ! obtain the refinement level bounds
