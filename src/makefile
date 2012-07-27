@@ -218,8 +218,8 @@ evolution.o      : evolution.F90 blocks.o boundaries.o config.o coordinates.o  \
                    scheme.o variables.o
 forcing.o        : forcing.F90 config.o constants.o coordinates.o mpitools.o   \
                    random.o variables.o
-integrals.o      : integrals.F90 blocks.o config.o coordinates.o evolution.o   \
-                   mpitools.o variables.o
+integrals.o      : integrals.F90 blocks.o coordinates.o evolution.o mpitools.o \
+                   variables.o
 interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o      \
                    variables.o
 io.o             : io.F90 blocks.o coordinates.o error.o evolution.o           \

@@ -136,12 +136,12 @@ module integrals
   subroutine store_integrals()
 
     use blocks   , only : block_meta, block_data, list_data
-    use config   , only : ib, ie, jb, je, kb, ke
+    use coordinates, only : ib, ie, jb, je, kb, ke
+    use coordinates, only : advol
     use evolution, only : n, t, dt
 #ifdef FORCE
     use forcing  , only : fcor, finp
 #endif /* FORCE */
-    use coordinates, only : advol
     use mpitools , only : master
 #ifdef MPI
     use mpitools , only : reduce_sum_real_array
