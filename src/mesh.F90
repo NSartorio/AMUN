@@ -156,7 +156,7 @@ module mesh
     use coordinates, only : minlev, maxlev, res
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
-    use problem , only : init_domain, init_problem, check_ref
+    use problems, only : init_domain, init_problem, check_ref
 
     implicit none
 
@@ -436,7 +436,7 @@ module mesh
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : master, nprocs, nproc
 #endif /* MPI */
-    use problem  , only : check_ref
+    use problems , only : check_ref
     use variables, only : nqt
 
     implicit none

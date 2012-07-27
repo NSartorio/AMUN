@@ -21,11 +21,14 @@
 !!
 !!******************************************************************************
 !!
-!! module: PROBLEM - handling the initial problem definition
+!! module: PROBLEMS
+!!
+!!  This module handles the initialization of various test and research
+!!  problems.
 !!
 !!******************************************************************************
 !
-module problem
+module problems
 
   implicit none
 
@@ -1810,4 +1813,4 @@ module problem
 
 !===============================================================================
 !
-end module
+end module problems

@@ -320,7 +320,7 @@ module evolution
 #endif /* ADI */
 #endif /* FORCE */
 #ifdef SHAPE
-    use problem    , only : update_shapes
+    use problems   , only : update_shapes
 #endif /* SHAPE */
 
     implicit none
@@ -888,7 +888,7 @@ module evolution
     use forcing    , only : real_forcing
 #endif /* FORCE */
 #ifdef SHAPE
-    use problem    , only : update_shapes
+    use problems   , only : update_shapes
 #endif /* SHAPE */
     use scheme     , only : update, cmax
     use variables  , only : nqt, nfl
@@ -1031,7 +1031,7 @@ module evolution
     use forcing    , only : real_forcing
 #endif /* FORCE */
 #ifdef SHAPE
-    use problem    , only : update_shapes
+    use problems   , only : update_shapes
 #endif /* SHAPE */
     use scheme     , only : update, cmax
     use variables  , only : nqt, nfl
@@ -1199,7 +1199,7 @@ module evolution
 #endif /* FORCE */
     use coordinates, only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem    , only : update_shapes
+    use problems   , only : update_shapes
 #endif /* SHAPE */
     use scheme     , only : update, cmax
     use variables  , only : nqt, nfl
