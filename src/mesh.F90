@@ -42,18 +42,23 @@ module mesh
 !
 !===============================================================================
 !
-! init_mesh: subroutine initializes mesh module and coordinate variables
+! subroutine INITIALIZE_MESH:
+! --------------------------
+!
+!   Subroutine initializes mesh module and its variables.
 !
 !===============================================================================
 !
-  subroutine init_mesh(flag)
+  subroutine initialize_mesh(flag)
 
-    use blocks   , only : datablock_set_dims
-    use config   , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng
+    use blocks     , only : datablock_set_dims
+    use config     , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use mpitools , only : master, nprocs
-    use variables, only : nqt, nvr
+    use mpitools   , only : master, nprocs
+    use variables  , only : nqt, nvr
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -132,7 +137,7 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_mesh
+  end subroutine initialize_mesh
 !
 !===============================================================================
 !

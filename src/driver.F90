@@ -42,7 +42,8 @@ program amun
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use io       , only : nfile, write_data, write_restart_data, restart_job
-  use mesh     , only : init_mesh, generate_mesh, store_mesh_stats, clear_mesh
+  use mesh          , only : initialize_mesh, clear_mesh
+  use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
   use mesh     , only : redistribute_blocks
 #endif /* MPI */
@@ -218,7 +219,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call init_mesh(.true.)
+    call initialize_mesh(.true.)
 
 ! initialize the integrals module
 !
@@ -249,7 +250,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call init_mesh(.false.)
+    call initialize_mesh(.false.)
 
 ! initialize the integrals module
 !
