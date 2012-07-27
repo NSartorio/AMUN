@@ -39,7 +39,7 @@ program amun
   use equations     , only : initialize_equations
   use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
-  use forcing  , only : init_forcing, clear_forcing
+  use forcing       , only : initialize_forcing, clear_forcing
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
@@ -294,7 +294,7 @@ program amun
 
 ! initialize forcing module
 !
-  call init_forcing()
+  call initialize_forcing()
 #endif /* FORCE */
 
 ! stop time accounting for the initialization

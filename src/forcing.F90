@@ -21,15 +21,33 @@
 !!
 !!******************************************************************************
 !!
-!! module: FORCING - handles turbulence driving
+!! module: FORCING
+!!
+!!  This module handles turbulence driving and energy injection.
 !!
 !!******************************************************************************
 !
 module forcing
 
+! module variables are not implicit by default
+!
   implicit none
 
 #ifdef FORCE
+! module runtime parameters
+!
+  real        , save                              :: pwfor = 0.0d0
+  real        , save                              :: kf    = 2.5d0
+  real        , save                              :: kl    = 2.0d0
+  real        , save                              :: ku    = 3.0d0
+  real        , save                              :: kc    = 0.5d0
+  real        , save                              :: dtfor = 1.0d-6
+  real        , save                              :: tbfor = 0.0d0
+  real        , save                              :: tefor = 0.0d0
+  real        , save                              :: drate = 1.0d0
+  real        , save                              :: famp  = 1.0d0
+  integer     , save                              :: kd    = 1
+
 ! number of driven components
 !
   integer                             , save :: nf
@@ -51,15 +69,17 @@ module forcing
 !
 !===============================================================================
 !
-! init_forcing: subroutine allocates and initializes the forcing variables
-!               required e.g. for driving turbulence
+! subroutine INITIALIZE_FORCING:
+! -----------------------------
+!
+!   Subroutine initializes forcing by calculating forcing parameters and
+!   preparing transformation arrays.
 !
 !===============================================================================
 !
-  subroutine init_forcing()
+  subroutine initialize_forcing()
 
 #ifdef FORCE
-    use config   , only : fpow, fani, fdt, kf, kl, ku, kc, kd
     use constants, only : pi
     use mpitools , only : is_master
 #endif /* FORCE */
@@ -79,6 +99,20 @@ module forcing
 !-------------------------------------------------------------------------------
 !
 #ifdef FORCE
+! read forcing runtime parameters from the parameter file
+!
+    call get_parameter_real   ("pwfor", pwfor)
+    call get_parameter_real   ("kf"   , kf   )
+    call get_parameter_real   ("kl"   , kl   )
+    call get_parameter_real   ("ku"   , ku   )
+    call get_parameter_real   ("kc"   , kc   )
+    call get_parameter_real   ("dtfor", dtfor)
+    call get_parameter_real   ("tbfor", tbfor)
+    call get_parameter_real   ("tefor", tefor)
+    call get_parameter_real   ("drate", drate)
+    call get_parameter_real   ("famp" , famp )
+    call get_parameter_integer("kd"   , kd   )
+
 ! initialize the number of drived components, normalization factor, and
 ! maximum wave number
 !
@@ -176,7 +210,7 @@ module forcing
 ! multiply aplitude by the square of forcing time step so we don't have to
 ! multiply this at each step
 !
-    fa = fa * sqrt(fdt)
+    fa = fa * sqrt(dtfor)
 
 ! allocate arrays for k vectors, mode amplitudes and unit vectors
 !
@@ -311,7 +345,7 @@ module forcing
 !
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_forcing
+  end subroutine initialize_forcing
 !
 !===============================================================================
 !
@@ -349,7 +383,6 @@ module forcing
 !
   subroutine evolve_forcing(t, dt)
 
-    use config   , only : fpow, fdt, tbfor, tefor
     use constants, only : hpi, dpi
 #ifdef MPI
     use mpitools , only : mallreducesumc
@@ -391,7 +424,7 @@ module forcing
 
 ! calculate the number of forcing integration iteration for the current timestep
 !
-    ni = max(1, int(dt / fdt))
+    ni = max(1, int(dt / dtfor))
 
 ! iterate over all perturbed Fourier components
 !
@@ -474,8 +507,8 @@ module forcing
 !
   subroutine fourier_transform(l, xmn, ymn, zmn, u)
 
-    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
     use coordinates, only : ax, ay, az, advol
     use variables, only : idn, imx, imy, imz
 
@@ -628,8 +661,8 @@ module forcing
 !
   subroutine real_forcing(l, xmn, ymn, zmn, f)
 
-    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke
     use constants, only : dpi
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
     use coordinates, only : ax, ay, az, advol
 
     implicit none

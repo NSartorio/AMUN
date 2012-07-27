@@ -216,8 +216,8 @@ error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o config.o coordinates.o  \
                    forcing.o interpolations.o mesh.o mpitools.o problem.o      \
                    scheme.o variables.o
-forcing.o        : forcing.F90 config.o constants.o coordinates.o mpitools.o   \
-                   random.o variables.o
+forcing.o        : forcing.F90 constants.o coordinates.o mpitools.o            \
+                   parameters.o random.o variables.o
 integrals.o      : integrals.F90 blocks.o coordinates.o evolution.o mpitools.o \
                    variables.o
 interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o      \
