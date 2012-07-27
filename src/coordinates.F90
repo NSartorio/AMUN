@@ -34,7 +34,27 @@ module coordinates
 !
   implicit none
 
-! domain bounds
+! the domain block dimensions
+!
+  integer, save :: nn =  8, in =  8, jn =  8, kn =  1
+
+! the number of ghost zones
+!
+  integer, save :: ng =  2
+
+! the domain block dimensions including the ghost zones
+!
+  integer, save :: im = 12, jm = 12, km =  1
+
+! the domain division
+!
+  integer, save :: ir =  1, jr =  1, kr =  1
+
+! the limits of refinement level
+!
+  integer, save :: minlev = 1, maxlev = 1, toplev = 1
+
+! the domain bounds
 !
   real, save :: xmin = 0.0d0
   real, save :: xmax = 1.0d0
@@ -80,10 +100,12 @@ module coordinates
 !
   subroutine initialize_coordinates(flag)
 
-    use config, only : maxlev, toplev, ng, in, jn, kn, im, jm, km, rdims
-    use parameters, only : get_parameter_integer, get_parameter_real           &
-                         , get_parameter_string
+! include external procedures and variables
+!
+    use parameters, only : get_parameter_integer, get_parameter_real
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -98,18 +120,68 @@ module coordinates
 
 ! local arrays
 !
-    integer(kind=4), dimension(3) :: bm, cm, rm, dm
+    integer(kind=4), dimension(3) :: cm, rm, dm
 !
 !-------------------------------------------------------------------------------
 !
-! first obtain all coordinate parameters from the parameter module
+! obtain the number of cells along each block dimension in the case when all
+! dimensions are the same
 !
-    call get_parameter_real   ("xmin" , xmin )
-    call get_parameter_real   ("xmax" , xmax )
-    call get_parameter_real   ("ymin" , ymin )
-    call get_parameter_real   ("ymax" , ymax )
-    call get_parameter_real   ("zmin" , zmin )
-    call get_parameter_real   ("zmax" , zmax )
+    call get_parameter_integer("ncells", nn    )
+
+! set the block dimensions
+!
+    in = nn
+    jn = nn
+#if NDIMS == 3
+    kn = nn
+#endif /* NDIMS == 3 */
+
+! change individual block dimension if set
+!
+    call get_parameter_integer("icells", in    )
+    call get_parameter_integer("jcells", jn    )
+#if NDIMS == 3
+    call get_parameter_integer("kcells", kn    )
+#endif /* NDIMS == 3 */
+
+! obtain the number of ghost zones
+!
+    call get_parameter_integer("nghost", ng    )
+
+! calculate the block dimensions including ghost cells
+!
+    im = in + 2 * ng
+    jm = jn + 2 * ng
+#if NDIMS == 3
+    km = kn + 2 * ng
+#endif /* NDIMS == 3 */
+
+! obtain the refinement level bounds
+!
+    call get_parameter_integer("minlev", minlev)
+    call get_parameter_integer("maxlev", maxlev)
+
+! set the top level
+!
+    toplev = maxlev
+
+! obtain the domain base division
+!
+    call get_parameter_integer("rdimx" , ir    )
+    call get_parameter_integer("rdimy" , jr    )
+#if NDIMS == 3
+    call get_parameter_integer("rdimz" , kr    )
+#endif /* NDIMS == 3 */
+
+! obtain the domain bounds
+!
+    call get_parameter_real   ("xmin"  , xmin  )
+    call get_parameter_real   ("xmax"  , xmax  )
+    call get_parameter_real   ("ymin"  , ymin  )
+    call get_parameter_real   ("ymax"  , ymax  )
+    call get_parameter_real   ("zmin"  , zmin  )
+    call get_parameter_real   ("zmax"  , zmax  )
 
 ! allocate space for coordinate variables and resolutions
 !
@@ -147,16 +219,17 @@ module coordinates
 
 ! calculate the block resolution at each level
 !
-      ni = in * 2**(l - 1)
-      nj = jn * 2**(l - 1)
-      nk = kn * 2**(l - 1)
+      j  = 2**(l - 1)
+      ni = in * j
+      nj = jn * j
+      nk = kn * j
 
-! calculate the cell size at each level
+! calculate the cell sizes for each level
 !
-      adx (l) = (xmax - xmin) / (rdims(1) * ni)
-      ady (l) = (ymax - ymin) / (rdims(2) * nj)
+      adx (l) = (xmax - xmin) / (ir * ni)
+      ady (l) = (ymax - ymin) / (jr * nj)
 #if NDIMS == 3
-      adz (l) = (zmax - zmin) / (rdims(3) * nk)
+      adz (l) = (zmax - zmin) / (kr * nk)
 #endif /* NDIMS == 3 */
 #if NDIMS == 2
       adr (l) = sqrt(adx(l)**2 + ady(l)**2)
@@ -165,7 +238,7 @@ module coordinates
       adr (l) = sqrt(adx(l)**2 + ady(l)**2 + adz(l)**2)
 #endif /* NDIMS == 3 */
 
-! calculate the inverse of cell size at each level
+! calculate the inverse of cell size
 !
       adxi(l) = 1.0d0 / adx(l)
       adyi(l) = 1.0d0 / ady(l)
@@ -173,7 +246,7 @@ module coordinates
       adzi(l) = 1.0d0 / adz(l)
 #endif /* NDIMS == 3 */
 
-! calculate the block coordinates at each level
+! calculate the block coordinates for each level
 !
       ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
       ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
@@ -187,33 +260,48 @@ module coordinates
 
 ! calculate the effective block resolution at each level
 !
-      res(l,1)  = max(1, in * 2**(maxlev - l))
-      res(l,2)  = max(1, jn * 2**(maxlev - l))
+      j         = 2**(maxlev - l)
+      res(l,1)  = max(1, in * j)
+      res(l,2)  = max(1, jn * j)
 #if NDIMS == 3
-      res(l,3)  = max(1, kn * 2**(maxlev - l))
+      res(l,3)  = max(1, kn * j)
 #endif /* NDIMS == 3 */
 
     end do
 
-! print general information about resolutions
+! print general information about the level resolutions
 !
     if (flag) then
 
-      bm( :     ) = (/ in, jn, kn /)
-      rm( :     ) = 1
-      dm( :     ) = 1
+! the base resolution
+!
+      cm(1) = ir * in
+      cm(2) = jr * jn
+      cm(3) = kr * kn
 
-      cm(1:NDIMS) = rdims(1:NDIMS) * bm(1:NDIMS)
-      rm(1:NDIMS) = rdims(1:NDIMS) * res(1,1:NDIMS)
-      dm(1:NDIMS) = rm(1:NDIMS) / bm(1:NDIMS)
+! the effective resolution
+!
+      rm(1) = ir * res(1,1)
+      rm(2) = jr * res(1,2)
+      rm(3) = kr * res(1,3)
 
+! the effective resolution
+!
       effres(1:NDIMS) = rm(1:NDIMS)
 
+! the top level block division
+!
+      dm(1) = rm(1) / in
+      dm(2) = rm(2) / jn
+      dm(3) = rm(3) / kn
+
+! print info
+!
       write(*,*)
       write(*,"(1x,a)"         ) "Geometry:"
       write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", toplev
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", rdims(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6))") "base configuration     =", ir, jr, kr
+      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(:)
       write(*,"(4x,a,  1x,i6)" ) "maxium cover blocks    =", product(dm(:))
       write(*,"(4x,a,3(1x,i6))") "base resolution        =", cm(1:NDIMS)
       write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
