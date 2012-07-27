@@ -161,13 +161,14 @@ name = amun
 default: $(name).x
 
 sources = blocks.F90 boundaries.F90 config.F90 constants.F90 coordinates.F90   \
-          driver.F90 error.F90 evolution.F90 forcing.F90 integrals.F90         \
-          interpolation.F90 io.F90 mesh.F90 mpitools.F90 parameters.F90        \
-          problem.F90 random.F90 scheme.F90 timers.F90 variables.F90
+          driver.F90 equations.F90 error.F90 evolution.F90 forcing.F90         \
+          integrals.F90 interpolation.F90 io.F90 mesh.F90 mpitools.F90         \
+          parameters.F90 problem.F90 random.F90 scheme.F90 timers.F90          \
+          variables.F90
 objects = blocks.o boundaries.o config.o constants.o coordinates.o driver.o    \
-          error.o evolution.o forcing.o integrals.o interpolation.o io.o       \
-          mesh.o mpitools.o parameters.o problem.o random.o scheme.o timers.o  \
-          variables.o
+          equations.o error.o evolution.o forcing.o integrals.o                \
+          interpolation.o io.o mesh.o mpitools.o parameters.o problem.o        \
+          random.o scheme.o timers.o variables.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
 $(name).x: $(objects)
@@ -210,6 +211,7 @@ coordinates.o   : coordinates.F90 parameters.o
 driver.o        : driver.F90 blocks.o config.o coordinates.o evolution.o       \
                   forcing.o integrals.o io.o mesh.o mpitools.o parameters.o    \
                   random.o
+equations.o     : equations.F90 parameters.o variables.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o coordinates.o   \
                   forcing.o interpolation.o mesh.o mpitools.o problem.o        \

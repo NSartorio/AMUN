@@ -54,6 +54,7 @@ module variables
 #endif /* GLM */
 #endif /* MHD */
   integer(kind=4), parameter :: nvr = nqt
+  integer(kind=4), parameter :: nt  = nqt
 !
 !===============================================================================
 !
