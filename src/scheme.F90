@@ -45,7 +45,7 @@ module scheme
 !
   subroutine update_flux(idir, dh, u, f)
 
-    use config       , only : im, jm, km
+    use coordinates, only : im, jm, km
     use variables    , only : nqt, nfl
     use variables    , only : idn, imx, imy, imz
 #ifdef ADI
@@ -325,7 +325,7 @@ module scheme
 !
   subroutine update(u, du, dxi, dyi, dzi)
 
-    use config       , only : im, jm, km
+    use coordinates, only : im, jm, km
     use variables    , only : nvr, nqt, nfl
     use variables    , only : idn, imx, imy, imz
 #ifdef ADI
@@ -2556,7 +2556,7 @@ module scheme
 !
   function maxspeed(u)
 
-    use config       , only : im, jm, km, ib, ie, jb, je, kb, ke
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
 #ifdef ADI
     use config       , only : gamma
 #endif /* ADI */
