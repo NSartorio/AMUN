@@ -162,12 +162,12 @@ default: $(name).x
 
 sources = blocks.F90 boundaries.F90 config.F90 constants.F90 coordinates.F90   \
           driver.F90 equations.F90 error.F90 evolution.F90 forcing.F90         \
-          integrals.F90 interpolation.F90 io.F90 mesh.F90 mpitools.F90         \
+          integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
           parameters.F90 problem.F90 random.F90 scheme.F90 timers.F90          \
           variables.F90
 objects = blocks.o boundaries.o config.o constants.o coordinates.o driver.o    \
           equations.o error.o evolution.o forcing.o integrals.o                \
-          interpolation.o io.o mesh.o mpitools.o parameters.o problem.o        \
+          interpolations.o io.o mesh.o mpitools.o parameters.o problem.o       \
           random.o scheme.o timers.o variables.o
 files   = $(sources) makefile make.default config.in license.txt hosts
 
@@ -202,36 +202,38 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 #-------------------------------------------------------------------------------
 
-blocks.o        : blocks.F90 error.o
-boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
-                  mpitools.o variables.o
-config.o        : config.F90 error.o
-constants.o     : constants.F90
-coordinates.o   : coordinates.F90 parameters.o
-driver.o        : driver.F90 blocks.o config.o coordinates.o equations.o       \
-                  evolution.o forcing.o integrals.o io.o mesh.o mpitools.o     \
-                  parameters.o random.o
-equations.o     : equations.F90 parameters.o variables.o
-error.o         : error.F90
-evolution.o     : evolution.F90 blocks.o boundaries.o config.o coordinates.o   \
-                  forcing.o interpolation.o mesh.o mpitools.o problem.o        \
-                  scheme.o variables.o
-forcing.o       : forcing.F90 config.o constants.o coordinates.o mpitools.o    \
-                  random.o variables.o
-integrals.o     : integrals.F90 blocks.o config.o coordinates.o evolution.o    \
-                  mpitools.o variables.o
-interpolation.o : interpolation.F90 blocks.o config.o coordinates.o variables.o
-io.o            : io.F90 blocks.o coordinates.o error.o evolution.o mpitools.o \
-                  random.o scheme.o variables.o
-mesh.o          : mesh.F90 blocks.o coordinates.o error.o interpolation.o      \
-                  mpitools.o problem.o variables.o
-mpitools.o      : mpitools.F90 timers.o
-parameters.o    : parameters.F90 mpitools.o
-problem.o       : problem.F90 blocks.o constants.o coordinates.o mpitools.o    \
-                  random.o scheme.o variables.o
-scheme.o        : scheme.F90 blocks.o coordinates.o interpolation.o variables.o
-random.o        : random.F90 mpitools.o parameters.o
-timers.o        : timers.F90
-variables.o     : variables.F90
+blocks.o         : blocks.F90 error.o
+boundaries.o     : boundaries.F90 blocks.o config.o error.o interpolations.o   \
+                   mpitools.o variables.o
+config.o         : config.F90 error.o
+constants.o      : constants.F90
+coordinates.o    : coordinates.F90 parameters.o
+driver.o         : driver.F90 blocks.o config.o coordinates.o equations.o      \
+                   evolution.o forcing.o integrals.o io.o mesh.o mpitools.o    \
+                   parameters.o random.o
+equations.o      : equations.F90 parameters.o variables.o
+error.o          : error.F90
+evolution.o      : evolution.F90 blocks.o boundaries.o config.o coordinates.o  \
+                   forcing.o interpolations.o mesh.o mpitools.o problem.o      \
+                   scheme.o variables.o
+forcing.o        : forcing.F90 config.o constants.o coordinates.o mpitools.o   \
+                   random.o variables.o
+integrals.o      : integrals.F90 blocks.o config.o coordinates.o evolution.o   \
+                   mpitools.o variables.o
+interpolations.o : interpolations.F90 blocks.o config.o coordinates.o          \
+                   variables.o
+io.o             : io.F90 blocks.o coordinates.o error.o evolution.o           \
+                   mpitools.o random.o scheme.o variables.o
+mesh.o           : mesh.F90 blocks.o coordinates.o error.o interpolations.o    \
+                   mpitools.o problem.o variables.o
+mpitools.o       : mpitools.F90 timers.o
+parameters.o     : parameters.F90 mpitools.o
+problem.o        : problem.F90 blocks.o constants.o coordinates.o mpitools.o   \
+                   random.o scheme.o variables.o
+scheme.o         : scheme.F90 blocks.o coordinates.o interpolations.o          \
+                   variables.o
+random.o         : random.F90 mpitools.o parameters.o
+timers.o         : timers.F90
+variables.o      : variables.F90
 
 #-------------------------------------------------------------------------------
