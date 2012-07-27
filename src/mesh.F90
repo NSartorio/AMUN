@@ -52,8 +52,8 @@ module mesh
   subroutine initialize_mesh(flag)
 
     use blocks     , only : datablock_set_dims
-    use config     , only : toplev, in, jn, kn, im, jm, km, ncells, rdims, ng
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates, only : toplev, im, jm, km
     use mpitools   , only : master, nprocs
     use variables  , only : nqt, nvr
 
@@ -153,8 +153,7 @@ module mesh
     use blocks  , only : refine_block, deallocate_datablock
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
-    use config  , only : minlev, maxlev, rdims
-    use coordinates, only : res
+    use coordinates, only : minlev, maxlev, res
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
     use problem , only : init_domain, init_problem, check_ref
@@ -430,8 +429,7 @@ module mesh
                         , refine_block, derefine_block, append_datablock       &
                         , associate_blocks, deallocate_datablock
     use blocks   , only : get_nleafs
-    use config   , only : minlev, maxlev, toplev, im, jm, km
-    use coordinates, only : res
+    use coordinates, only : minlev, maxlev, toplev, im, jm, km, res
     use error    , only : print_info, print_error
 #ifdef MPI
     use mpitools , only : reduce_sum_integer_array
@@ -909,7 +907,7 @@ module mesh
     use blocks   , only : block_meta, block_data, list_meta, list_data
     use blocks   , only : get_nleafs, append_datablock, deallocate_datablock   &
                         , associate_blocks
-    use config   , only : im, jm, km
+    use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
     use variables, only : nqt
@@ -1042,8 +1040,8 @@ module mesh
   subroutine prolong_block(pblock)
 
     use blocks       , only : block_meta, block_data, nchild
-    use config       , only : ng, nh, in, jn, kn, im, jm, km
-    use config       , only : ib, ie, jb, je, kb, ke
+    use coordinates  , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates  , only : ib, ie, jb, je, kb, ke
     use interpolation, only : minmod
     use variables    , only : nqt
 
@@ -1214,14 +1212,14 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nchild
-    use config       , only : ng, in, ih, im, ib, ie, nh, jn, jh, jm, jb, je   &
-                                , kn, kh, km, kb, ke
-    use variables    , only : nfl
+    use blocks     , only : block_meta, block_data, nchild
+    use coordinates, only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates, only : ih, jh, kh, ib, jb, kb, ie, je, ke
+    use variables  , only : nfl
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use variables  , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -1403,8 +1401,7 @@ module mesh
 
     use blocks  , only : block_meta, list_meta
     use blocks  , only : get_mblocks, get_nleafs
-    use config  , only : ncells, nghost, toplev
-    use coordinates, only : effres
+    use coordinates, only : ng, im, jm, km, toplev, effres
     use mpitools, only : master, nprocs
 
     implicit none
@@ -1450,8 +1447,7 @@ module mesh
 ! calculate the coverage
 !
       cov = (1.0 * nl) / tblocks
-      eff = (1.0 * nl * (ncells + 2 * nghost)**NDIMS)                          &
-                                       / product(effres(1:NDIMS) + 2 * nghost)
+      eff = 1.0 * nl * (im * jm * km) / product(effres(1:NDIMS) + 2 * ng)
 
 ! get the block level distribution
 !

@@ -221,8 +221,8 @@ integrals.o     : integrals.F90 blocks.o config.o coordinates.o evolution.o    \
 interpolation.o : interpolation.F90 blocks.o config.o variables.o
 io.o            : io.F90 blocks.o coordinates.o error.o evolution.o mpitools.o \
                   random.o scheme.o variables.o
-mesh.o          : mesh.F90 blocks.o config.o coordinates.o error.o             \
-                  interpolation.o mpitools.o problem.o variables.o
+mesh.o          : mesh.F90 blocks.o coordinates.o error.o interpolation.o      \
+                  mpitools.o problem.o variables.o
 mpitools.o      : mpitools.F90 timers.o
 parameters.o    : parameters.F90 mpitools.o
 problem.o       : problem.F90 blocks.o constants.o coordinates.o mpitools.o    \
