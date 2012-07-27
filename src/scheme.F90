@@ -612,9 +612,6 @@ module scheme
     use variables    , only : ien
 #endif /* ADI */
 #ifdef MHD
-#ifdef RESISTIVITY
-    use config       , only : ueta
-#endif /* RESISTIVITY */
     use variables    , only : ibx, iby, ibz
 #ifdef GLM
     use variables    , only : iph
@@ -637,18 +634,9 @@ module scheme
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real                   :: al, ar, ap, div
-#if defined MHD && defined RESISTIVITY
-    real                   :: dbx, dby, dbz, ueh
-#endif /* MHD & RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
-! usefull parameters
-!
-#if defined MHD && defined RESISTIVITY
-    ueh = ueta / h
-#endif /* MHD & RESISTIVITY */
-
 ! calculate the primitive variables
 !
     call cons2prim(n, u(:,:), q(:,:))
@@ -714,26 +702,6 @@ module scheme
         fn(:,i) = div * (ar * fl(:,i) - al * fr(:,i) + ap * (ur(:,i) - ul(:,i)))
       end if
     end do
-
-#if defined MHD && defined RESISTIVITY
-! add resistivity term to the left and right fluxes
-!
-    do i = 1, n - 1
-      ip1 = i + 1
-
-      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
-      fn(ibx,i) = fn(ibx,i) - dbx
-
-      dby = ueh * (q(iby,ip1) - q(iby,i))
-      fn(iby,i) = fn(iby,i) - dby
-
-      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
-      fn(ibz,i) = fn(ibz,i) - dbz
-#ifdef ADI
-      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
-#endif /* ADI */
-    end do
-#endif /* MHD & RESISTIVITY */
 
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
@@ -978,9 +946,6 @@ module scheme
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
     use variables    , only : ibx, iby, ibz
-#ifdef RESISTIVITY
-    use config       , only : ueta
-#endif /* RESISTIVITY */
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1003,18 +968,9 @@ module scheme
     real, dimension(nvr)   :: u1l, u1r, u2
     real                   :: sl, sr, srl, srml, sm, sml, smr
     real                   :: dnm, mxm, sqd, div, fac, bxs
-#ifdef RESISTIVITY
-    real                   :: dbx, dby, dbz, ueh
-#endif /* RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
-! usefull parameters
-!
-#ifdef RESISTIVITY
-    ueh = ueta / h
-#endif /* RESISTIVITY */
-
 ! calculate the primitive variables
 !
     call cons2prim(n, u, q)
@@ -1208,23 +1164,6 @@ module scheme
 
     end do
 
-#ifdef RESISTIVITY
-! add resistivity term to the left and right fluxes
-!
-    do i = 1, n - 1
-      ip1 = i + 1
-
-      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
-      fn(ibx,i) = fn(ibx,i) - dbx
-
-      dby = ueh * (q(iby,ip1) - q(iby,i))
-      fn(iby,i) = fn(iby,i) - dby
-
-      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
-      fn(ibz,i) = fn(ibz,i) - dbz
-    end do
-#endif /* RESISTIVITY */
-
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -1259,9 +1198,6 @@ module scheme
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
     use variables    , only : ibx, iby, ibz
-#ifdef RESISTIVITY
-    use config       , only : ueta
-#endif /* RESISTIVITY */
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
@@ -1285,18 +1221,9 @@ module scheme
     real                   :: sl, sr, slmv, srmv, slmm, srmm, sm, smvl, smvr   &
                             , sml, smr
     real                   :: ptl, ptr, pt, bx2, div, fac, bxs, dlsq, drsq
-#ifdef RESISTIVITY
-    real                   :: dbx, dby, dbz, ueh
-#endif /* RESISTIVITY */
 !
 !-------------------------------------------------------------------------------
 !
-! usefull parameters
-!
-#ifdef RESISTIVITY
-    ueh = ueta / h
-#endif /* RESISTIVITY */
-
 ! calculate the primitive variables
 !
     call cons2prim(n, u, q)
@@ -1584,26 +1511,6 @@ module scheme
 
     end do
 
-#ifdef RESISTIVITY
-! add resistivity term to the left and right fluxes
-!
-    do i = 1, n - 1
-      ip1 = i + 1
-
-      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
-      fn(ibx,i) = fn(ibx,i) - dbx
-
-      dby = ueh * (q(iby,ip1) - q(iby,i))
-      fn(iby,i) = fn(iby,i) - dby
-
-      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
-      fn(ibz,i) = fn(ibz,i) - dbz
-#ifdef ADI
-      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
-#endif /* ADI */
-    end do
-#endif /* RESISTIVITY */
-
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
 !
@@ -1650,9 +1557,6 @@ module scheme
 #ifdef GLM
     use variables    , only : iph
 #endif /* GLM */
-#ifdef RESISTIVITY
-    use config       , only : ueta
-#endif /* RESISTIVITY */
 #endif /* MHD */
 
     implicit none
@@ -1676,19 +1580,10 @@ module scheme
     real                     :: sdl, sdr, sds, sfl, sfr
 #ifdef MHD
     real                     :: pbl, pbr, xfc, yfc
-#ifdef RESISTIVITY
-    real                     :: dbx, dby, dbz, ueh
-#endif /* RESISTIVITY */
 #endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
-! usefull parameters
-!
-#ifdef RESISTIVITY
-    ueh = ueta / h
-#endif /* RESISTIVITY */
-
 ! reset eigensystem values
 !
     ci(:)   = 0.0d0
@@ -1837,26 +1732,6 @@ module scheme
       end if
 
     end do
-
-#if defined MHD && defined RESISTIVITY
-! add resistivity term to the left and right fluxes
-!
-    do i = 1, n - 1
-      ip1 = i + 1
-
-      dbx = ueh * (q(ibx,ip1) - q(ibx,i))
-      fn(ibx,i) = fn(ibx,i) - dbx
-
-      dby = ueh * (q(iby,ip1) - q(iby,i))
-      fn(iby,i) = fn(iby,i) - dby
-
-      dbz = ueh * (q(ibz,ip1) - q(ibz,i))
-      fn(ibz,i) = fn(ibz,i) - dbz
-#ifdef ADI
-      fn(ien,i) = fn(ien,i) - ql(ibx,i) * dbx
-#endif /* ADI */
-    end do
-#endif /* MHD & RESISTIVITY */
 
 #ifdef CONSERVATIVE
 ! return numerica flux at i+1/2
