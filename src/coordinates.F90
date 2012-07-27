@@ -314,10 +314,10 @@ module coordinates
 !
 !===============================================================================
 !
-! subroutine FINALIZE_MESH:
-! ------------------------
+! subroutine FINALIZE_COORDINATES:
+! -------------------------------
 !
-!   subroutine finalizes allocated mesh coordinates by deallocating them;
+!   Subroutine deallocates mesh coordinates.
 !
 !===============================================================================
 !
