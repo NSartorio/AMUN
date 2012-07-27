@@ -1193,7 +1193,7 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
-    use config       , only : gamma
+    use equations    , only : gamma
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -1545,7 +1545,7 @@ module scheme
 !
   subroutine roe(n, h, u, f)
 
-    use config       , only : gamma
+    use equations    , only : gamma
     use interpolation, only : reconstruct
     use variables    , only : nvr, nfl, nqt
     use variables    , only : idn, ivx, ivy, ivz
@@ -1764,7 +1764,7 @@ module scheme
 #ifdef ADI
   subroutine eigensystem(q, c, r, l)
 
-    use config   , only : gamma
+    use equations, only : gamma
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
     use variables, only : ien
@@ -1865,7 +1865,7 @@ module scheme
 #ifdef ISO
   subroutine eigensystem(q, c, r, l)
 
-    use config   , only : csnd
+    use equations, only : csnd
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz
 
@@ -1934,7 +1934,7 @@ module scheme
 #ifdef ADI
   subroutine eigensystem(q, c, r, l, x, y)
 
-    use config   , only : gamma
+    use equations, only : gamma
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz, ibx, iby, ibz, ien
 
@@ -2002,7 +2002,7 @@ module scheme
 #ifdef ISO
   subroutine eigensystem(q, c, r, l, x, y)
 
-    use config   , only : csnd
+    use equations, only : csnd
     use variables, only : nqt
     use variables, only : idn, ivx, ivy, ivz, ibx, iby, ibz
 
@@ -2056,7 +2056,12 @@ module scheme
 !
   subroutine fluxspeed(n, q, u, f, c)
 
-    use config   , only : gamma, csnd, csnd2
+#ifdef ADI
+    use equations, only : gamma
+#endif /* ADI */
+#ifdef ISO
+    use equations, only : csnd, csnd2
+#endif /* ISO */
     use variables, only : nvr, nqt
     use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
@@ -2156,7 +2161,7 @@ module scheme
 !
   subroutine cons2prim(n, u, q)
 
-    use config   , only : gammam1
+    use equations, only : gammam1
     use variables, only : nvr
     use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
@@ -2222,7 +2227,7 @@ module scheme
 !
   subroutine prim2cons(n, q, u)
 
-    use config   , only : gammam1i
+    use equations, only : gammam1i
     use variables, only : nvr
     use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
@@ -2288,10 +2293,10 @@ module scheme
 
     use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
 #ifdef ADI
-    use config       , only : gamma
+    use equations  , only : gamma
 #endif /* ADI */
 #ifdef ISO
-    use config       , only : csnd, csnd2
+    use equations  , only : csnd, csnd2
 #endif /* ISO */
     use variables    , only : nvr, nqt
     use variables    , only : idn, ivx, ivz

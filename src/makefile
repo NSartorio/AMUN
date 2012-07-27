@@ -229,8 +229,7 @@ mpitools.o      : mpitools.F90 timers.o
 parameters.o    : parameters.F90 mpitools.o
 problem.o       : problem.F90 blocks.o constants.o coordinates.o mpitools.o    \
                   random.o scheme.o variables.o
-scheme.o        : scheme.F90 blocks.o config.o coordinates.o interpolation.o   \
-                  variables.o
+scheme.o        : scheme.F90 blocks.o coordinates.o interpolation.o variables.o
 random.o        : random.F90 mpitools.o parameters.o
 timers.o        : timers.F90
 variables.o     : variables.F90
