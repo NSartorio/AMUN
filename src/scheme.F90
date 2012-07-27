@@ -605,16 +605,16 @@ module scheme
 !
   subroutine hll(n, h, u, f)
 
-    use interpolation, only : reconstruct
-    use variables    , only : nvr, nfl, nqt
-    use variables    , only : ivx, ivy, ivz
+    use interpolations, only : reconstruct
+    use variables     , only : nvr, nfl, nqt
+    use variables     , only : ivx, ivy, ivz
 #ifdef ADI
-    use variables    , only : ien
+    use variables     , only : ien
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use variables     , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables     , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -734,9 +734,9 @@ module scheme
 !
   subroutine hllc(n, h, u, f)
 
-    use interpolation, only : reconstruct
-    use variables    , only : nvr, nfl, nqt
-    use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
+    use interpolations, only : reconstruct
+    use variables     , only : nvr, nfl, nqt
+    use variables     , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
 
     implicit none
 
@@ -942,12 +942,12 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
-    use interpolation, only : reconstruct
-    use variables    , only : nvr, nfl, nqt
-    use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
-    use variables    , only : ibx, iby, ibz
+    use interpolations, only : reconstruct
+    use variables     , only : nvr, nfl, nqt
+    use variables     , only : idn, imx, imy, imz, ivx, ivy, ivz
+    use variables     , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables     , only : iph
 #endif /* GLM */
 
     implicit none
@@ -1193,13 +1193,13 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
-    use equations    , only : gamma
-    use interpolation, only : reconstruct
-    use variables    , only : nvr, nfl, nqt
-    use variables    , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
-    use variables    , only : ibx, iby, ibz
+    use equations     , only : gamma
+    use interpolations, only : reconstruct
+    use variables     , only : nvr, nfl, nqt
+    use variables     , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
+    use variables     , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables     , only : iph
 #endif /* GLM */
 
     implicit none
@@ -1545,17 +1545,17 @@ module scheme
 !
   subroutine roe(n, h, u, f)
 
-    use equations    , only : gamma
-    use interpolation, only : reconstruct
-    use variables    , only : nvr, nfl, nqt
-    use variables    , only : idn, ivx, ivy, ivz
+    use equations     , only : gamma
+    use interpolations, only : reconstruct
+    use variables     , only : nvr, nfl, nqt
+    use variables     , only : idn, ivx, ivy, ivz
 #ifdef ADI
-    use variables    , only : ien, ipr
+    use variables     , only : ien, ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use variables     , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables     , only : iph
 #endif /* GLM */
 #endif /* MHD */
 

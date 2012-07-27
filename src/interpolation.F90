@@ -21,11 +21,14 @@
 !!
 !!******************************************************************************
 !!
-!! module: INTERPOLATION - subroutines for different kinds of interpolation
+!! module: INTERPOLATIONS
+!!
+!!  This module provides subroutine to interpolate variables and reconstruct
+!!  Riemann states.
 !!
 !!******************************************************************************
 !
-module interpolation
+module interpolations
 
   implicit none
 
@@ -1273,4 +1276,4 @@ module interpolation
 !
 !===============================================================================
 !
-end module
+end module interpolations

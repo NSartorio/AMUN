@@ -1039,11 +1039,11 @@ module mesh
 !
   subroutine prolong_block(pblock)
 
-    use blocks       , only : block_meta, block_data, nchild
-    use coordinates  , only : ng, nh, in, jn, kn, im, jm, km
-    use coordinates  , only : ib, ie, jb, je, kb, ke
-    use interpolation, only : minmod
-    use variables    , only : nqt
+    use blocks        , only : block_meta, block_data, nchild
+    use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates   , only : ib, ie, jb, je, kb, ke
+    use interpolations, only : minmod
+    use variables     , only : nqt
 
     implicit none
 

@@ -2336,7 +2336,7 @@ module boundaries
     use config       , only : ng, im, ih, ib, ie, ieu                          &
                             , nd, jm, jh, jb, je, jeu                          &
                             , nh, km, kh, kb, ke, keu
-    use interpolation, only : minmod
+    use interpolations, only : minmod
     use variables    , only : nqt
 
     implicit none
@@ -2665,7 +2665,7 @@ module boundaries
                             , zubndry, ng, im, jm, km, ib, ibl, ie, ieu, jb    &
                             , jbl, je, jeu, kb, kbl, ke, keu
     use error        , only : print_warning
-    use interpolation, only : limiter
+    use interpolations, only : limiter
     use variables    , only : nvr, nfl, idn, imx, imy, imz
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
