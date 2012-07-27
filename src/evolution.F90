@@ -43,19 +43,19 @@ module evolution
 !
   subroutine evolve()
 
-    use blocks    , only : block_data, list_data
-    use boundaries, only : boundary_variables
+    use blocks     , only : block_data, list_data
+    use boundaries , only : boundary_variables
 #ifdef CONSERVATIVE
-    use boundaries, only : boundary_correct_fluxes
+    use boundaries , only : boundary_correct_fluxes
 #endif /* CONSERVATIVE */
 #ifdef REFINE
-    use config    , only : toplev
+    use coordinates, only : toplev
 #endif /* REFINE */
-    use mesh      , only : update_mesh
+    use mesh       , only : update_mesh
 #ifdef FORCE
-    use config    , only : tbfor
-    use forcing   , only : fourier_transform, evolve_forcing
-    use variables , only : idn, imz
+    use forcing    , only : tbfor
+    use forcing    , only : fourier_transform, evolve_forcing
+    use variables  , only : idn, imz
 #endif /* FORCE */
 
     implicit none
@@ -190,19 +190,13 @@ module evolution
 !
   subroutine find_new_timestep()
 
-    use blocks  , only : block_meta, block_data, list_meta, list_data
-    use config  , only : toplev
-#ifdef MPI
-    use mpitools, only : reduce_maximum_real
-#endif /* MPI */
+    use blocks     , only : block_meta, block_data, list_meta, list_data
+    use coordinates, only : toplev
     use coordinates, only : adx, ady, adz
+#ifdef MPI
+    use mpitools   , only : reduce_maximum_real
+#endif /* MPI */
     use scheme  , only : maxspeed, cmax
-#ifdef VISCOSITY
-    use config  , only : visc
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    use config  , only : ueta
-#endif /* MHD & RESISTIVITY */
 
     implicit none
 
@@ -292,12 +286,6 @@ module evolution
 ! calcilate new time step
 !
     dtn = dxmin / max(cmax, 1.0d-16)
-#ifdef VISCOSITY
-    dtn = min(dtn, 0.5d0 * dxmin * dxmin / max(1.0d-16, visc))
-#endif /* VISCOSITY */
-#if defined MHD && defined RESISTIVITY
-    dtn = min(dtn, 0.5d0 * dxmin * dxmin / max(1.0d-16, ueta))
-#endif /* MHD & RESISTIVITY */
 
 !-------------------------------------------------------------------------------
 !
@@ -314,25 +302,25 @@ module evolution
 !
   subroutine update_solution(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
     use coordinates, only : adxi, adyi, adzi
 #if defined MHD && defined GLM
-    use config   , only : decay
-    use scheme   , only : cmax
-    use variables, only : iph
+    use config     , only : decay
+    use scheme     , only : cmax
+    use variables  , only : iph
 #endif /* MHD & GLM */
 #ifdef FORCE
-    use config   , only : tbfor
-    use forcing  , only : real_forcing
-    use variables, only : inx, iny, inz
-    use variables, only : idn, imx, imy, imz
+    use forcing    , only : tbfor
+    use forcing    , only : real_forcing
+    use variables  , only : inx, iny, inz
+    use variables  , only : idn, imx, imy, imz
 #ifdef ADI
-    use variables, only : ien
+    use variables  , only : ien
 #endif /* ADI */
 #endif /* FORCE */
 #ifdef SHAPE
-    use problem  , only : update_shapes
+    use problem    , only : update_shapes
 #endif /* SHAPE */
 
     implicit none
@@ -435,14 +423,14 @@ module evolution
 !
   subroutine advance_solution(u, f, dh, dxi, dyi, dzi)
 
-    use config   , only : im, jm, km
-    use variables, only : nqt, nfl
-    use variables, only : inx, iny, inz
+    use coordinates, only : im, jm, km
+    use variables  , only : nqt, nfl
+    use variables  , only : inx, iny, inz
 #ifdef MHD
-    use variables, only : ibx, ibz
+    use variables  , only : ibx, ibz
 #ifdef GLM
-    use scheme   , only : cmax
-    use variables, only : iph
+    use scheme     , only : cmax
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -543,14 +531,14 @@ module evolution
 !
   subroutine advance_solution_1d(idir, dh, dxi, u, f)
 
-    use config   , only : im, jm, km
-    use variables, only : nqt, nfl
-    use variables, only : inx, iny, inz
+    use coordinates, only : im, jm, km
+    use variables  , only : nqt, nfl
+    use variables  , only : inx, iny, inz
 #ifdef MHD
-    use variables, only : ibx, ibz
+    use variables  , only : ibx, ibz
 #ifdef GLM
-    use scheme   , only : cmax
-    use variables, only : iph
+    use scheme     , only : cmax
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -712,11 +700,11 @@ module evolution
 !
   subroutine flux_rk2(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
     use coordinates, only : adx, ady, adz, adxi, adyi, adzi
-    use scheme   , only : update_flux
-    use variables, only : nqt
+    use scheme     , only : update_flux
+    use variables  , only : nqt
 
     implicit none
 
@@ -787,11 +775,11 @@ module evolution
 !
   subroutine flux_rk3(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
     use coordinates, only : adx, ady, adz, adxi, adyi, adzi
-    use scheme   , only : update_flux
-    use variables, only : nqt
+    use scheme     , only : update_flux
+    use variables  , only : nqt
 
     implicit none
 
@@ -892,29 +880,29 @@ module evolution
 !
   subroutine evolve_euler(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-#ifdef FORCE
-    use config   , only : tbfor
-    use forcing  , only : real_forcing
-#endif /* FORCE */
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
     use coordinates, only : adxi, adyi, adzi
+#ifdef FORCE
+    use forcing    , only : tbfor
+    use forcing    , only : real_forcing
+#endif /* FORCE */
 #ifdef SHAPE
-    use problem  , only : update_shapes
+    use problem    , only : update_shapes
 #endif /* SHAPE */
-    use scheme   , only : update, cmax
-    use variables, only : nqt, nfl
+    use scheme     , only : update, cmax
+    use variables  , only : nqt, nfl
 #ifdef MHD
-    use variables, only : ibx, ibz
+    use variables  , only : ibx, ibz
 #ifdef GLM
-    use config   , only : decay
-    use variables, only : iph
+    use config     , only : decay
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 #ifdef FORCE
-    use variables, only : idn, imx, imy, imz
+    use variables  , only : idn, imx, imy, imz
 #ifdef ADI
-    use variables, only : ien
+    use variables  , only : ien
 #endif /* ADI */
 #endif /* FORCE */
 
@@ -1035,29 +1023,29 @@ module evolution
 !
   subroutine evolve_rk2(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-#ifdef FORCE
-    use config   , only : tbfor
-    use forcing  , only : real_forcing
-#endif /* FORCE */
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
     use coordinates, only : adxi, adyi, adzi
+#ifdef FORCE
+    use forcing    , only : tbfor
+    use forcing    , only : real_forcing
+#endif /* FORCE */
 #ifdef SHAPE
-    use problem  , only : update_shapes
+    use problem    , only : update_shapes
 #endif /* SHAPE */
-    use scheme   , only : update, cmax
-    use variables, only : nqt, nfl
+    use scheme     , only : update, cmax
+    use variables  , only : nqt, nfl
 #ifdef MHD
-    use variables, only : ibx, ibz
+    use variables  , only : ibx, ibz
 #ifdef GLM
-    use config   , only : decay
-    use variables, only : iph
+    use config     , only : decay
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 #ifdef FORCE
-    use variables, only : idn, imx, imy, imz
+    use variables  , only : idn, imx, imy, imz
 #ifdef ADI
-    use variables, only : ien
+    use variables  , only : ien
 #endif /* ADI */
 #endif /* FORCE */
 
@@ -1203,29 +1191,29 @@ module evolution
 !
   subroutine evolve_rk3(pblock)
 
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
 #ifdef FORCE
-    use config   , only : tbfor
-    use forcing  , only : real_forcing
+    use forcing    , only : tbfor
+    use forcing    , only : real_forcing
 #endif /* FORCE */
     use coordinates, only : adxi, adyi, adzi
 #ifdef SHAPE
-    use problem  , only : update_shapes
+    use problem    , only : update_shapes
 #endif /* SHAPE */
-    use scheme   , only : update, cmax
-    use variables, only : nqt, nfl
+    use scheme     , only : update, cmax
+    use variables  , only : nqt, nfl
 #ifdef MHD
-    use variables, only : ibx, ibz
+    use variables  , only : ibx, ibz
 #ifdef GLM
-    use config   , only : decay
-    use variables, only : iph
+    use config     , only : decay
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 #ifdef FORCE
-    use variables, only : idn, imx, imy, imz
+    use variables  , only : idn, imx, imy, imz
 #ifdef ADI
-    use variables, only : ien
+    use variables  , only : ien
 #endif /* ADI */
 #endif /* FORCE */
 

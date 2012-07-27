@@ -213,8 +213,8 @@ driver.o         : driver.F90 blocks.o config.o coordinates.o equations.o      \
                    mesh.o mpitools.o parameters.o random.o
 equations.o      : equations.F90 parameters.o variables.o
 error.o          : error.F90
-evolution.o      : evolution.F90 blocks.o boundaries.o config.o coordinates.o  \
-                   forcing.o interpolations.o mesh.o mpitools.o problem.o      \
+evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o forcing.o \
+                   interpolations.o mesh.o mpitools.o problem.o      \
                    scheme.o variables.o
 forcing.o        : forcing.F90 constants.o coordinates.o mpitools.o            \
                    parameters.o random.o variables.o
