@@ -36,6 +36,7 @@ program amun
   use config   , only : fdt
 #endif /* FORCE */
   use coordinates, only : initialize_coordinates, finalize_coordinates
+  use equations     , only : initialize_equations
   use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
 #ifdef FORCE
   use forcing  , only : init_forcing, clear_forcing
@@ -220,6 +221,10 @@ program amun
 ! initialize the mesh module
 !
     call initialize_mesh(.true.)
+
+! initialize module EQUATIONS
+!
+    call initialize_equations()
 
 ! initialize the integrals module
 !

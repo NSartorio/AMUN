@@ -208,9 +208,9 @@ boundaries.o    : boundaries.F90 blocks.o config.o error.o interpolation.o     \
 config.o        : config.F90 error.o
 constants.o     : constants.F90
 coordinates.o   : coordinates.F90 parameters.o
-driver.o        : driver.F90 blocks.o config.o coordinates.o evolution.o       \
-                  forcing.o integrals.o io.o mesh.o mpitools.o parameters.o    \
-                  random.o
+driver.o        : driver.F90 blocks.o config.o coordinates.o equations.o       \
+                  evolution.o forcing.o integrals.o io.o mesh.o mpitools.o     \
+                  parameters.o random.o
 equations.o     : equations.F90 parameters.o variables.o
 error.o         : error.F90
 evolution.o     : evolution.F90 blocks.o boundaries.o config.o coordinates.o   \
