@@ -1216,7 +1216,7 @@ module interpolation
 !
   subroutine divergence(b, db, dx, dy, dz)
 
-    use config   , only : im, jm, km
+    use coordinates, only : im, jm, km
     use variables, only : nvr
 
     implicit none

@@ -218,7 +218,7 @@ forcing.o       : forcing.F90 config.o constants.o coordinates.o mpitools.o    \
                   random.o variables.o
 integrals.o     : integrals.F90 blocks.o config.o coordinates.o evolution.o    \
                   mpitools.o variables.o
-interpolation.o : interpolation.F90 blocks.o config.o variables.o
+interpolation.o : interpolation.F90 blocks.o config.o coordinates.o variables.o
 io.o            : io.F90 blocks.o coordinates.o error.o evolution.o mpitools.o \
                   random.o scheme.o variables.o
 mesh.o          : mesh.F90 blocks.o coordinates.o error.o interpolation.o      \
