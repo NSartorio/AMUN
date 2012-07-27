@@ -42,6 +42,7 @@ program amun
   use forcing  , only : init_forcing, clear_forcing
 #endif /* FORCE */
   use integrals, only : init_integrals, clear_integrals, store_integrals
+  use interpolations, only : initialize_interpolations
   use io       , only : nfile, write_data, write_restart_data, restart_job
   use mesh          , only : initialize_mesh, clear_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
@@ -214,6 +215,14 @@ program amun
 !
   call initialize_coordinates(master)
 
+! initialize module EQUATIONS
+!
+  call initialize_equations()
+
+! initialize module INTERPOLATIONS
+!
+  call initialize_interpolations()
+
 ! check if we initiate new problem or restart previous job
 !
   if (nres .lt. 0) then
@@ -221,10 +230,6 @@ program amun
 ! initialize the mesh module
 !
     call initialize_mesh(.true.)
-
-! initialize module EQUATIONS
-!
-    call initialize_equations()
 
 ! initialize the integrals module
 !

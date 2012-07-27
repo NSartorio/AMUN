@@ -30,9 +30,63 @@
 !
 module interpolations
 
+! module variables are not implicit by default
+!
   implicit none
 
+! module parameters
+!
+  real, save :: kappa = 1.0d0
+  real, save :: rad   = 1.0d0
+  real, save :: eps   = epsilon(rad)
+
+! by default everything is public
+!
+  public
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
+!
+!===============================================================================
+!
+! subroutine INITIALIZE_INTERPOLATIONS:
+! ------------------------------------
+!
+!   Subroutine initializes the interpolation module by reading the module
+!   parameters.
+!
+!===============================================================================
+!
+  subroutine initialize_interpolations()
+
+! include external procedures
+!
+    use parameters, only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    real :: cfl = 0.5d0
+!
+!-------------------------------------------------------------------------------
+!
+! obtain the interpolation coefficients
+!
+    call get_parameter_real("rad", rad)
+    call get_parameter_real("eps", eps)
+    call get_parameter_real("cfl", cfl)
+
+! calculate κ = (1 - ν) / ν
+!
+    kappa = (1.0d0 - cfl) / cfl
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_interpolations
 !
 #ifdef TVD
 !===============================================================================
@@ -44,8 +98,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -120,8 +174,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -244,8 +298,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -352,8 +406,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -473,8 +527,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : eps, rad
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -577,8 +631,8 @@ module interpolations
 !
   subroutine reconstruct(n, h, f, fl, fr)
 
-    use config, only : alpha
-
+! local variables are not implicit by default
+!
     implicit none
 
 ! input/output arguments
@@ -675,7 +729,7 @@ module interpolations
          + a6 * f(ip1) + a7 * f(ip2) + a8 * f(ip3) + a9 * f(ip4)
 #endif /* MP9 */
 
-      fmp = f(i) + minmod(2.0d0 * dfr(i), alpha * dfl(i))
+      fmp = f(i) + minmod(2.0d0 * dfr(i), kappa * dfl(i))
       ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
         fl(i) = fh
@@ -690,7 +744,7 @@ module interpolations
 
         flag  = .false.
 
-        ful   = f(i) + alpha * dfl(i)
+        ful   = f(i) + kappa * dfl(i)
         fav   = 0.5d0 * (f(i) + f(ip1))
         fmd   = fav - dmr
         flc   = 0.5d0 * (f(i) + ful) + dml
@@ -715,7 +769,7 @@ module interpolations
          + a6 * f(im1) + a7 * f(im2) + a8 * f(im3) + a9 * f(im4)
 #endif /* MP9 */
 
-      fmp = f(i) - minmod(2.0d0 * dfl(i), alpha * dfr(i))
+      fmp = f(i) - minmod(2.0d0 * dfl(i), kappa * dfr(i))
       ds  = (fh - f(i)) * (fh - fmp)
       if (ds .le. eps) then
         fr(im1) = fh
@@ -730,7 +784,7 @@ module interpolations
           dmr   = minmod4(4.0d0 * dp1 - dc0, dc4 - dp1, dp1, dc0)
         end if
 
-        ful   = f(i) - alpha * dfr(i)
+        ful   = f(i) - kappa * dfr(i)
         fav   = 0.5d0 * (f(i) + f(im1))
         fmd   = fav - dml
         flc   = 0.5d0 * (f(i) + ful) + dmr
