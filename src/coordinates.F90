@@ -56,9 +56,13 @@ module coordinates
 
 ! block indices
 !
-  integer, save :: ih =  6, jh =  6, kh =  1
-  integer, save :: ib =  3, jb =  3, kb =  1
-  integer, save :: ie = 10, je = 10, ke =  1
+  integer, save :: ih  =  6, jh  =  6, kh  =  1
+  integer, save :: ib  =  3, jb  =  3, kb  =  1
+  integer, save :: ie  = 10, je  = 10, ke  =  1
+  integer, save :: ibl =  2, jbl =  2, kbl =  1
+  integer, save :: ibu =  4, jbu =  4, kbu =  1
+  integer, save :: iel =  9, jel =  9, kel =  1
+  integer, save :: ieu = 11, jeu = 11, keu =  1
 
 ! the domain bounds
 !
@@ -170,16 +174,28 @@ module coordinates
 
 ! calculate block indices
 !
-    ih = im / 2
-    ib = ng +  1
-    ie = ng + in
-    jh = jm / 2
-    jb = ng +  1
-    je = ng + jn
+    ih  = im / 2
+    ib  = ng +  1
+    ie  = ng + in
+    ibl = ib - 1
+    ibu = ib + ng - 1
+    iel = ie - ng + 1
+    ieu = ie + 1
+    jh  = jm / 2
+    jb  = ng +  1
+    je  = ng + jn
+    jbl = jb - 1
+    jbu = jb + ng - 1
+    jel = je - ng + 1
+    jeu = je + 1
 #if NDIMS == 3
-    kh = km / 2
-    kb = ng +  1
-    ke = ng + kn
+    kh  = km / 2
+    kb  = ng +  1
+    ke  = ng + kn
+    kbl = kb - 1
+    kbu = kb + ng - 1
+    kel = ke - ng + 1
+    keu = ke + 1
 #endif /* NDIMS == 3 */
 
 ! obtain the refinement level bounds

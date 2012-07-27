@@ -203,8 +203,8 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 #-------------------------------------------------------------------------------
 
 blocks.o         : blocks.F90 error.o
-boundaries.o     : boundaries.F90 blocks.o config.o error.o interpolations.o   \
-                   mpitools.o variables.o
+boundaries.o     : boundaries.F90 blocks.o coordinates.o error.o               \
+                   interpolations.o mpitools.o variables.o
 config.o         : config.F90 error.o
 constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o

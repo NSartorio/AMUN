@@ -21,15 +21,113 @@
 !!
 !!******************************************************************************
 !!
-!! module: BOUNDARIES - subroutines for handling the boundary conditions
+!! module: BOUNDARIES
+!!
+!!  This module handles the boundary synchronization.
 !!
 !!******************************************************************************
 !
 module boundaries
 
+! module variables are not implicit by default
+!
   implicit none
 
+! module parameters for the boundary update order and boundary type
+!
+  character(len = 32), save     :: xlbndry = "periodic"
+  character(len = 32), save     :: xubndry = "periodic"
+  character(len = 32), save     :: ylbndry = "periodic"
+  character(len = 32), save     :: yubndry = "periodic"
+  character(len = 32), save     :: zlbndry = "periodic"
+  character(len = 32), save     :: zubndry = "periodic"
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
+!
+!===============================================================================
+!
+! subroutine INITIALIZE_BOUNDARIES:
+! --------------------------------
+!
+!   Subroutine initializes the module BOUNDARIES by setting its parameters.
+!
+!===============================================================================
+!
+  subroutine initialize_boundaries()
+
+! include external procedures and variables
+!
+#ifdef MPI
+    use mpitools  , only : pdims, pcoords, periodic
+#endif /* MPI */
+    use parameters, only : get_parameter_string
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! get runtime values for the boundary types
+!
+    call get_parameter_string ("xlbndry" , xlbndry)
+    call get_parameter_string ("xubndry" , xubndry)
+    call get_parameter_string ("ylbndry" , ylbndry)
+    call get_parameter_string ("yubndry" , yubndry)
+    call get_parameter_string ("zlbndry" , zlbndry)
+    call get_parameter_string ("zubndry" , zubndry)
+
+#ifdef MPI
+! change the internal boundaries to "exchange" type for the MPI update
+!
+    if (pdims(1) .gt. 1) then
+      if (periodic(1)) then
+        xlbndry       = "exchange"
+        xubndry       = "exchange"
+      else
+        if (pcoords(1) .gt. 0         ) then
+          xlbndry       = "exchange"
+        end if
+        if (pcoords(1) .lt. pdims(1)-1) then
+          xubndry       = "exchange"
+        end if
+      end if
+    end if
+
+    if (pdims(2) .gt. 1) then
+      if (periodic(2)) then
+        ylbndry       = "exchange"
+        yubndry       = "exchange"
+      else
+        if (pcoords(2) .gt. 0         ) then
+          ylbndry       = "exchange"
+        end if
+        if (pcoords(2) .lt. pdims(2)-1) then
+          yubndry       = "exchange"
+        end if
+      end if
+    end if
+
+    if (pdims(3) .gt. 1) then
+      if (periodic(3)) then
+        zlbndry       = "exchange"
+        zubndry       = "exchange"
+      else
+        if (pcoords(3) .gt. 0         ) then
+          zlbndry       = "exchange"
+        end if
+        if (pcoords(3) .lt. pdims(3)-1) then
+          zubndry       = "exchange"
+        end if
+      end if
+    end if
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_boundaries
 !
 !===============================================================================
 !
@@ -43,12 +141,13 @@ module boundaries
     use blocks   , only : ndims, nsides, nfaces
     use blocks   , only : block_meta, block_data, block_info, pointer_info     &
                         , list_meta
-    use config   , only : periodic, ng, nd, nh, toplev
-    use config   , only : im, jm, km
-    use config   , only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
+    use coordinates, only : ng, nd, nh, toplev
+    use coordinates, only : im, jm, km
+    use coordinates, only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
 #ifdef MPI
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nproc, nprocs
+    use mpitools   , only : periodic
     use variables, only : nqt
 #endif /* MPI */
 
@@ -1496,11 +1595,11 @@ module boundaries
 
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
-    use config   , only : toplev
-    use config   , only : ibl, ie, jbl, je, kbl, ke
+    use coordinates, only : toplev
+    use coordinates, only : ibl, ie, jbl, je, kbl, ke
 #ifdef MPI
     use blocks   , only : block_info, pointer_info
-    use config   , only : im, jm, km
+    use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
     use variables, only : nqt
@@ -1919,8 +2018,8 @@ module boundaries
   subroutine correct_flux(pdata, f, idir, iside, iface)
 
     use blocks   , only : block_data
-    use config   , only : ng, in, jn, kn, ih, jh, kh                           &
-                        , ib, ie, ibl, jb, je, jbl, kb, ke, kbl
+    use coordinates, only : ng, in, jn, kn, ih, jh, kh                         &
+                          , ib, ie, ibl, jb, je, jbl, kb, ke, kbl
 
     implicit none
 
@@ -2096,7 +2195,7 @@ module boundaries
   subroutine boundary_copy(pdata, u, idir, iside)
 
     use blocks   , only : block_data
-    use config   , only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
+    use coordinates, only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
     use variables, only : nqt
 
     implicit none
@@ -2153,7 +2252,7 @@ module boundaries
   subroutine boundary_restrict(pdata, u, idir, iside, iface)
 
     use blocks   , only : block_data
-    use config   , only : ng, im, ih, ib, ie, ieu           &
+    use coordinates, only : ng, im, ih, ib, ie, ieu           &
                         , nd, jm, jh, jb, je, jeu           &
                         , nh, km, kh, kb, ke, keu
     use variables, only : nqt
@@ -2333,7 +2432,7 @@ module boundaries
   subroutine boundary_prolong(pdata, u, idir, iside, iface)
 
     use blocks       , only : block_data
-    use config       , only : ng, im, ih, ib, ie, ieu                          &
+    use coordinates   , only : ng, im, ih, ib, ie, ieu                          &
                             , nd, jm, jh, jb, je, jeu                          &
                             , nh, km, kh, kb, ke, keu
     use interpolations, only : minmod
@@ -2661,8 +2760,7 @@ module boundaries
   subroutine boundary_specific(pdata, idir, iside)
 
     use blocks       , only : block_data
-    use config       , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry      &
-                            , zubndry, ng, im, jm, km, ib, ibl, ie, ieu, jb    &
+    use coordinates  , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
                             , jbl, je, jeu, kb, kbl, ke, keu
     use error        , only : print_warning
     use interpolations, only : limiter

@@ -30,6 +30,7 @@ program amun
 ! modules
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
+  use boundaries    , only : initialize_boundaries
   use config   , only : read_config
   use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
 #ifdef FORCE
@@ -214,6 +215,10 @@ program amun
 ! initialize module COORDINATES
 !
   call initialize_coordinates(master)
+
+! initialize boundaries
+!
+  call initialize_boundaries()
 
 ! initialize module EQUATIONS
 !
