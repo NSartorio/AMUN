@@ -154,9 +154,10 @@ module mesh
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
     use coordinates, only : minlev, maxlev, res
+    use domains    , only : setup_domain
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
-    use problems   , only : setup_domain, setup_problem
+    use problems   , only : setup_problem
     use refinement , only : check_refinement_criterion
 
     implicit none
