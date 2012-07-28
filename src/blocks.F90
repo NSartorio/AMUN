@@ -1095,9 +1095,13 @@ module blocks
       if (associated(pdata%next)) &
         pdata%next%prev => pdata%prev
 
-! deallocate variables
+! deallocate conservative variables
 !
       if (allocated(pdata%u)) deallocate(pdata%u)
+
+! deallocate primitive variables
+!
+      if (allocated(pdata%q)) deallocate(pdata%q)
 
 ! deallocate numerical fluxes
 !
