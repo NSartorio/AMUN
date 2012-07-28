@@ -23,36 +23,40 @@
 !!
 !! program: AMUN
 !!
+!!  AMUN is a code to perform numerical simulations in a fluid approximation on
+!!  adaptive mesh for Newtonian and relativistic environments with or without
+!!  magnetic field.
+!!
 !!******************************************************************************
 !
 program amun
 
-! modules
+! include external subroutines used in this module
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries
-  use coordinates, only : initialize_coordinates, finalize_coordinates
+  use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations
   use evolution     , only : initialize_evolution, evolve, find_new_timestep
   use evolution     , only : n, t, dt, dtn, cfl
 #ifdef FORCE
   use forcing       , only : initialize_forcing, clear_forcing
 #endif /* FORCE */
-  use integrals, only : init_integrals, clear_integrals, store_integrals
+  use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
-  use io       , only : nfile, write_data, write_restart_data, restart_job
-  use io            , only : nres
+  use io            , only : write_data, write_restart_data, restart_job
+  use io            , only : nfile, nres
   use mesh          , only : initialize_mesh, clear_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
-  use mesh     , only : redistribute_blocks
+  use mesh          , only : redistribute_blocks
 #endif /* MPI */
-  use mpitools , only : initialize_mpi, finalize_mpi
+  use mpitools      , only : initialize_mpi, finalize_mpi
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
   use mpitools      , only : reduce_maximum_integer
 #endif /* MPI */
-  use mpitools , only : master, nprocs
+  use mpitools      , only : master, nprocs, nproc
   use parameters    , only : read_parameters, finalize_parameters
 #ifdef MPI
   use parameters    , only : redistribute_parameters
@@ -62,25 +66,28 @@ program amun
   use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement
-  use timers   , only : initialize_timers, start_timer, stop_timer             &
-                      , set_timer, get_timer, get_timer_total                  &
-                      , timer_enabled, timer_description, ntimers
+  use timers        , only : initialize_timers, start_timer, stop_timer        &
+                          , set_timer, get_timer, get_timer_total              &
+                          , timer_enabled, timer_description, ntimers
+
+! module variables are not implicit by default
 !
-!-------------------------------------------------------------------------------
-!
+  implicit none
+
 ! local variables
 !
   character(len=80) :: fmt, tmp
   integer           :: ed, eh, em, es, ec, ln
   real              :: tall, tcur, tpre, thrs, per
 
+  integer               :: nmax  = 0
   real                  :: dtout = 1.0d0, dtini = 1.0d-8
   real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
 
 ! timer indices
 !
   integer           :: nsteps = 1
-  integer           :: iin, iev, itm
+  integer           :: i, iin, iev, itm
   real(kind=8)      :: tm_curr, tm_exec, tm_conv
 
 ! the termination and status flags
@@ -91,10 +98,15 @@ program amun
 !
   real(kind=8), dimension(ntimers) :: tm
 
+#ifdef INTEL
+! the type of the function SIGNAL should be defined for Intel compiler
+!
+  integer(kind=4)       :: signal
+#endif /* INTEL */
+
 #ifdef SIGNALS
 ! references to functions handling signals
 !
-  integer(kind=4) :: iret
 #ifdef GNU
   intrinsic signal
 #endif /* GNU */
@@ -111,22 +123,26 @@ program amun
 !
 !-------------------------------------------------------------------------------
 !
-! initialize timers
+! initialize the termination flag
+!
+  iterm = 0
+
+! initialize module TIMES
 !
   call initialize_timers()
 
 ! set timer descriptions
 !
-  call set_timer('INITIALIZATION'   , iin)
-  call set_timer('EVOLUTION'        , iev)
-  call set_timer('TERMINATION'      , itm)
+  call set_timer('INITIALIZATION', iin)
+  call set_timer('EVOLUTION'     , iev)
+  call set_timer('TERMINATION'   , itm)
 
 ! start time accounting for the initialization
 !
   call start_timer(iin)
 
 #ifdef SIGNALS
-! assign function terminate with signals
+! assign function terminate() with signals
 !
 #ifdef GNU
   iret = signal(SIGINT , terminate)
@@ -139,7 +155,7 @@ program amun
 #endif /* GNU */
 #endif /* SIGNALS */
 
-! initialize MPI
+! initialize module MPITOOLS
 !
   call initialize_mpi()
 
@@ -608,6 +624,7 @@ program amun
 !-------------------------------------------------------------------------------
 !
 end program
+
 #ifdef SIGNALS
 !
 !===============================================================================
