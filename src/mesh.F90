@@ -156,7 +156,8 @@ module mesh
     use coordinates, only : minlev, maxlev, res
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
-    use problems, only : init_domain, init_problem, check_ref
+    use problems   , only : setup_domain, setup_problem
+    use problems   , only : check_refinement_criterion
 
     implicit none
 
@@ -176,7 +177,7 @@ module mesh
 !
 ! allocate the initial structure of blocks according to the problem
 !
-    call init_domain(res(1,:))
+    call setup_domain()
 
 ! at this point we assume, that the initial structure of blocks
 ! according to the defined geometry is already created; no refinement
@@ -204,7 +205,7 @@ module mesh
 ! set the initial conditions at the current block
 !
         if (pdata%meta%level .le. l) &
-          call init_problem(pdata)
+          call setup_problem(pdata)
 
 ! assign pointer to the next block
 !
@@ -223,7 +224,7 @@ module mesh
         do while (associated(pdata))
 
           if (pdata%meta%level .eq. l) then
-            pdata%meta%refine = max(0, check_ref(pdata))
+            pdata%meta%refine = max(0, check_refinement_criterion(pdata))
 
 ! if there is only one block, and it is set not to be refined, refine it anyway
 ! because the resolution for the problem initiation may be too small
@@ -436,7 +437,7 @@ module mesh
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : master, nprocs, nproc
 #endif /* MPI */
-    use problems , only : check_ref
+    use problems , only : check_refinement_criterion
     use variables, only : nqt
 
     implicit none
@@ -497,7 +498,7 @@ module mesh
 
 ! check the refinement criterion for the current data block
 !
-          pmeta%refine = check_ref(pdata)
+          pmeta%refine = check_refinement_criterion(pdata)
 
 ! correct the refinement of the block for the base and top levels
 !

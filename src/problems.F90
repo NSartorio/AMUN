@@ -26,52 +26,134 @@
 !!  This module handles the initialization of various test and research
 !!  problems.
 !!
+!!
 !!******************************************************************************
 !
 module problems
 
+! include external procedures and variables
+!
+  use parameters, only : get_parameter_integer, get_parameter_real             &
+                       , get_parameter_string
+
+! module variables are not implicit by default
+!
   implicit none
 
+! module variable to store the problem name
+!
+  character(len=32), save :: problem = "blast"
+
+! refinement criterion parameters
+!
+  real             , save :: crefmin = 2.0d-1
+  real             , save :: crefmax = 5.0d-1
+  real             , save :: epsref  = 1.0d-2
+
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_problems, setup_domain, setup_problem
+  public :: check_refinement_criterion
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
 !
-! init_domain: subroutine initializes the domain for a given problem
+! subroutine INITIALIZE_PROBLEMS:
+! ------------------------------
+!
+!   Subroutine prepares module PROBLEMS.
+!
 !
 !===============================================================================
 !
-  subroutine init_domain(res)
+  subroutine initialize_problems()
 
-    use config, only : problem
-
-    implicit none
-
-! input arguments
+! local variables are not implicit by default
 !
-    integer(kind=4), dimension(3), intent(in) :: res
+    implicit none
 !
 !-------------------------------------------------------------------------------
 !
-    select case(trim(problem))
+! get the problem name
+!
+    call get_parameter_string("problem", problem)
+
+! get the refinement parameters
+!
+    call get_parameter_real  ("crefmin", crefmin)
+    call get_parameter_real  ("crefmax", crefmax)
+    call get_parameter_real  ("epsref" , epsref )
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_problems
+!
+!===============================================================================
+!
+! subroutine SETUP_DOMAIN:
+! -----------------------
+!
+!   Subroutine sets up the domain for selected problem.  If there is no special
+!   domain required, sets up the default domain.
+!
+!
+!===============================================================================
+!
+  subroutine setup_domain()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! select the domain setup depending on the problem name
+!
+    select case(problem)
     case default
-      call domain_default(res)
+      call setup_domain_default()
     end select
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_domain
+  end subroutine setup_domain
 !
 !===============================================================================
 !
-! init_problem: subroutine initializes the variables according to
-!               the studied problem
+! subroutine SETUP_PROBLEM:
+! ------------------------
+!
+!   Subroutine sets the initial conditions for selected problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
 !
 !===============================================================================
 !
-  subroutine init_problem(pdata)
+  subroutine setup_problem(pdata)
 
+! include external procedures and variables
+!
     use blocks, only : block_data
-    use config, only : problem
+    use error , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
 
 ! input arguments
 !
@@ -79,1542 +161,60 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
-    select case(trim(problem))
+! select the setup subroutine depending on the problem name
+!
+    select case(problem)
+
+! general test problems
+!
     case("blast")
-      call init_blast(pdata)
-    case("implosion")
-      call init_implosion(pdata)
-    case("binaries")
-      call init_binaries(pdata)
-    case("reconnection")
-      call init_reconnection(pdata)
-    case("multi_current_sheet")
-      call init_multi_current_sheet(pdata)
-    case("turbulence")
-      call init_turbulence(pdata)
-    case("orszag_tang")
-      call init_orszag_tang(pdata)
-    end select
+      call setup_problem_blast(pdata)
 
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_problem
-#ifdef SHAPE
-!
-!===============================================================================
-!
-! shapes: subroutine resets the update for a give shape
-!
-!===============================================================================
-!
-  subroutine update_shapes(pdata, t)
-
-    use blocks, only : block_data
-    use config, only : problem
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-    real                     , intent(in)    :: t
-!
-!-------------------------------------------------------------------------------
-!
-    select case(trim(problem))
-    case("binaries")
-      call shape_binaries(pdata, t)
     case default
+      call print_error("problems::init_problem()"                              &
+                     , "Setup subroutime is not implemented for this problem!")
     end select
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine update_shapes
-#endif /* SHAPE */
+  end subroutine setup_problem
 !
 !===============================================================================
 !
-! domain_default: subroutine initializes the default domain of N1xN2xN3 blocks
-!                 in the proper configuration; the dimensions N1xN2xN3 are set
-!                 in variable rdims
+! function CHECK_REFINEMENT_CRITERION:
+! -----------------------------------
+!
+!   Function scans the given data block and checks for the refinement
+!   criterion.  It returns +1 if the criterion is met, which indicates that
+!   the block needs to be refined, 0 if there is no need for the refinement, and
+!   -1 if the block can be derefined.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
 !
 !===============================================================================
 !
-  subroutine domain_default(res)
+  function check_refinement_criterion(pdata) result(criterion)
 
-    use blocks, only : pointer_meta, block_meta, block_data, append_metablock  &
-                     , append_datablock, associate_blocks, metablock_set_leaf  &
-                     , metablock_set_config, metablock_set_level               &
-                     , metablock_set_coord, metablock_set_bounds               &
-                     , nsides, nfaces
-    use config, only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry    &
-                     , rdims
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
+    use scheme     , only : cons2prim
+    use variables  , only : nvr, nqt
+    use variables  , only : idn
+#ifdef ADI
+    use variables  , only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables  , only : ibx, iby, ibz
+#endif /* MHD */
 
+! local variables are not implicit by default
+!
     implicit none
-
-! input arguments
-!
-    integer(kind=4), dimension(3), intent(in) :: res
-
-! local variables
-!
-    integer :: i, j, k, n, p, il, jl, kl
-    real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
-
-! local arrays
-!
-    integer, dimension(3) :: loc, del
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pnext
-    type(block_data), pointer :: pdata
-
-! allocatable arrays
-!
-    integer, dimension(:,:,:), allocatable :: cfg
-
-! local pointer array
-!
-    type(pointer_meta), dimension(:,:,:), allocatable :: block_array
-!
-!-------------------------------------------------------------------------------
-!
-! obtain the number of blocks
-!
-    n = product(rdims(:))
-
-!! PREPARE BLOCK CONFIGURATION ARRAY
-!!
-! allocate the configuration array
-!
-    allocate(cfg(rdims(1),rdims(2),rdims(3)))
-
-! set the block configurations
-!
-    cfg(1:rdims(1),1:rdims(2):2,1:rdims(3):2) = 12
-
-    if (rdims(2) .gt. 1) then
-      cfg(1:rdims(1),2:rdims(2):2,1:rdims(3):2) = 43
-      cfg(  rdims(1),1:rdims(2)  ,1:rdims(3):2) = 13
-    end if
-
-    if (rdims(3) .gt. 1) then
-      cfg(1:rdims(1),1:rdims(2):2,2:rdims(3):2) = 65
-      if (rdims(2) .gt. 1) then
-        cfg(1:rdims(1),2:rdims(2):2,2:rdims(3):2) = 78
-        cfg(  rdims(1),1:rdims(2)  ,2:rdims(3):2) = 75
-      end if
-      if (rdims(1) .eq. 1 .or. mod(rdims(2),2) .eq. 1) then
-        cfg(  rdims(1),  rdims(2)  ,1:rdims(3)  ) = 15
-      else
-        cfg(  1       ,  rdims(2)  ,1:rdims(3)  ) = 48
-      end if
-    end if
-
-!! ALLOCATE AND GENERATE META BLOCK CHAIN AND SET BLOCK CONFIGURATIONS
-!!
-! allocate the block pointer array
-!
-    allocate(block_array(rdims(1),rdims(2),rdims(3)))
-
-! generate the gray code for a given configuration and link the block in
-! the proper order
-!
-    loc(:) = (/ 0, 0, 0 /)
-    del(:) = (/ 1, 1, 1 /)
-
-    p = 1
-    do k = 1, rdims(3)
-      if (del(3) .eq. 1) loc(3) = loc(3) + del(3)
-      do j = 1, rdims(2)
-        if (del(2) .eq. 1) loc(2) = loc(2) + del(2)
-        do i = 1, rdims(1)
-          if (del(1) .eq. 1) loc(1) = loc(1) + del(1)
-
-! append a new metablock
-!
-          call append_metablock(block_array(loc(1),loc(2),loc(3))%ptr)
-
-! set the configuration type
-!
-          call metablock_set_config(block_array(loc(1),loc(2),loc(3))%ptr      &
-                                         , cfg(loc(1),loc(2),loc(3)))
-
-! increase the block number
-!
-          p = p + 1
-
-          if (del(1) .eq. -1) loc(1) = loc(1) + del(1)
-        end do
-        if (del(2) .eq. -1) loc(2) = loc(2) + del(2)
-        del(1) = - del(1)
-      end do
-      if (del(3) .eq. -1) loc(3) = loc(3) + del(3)
-      del(2) = - del(2)
-    end do
-
-! deallocate the configuration array
-!
-    deallocate(cfg)
-
-!! FILL OUT THE REMAINING FIELDS AND ALLOCATE AND ASSOCIATE DATA BLOCKS
-!!
-! calculate block sizes
-!
-    xl = (xmax - xmin) / rdims(1)
-    yl = (ymax - ymin) / rdims(2)
-    zl = (zmax - zmin) / rdims(3)
-
-! fill out block structure fields
-!
-    do k = 1, rdims(3)
-
-! claculate the block position along Z
-!
-      kl  = (k - 1) * res(3)
-
-! calculate the Z bounds
-!
-      zmn = zmin + (k - 1) * zl
-      zmx = zmin +  k      * zl
-
-      do j = 1, rdims(2)
-
-! claculate the block position along Y
-!
-        jl  = (j - 1) * res(2)
-
-! calculate the Y bounds
-!
-        ymn = ymin + (j - 1) * yl
-        ymx = ymin +  j      * yl
-
-        do i = 1, rdims(1)
-
-! claculate the block position along Y
-!
-          il  = (i - 1) * res(1)
-
-! calculate the Z bounds
-!
-          xmn = xmin + (i - 1) * xl
-          xmx = xmin +  i      * xl
-
-! assign a pointer
-!
-          pmeta => block_array(i,j,k)%ptr
-
-! mark it as the leaf
-!
-          call metablock_set_leaf(pmeta)
-
-! set the level
-!
-          call metablock_set_level(pmeta, 1)
-
-! create a new data block
-!
-          call append_datablock(pdata)
-
-! associate meta and data blocks
-!
-          call associate_blocks(pmeta, pdata)
-
-! set block coordinates
-!
-          call metablock_set_coord(pmeta, il, jl, kl)
-
-! set the bounds
-!
-          call metablock_set_bounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
-        end do
-      end do
-    end do
-
-!! ASSIGN THE BLOCK NEIGHBORS
-!!
-! assign boundaries along the X direction
-!
-    do k = 1, rdims(3)
-      do j = 1, rdims(2)
-        do i = 1, rdims(1) - 1
-
-! assign a pointer
-!
-          pmeta => block_array(i  ,j,k)%ptr
-
-! assign neighbor
-!
-          pnext => block_array(i+1,j,k)%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(1,2,p)%ptr => pnext
-            pnext%neigh(1,1,p)%ptr => pmeta
-          end do
-
-        end do
-      end do
-    end do
-
-! if periodic boundary conditions set edge block neighbors
-!
-    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
-      do k = 1, rdims(3)
-        do j = 1, rdims(2)
-
-! assign pointers
-!
-          pmeta => block_array(      1 ,j,k)%ptr
-          pnext => block_array(rdims(1),j,k)%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(1,1,p)%ptr => pnext
-            pnext%neigh(1,2,p)%ptr => pmeta
-          end do
-        end do
-      end do
-    end if
-
-! assign boundaries along the Y direction
-!
-    do k = 1, rdims(3)
-      do j = 1, rdims(2) - 1
-        do i = 1, rdims(1)
-
-! assign a pointer
-!
-          pmeta => block_array(i,j  ,k)%ptr
-
-! assign neighbor
-!
-          pnext => block_array(i,j+1,k)%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(2,2,p)%ptr => pnext
-            pnext%neigh(2,1,p)%ptr => pmeta
-          end do
-
-        end do
-      end do
-    end do
-
-! if periodic boundary conditions set edge block neighbors
-!
-    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
-      do k = 1, rdims(3)
-        do i = 1, rdims(1)
-
-! assign pointers
-!
-          pmeta => block_array(i,      1 ,k)%ptr
-          pnext => block_array(i,rdims(2),k)%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(2,1,p)%ptr => pnext
-            pnext%neigh(2,2,p)%ptr => pmeta
-          end do
-        end do
-      end do
-    end if
-#if NDIMS == 3
-
-! assign boundaries along the Z direction
-!
-    do k = 1, rdims(3) - 1
-      do j = 1, rdims(2)
-        do i = 1, rdims(1)
-
-! assign a pointer
-!
-          pmeta => block_array(i,j,k  )%ptr
-
-! assign neighbor
-!
-          pnext => block_array(i,j,k+1)%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(3,2,p)%ptr => pnext
-            pnext%neigh(3,1,p)%ptr => pmeta
-          end do
-
-        end do
-      end do
-    end do
-
-! if periodic boundary conditions set edge block neighbors
-!
-    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
-      do j = 1, rdims(2)
-        do i = 1, rdims(1)
-
-! assign pointers
-!
-          pmeta => block_array(i,j,      1 )%ptr
-          pnext => block_array(i,j,rdims(3))%ptr
-
-! assign their neighbor pointers
-!
-          do p = 1, nfaces
-            pmeta%neigh(3,1,p)%ptr => pnext
-            pnext%neigh(3,2,p)%ptr => pmeta
-          end do
-        end do
-      end do
-    end if
-#endif /* NDIMS == 3 */
-
-! deallocate the block pointer array
-!
-    deallocate(block_array)
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine domain_default
-!
-!===============================================================================
-!
-! init_blast: subroutine initializes the variables for the blast problem
-!
-!===============================================================================
-!
-  subroutine init_blast(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : gamma, dens, pres, ratio, rcut
-    use coordinates, only : ax, ay, az
-    use scheme   , only : prim2cons
-    use variables, only : nvr, nqt, idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
-    real                          :: r
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nvr,im) :: q, u
-!
-!-------------------------------------------------------------------------------
-!
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-#if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
-#else /* NDIMS == 3 */
-    z(:) = 0.0d0
-#endif /* NDIMS == 3 */
-
-! set the uniform variables
-!
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-#ifdef MHD
-    q(ibx,:) = 1.0d0 / sqrt(2.0d0)
-    q(iby,:) = 1.0d0 / sqrt(2.0d0)
-    q(ibz,:) = 0.0d0
-#ifdef GLM
-    q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-! set the initial star profile (density for ISO or pressure for ADI)
-!
-    do k = 1, km
-      do j = 1, jm
-        do i = 1, im
-
-          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-
-#ifdef ISO
-          if (r .lt. rcut) then
-            q(idn,i) = dens * ratio
-          else
-            q(idn,i) = dens
-          end if
-#endif /* ISO */
-#ifdef ADI
-          if (r .lt. rcut) then
-            q(ipr,i) = pres * ratio
-          else
-            q(ipr,i) = pres
-          end if
-#endif /* ADI */
-        end do
-
-! convert the primitive variables to conserved ones
-!
-        call prim2cons(im, q(:,:), u(:,:))
-
-! copy the conserved variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_blast
-!
-!===============================================================================
-!
-! init_implosion: subroutine initializes variables for the implosion problem
-!
-!===============================================================================
-!
-  subroutine init_implosion(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, pres, rmid, gammam1i
-    use coordinates, only : ax, ay, adx, ady
-    use scheme   , only : prim2cons
-    use variables, only : nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer                 :: i, j, k
-    real                    :: dx, dy, dxh, dyh, rc, rl, ru, ds, dl, dr
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nqt,im) :: q, u
-!
-!-------------------------------------------------------------------------------
-!
-! obtain the cell sizes
-!
-    dx  = adx(pdata%meta%level)
-    dy  = ady(pdata%meta%level)
-    dxh = 0.5d0 * dx
-    dyh = 0.5d0 * dy
-    ds  = dx * dy
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-
-! initiate the primitive variables
-!
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-
-! set initial density and pressure
-!
-    do j = 1, jm
-      do i = 1, im
-        rc = x(i) + y(j)
-        rl = rc - dxh - dyh
-        ru = rc + dxh + dyh
-
-        if (ru .le. rmid) then
-          q(idn,i) = 0.125d0
-#ifdef ADI
-          q(ipr,i) = 0.140d0
-#endif /* ADI */
-        else if (rl .ge. rmid) then
-          q(idn,i) = 1.0d0
-#ifdef ADI
-          q(ipr,i) = 1.0d0
-#endif /* ADI */
-        else
-          if (rc .ge. rmid) then
-            dl = 0.125d0 * (rmid - rl)**2 / ds
-            dr = 1.0d0 - dl
-          else
-            dr = 0.125d0 * (ru - rmid)**2 / ds
-            dl = 1.0d0 - dr
-          endif
-          q(idn,i) = 0.125d0 * dl + dr
-#ifdef ADI
-          q(ipr,i) = 0.140d0 * dl + dr
-#endif /* ADI */
-        endif
-      end do
-
-! convert primitive variables to conserved
-!
-      call prim2cons(im, q(:,:), u(:,:))
-
-! copy conservative variables to the current block
-!
-      do k = 1, km
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-      end do
-
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_implosion
-!
-!===============================================================================
-!
-! init_binaries: subroutine initializes the variables for the binary star
-!                problem
-!
-!===============================================================================
-!
-  subroutine init_binaries(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, pres, csnd2, gamma
-    use config   , only : dnfac, dnrat
-    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
-    use constants, only : dpi
-    use coordinates, only : ax, ay, az, adr
-    use scheme   , only : prim2cons
-    use variables, only : nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer    :: i, j, k
-    real       :: dr, rc, rs, xs, ys
-    real       :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
-    real, save :: dnamb, pramb
-    real, save :: dnstar, prstar, vrstar
-    real, save :: dnsat , prsat , vrsat
-    real, save :: asat, bsat = - 1.0d0
-    real, save :: xsh, ysh, xvl, yvl
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nqt,im) :: q, u
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the interior and orbit parameters only once
-!
-    if (bsat .le. 0.0d0) then
-
-! calculate pressure from sound speed
-!
-#ifdef ISO
-      pres   = csnd2 * dens
-#endif /* ISO */
-#ifdef ADI
-      pres   = csnd2 * dens / gamma
-#endif /* ADI */
-
-! calculate star interior parameters
-!
-      dnamb  = dens
-      pramb  = pres
-      dnstar = dnamb * dnfac * dnrat
-      dnsat  = dnamb * dnfac
-      prstar = pramb * dnfac
-      prsat  = pramb * dnfac / dnrat
-      vrstar = vstar / rstar
-      vrsat  = vsat  / rsat
-
-! calculate orbit parameters
-!
-      asat   = dsat / (1.0d0 - esat)
-      bsat   = asat * sqrt(1.0d0 - esat * esat)
-
-! angular speed and triginometric functions
-!
-      sn     = 0.0d0
-      cs     = 1.0d0
-      om     = dpi / tsat / (1.0d0 - esat * cs)
-
-! calculate satellite initial position and speed
-!
-      xsh    =   asat * (cs - esat)
-      ysh    =   bsat * sn
-      xvl    = - asat * sn * om
-      yvl    =   bsat * cs * om
-
-    end if
-
-! obtain the diagonal size of a cell at the current level
-!
-    dr   = adr(pdata%meta%level)
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-#if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
-#else /* NDIMS == 3 */
-    z(:) = 0.0d0
-#endif /* NDIMS == 3 */
-
-! set initial pressure
-!
-    do k = 1, km
-
-      do j = 1, jm
-        ys = y(j) - ysh
-
-! reset primitive variables
-!
-        q(idn,:) = dnamb
-        q(ivx,:) = 0.0d0
-        q(ivy,:) = 0.0d0
-        q(ivz,:) = 0.0d0
-#ifdef ADI
-        q(ipr,:) = pramb
-#endif /* ADI */
-#ifdef MHD
-        q(ibx,:) = 0.0d0
-        q(iby,:) = 0.0d0
-        q(ibz,:) = 0.0d0
-#ifdef GLM
-        q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-        do i = 1, im
-
-          xs = x(i) - xsh
-
-! calculate radia for both stars
-!
-          rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          rs = sqrt(xs * xs + ys * ys + z(k)**2)
-
-! variables within the first start
-!
-          if (rc .le. max(rstar, dr)) then
-
-            q(idn,i) = dnstar
-            q(ivx,i) = vrstar * x(i)
-            q(ivy,i) = vrstar * y(j)
-#if NDIMS == 3
-            q(ivz,i) = vrstar * z(k)
-#endif /* NDIMS == 3 */
-#ifdef ADI
-            q(ipr,i) = prstar
-#endif /* ADI */
-          end if
-
-! variables within the second start
-!
-          if (rs .le. max(rsat, dr)) then
-
-            q(idn,i) = dnsat
-            q(ivx,i) = vrsat * xs + xvl
-            q(ivy,i) = vrsat * ys + yvl
-#if NDIMS == 3
-            q(ivz,i) = vrsat * z(k)
-#endif /* NDIMS == 3 */
-#ifdef ADI
-            q(ipr,i) = prsat
-#endif /* ADI */
-          end if
-
-        end do ! i
-
-! convert primitive variables to conserved
-!
-        call prim2cons(im, q(:,:), u(:,:))
-
-! copy conservative variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do ! j
-    end do ! k
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_binaries
-!
-!===============================================================================
-!
-! init_reconnection: subroutine initializes the variables for the reconnection
-!                    problem
-!
-!===============================================================================
-!
-  subroutine init_reconnection(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, pres, bamp, bper, ydel, ycut
-#ifdef ISO
-    use config   , only : csnd2
-#endif /* ISO */
-    use constants, only : dpi
-    use coordinates, only : xmin, xmax, ax, ay, az
-    use scheme   , only : prim2cons
-    use variables, only : nvr, nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
-    real                          :: xlen, yexp
-#ifdef MHD
-    real                          :: ptot, pmag
-#endif /* MHD */
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nvr,im) :: q, u
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the length of the box
-!
-    xlen = xmax - xmin
-
-#ifdef MHD
-! calculate the total pressure
-!
-    ptot = 0.5d0 * bamp * bamp
-#endif /* MHD */
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-#if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
-#else /* NDIMS == 3 */
-    z(:) = 0.0d0
-#endif /* NDIMS == 3 */
-
-! set variables
-!
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-#ifdef MHD
-    q(ibx,:) = 0.0d0
-    q(iby,:) = 0.0d0
-    q(ibz,:) = 0.0d0
-#ifdef GLM
-    q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-! set the initial profiles
-!
-    do k = 1, km
-      do j = 1, jm
-
-! calculate the exponent factor
-!
-        yexp = exp(- 0.5d0 * (y(j) / ycut)**2)
-
-#ifdef MHD
-        do i = 1, im
-
-! initialize the magnetic field components
-!
-          q(ibx,i) = bamp * tanh(y(j) / ydel)
-
-! calculate magnetic pressure
-!
-          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
-
-! add perturbation
-!
-          q(ibx,i) = q(ibx,i) &
-                   - bper * yexp * y(j) * cos(dpi * x(i) / xlen) / ycut**2
-          q(iby,i) = bper * yexp * dpi  * sin(dpi * x(i) / xlen)
-
-! initialize density or pressure depending on EOS, so the total pressure is
-! uniform
-!
-
-#ifdef ADI
-          q(ipr,i) = pres + (ptot - pmag)
-#endif /* ADI */
-#ifdef ISO
-          q(idn,i) = dens + (ptot - pmag) / csnd2
-#endif /* ISO */
-        end do
-#endif /* MHD */
-
-! convert primitive variables to conserved
-!
-        call prim2cons(im, q(:,:), u(:,:))
-
-! copy conservative variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_reconnection
-!
-!===============================================================================
-!
-! init_multi_current_sheet: subroutine initializes the set up for the multiple
-!                           current sheet problem
-!
-!===============================================================================
-!
-  subroutine init_multi_current_sheet(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, pres, bamp, vper, ydel
-#ifdef ISO
-    use config   , only : csnd2
-#endif /* ISO */
-    use constants, only : dpi
-    use coordinates, only : xmin, xmax, ax, ay, az
-    use mpitools , only : nproc
-    use random   , only : randomn
-    use scheme   , only : prim2cons
-    use variables, only : nvr, nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer                       :: i, j, k
-    real                          :: xlen, yi, yt
-#ifdef MHD
-    real                          :: ptot, pmag
-#endif /* MHD */
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nvr,im) :: q, u
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the length of the box
-!
-    xlen = xmax - xmin
-
-#ifdef MHD
-! calculate the total pressure
-!
-    ptot = 0.5d0 * bamp * bamp
-#endif /* MHD */
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-#if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
-#else /* NDIMS == 3 */
-    z(:) = 0.0d0
-#endif /* NDIMS == 3 */
-
-! set variables
-!
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-#ifdef MHD
-    q(ibx,:) = 0.0d0
-    q(iby,:) = 0.0d0
-    q(ibz,:) = 0.0d0
-#ifdef GLM
-    q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-! set the initial profiles
-!
-    do k = 1, km
-      do j = 1, jm
-
-! calculate the exponent factor
-!
-        yi = y(j) - floor(y(j)) - 0.5d0
-        yt = yi - sign(0.25d0, yi)
-
-#ifdef MHD
-        do i = 1, im
-
-! initialize random velocity field
-!
-          q(ivx,i) = vper * randomn(nproc)
-          q(ivy,i) = vper * randomn(nproc)
-#if NDIMS == 3
-          q(ivz,i) = vper * randomn(nproc)
-#endif /* NDIMS == 3 */
-
-! initialize the magnetic field components
-!
-          q(ibx,i) = - sign(1.0d0, yi) * bamp * tanh(yt / ydel)
-
-! calculate magnetic pressure
-!
-          pmag = 0.5d0 * q(ibx,i) * q(ibx,i)
-
-! initialize density or pressure depending on EOS, so the total pressure is
-! uniform
-!
-
-#ifdef ADI
-          q(ipr,i) = pres + (ptot - pmag)
-#endif /* ADI */
-#ifdef ISO
-          q(idn,i) = dens + (ptot - pmag) / csnd2
-#endif /* ISO */
-        end do
-#endif /* MHD */
-
-! convert primitive variables to conserved
-!
-        call prim2cons(im, q(:,:), u(:,:))
-
-! copy conservative variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_multi_current_sheet
-!
-!===============================================================================
-!
-! init_turbulence: subroutine initializes the variables for the turbulence
-!                  problem
-!
-!===============================================================================
-!
-  subroutine init_turbulence(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, pres, bamp
-    use scheme   , only : prim2cons
-    use variables, only : nvr, nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer                 :: j, k
-
-! local arrays
-!
-    real, dimension(nvr,im) :: q
-    real, dimension(nqt,im) :: u
-!
-!-------------------------------------------------------------------------------
-!
-! initiate the primitive variables
-!
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-#ifdef MHD
-    q(ibx,:) = bamp
-    q(iby,:) = 0.0d0
-    q(ibz,:) = 0.0d0
-#ifdef GLM
-    q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-! convert the primitive variables to their conserved representation
-!
-    call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
-
-! set the initial profiles
-!
-    do k = 1, km
-      do j = 1, jm
-
-! copy the conservative variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_turbulence
-!
-!===============================================================================
-!
-! init_orszag_tang: subroutine initializes the setup for Orszag-Tang problems
-!
-!===============================================================================
-!
-  subroutine init_orszag_tang(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : dens, bamp
-#ifdef ADI
-    use config   , only : gamma, pres
-#endif /* ADI */
-#ifdef ISO
-    use config   , only : csnd
-#endif /* ISO */
-    use constants, only : dpi, qpi
-    use coordinates, only : ax, ay
-    use scheme   , only : prim2cons
-    use variables, only : nvr, nqt
-    use variables, only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-
-! local variables
-!
-    integer                 :: i, j, k
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(nvr,im) :: q
-    real, dimension(nqt,im) :: u
-!
-!-------------------------------------------------------------------------------
-!
-! calculate constants
-!
-#ifdef ADI
-    bamp = 1.0d0 / sqrt(qpi)
-    pres = gamma / qpi
-    dens = gamma**2 / qpi
-#endif /* ADI */
-#ifdef ISO
-    bamp = csnd * (5.0d0 / 3.0d0) / qpi
-#endif /* ISO */
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-
-! initialize the primitive variables
-!
-    q(idn,:) = dens
-#ifdef ADI
-    q(ipr,:) = pres
-#endif /* ADI */
-#ifdef MHD
-#ifdef GLM
-    q(iph,:) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-
-! set the initial profiles
-!
-    do k = 1, km
-      do j = 1, jm
-        do i = 1, im
-          q(ivx,i) = - sin(dpi * y(j))
-          q(ivy,i) =   sin(dpi * x(i))
-          q(ivz,i) = 0.0d0
-#ifdef MHD
-          q(ibx,i) = - bamp * sin(dpi * y(j))
-          q(iby,i) =   bamp * sin(qpi * x(i))
-          q(ibz,i) = 0.0d0
-#endif /* MHD */
-        end do
-
-! convert primitive variables to conserved
-!
-        call prim2cons(im, q(1:nvr,1:im), u(1:nqt,1:im))
-
-! copy conservative variables to the current block
-!
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
-
-      end do
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine init_orszag_tang
-#ifdef SHAPE
-!
-!===============================================================================
-!
-! shape_binaries: subroutine resets the variables to the initial state for
-!                 solid bodies embedded in the domain
-!
-!===============================================================================
-!
-  subroutine shape_binaries(pdata, t)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km
-    use config   , only : rstar, vstar, rsat, dsat, vsat, tsat, esat
-    use config   , only : dens, dnfac, dnrat, pres, csnd2
-#ifdef ADI
-    use config   , only : gamma, gammam1i
-#endif /* ADI */
-    use constants, only : dpi
-    use coordinates, only : ax, ay, az, adr
-    use variables, only : idn, imx, imy, imz
-#ifdef ADI
-    use variables, only : ien
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-! input arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-    real                     , intent(in)    :: t
-
-! local variables
-!
-    integer    :: i, j, k
-    real       :: dr, rs, xs, ys, rc
-    real       :: om = 0.0d0, sn = 0.0d0, cs = 1.0d0
-    real       :: rhs, res
-    real, save :: dnamb, pramb
-    real, save :: dnstar, vrstar, prstar
-    real, save :: dnsat , vrsat , prsat
-#ifdef ADI
-    real, save :: ekstar, eksat
-    real       :: ekin
-#ifdef MHD
-    real       :: emag
-#endif /* MHD */
-#endif /* ADI */
-    real, save :: asat, bsat = -1.0d0
-    real, save :: xsh, ysh, xvl, yvl
-    real, save :: tpre = -1.0d0, ang = 0.0d0
-
-! local arrays
-!
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the star and satellite orbit parameters only once
-!
-    if (bsat .lt. 0.0d0) then
-
-! calculate parameters for the star interiors
-!
-#ifdef ISO
-      pres   = csnd2 * dens
-#endif /* ISO */
-#ifdef ADI
-      pres   = csnd2 * dens / gamma
-#endif /* ADI */
-      dnamb  = dens
-      pramb  = pres
-      dnstar = dnamb * dnfac * dnrat
-      dnsat  = dnamb * dnfac
-      prstar = pramb * dnfac
-      prsat  = pramb * dnfac / dnrat
-      vrstar = vstar / rstar
-      vrsat  = vsat  / rsat
-#ifdef ADI
-      ekstar = 0.5d0 * dnstar * vstar * vstar
-      eksat  = 0.5d0 * dnsat  * vsat  * vsat
-#endif /* ADI */
-
-! calculate orbit parameters
-!
-      asat   = dsat / (1.0d0 - esat)
-      bsat   = asat * sqrt(1.0d0 - esat * esat)
-
-    end if
-
-! recalculate the angles and coordinates
-!
-    if (t .gt. tpre) then
-
-! calculate the new value of eccentric anomaly
-!
-      rhs = dpi * t / tsat
-      res = 1.0d0
-      i   = 1
-      do while(res .ge. 1.0e-15 .and. i .le. 100)
-        sn  = esat * sin(ang)
-        ang = rhs + sn
-        res = abs((ang - sn) - rhs)
-        i   = i + 1
-      end do
-
-! calculate trigonometric functions
-!
-      sn = sin(ang)
-      cs = cos(ang)
-
-! calculate the angular velocity
-!
-      om = dpi / tsat / (1.0d0 - esat * cs)
-
-! calculate position coordinates and velocity components
-!
-      xsh  =   asat * (cs - esat)
-      ysh  =   bsat * sn
-      xvl  = - asat * sn * om
-      yvl  =   bsat * cs * om
-
-! substitute the previous time
-!
-      tpre = t
-
-    end if
-
-! obtain the diagonal size of a cell at the current level
-!
-    dr   = adr(pdata%meta%level)
-
-! obtain block coordinates
-!
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
-#if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
-#else /* NDIMS == 3 */
-    z(:) = 0.0d0
-#endif /* NDIMS == 3 */
-
-! reset update
-!
-    do k = 1, km
-
-      do j = 1, jm
-        ys = y(j) - ysh
-
-        do i = 1, im
-          xs = x(i) - xsh
-
-          rc = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
-          rs = sqrt(xs * xs + ys * ys + z(k)**2)
-
-! variables within the first start
-!
-          if (rc .le. max(rstar, dr)) then
-
-            pdata%u(idn,i,j,k) = dnstar
-            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * vrstar * x(i)
-            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * vrstar * y(j)
-#if NDIMS == 2
-            pdata%u(imz,i,j,k) = 0.0d0
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrstar * z(k)
-#endif /* NDIMS == 3 */
-#ifdef MHD
-            pdata%u(ibx,i,j,k) = 0.0d0
-            pdata%u(iby,i,j,k) = 0.0d0
-            pdata%u(ibz,i,j,k) = 0.0d0
-#ifdef GLM
-            pdata%u(iph,i,j,k) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-#ifdef ADI
-            ekin = 0.5d0 * sum(pdata%u(imx:imz,i,j,k)**2) / pdata%u(idn,i,j,k)
-            pdata%u(ien,i,j,k) = gammam1i * prstar + ekin
-#endif /* ADI */
-          end if
-
-! variables within the second start
-!
-          if (rs .le. max(rsat, dr)) then
-
-            pdata%u(idn,i,j,k) = dnsat
-            pdata%u(imx,i,j,k) = pdata%u(idn,i,j,k) * (vrsat * xs + xvl)
-            pdata%u(imy,i,j,k) = pdata%u(idn,i,j,k) * (vrsat * ys + yvl)
-#if NDIMS == 2
-            pdata%u(imz,i,j,k) = 0.0d0
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            pdata%u(imz,i,j,k) = pdata%u(idn,i,j,k) * vrsat * z(k)
-#endif /* NDIMS == 3 */
-#ifdef MHD
-            pdata%u(ibx,i,j,k) = 0.0d0
-            pdata%u(iby,i,j,k) = 0.0d0
-            pdata%u(ibz,i,j,k) = 0.0d0
-#ifdef GLM
-            pdata%u(iph,i,j,k) = 0.0d0
-#endif /* GLM */
-#endif /* MHD */
-#ifdef ADI
-            ekin = 0.5d0 * sum(pdata%u(imx:imz,i,j,k)**2) / pdata%u(idn,i,j,k)
-            pdata%u(ien,i,j,k) = gammam1i * prsat + ekin
-#endif /* ADI */
-          end if
-
-        end do ! i
-      end do ! j
-    end do ! k
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine shape_binaries
-#endif /* SHAPE */
-!
-!===============================================================================
-!
-! check_ref: function checks refinement criterium and returns +1 if
-!            the criterium fullfiled and block is selected for
-!            refinement, 0 there is no need for refinement, and -1 if
-!            block is selected for refinement
-!
-!===============================================================================
-!
-  function check_ref(pdata)
-
-    use blocks   , only : block_data
-    use config   , only : im, jm, km, ib, ie, jb, je, kb, ke                   &
-                        , crefmin, crefmax, epsref
-    use scheme   , only : cons2prim
-    use variables, only : nvr, nqt
-    use variables, only : idn
-#ifdef ADI
-    use variables, only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#endif /* MHD */
 
 ! input arguments
 !
@@ -1622,7 +222,7 @@ module problems
 
 ! return variable
 !
-    integer(kind=4) :: check_ref
+    integer(kind=4) :: criterion
 
 ! local variables
 !
@@ -1796,20 +396,536 @@ module problems
 
 ! return the refinement flag depending on the condition value
 !
-    check_ref = 0
+    criterion = 0
 
     if (cref .ge. crefmax) then
-      check_ref =  1
+      criterion =  1
     end if
     if (cref .le. crefmin) then
-      check_ref = -1
+      criterion = -1
     end if
 
     return
 
 !-------------------------------------------------------------------------------
 !
-  end function check_ref
+  end function check_refinement_criterion
+!
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
+!
+! subroutine SETUP_DOMAIN_DEFAULT:
+! -------------------------------
+!
+!   Subroutine sets the default domain of N₁xN₂xN₃ blocks in the right
+!   configuration.
+!
+!
+!===============================================================================
+!
+  subroutine setup_domain_default()
+
+! include external procedures and variables
+!
+    use blocks     , only : pointer_meta, block_meta, block_data               &
+                          , append_metablock, append_datablock                 &
+                          , associate_blocks, metablock_set_leaf               &
+                          , metablock_set_config, metablock_set_level          &
+                          , metablock_set_coord, metablock_set_bounds
+    use blocks     , only : nsides, nfaces
+    use boundaries , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry
+    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates, only : ir, jr, kr, res
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer :: i, j, k, n, p, il, jl, kl
+    real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
+
+! local arrays
+!
+    integer, dimension(3) :: loc, del
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pnext
+    type(block_data), pointer :: pdata
+
+! allocatable arrays
+!
+    integer, dimension(:,:,:), allocatable :: cfg
+
+! local pointer array
+!
+    type(pointer_meta), dimension(:,:,:), allocatable :: block_array
+!
+!-------------------------------------------------------------------------------
+!
+! obtain the number of blocks
+!
+    n = ir * jr * kr
+
+!! PREPARE BLOCK CONFIGURATION ARRAY
+!!
+! allocate the configuration array
+!
+    allocate(cfg(ir,jr,kr))
+
+! set the block configurations
+!
+    cfg(1:ir,1:jr:2,1:kr:2) = 12
+
+    if (jr .gt. 1) then
+      cfg(1:ir,2:jr:2,1:kr:2) = 43
+      cfg(  ir,1:jr  ,1:kr:2) = 13
+    end if
+
+    if (kr .gt. 1) then
+      cfg(1:ir,1:jr:2,2:kr:2) = 65
+      if (jr .gt. 1) then
+        cfg(1:ir,2:jr:2,2:kr:2) = 78
+        cfg(  ir,1:jr  ,2:kr:2) = 75
+      end if
+      if (ir .eq. 1 .or. mod(jr,2) .eq. 1) then
+        cfg(  ir,  jr  ,1:kr  ) = 15
+      else
+        cfg(  1       ,  jr  ,1:kr  ) = 48
+      end if
+    end if
+
+!! ALLOCATE AND GENERATE META BLOCK CHAIN AND SET BLOCK CONFIGURATIONS
+!!
+! allocate the block pointer array
+!
+    allocate(block_array(ir,jr,kr))
+
+! generate the gray code for a given configuration and link the block in
+! the proper order
+!
+    loc(:) = (/ 0, 0, 0 /)
+    del(:) = (/ 1, 1, 1 /)
+
+    p = 1
+    do k = 1, kr
+      if (del(3) .eq. 1) loc(3) = loc(3) + del(3)
+      do j = 1, jr
+        if (del(2) .eq. 1) loc(2) = loc(2) + del(2)
+        do i = 1, ir
+          if (del(1) .eq. 1) loc(1) = loc(1) + del(1)
+
+! append a new metablock
+!
+          call append_metablock(block_array(loc(1),loc(2),loc(3))%ptr)
+
+! set the configuration type
+!
+          call metablock_set_config(block_array(loc(1),loc(2),loc(3))%ptr      &
+                                         , cfg(loc(1),loc(2),loc(3)))
+
+! increase the block number
+!
+          p = p + 1
+
+          if (del(1) .eq. -1) loc(1) = loc(1) + del(1)
+        end do
+        if (del(2) .eq. -1) loc(2) = loc(2) + del(2)
+        del(1) = - del(1)
+      end do
+      if (del(3) .eq. -1) loc(3) = loc(3) + del(3)
+      del(2) = - del(2)
+    end do
+
+! deallocate the configuration array
+!
+    deallocate(cfg)
+
+!! FILL OUT THE REMAINING FIELDS AND ALLOCATE AND ASSOCIATE DATA BLOCKS
+!!
+! calculate block sizes
+!
+    xl = (xmax - xmin) / ir
+    yl = (ymax - ymin) / jr
+    zl = (zmax - zmin) / kr
+
+! fill out block structure fields
+!
+    do k = 1, kr
+
+! claculate the block position along Z
+!
+      kl  = (k - 1) * res(1,3)
+
+! calculate the Z bounds
+!
+      zmn = zmin + (k - 1) * zl
+      zmx = zmin +  k      * zl
+
+      do j = 1, jr
+
+! claculate the block position along Y
+!
+        jl  = (j - 1) * res(1,2)
+
+! calculate the Y bounds
+!
+        ymn = ymin + (j - 1) * yl
+        ymx = ymin +  j      * yl
+
+        do i = 1, ir
+
+! claculate the block position along Y
+!
+          il  = (i - 1) * res(1,1)
+
+! calculate the Z bounds
+!
+          xmn = xmin + (i - 1) * xl
+          xmx = xmin +  i      * xl
+
+! assign a pointer
+!
+          pmeta => block_array(i,j,k)%ptr
+
+! mark it as the leaf
+!
+          call metablock_set_leaf(pmeta)
+
+! set the level
+!
+          call metablock_set_level(pmeta, 1)
+
+! create a new data block
+!
+          call append_datablock(pdata)
+
+! associate meta and data blocks
+!
+          call associate_blocks(pmeta, pdata)
+
+! set block coordinates
+!
+          call metablock_set_coord(pmeta, il, jl, kl)
+
+! set the bounds
+!
+          call metablock_set_bounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
+        end do
+      end do
+    end do
+
+!! ASSIGN THE BLOCK NEIGHBORS
+!!
+! assign boundaries along the X direction
+!
+    do k = 1, kr
+      do j = 1, jr
+        do i = 1, ir - 1
+
+! assign a pointer
+!
+          pmeta => block_array(i  ,j,k)%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i+1,j,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(1,2,p)%ptr => pnext
+            pnext%neigh(1,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
+!
+    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
+      do k = 1, kr
+        do j = 1, jr
+
+! assign pointers
+!
+          pmeta => block_array(      1 ,j,k)%ptr
+          pnext => block_array(ir,j,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(1,1,p)%ptr => pnext
+            pnext%neigh(1,2,p)%ptr => pmeta
+          end do
+        end do
+      end do
+    end if
+
+! assign boundaries along the Y direction
+!
+    do k = 1, kr
+      do j = 1, jr - 1
+        do i = 1, ir
+
+! assign a pointer
+!
+          pmeta => block_array(i,j  ,k)%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i,j+1,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(2,2,p)%ptr => pnext
+            pnext%neigh(2,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
+!
+    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
+      do k = 1, kr
+        do i = 1, ir
+
+! assign pointers
+!
+          pmeta => block_array(i,      1 ,k)%ptr
+          pnext => block_array(i,jr,k)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(2,1,p)%ptr => pnext
+            pnext%neigh(2,2,p)%ptr => pmeta
+          end do
+        end do
+      end do
+    end if
+#if NDIMS == 3
+
+! assign boundaries along the Z direction
+!
+    do k = 1, kr - 1
+      do j = 1, jr
+        do i = 1, ir
+
+! assign a pointer
+!
+          pmeta => block_array(i,j,k  )%ptr
+
+! assign neighbor
+!
+          pnext => block_array(i,j,k+1)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(3,2,p)%ptr => pnext
+            pnext%neigh(3,1,p)%ptr => pmeta
+          end do
+
+        end do
+      end do
+    end do
+
+! if periodic boundary conditions set edge block neighbors
+!
+    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
+      do j = 1, jr
+        do i = 1, ir
+
+! assign pointers
+!
+          pmeta => block_array(i,j,      1 )%ptr
+          pnext => block_array(i,j,kr)%ptr
+
+! assign their neighbor pointers
+!
+          do p = 1, nfaces
+            pmeta%neigh(3,1,p)%ptr => pnext
+            pnext%neigh(3,2,p)%ptr => pmeta
+          end do
+        end do
+      end do
+    end if
+#endif /* NDIMS == 3 */
+
+! deallocate the block pointer array
+!
+    deallocate(block_array)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_domain_default
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_BLAST:
+! ------------------------------
+!
+!   Subroutine sets the initial conditions for the spherical blast problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!
+!===============================================================================
+!
+  subroutine setup_problem_blast(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az
+    use equations  , only : gamma
+    use scheme     , only : prim2cons
+    use variables  , only : nvr, nqt, idn, ivx, ivy, ivz
+#ifdef ADI
+    use variables  , only : ipr
+#endif /* ADI */
+#ifdef MHD
+    use variables  , only : ibx, iby, ibz
+#ifdef GLM
+    use variables  , only : iph
+#endif /* GLM */
+#endif /* MHD */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real   , save :: dens = 1.0d0, ratio = 1.0e2, radius = 0.1d0
+#ifdef ADI
+    real   , save :: csnd = 0.40824829046386301635d0
+    real   , save :: pres = 1.0d0
+#endif /* ADI */
+    logical, save :: first = .true.
+
+! local variables
+!
+    integer(kind=4), dimension(3) :: dm
+    integer                       :: i, j, k
+    real                          :: r
+
+! local arrays
+!
+    real, dimension(im)     :: x
+    real, dimension(jm)     :: y
+    real, dimension(km)     :: z
+    real, dimension(nvr,im) :: q, u
+!
+!-------------------------------------------------------------------------------
+!
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("dens"  , dens  )
+      call get_parameter_real("ratio" , ratio )
+      call get_parameter_real("radius", radius)
+#ifdef ADI
+      call get_parameter_real("csnd"  , csnd  )
+
+! calculate pressure
+!
+      pres = dens * csnd * csnd / gamma
+#endif /* ADI */
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if
+
+! obtain block coordinates
+!
+    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
+    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
+#if NDIMS == 3
+    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
+#else /* NDIMS == 3 */
+    z(:) = 0.0d0
+#endif /* NDIMS == 3 */
+
+! set the uniform variables
+!
+    q(idn,:) = dens
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
+#ifdef ADI
+    q(ipr,:) = pres
+#endif /* ADI */
+#ifdef MHD
+    q(ibx,:) = 1.0d0 / sqrt(2.0d0)
+    q(iby,:) = 1.0d0 / sqrt(2.0d0)
+    q(ibz,:) = 0.0d0
+#ifdef GLM
+    q(iph,:) = 0.0d0
+#endif /* GLM */
+#endif /* MHD */
+
+! set the initial star profile (density for ISO or pressure for ADI)
+!
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+
+          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+
+#ifdef ISO
+          if (r .lt. radius) then
+            q(idn,i) = dens * ratio
+          else
+            q(idn,i) = dens
+          end if
+#endif /* ISO */
+#ifdef ADI
+          if (r .lt. radius) then
+            q(ipr,i) = pres * ratio
+          else
+            q(ipr,i) = pres
+          end if
+#endif /* ADI */
+        end do
+
+! convert the primitive variables to conserved ones
+!
+        call prim2cons(im, q(:,:), u(:,:))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+
+      end do
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_blast
 
 !===============================================================================
 !

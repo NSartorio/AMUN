@@ -60,6 +60,7 @@ program amun
 #ifdef MPI
   use parameters    , only : redistribute_parameters
 #endif /* MPI */
+  use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
   use timers   , only : initialize_timers, start_timer, stop_timer             &
                       , set_timer, get_timer, get_timer_total                  &
@@ -227,6 +228,10 @@ program amun
 ! initialize module INTERPOLATIONS
 !
   call initialize_interpolations()
+
+! initialize module PROBLEMS
+!
+  call initialize_problems()
 
 ! check if we initiate new problem or restart previous job
 !

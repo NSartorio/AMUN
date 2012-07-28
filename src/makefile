@@ -210,7 +210,7 @@ constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o config.o coordinates.o equations.o      \
                    evolution.o forcing.o integrals.o interpolations.o io.o     \
-                   mesh.o mpitools.o parameters.o random.o
+                   mesh.o mpitools.o parameters.o problems.o random.o
 equations.o      : equations.F90 parameters.o variables.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o config.o coordinates.o  \
@@ -228,8 +228,8 @@ mesh.o           : mesh.F90 blocks.o coordinates.o error.o interpolations.o    \
                    mpitools.o problems.o variables.o
 mpitools.o       : mpitools.F90 timers.o
 parameters.o     : parameters.F90 mpitools.o
-problems.o       : problems.F90 blocks.o config.o constants.o coordinates.o    \
-                   mpitools.o random.o scheme.o variables.o
+problems.o       : problems.F90 blocks.o boundaries.o coordinates.o            \
+                   equations.o error.o parameters.o scheme.o variables.o
 scheme.o         : scheme.F90 blocks.o coordinates.o interpolations.o          \
                    variables.o
 random.o         : random.F90 mpitools.o parameters.o
