@@ -166,7 +166,8 @@ module problems
     use equations  , only : prim2cons
     use equations  , only : gamma
     use parameters , only : get_parameter_real
-    use variables  , only : nvr, nqt, idn, ivx, ivy, ivz
+    use variables  , only : nt
+    use variables  , only : idn, ivx, ivy, ivz
 #ifdef ADI
     use variables  , only : ipr
 #endif /* ADI */
@@ -196,16 +197,15 @@ module problems
 
 ! local variables
 !
-    integer(kind=4), dimension(3) :: dm
-    integer                       :: i, j, k
-    real                          :: r
+    integer                :: i, j, k
+    real                   :: r
 
 ! local arrays
 !
-    real, dimension(im)     :: x
-    real, dimension(jm)     :: y
-    real, dimension(km)     :: z
-    real, dimension(nvr,im) :: q, u
+    real, dimension(nt,im) :: q, u
+    real, dimension(im)    :: x
+    real, dimension(jm)    :: y
+    real, dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -234,29 +234,29 @@ module problems
 
 ! obtain block coordinates
 !
-    x(:) = pdata%meta%xmin + ax(pdata%meta%level,:)
-    y(:) = pdata%meta%ymin + ay(pdata%meta%level,:)
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 #if NDIMS == 3
-    z(:) = pdata%meta%zmin + az(pdata%meta%level,:)
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
 #else /* NDIMS == 3 */
-    z(:) = 0.0d0
+    z(1:km) = 0.0d0
 #endif /* NDIMS == 3 */
 
 ! set the uniform variables
 !
-    q(idn,:) = dens
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
+    q(idn,1:im) = dens
+    q(ivx,1:im) = 0.0d0
+    q(ivy,1:im) = 0.0d0
+    q(ivz,1:im) = 0.0d0
 #ifdef ADI
-    q(ipr,:) = pres
+    q(ipr,1:im) = pres
 #endif /* ADI */
 #ifdef MHD
-    q(ibx,:) = 1.0d0 / sqrt(2.0d0)
-    q(iby,:) = 1.0d0 / sqrt(2.0d0)
-    q(ibz,:) = 0.0d0
+    q(ibx,1:im) = 1.0d0 / sqrt(2.0d0)
+    q(iby,1:im) = 1.0d0 / sqrt(2.0d0)
+    q(ibz,1:im) = 0.0d0
 #ifdef GLM
-    q(iph,:) = 0.0d0
+    q(iph,1:im) = 0.0d0
 #endif /* GLM */
 #endif /* MHD */
 
@@ -264,24 +264,31 @@ module problems
 !
     do k = 1, km
       do j = 1, jm
+
         do i = 1, im
 
+! calculate distance from the coordinate system origin
+!
           r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
 
-#ifdef ISO
-          if (r .lt. radius) then
-            q(idn,i) = dens * ratio
-          else
-            q(idn,i) = dens
-          end if
-#endif /* ISO */
+! fill in the internal radius
+!
+          if (r < radius) then
 #ifdef ADI
-          if (r .lt. radius) then
             q(ipr,i) = pres * ratio
-          else
-            q(ipr,i) = pres
-          end if
 #endif /* ADI */
+#ifdef ISO
+            q(idn,i) = dens * ratio
+#endif /* ISO */
+          else
+#ifdef ADI
+            q(ipr,i) = pres
+#endif /* ADI */
+#ifdef ISO
+            q(idn,i) = dens
+#endif /* ISO */
+          end if
+
         end do
 
 ! convert the primitive variables to conserved ones
@@ -290,7 +297,11 @@ module problems
 
 ! copy the conserved variables to the current block
 !
-        pdata%u(1:nqt,1:im,j,k) = u(1:nqt,1:im)
+        pdata%u(1:nt,1:im,j,k) = u(1:nt,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nt,1:im,j,k) = q(1:nt,1:im)
 
       end do
     end do
