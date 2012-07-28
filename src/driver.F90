@@ -32,13 +32,14 @@ program amun
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries
   use config   , only : read_config
-  use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, cfl, nres
+  use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, nres
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
   use coordinates, only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations
-  use evolution, only : evolve, find_new_timestep, n, t, dt, dtn
+  use evolution     , only : initialize_evolution, evolve, find_new_timestep
+  use evolution     , only : n, t, dt, dtn, cfl
 #ifdef FORCE
   use forcing       , only : initialize_forcing, clear_forcing
 #endif /* FORCE */
@@ -237,6 +238,10 @@ program amun
 ! initialize module REFINEMENT
 !
   call initialize_refinement()
+
+! initialize evolution
+!
+  call initialize_evolution()
 
 ! check if we initiate new problem or restart previous job
 !

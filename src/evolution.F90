@@ -21,18 +21,91 @@
 !!
 !!******************************************************************************
 !!
-!! module: EVOLUTION - handling the time evolution of the block structure
+!! module: EVOLUTION
+!!
+!!  This module performs the time integration using different methods.
 !!
 !!******************************************************************************
 !
 module evolution
 
+! module variables are not implicit by default
+!
   implicit none
+
+! evolution parameters
+!
+  real   , save :: cfl   = 0.5d0
+
+#if defined MHD && defined GLM
+! coefficient controlling the decay of scalar potential Psi
+!
+  real   , save :: alpha_p = 0.5d0
+  real   , save :: decay   = 1.0d0
+#endif /* MHD & GLM */
 
   integer, save :: n
   real   , save :: t, dt, dtn, dxmin
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_evolution, evolve, find_new_timestep
+
+! declare public variables
+!
+  public :: n, cfl, t, dt, dtn, dxmin
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
+!
+!===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
+!
+! subroutine INITIALIZE_EVOLUTION:
+! -------------------------------
+!
+!   Subroutine initializes the EVOLUTION module by setting its parameters.
+!
+!
+!===============================================================================
+!
+  subroutine initialize_evolution()
+
+! include external procedures and variables
+!
+    use parameters, only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! get the value of the stability coefficient
+!
+    call get_parameter_real("cfl", cfl)
+
+#if defined MHD && defined GLM
+! get the value of the stability coefficient
+!
+    call get_parameter_real("alpha_p", alpha_p)
+
+! calculate decay factor for magnetic field divergence scalar
+!
+    decay = exp(- alpha_p * cfl)
+#endif /* MHD & GLM */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_evolution
 !
 !===============================================================================
 !
@@ -198,6 +271,10 @@ module evolution
   end subroutine evolve
 !
 !===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
 !
 ! find_new_timestep: subroutine updates the maximum speed among the leafs and
 !                    calculates new time step
@@ -322,7 +399,6 @@ module evolution
     use coordinates, only : im, jm, km
     use coordinates, only : adxi, adyi, adzi
 #if defined MHD && defined GLM
-    use config     , only : decay
     use scheme     , only : cmax
     use variables  , only : iph
 #endif /* MHD & GLM */
@@ -911,7 +987,6 @@ module evolution
 #ifdef MHD
     use variables  , only : ibx, ibz
 #ifdef GLM
-    use config     , only : decay
     use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -1054,7 +1129,6 @@ module evolution
 #ifdef MHD
     use variables  , only : ibx, ibz
 #ifdef GLM
-    use config     , only : decay
     use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
@@ -1222,7 +1296,6 @@ module evolution
 #ifdef MHD
     use variables  , only : ibx, ibz
 #ifdef GLM
-    use config     , only : decay
     use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
