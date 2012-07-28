@@ -157,7 +157,7 @@ module mesh
     use error   , only : print_info, print_error
     use mpitools, only : master, nproc, nprocs
     use problems   , only : setup_domain, setup_problem
-    use problems   , only : check_refinement_criterion
+    use refinement , only : check_refinement_criterion
 
     implicit none
 
@@ -437,7 +437,7 @@ module mesh
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : master, nprocs, nproc
 #endif /* MPI */
-    use problems , only : check_refinement_criterion
+    use refinement , only : check_refinement_criterion
     use variables, only : nqt
 
     implicit none

@@ -62,6 +62,7 @@ program amun
 #endif /* MPI */
   use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
+  use refinement    , only : initialize_refinement
   use timers   , only : initialize_timers, start_timer, stop_timer             &
                       , set_timer, get_timer, get_timer_total                  &
                       , timer_enabled, timer_description, ntimers
@@ -232,6 +233,10 @@ program amun
 ! initialize module PROBLEMS
 !
   call initialize_problems()
+
+! initialize module REFINEMENT
+!
+  call initialize_refinement()
 
 ! check if we initiate new problem or restart previous job
 !
