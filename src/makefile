@@ -232,7 +232,7 @@ mesh.o           : mesh.F90 blocks.o coordinates.o domains.o error.o           \
 mpitools.o       : mpitools.F90 timers.o
 parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o coordinates.o equations.o error.o     \
-                   parameters.o scheme.o variables.o
+                   parameters.o variables.o
 refinement.o     : refinement.F90 blocks.o coordinates.o parameters.o          \
                    scheme.o variables.o
 scheme.o         : scheme.F90 blocks.o coordinates.o interpolations.o          \

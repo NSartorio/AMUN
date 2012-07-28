@@ -69,7 +69,7 @@ module problems
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_string
+    use parameters , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -104,8 +104,8 @@ module problems
 
 ! include external procedures and variables
 !
-    use blocks, only : block_data
-    use error , only : print_error
+    use blocks     , only : block_data
+    use error      , only : print_error
 
 ! local variables are not implicit by default
 !
@@ -163,9 +163,9 @@ module problems
     use blocks     , only : block_data
     use coordinates, only : im, jm, km
     use coordinates, only : ax, ay, az
+    use equations  , only : prim2cons
     use equations  , only : gamma
     use parameters , only : get_parameter_real
-    use scheme     , only : prim2cons
     use variables  , only : nvr, nqt, idn, ivx, ivy, ivz
 #ifdef ADI
     use variables  , only : ipr
