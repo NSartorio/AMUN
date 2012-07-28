@@ -308,6 +308,95 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine fluxspeed
+!
+!===============================================================================
+!
+! subroutine UPDATE_PRIMITIVE_VARIABLES:
+! -------------------------------------
+!
+!   Subroutine updates primitive variables from their conservative
+!   representation.  This process is done ones after advance of the conserved
+!   variables due to their evolution in time.
+!
+!===============================================================================
+!
+  subroutine update_primitive_variables(uu, qq)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km
+#ifdef DEBUG
+    use variables  , only : idn
+#ifdef ADI
+    use variables  , only : ipr
+#endif /* ADI */
+#endif /* DEBUG */
+    use variables  , only : nt
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real, dimension(nt,im,jm,km), intent(in)    :: uu
+    real, dimension(nt,im,jm,km), intent(inout) :: qq
+
+! temporary variables
+!
+#ifdef DEBUG
+    integer                :: i
+#endif /* DEBUG */
+    integer                :: j, k
+
+! temporary array to store conserved variable vector
+!
+    real, dimension(nt,im) :: u
+!
+!-------------------------------------------------------------------------------
+!
+! update primitive variables
+!
+    do k = 1, km
+      do j = 1, jm
+
+! copy variables to temporary array of conserved variables
+!
+        u(1:nt,1:im) = uu(1:nt,1:im,j,k)
+
+! convert conserved variables to primitive ones
+!
+        call cons2prim(im, u(1:nt,1:im), qq(1:nt,1:im,j,k))
+
+#ifdef DEBUG
+! check the positivity of density and pressure
+!
+        do i = 1, im
+          if (qq(idn,i,j,k) <= 0.0d0) then
+            write(*,*)
+            write(*,*) 'Unphysical state: ρ ≤ 0', i, j, k
+            write(*,"('Q = ',4(1pe24.16))") qq(1:4 ,i,j,k)
+            write(*,"('    ',4(1pe24.16))") qq(5:nt,i,j,k)
+            stop
+          end if
+#ifdef ADI
+          if (qq(ipr,i,j,k) <= 0.0d0) then
+            write(*,*)
+            write(*,*) 'Unphysical state: p ≤ 0', i, j, k
+            write(*,"('Q = ',4(1pe24.16))") qq(1:4 ,i,j,k)
+            write(*,"('    ',4(1pe24.16))") qq(5:nt,i,j,k)
+            stop
+          end if
+#endif /* ADI */
+        end do
+#endif /* DEBUG */
+
+      end do
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_primitive_variables
 #endif /* HYDRO */
 #ifdef MHD
 !
