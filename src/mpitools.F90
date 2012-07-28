@@ -26,6 +26,7 @@
 !!  This module provides wrapper subroutines handling the parallel execution
 !!  with the Message Passing Interface protocol.
 !!
+!!
 !!******************************************************************************
 !
 module mpitools
@@ -60,15 +61,20 @@ module mpitools
   contains
 !
 !===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
 !
-! subroutine INITIALIZE_MPI:
-! -------------------------
+! subroutine INITIALIZE_MPITOOLS:
+! ------------------------------
 !
 !   Subroutine initializes the MPITOOLS modules.
 !
+!
 !===============================================================================
 !
-  subroutine initialize_mpi()
+  subroutine initialize_mpitools()
 
 ! include external procedures and variables
 !
@@ -161,18 +167,19 @@ module mpitools
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine initialize_mpi
+  end subroutine initialize_mpitools
 !
 !===============================================================================
 !
-! subroutine FINALIZE_MPI:
-! -----------------------
+! subroutine FINALIZE_MPITOOLS:
+! ----------------------------
 !
 !   Subroutine finalizes the MPITOOLS modules.
 !
+!
 !===============================================================================
 !
-  subroutine finalize_mpi()
+  subroutine finalize_mpitools()
 
 ! include external procedures and variables
 !
@@ -218,7 +225,7 @@ module mpitools
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine finalize_mpi
+  end subroutine finalize_mpitools
 !
 !===============================================================================
 !
@@ -291,7 +298,7 @@ module mpitools
           write(*,*)
         end if
 
-        call finalize_mpi()
+        call finalize_mpitools()
         stop
 
       end if
@@ -1243,6 +1250,13 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine receive_real_array
+!
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
+!
 #endif /* MPI */
 
 !===============================================================================

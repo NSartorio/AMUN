@@ -51,7 +51,7 @@ program amun
 #ifdef MPI
   use mesh          , only : redistribute_blocks
 #endif /* MPI */
-  use mpitools      , only : initialize_mpi, finalize_mpi
+  use mpitools      , only : initialize_mpitools, finalize_mpitools
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
   use mpitools      , only : reduce_maximum_integer
@@ -157,7 +157,7 @@ program amun
 
 ! initialize module MPITOOLS
 !
-  call initialize_mpi()
+  call initialize_mpitools()
 
 ! print info message
 !
@@ -617,9 +617,9 @@ program amun
 !
   call finalize_parameters()
 
-! finalize module mpitools
+! finalize module MPITOOLS
 !
-  call finalize_mpi()
+  call finalize_mpitools()
 
 !-------------------------------------------------------------------------------
 !
