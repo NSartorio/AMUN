@@ -160,7 +160,7 @@ module problems
 !
     use blocks     , only : block_data
     use coordinates, only : im, jm, km
-    use coordinates, only : ax, ay, az
+    use coordinates, only : ax, ay, az, adx, ady, adz
     use equations  , only : prim2cons
     use equations  , only : gamma
     use parameters , only : get_parameter_real
@@ -189,14 +189,21 @@ module problems
     real   , save :: dens = 1.0d0, ratio = 1.0e2, radius = 0.1d0
 #ifdef ADI
     real   , save :: csnd = 0.40824829046386301635d0
-    real   , save :: pres = 1.0d0
 #endif /* ADI */
     logical, save :: first = .true.
+    real   , save :: dn_amb, dn_ovr
+#ifdef ADI
+    real   , save :: pr_amb, pr_ovr
+#endif /* ADI */
+    real   , save :: rad
 
 ! local variables
 !
-    integer                :: i, j, k
-    real                   :: r
+    integer       :: i, j, k
+    real          :: xl, yl, zl, xu, yu, zu, rl, ru
+    real          :: xb, yb, xt, yt
+    real          :: dx, dy, dz, dxh, dyh, dzh, daxy
+    real          :: fc_amb, fc_ovr
 
 ! local arrays
 !
@@ -218,11 +225,28 @@ module problems
       call get_parameter_real("radius", radius)
 #ifdef ADI
       call get_parameter_real("csnd"  , csnd  )
-
-! calculate pressure
-!
-      pres = dens * csnd * csnd / gamma
 #endif /* ADI */
+
+! calculate the overdense and ambient region densities
+!
+      dn_amb = dens
+#ifdef ISO
+      dn_ovr = dn_amb * ratio
+#endif /* ISO */
+#ifdef ADI
+      dn_ovr = dn_amb
+#endif /* ADI */
+
+#ifdef ADI
+! calculate parallel and perpendicular pressures from sound speeds
+!
+      pr_amb = dens * csnd * csnd / gamma
+      pr_ovr = pr_amb * ratio
+#endif /* ADI */
+
+! calculate the square of radius
+!
+      rad    = radius * radius
 
 ! reset the first execution flag
 !
@@ -240,58 +264,169 @@ module problems
     z(1:km) = 0.0d0
 #endif /* NDIMS == 3 */
 
-! set the uniform variables
+! calculate mesh intervals and areas
 !
-    q(idn,1:im) = dens
-    q(ivx,1:im) = 0.0d0
-    q(ivy,1:im) = 0.0d0
-    q(ivz,1:im) = 0.0d0
-#ifdef ADI
-    q(ipr,1:im) = pres
-#endif /* ADI */
+    dx   = adx(pdata%meta%level)
+    dy   = ady(pdata%meta%level)
+    dz   = adz(pdata%meta%level)
+    dxh  = 0.5d0 * dx
+    dyh  = 0.5d0 * dy
+#if NDIMS == 3
+    dzh  = 0.5d0 * dz
+#else /* NDIMS == 3 */
+    dzh  = 1.0d0
+#endif /* NDIMS == 3 */
+    daxy = dx * dy
+
+! set the uniform primitive variables
+!
+    q(ivx,:) = 0.0d0
+    q(ivy,:) = 0.0d0
+    q(ivz,:) = 0.0d0
+
 #ifdef MHD
-    q(ibx,1:im) = 1.0d0 / sqrt(2.0d0)
-    q(iby,1:im) = 1.0d0 / sqrt(2.0d0)
-    q(ibz,1:im) = 0.0d0
-#ifdef GLM
-    q(iph,1:im) = 0.0d0
-#endif /* GLM */
+! set the uniform magnetic field
+!
+    q(ibx,:) = bext(inx)
+    q(iby,:) = bext(iny)
+    q(ibz,:) = bext(inz)
 #endif /* MHD */
 
-! set the initial star profile (density for ISO or pressure for ADI)
+! iterate over all positions in the YZ plane
 !
     do k = 1, km
+
+#ifdef R3D
+! calculate the corner Z coordinates
+!
+      zl = abs(z(k)) - dzh
+      zu = abs(z(k)) + dzh
+#endif /* R3D */
+
       do j = 1, jm
 
+! calculate the corner Y coordinates
+!
+        yl = abs(y(j)) - dyh
+        yu = abs(y(j)) + dyh
+
+! sweep along the X coordinate
+!
         do i = 1, im
 
-! calculate distance from the coordinate system origin
+! calculate the corner X coordinates
 !
-          r = sqrt(x(i)**2 + y(j)**2 + z(k)**2)
+          xl = abs(x(i)) - dxh
+          xu = abs(x(i)) + dxh
 
-! fill in the internal radius
+! calculate the minimum and maximum corner distances from the origin
 !
-          if (r < radius) then
+#ifdef R3D
+          rl = xl * xl + yl * yl + zl * zl
+          ru = xu * xu + yu * yu + zu * zu
+#else /* R3D */
+          rl = xl * xl + yl * yl
+          ru = xu * xu + yu * yu
+#endif /* R3D */
+
+! set the initial density and pressure
+!
+          q(idn,i) = dn_amb
 #ifdef ADI
-            q(ipr,i) = pres * ratio
+          q(ipr,i) = pr_amb
 #endif /* ADI */
-#ifdef ISO
-            q(idn,i) = dens * ratio
-#endif /* ISO */
+
+! set the initial pressure in cells laying completely within the radius
+!
+          if (ru .le. rad) then
+
+! set the overpressure region density
+!
+            q(idn,i) = dn_ovr
+
+#ifdef ADI
+! set the overpressure region pressure
+!
+            q(ipr,i) = pr_ovr
+#endif /* ADI */
+
+! set the initial pressure in the cell completely outside the radius
+!
+          else if (rl .ge. rad) then
+
+! set the ambient region density
+!
+            q(idn,i) = dn_amb
+
+#ifdef ADI
+! set the ambient medium pressure
+!
+            q(ipr,i) = pr_amb
+#endif /* ADI */
+
+! integrate density or pressure in cells which are crossed by the circule with
+! the given radius
+!
           else
+
+#ifdef R3D
+! in 3D simply set the ambient values since the integration is more complex
+!
+
+! set the ambient region density
+!
+            q(idn,i) = dn_amb
+
 #ifdef ADI
-            q(ipr,i) = pres
+! set the ambient medium pressure
+!
+            q(ipr,i) = pr_amb
 #endif /* ADI */
-#ifdef ISO
-            q(idn,i) = dens
-#endif /* ISO */
+#else /* R3D */
+! calculate the bounds of area integration
+!
+            xb = max(xl, sqrt(max(0.0d0, rad - yu * yu)))
+            xt = min(xu, sqrt(max(0.0d0, rad - yl * yl)))
+            yb = max(yl, sqrt(max(0.0d0, rad - xu * xu)))
+            yt = min(yu, sqrt(max(0.0d0, rad - xl * xl)))
+
+! integrate the area below the circle within the current cell for both
+! functions, y = f(x) and x = g(y), and then average them to be sure that we
+! are getting the ideal symmetry
+!
+            fc_ovr = 0.5d0 * (rad * (asin(xt / radius) - asin(xb / radius))   &
+                   + (xt * yb - xb * yt)) - yl * (xt - xb)
+            fc_ovr = fc_ovr + (xb - xl) * dy
+
+            fc_amb = 0.5d0 * (rad * (asin(yt / radius) - asin(yb / radius))   &
+                   + (yt * xb - yb * xt)) - xl * (yt - yb)
+            fc_amb = fc_amb + (yb - yl) * dx
+
+            fc_ovr = 0.5d0 * (fc_ovr + fc_amb)
+
+! normalize coefficients
+!
+            fc_ovr = fc_ovr / daxy
+            fc_amb = 1.0d0 - fc_ovr
+
+! integrate the density over the edge cells
+!
+            q(idn,i) = fc_ovr * dn_ovr + fc_amb * dn_amb
+
+#ifdef ADI
+! integrate the pressure over the edge cells
+!
+            q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
+#endif /* ADI */
+#endif /* R3D */
+
           end if
 
         end do
 
-! convert the primitive variables to conserved ones
+! convert the primitive variables to conservative ones
 !
-        call prim2cons(im, q(:,:), u(:,:))
+        call prim2cons(im, q(1:nt,1:im), u(1:nt,1:im))
 
 ! copy the conserved variables to the current block
 !
