@@ -51,6 +51,7 @@ module evolution
 #ifdef REFINE
     use coordinates, only : toplev
 #endif /* REFINE */
+    use equations  , only : update_primitive_variables
     use mesh       , only : update_mesh
 #ifdef FORCE
     use forcing    , only : tbfor
@@ -176,6 +177,21 @@ module evolution
 ! find new time step
 !
     call find_new_timestep()
+
+! update solution using numerical fluxes stored in data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! convert conserved variables to primitive ones for the current block
+!
+      call update_primitive_variables(pblock%u, pblock%q)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
 
 !-------------------------------------------------------------------------------
 !
