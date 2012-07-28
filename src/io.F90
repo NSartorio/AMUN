@@ -790,7 +790,6 @@ module io
     use hdf5     , only : h5gcreate_f, h5gclose_f
     use mpitools , only : nprocs, nproc
     use random   , only : nseeds, get_seeds
-    use scheme   , only : cmax
 
 ! declare variables
 !
@@ -849,7 +848,6 @@ module io
       call write_attribute_double_h5(gid, 'time', t   )
       call write_attribute_double_h5(gid, 'dt'  , dt  )
       call write_attribute_double_h5(gid, 'dtn' , dtn )
-      call write_attribute_double_h5(gid, 'cmax', cmax)
 
 ! store the vector attributes
 !
@@ -935,7 +933,6 @@ module io
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
     use mpitools , only : nprocs, nproc
     use random   , only : nseeds, set_seeds
-    use scheme   , only : cmax
 
 ! declare variables
 !
@@ -1070,8 +1067,6 @@ module io
               call read_attribute_double_h5(aid, aname, dt)
             case('dtn')
               call read_attribute_double_h5(aid, aname, dtn)
-            case('cmax')
-              call read_attribute_double_h5(aid, aname, cmax)
             case('xmin')
               call read_attribute_double_h5(aid, aname, xmin)
             case('xmax')
@@ -2841,7 +2836,6 @@ module io
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-    use scheme       , only : cons2prim
     use variables    , only : nvr, nqt
     use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
@@ -2874,7 +2868,6 @@ module io
 
 ! local allocatable arrays
 !
-    real(kind=8), dimension(:,:,:,:), allocatable :: u, q
     real(kind=8), dimension(:,:,:,:), allocatable :: dens
     real(kind=8), dimension(:,:,:,:), allocatable :: momx, momy, momz
     real(kind=8), dimension(:,:,:,:), allocatable :: velx, vely, velz
@@ -2915,9 +2908,6 @@ module io
 
 ! allocate arrays to store variables from all datablocks
 !
-        allocate(u(nvr,im,jm,km))
-        allocate(q(nvr,im,jm,km))
-
         allocate(dens(dm(1),dm(2),dm(3),dm(4)))
         allocate(momx(dm(1),dm(2),dm(3),dm(4)))
         allocate(momy(dm(1),dm(2),dm(3),dm(4)))
@@ -2944,35 +2934,23 @@ module io
         pdata => list_data
         do while(associated(pdata))
 
-! copy conserved variables from the current block to the temporary array
-!
-          u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
-
-! obtain the primitive variables from the conserved ones
-!
-          do k = 1, km
-            do j = 1, jm
-              call cons2prim(im, u(:,:,j,k), q(:,:,j,k))
-            end do
-          end do
-
-          dens(l,1:im,1:jm,1:km) = u(idn,1:im,1:jm,1:km)
-          momx(l,1:im,1:jm,1:km) = u(imx,1:im,1:jm,1:km)
-          momy(l,1:im,1:jm,1:km) = u(imy,1:im,1:jm,1:km)
-          momz(l,1:im,1:jm,1:km) = u(imz,1:im,1:jm,1:km)
-          velx(l,1:im,1:jm,1:km) = q(ivx,1:im,1:jm,1:km)
-          vely(l,1:im,1:jm,1:km) = q(ivy,1:im,1:jm,1:km)
-          velz(l,1:im,1:jm,1:km) = q(ivz,1:im,1:jm,1:km)
+          dens(l,1:im,1:jm,1:km) = pdata%u(idn,1:im,1:jm,1:km)
+          momx(l,1:im,1:jm,1:km) = pdata%u(imx,1:im,1:jm,1:km)
+          momy(l,1:im,1:jm,1:km) = pdata%u(imy,1:im,1:jm,1:km)
+          momz(l,1:im,1:jm,1:km) = pdata%u(imz,1:im,1:jm,1:km)
+          velx(l,1:im,1:jm,1:km) = pdata%q(ivx,1:im,1:jm,1:km)
+          vely(l,1:im,1:jm,1:km) = pdata%q(ivy,1:im,1:jm,1:km)
+          velz(l,1:im,1:jm,1:km) = pdata%q(ivz,1:im,1:jm,1:km)
 #ifdef ADI
-          ener(l,1:im,1:jm,1:km) = u(ien,1:im,1:jm,1:km)
-          pres(l,1:im,1:jm,1:km) = q(ipr,1:im,1:jm,1:km)
+          ener(l,1:im,1:jm,1:km) = pdata%u(ien,1:im,1:jm,1:km)
+          pres(l,1:im,1:jm,1:km) = pdata%q(ipr,1:im,1:jm,1:km)
 #endif /* ADI */
 #ifdef MHD
-          magx(l,1:im,1:jm,1:km) = u(ibx,1:im,1:jm,1:km)
-          magy(l,1:im,1:jm,1:km) = u(iby,1:im,1:jm,1:km)
-          magz(l,1:im,1:jm,1:km) = u(ibz,1:im,1:jm,1:km)
+          magx(l,1:im,1:jm,1:km) = pdata%u(ibx,1:im,1:jm,1:km)
+          magy(l,1:im,1:jm,1:km) = pdata%u(iby,1:im,1:jm,1:km)
+          magz(l,1:im,1:jm,1:km) = pdata%u(ibz,1:im,1:jm,1:km)
 #ifdef GLM
-          bpsi(l,1:im,1:jm,1:km) = q(iph,1:im,1:jm,1:km)
+          bpsi(l,1:im,1:jm,1:km) = pdata%q(iph,1:im,1:jm,1:km)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -3023,8 +3001,6 @@ module io
         if (allocated(bpsi)) deallocate(bpsi)
 #endif /* GLM */
 #endif /* MHD */
-        if (allocated(u))    deallocate(u)
-        if (allocated(q))    deallocate(q)
 
       end if ! dblocks > 0
 
@@ -3075,11 +3051,10 @@ module io
 !
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
-    use coordinates, only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
+    use coordinates  , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-    use scheme       , only : cons2prim
     use variables    , only : nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI
@@ -3112,7 +3087,6 @@ module io
 
 ! local allocatable arrays
 !
-    real        , dimension(:,:,:,:), allocatable :: u, q
     real(kind=4), dimension(:,:,:,:), allocatable :: dens, velx, vely, velz
 #ifdef ADI
     real(kind=4), dimension(:,:,:,:), allocatable :: pres
@@ -3151,11 +3125,6 @@ module io
       dm(3) = jn
       dm(4) = kn
 
-! allocate arrays for conservative and primitive variables
-!
-      allocate(u(nqt,im,jm,km))
-      allocate(q(nqt,im,jm,km))
-
 ! allocate arrays to store the variables from current processor data blocks
 !
       allocate(dens(dm(1),dm(2),dm(3),dm(4)))
@@ -3180,33 +3149,21 @@ module io
       pdata => list_data
       do while(associated(pdata))
 
-! copy conserved variables from the current block to the temporary array
-!
-        u(1:nqt,1:im,1:jm,1:km) = pdata%u(1:nqt,1:im,1:jm,1:km)
-
-! convert the conservative variables to their primitive representation
-!
-        do k = 1, km
-          do j = 1, jm
-            call cons2prim(im, u(1:nqt,1:im,j,k), q(1:nqt,1:im,j,k))
-          end do
-        end do
-
 ! copy the primitive variables to the stored arrays
 !
-        dens(l,1:in,1:jn,1:kn) = real(q(idn,ib:ie,jb:je,kb:ke),kind=4)
-        velx(l,1:in,1:jn,1:kn) = real(q(ivx,ib:ie,jb:je,kb:ke),kind=4)
-        vely(l,1:in,1:jn,1:kn) = real(q(ivy,ib:ie,jb:je,kb:ke),kind=4)
-        velz(l,1:in,1:jn,1:kn) = real(q(ivz,ib:ie,jb:je,kb:ke),kind=4)
+        dens(l,1:in,1:jn,1:kn) = real(pdata%q(idn,ib:ie,jb:je,kb:ke),kind=4)
+        velx(l,1:in,1:jn,1:kn) = real(pdata%q(ivx,ib:ie,jb:je,kb:ke),kind=4)
+        vely(l,1:in,1:jn,1:kn) = real(pdata%q(ivy,ib:ie,jb:je,kb:ke),kind=4)
+        velz(l,1:in,1:jn,1:kn) = real(pdata%q(ivz,ib:ie,jb:je,kb:ke),kind=4)
 #ifdef ADI
-        pres(l,1:in,1:jn,1:kn) = real(q(ipr,ib:ie,jb:je,kb:ke),kind=4)
+        pres(l,1:in,1:jn,1:kn) = real(pdata%q(ipr,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* ADI */
 #ifdef MHD
-        magx(l,1:in,1:jn,1:kn) = real(q(ibx,ib:ie,jb:je,kb:ke),kind=4)
-        magy(l,1:in,1:jn,1:kn) = real(q(iby,ib:ie,jb:je,kb:ke),kind=4)
-        magz(l,1:in,1:jn,1:kn) = real(q(ibz,ib:ie,jb:je,kb:ke),kind=4)
+        magx(l,1:in,1:jn,1:kn) = real(pdata%q(ibx,ib:ie,jb:je,kb:ke),kind=4)
+        magy(l,1:in,1:jn,1:kn) = real(pdata%q(iby,ib:ie,jb:je,kb:ke),kind=4)
+        magz(l,1:in,1:jn,1:kn) = real(pdata%q(ibz,ib:ie,jb:je,kb:ke),kind=4)
 #ifdef GLM
-        bpsi(l,1:in,1:jn,1:kn) = real(q(iph,ib:ie,jb:je,kb:ke),kind=4)
+        bpsi(l,1:in,1:jn,1:kn) = real(pdata%q(iph,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -3252,8 +3209,6 @@ module io
       if (allocated(magy)) deallocate(magy)
       if (allocated(magz)) deallocate(magz)
 #endif /* MHD */
-      if (allocated(u))    deallocate(u)
-      if (allocated(q))    deallocate(q)
 
     end if ! dblocks > 0
 
