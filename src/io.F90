@@ -46,6 +46,11 @@ module io
 !
   integer(kind=4), save :: ucor = 1, dcor = 1
 
+! data file type
+!
+  character      , save :: ftype = 'p'
+  integer(kind=4), save :: nres  = -1
+
 ! array of pointer used during job restart
 !
   type(pointer_meta), dimension(:), allocatable, save :: block_array
@@ -63,8 +68,6 @@ module io
 !===============================================================================
 !
   subroutine write_data()
-
-    use config, only : ftype
 
     implicit none
 !
@@ -126,8 +129,6 @@ module io
 !===============================================================================
 !
   subroutine restart_job()
-
-    use config, only : nres
 
     implicit none
 !
@@ -781,8 +782,7 @@ module io
 !
     use blocks   , only : get_mblocks, get_dblocks, get_nleafs
     use blocks   , only : get_last_id
-    use config   , only : ncells, nghost
-    use config   , only : in, jn, kn, rdims, minlev, maxlev, toplev
+    use coordinates, only : nn, ng, in, jn, kn, minlev, maxlev, toplev, ir, jr, kr
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error
     use evolution, only : n, t, dt, dtn
@@ -827,8 +827,8 @@ module io
       call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
       call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
       call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs())
-      call write_attribute_integer_h5(gid, 'ncells' , ncells)
-      call write_attribute_integer_h5(gid, 'nghost' , nghost)
+      call write_attribute_integer_h5(gid, 'ncells' , nn)
+      call write_attribute_integer_h5(gid, 'nghost' , ng)
       call write_attribute_integer_h5(gid, 'minlev' , minlev)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'toplev' , toplev)
@@ -855,7 +855,7 @@ module io
 !
       dm(:) = (/ in, jn, kn /)
       call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
-      call write_attribute_vector_integer_h5(gid, 'rdims', 3, rdims(:))
+      call write_attribute_vector_integer_h5(gid, 'rdims', 3, (/ ir, jr, kr /))
 
 ! store random number generator seed values
 !
@@ -925,8 +925,7 @@ module io
     use blocks   , only : append_metablock
     use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
                         , get_nleafs
-    use config   , only : ncells, nghost
-    use config   , only : in, jn, kn, rdims, maxlev, toplev
+    use coordinates, only : nn, ng, in, jn, kn, maxlev, toplev, ir, jr, kr
     use coordinates, only : initialize_coordinates, finalize_coordinates
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error, print_warning
@@ -1048,7 +1047,7 @@ module io
 
 ! check if the block dimensions are compatible
 !
-              if (lncells .ne. ncells) then
+              if (lncells .ne. nn) then
                 call print_error("io::read_attributes_h5"                      &
                         , "File and program block dimensions are incompatible!")
               end if
@@ -1057,7 +1056,7 @@ module io
 
 ! check if the ghost layers are compatible
 !
-              if (lnghost .ne. nghost) then
+              if (lnghost .ne. ng) then
                 call print_error("io::read_attributes_h5"                      &
                       , "File and program block ghost layers are incompatible!")
               end if
@@ -2404,7 +2403,7 @@ module io
 !
     use blocks   , only : block_meta, block_data, list_data
     use blocks   , only : get_dblocks
-    use config   , only : im, jm, km
+    use coordinates, only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
@@ -2545,7 +2544,7 @@ module io
 !
     use blocks   , only : block_meta, block_data, list_data
     use blocks   , only : append_datablock, associate_blocks
-    use config   , only : im, jm, km
+    use coordinates, only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f
@@ -2674,7 +2673,7 @@ module io
     use blocks, only : block_meta, block_data, list_data
     use blocks, only : nsides
     use blocks, only : get_dblocks
-    use config, only : maxlev, toplev
+    use coordinates, only : maxlev, toplev
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
@@ -2838,7 +2837,7 @@ module io
 !
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
-    use config       , only : im, jm, km
+    use coordinates, only : im, jm, km
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
@@ -3076,7 +3075,7 @@ module io
 !
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
-    use config       , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
+    use coordinates, only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f

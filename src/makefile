@@ -224,7 +224,7 @@ integrals.o      : integrals.F90 blocks.o coordinates.o evolution.o mpitools.o \
                    variables.o
 interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o      \
                    variables.o
-io.o             : io.F90 blocks.o config.o coordinates.o error.o evolution.o  \
+io.o             : io.F90 blocks.o coordinates.o error.o evolution.o           \
                    mpitools.o random.o scheme.o variables.o
 mesh.o           : mesh.F90 blocks.o coordinates.o domains.o error.o           \
                    interpolations.o mpitools.o problems.o refinement.o         \
