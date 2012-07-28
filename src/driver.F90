@@ -32,7 +32,7 @@ program amun
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries
   use config   , only : read_config
-  use config   , only : iterm, nmax, tmax, trun, tsav, dtini, dtout, nres
+  use config   , only : nmax, tmax, trun, tsav, dtini, dtout, nres
 #ifdef FORCE
   use config   , only : fdt
 #endif /* FORCE */
@@ -82,6 +82,10 @@ program amun
   integer           :: iin, iev, itm
   real(kind=8)      :: tm_curr, tm_exec, tm_conv
 
+! the termination and status flags
+!
+  integer               :: iterm, iret
+
 ! an array to store execution times
 !
   real(kind=8), dimension(ntimers) :: tm
@@ -99,6 +103,10 @@ program amun
 !
   integer, parameter :: SIGINT = 2, SIGABRT = 6, SIGTERM = 15
 #endif /* SIGNALS */
+
+! common block
+!
+  common /termination/ iterm
 !
 !-------------------------------------------------------------------------------
 !
@@ -600,13 +608,16 @@ end program
 !
 integer(kind=4) function terminate(sig_num)
 
-  use config, only : iterm
-
   implicit none
 
 ! input arguments
 !
   integer(kind=4), intent(in) :: sig_num
+  integer                     :: iterm
+
+! common block
+!
+  common /termination/ iterm
 
 !-------------------------------------------------------------------------------
 !
