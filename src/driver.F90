@@ -31,11 +31,6 @@ program amun
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries
-  use config   , only : read_config
-  use config   , only : nmax, tmax, trun, tsav, dtini, dtout, nres
-#ifdef FORCE
-  use config   , only : fdt
-#endif /* FORCE */
   use coordinates, only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations
   use evolution     , only : initialize_evolution, evolve, find_new_timestep
@@ -46,6 +41,7 @@ program amun
   use integrals, only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
   use io       , only : nfile, write_data, write_restart_data, restart_job
+  use io            , only : nres
   use mesh          , only : initialize_mesh, clear_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
@@ -61,6 +57,8 @@ program amun
 #ifdef MPI
   use parameters    , only : redistribute_parameters
 #endif /* MPI */
+  use parameters    , only : get_parameter_integer, get_parameter_real         &
+                           , get_parameter_string
   use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement
@@ -75,6 +73,9 @@ program amun
   character(len=80) :: fmt, tmp
   integer           :: ed, eh, em, es, ec, ln
   real              :: tall, tcur, tpre, thrs, per
+
+  real                  :: dtout = 1.0d0, dtini = 1.0d-8
+  real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
 
 ! timer indices
 !
@@ -200,9 +201,18 @@ program amun
   call reduce_maximum_integer(iterm, iret)
 #endif /* MPI */
 
-! read configuration file
+! get the type of snapshot files and interval between snapshots
 !
-  call read_config()
+  call get_parameter_real   ("dtout", dtout)
+
+! get the execution termination parameters
+!
+  call get_parameter_integer("nmax" , nmax)
+  call get_parameter_real   ("tmax" , tmax)
+  call get_parameter_real   ("trun" , trun)
+  call get_parameter_real   ("tsav" , tsav)
+
+  call get_parameter_real   ("dtini", dtini)
 
 ! reset number of iterations and time, etc.
 !
