@@ -134,9 +134,15 @@ module blocks
                                  !
     type(block_meta), pointer :: meta
 
-                                 ! an allocatable array to store all variables
+                                 ! an allocatable array to store all conserved
+                                 ! variables
                                  !
     real, dimension(:,:,:,:)  , allocatable :: u
+
+                                 ! an allocatable array to store all primitive
+                                 ! variables
+                                 !
+    real, dimension(:,:,:,:)  , allocatable :: q
 
                                  ! an allocatable array to store all fluxes
                                  !
@@ -1032,9 +1038,13 @@ module blocks
     nullify(pdata%next)
     nullify(pdata%meta)
 
-! allocate space for the conserved variables
+! allocate space for conserved variables
 !
     allocate(pdata%u(nvars,nx,ny,nz))
+
+! allocate space for primitive variables
+!
+    allocate(pdata%q(nvars,nx,ny,nz))
 
 ! allocate space for the numerical fluxes
 !
