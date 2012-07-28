@@ -27,6 +27,7 @@
 !!  adaptive mesh for Newtonian and relativistic environments with or without
 !!  magnetic field.
 !!
+!!
 !!******************************************************************************
 !
 program amun
@@ -45,13 +46,13 @@ program amun
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
   use io            , only : write_data, write_restart_data, restart_job
-  use io            , only : nfile, nres
+  use io            , only : nfile
   use mesh          , only : initialize_mesh, clear_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
   use mesh          , only : redistribute_blocks
 #endif /* MPI */
-  use mpitools      , only : initialize_mpitools, finalize_mpitools
+  use mpitools      , only : initialize_mpitools, finalize_mpitools, setup_mpi
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
   use mpitools      , only : reduce_maximum_integer
@@ -74,29 +75,43 @@ program amun
 !
   implicit none
 
-! local variables
+! default parameters
 !
-  character(len=80) :: fmt, tmp
-  integer           :: ed, eh, em, es, ec, ln
-  real              :: tall, tcur, tpre, thrs, per
-
-  integer               :: nmax  = 0
+  integer, dimension(3) :: div = 1
+  logical, dimension(3) :: per = .true.
+  character             :: store = "p"
+  integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
   real                  :: dtout = 1.0d0, dtini = 1.0d-8
   real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
 
-! timer indices
+! temporary variables
 !
-  integer           :: nsteps = 1
-  integer           :: i, iin, iev, itm
-  real(kind=8)      :: tm_curr, tm_exec, tm_conv
+  character(len=64)     :: lbnd, ubnd
 
 ! the termination and status flags
 !
   integer               :: iterm, iret
 
-! an array to store execution times
+! timer indices
 !
-  real(kind=8), dimension(ntimers) :: tm
+  integer               :: iin, iev, itm
+#ifdef PROFILE
+  integer               :: ipr, ipi
+#endif /* PROFILE */
+
+! local snapshot file counters
+!
+  integer               :: nrun = 1
+  integer               :: no   = 0
+
+! iteration and time variables
+!
+  integer               :: i, ed, eh, em, es, ec
+  integer               :: nsteps = 1
+  character(len=80)     :: fmt, tmp
+
+  real                  :: tbeg, thrs
+  real(kind=8)          :: tm_curr, tm_exec, tm_conv
 
 #ifdef INTEL
 ! the type of the function SIGNAL should be defined for Intel compiler
@@ -114,8 +129,12 @@ program amun
 
 ! signal definitions
 !
-  integer, parameter :: SIGINT = 2, SIGABRT = 6, SIGTERM = 15
+  integer, parameter    :: SIGINT = 2, SIGABRT = 6, SIGTERM = 15
 #endif /* SIGNALS */
+
+! an array to store execution times
+!
+  real(kind=8), dimension(ntimers) :: tm
 
 ! common block
 !
@@ -159,19 +178,59 @@ program amun
 !
   call initialize_mpitools()
 
-! print info message
+! print the welcome message
 !
   if (master) then
+
     write (*,"(1x,78('-'))")
-    write (*,"(1x,18('='),4x,a,4x,19('='))") '             A M U N             '
+    write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2011 Grzegorz Kowal'
-#ifdef MPI
-    write (*,"(1x,18('='),4x,a,i5,a,4x,19('='))") 'MPI enabled with ', nprocs   &
-            , ' processors'
-#endif /* MPI */
+                                        'Copyright (C) 2008-2012 Grzegorz Kowal'
+    write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
+                                        'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
     write (*,*)
+
+  end if
+
+! initialize and read parameters from the parameter file
+!
+  if (master) call read_parameters(iterm)
+
+#ifdef MPI
+! broadcast the termination flag
+!
+  call bcast_integer_variable(iterm, iret)
+
+! check if the termination flag was broadcaster successfully
+!
+  if (iterm > 0) go to 20
+
+! reset the termination flag
+!
+  iterm = 0
+
+! redistribute parameters among all processors
+!
+  call redistribute_parameters(iterm)
+
+! reduce the termination flag over all processors to check if everything is fine
+!
+  call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
+
+! check if the termination flag was broadcaster successfully
+!
+  if (iterm > 0) go to 20
+
+! reset the termination flag
+!
+  iterm = 0
+
+! print configuration information
+!
+  if (master) then
+
     write (*,"(1x,a)"         ) "Physics:"
     write (*,"(4x,a,1x,a)"    ) "equations              =",                    &
 #ifdef HYDRO
@@ -189,36 +248,32 @@ program amun
 #endif /* ISO */
     write (*,"(4x,a,1x,a)"    ) "geometry               =",                    &
     "rectangular"
+
   end if
 
-! initialize and read parameters from the parameter file
+! check if the domain is periodic
 !
-  if (master) call read_parameters(iterm)
-
-#ifdef MPI
-! broadcast the termination flag
-!
-  call bcast_integer_variable(iterm, iret)
-
-! check if the termination flag was broadcaster successfully
-!
-  if (iterm .gt. 0) go to 20
-
-! reset the termination flag
-!
-  iterm = 0
-
-! redistribute parameters among all processors
-!
-  call redistribute_parameters(iterm)
-
-! reduce the termination flag over all processors to check if everything is fine
-!
-  call reduce_maximum_integer(iterm, iret)
-#endif /* MPI */
+  lbnd = "periodic"
+  ubnd = "periodic"
+  call get_parameter_string("xlbndry" , lbnd)
+  call get_parameter_string("xubndry" , ubnd)
+  per(1) = (lbnd == "periodic") .and. (ubnd == "periodic")
+  lbnd = "periodic"
+  ubnd = "periodic"
+  call get_parameter_string("ylbndry" , lbnd)
+  call get_parameter_string("yubndry" , ubnd)
+  per(2) = (lbnd == "periodic") .and. (ubnd == "periodic")
+#ifdef R3D
+  lbnd = "periodic"
+  ubnd = "periodic"
+  call get_parameter_string("zlbndry" , lbnd)
+  call get_parameter_string("zubndry" , ubnd)
+  per(3) = (lbnd == "periodic") .and. (ubnd == "periodic")
+#endif /* R3D */
 
 ! get the type of snapshot files and interval between snapshots
 !
+  call get_parameter_string ("store", store)
   call get_parameter_real   ("dtout", dtout)
 
 ! get the execution termination parameters
@@ -228,18 +283,22 @@ program amun
   call get_parameter_real   ("trun" , trun)
   call get_parameter_real   ("tsav" , tsav)
 
+! get the initial time step
+!
   call get_parameter_real   ("dtini", dtini)
 
-! reset number of iterations and time, etc.
+! get integral calculation interval
 !
-  n    = 0
-  t    = 0.0
-  dt   = cfl * dtini
-  dtn  = dtini
-  ed   = 9999
-  eh   = 23
-  em   = 59
-  es   = 59
+  call get_parameter_integer("ndat" , ndat)
+
+! get counter and interval for restart snapshots
+!
+  call get_parameter_integer("nres" , nres)
+  call get_parameter_integer("ires" , ires)
+
+! set up the MPI geometry
+!
+  call setup_mpi(div(:), per(:), .false.)
 
 ! initialize the random number generator
 !
@@ -253,17 +312,17 @@ program amun
 !
   call initialize_coordinates(master)
 
-! initialize boundaries
+! initialize module INTERPOLATIONS
 !
-  call initialize_boundaries()
+  call initialize_interpolations()
 
 ! initialize module EQUATIONS
 !
   call initialize_equations()
 
-! initialize module INTERPOLATIONS
+! initialize boundaries
 !
-  call initialize_interpolations()
+  call initialize_boundaries()
 
 ! initialize module PROBLEMS
 !
@@ -273,13 +332,16 @@ program amun
 !
   call initialize_refinement()
 
-! initialize evolution
+! reset number of iterations and time, etc.
 !
-  call initialize_evolution()
+  n    = 0
+  t    = 0.0
+  dt   = cfl * dtini
+  dtn  = dtini
 
 ! check if we initiate new problem or restart previous job
 !
-  if (nres .lt. 0) then
+  if (nres < 0) then
 
 ! initialize the mesh module
 !
@@ -351,6 +413,43 @@ program amun
   call initialize_forcing()
 #endif /* FORCE */
 
+! initialize evolution
+!
+  call initialize_evolution()
+
+#ifdef MPI
+! reduce termination flag over all processors
+!
+  call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
+
+! check if the problem was successfully initialized or restarted
+!
+  if (iterm > 0) go to 10
+
+! store integrals and data to a file
+!
+  if (nres < 0) then
+
+    call store_integrals()
+    call write_data()
+
+#ifdef MPI
+! reduce termination flag over all processors
+!
+    call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
+
+  end if
+
+! if the initial data were not successfully writen, exit the program
+!
+  if (iterm > 0) go to 10
+
+! reset the termination flag
+!
+  iterm = 0
+
 ! stop time accounting for the initialization
 !
   call stop_timer(iin)
@@ -359,10 +458,25 @@ program amun
 !
   call start_timer(iev)
 
-! print information
+! get current time in seconds
+!
+  if (master) &
+    tbeg = t
+
+! print progress info on master processor
 !
   if (master) then
-    write(*,*          )
+
+! initialize estimated remaining time of calculations
+!
+    ed = 9999
+    eh =   23
+    em =   59
+    es =   59
+
+! print progress info
+!
+    write(*,*)
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
@@ -375,15 +489,12 @@ program amun
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
-  end if
 
-! set the previous time needed to estimate the execution time
-!
-  tpre = get_timer_total()
+  end if
 
 ! main loop
 !
-  do while((n .lt. nmax) .and. (t .le. tmax) .and. (iterm .eq. 0))
+  do while((nsteps < nmax) .and. (t <= tmax) .and. (iterm == 0))
 
 ! compute new time step
 !
@@ -399,6 +510,7 @@ program amun
 !
     t  = t + dt
     n  = n + 1
+    nsteps = nsteps + 1
 
 ! performe one step evolution
 !
@@ -414,24 +526,36 @@ program amun
 
 ! store data
 !
-    if (dtout .gt. 0.0 .and. nfile .lt. (int(t/dtout))) then
+    if (dtout > 0.0d0 .and. nfile < (int(t/dtout))) then
       call write_data()
     end if
 
 ! get current time in seconds
 !
-    tcur = get_timer_total()
-    ec   = int((tmax - t) * (tcur - tpre) / dt, kind=4)
-    es   = max(0, int(mod(ec,60)))
-    em   = int(mod(ec/60,60))
-    eh   = int(ec/3600)
-    ed   = int(eh/24)
-    eh   = int(mod(eh, 24))
-    ed   = min(9999,ed)
+    tm_curr = get_timer_total()
 
-! print progress information
+! compute elapsed time
 !
-    if (master)                                                           &
+    thrs = (tm_curr / 60.0 + tsav) / 60.0
+
+! check if the time exceeds execution time limit
+!
+    if (thrs >= trun) iterm = 100
+
+! print progress info to console
+!
+    if (master) then
+
+! calculate days, hours, seconds
+!
+      ec   = int(tm_curr * (tmax - t) / max(1.0e-8, t - tbeg), kind = 4)
+      es   = max(0, int(mod(ec, 60)))
+      em   = int(mod(ec / 60, 60))
+      eh   = int(ec / 3600)
+      ed   = int(eh / 24)
+      eh   = int(mod(eh, 24))
+      ed   = min(9999,ed)
+
 #if defined INTEL || defined PATHSCALE
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
@@ -442,24 +566,18 @@ program amun
                               n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
 
-! obtain the time in hours
-!
-    thrs = ((2.0 * tcur - tpre) / 60.0 + tsav) / 60.0
+    end if
 
-! terminate if the (thrs + tsav) > trun
+! prepare iterm
 !
-    if (thrs .gt. trun) iterm = 1
+    iterm = max(iterm, iret)
 
-! update the previous time
-!
-    tpre = tcur
-
-#if defined SIGNALS && defined MPI
+#ifdef MPI
 ! reduce termination flag over all processors
 !
     call reduce_maximum_integer(iterm, iret)
-    iterm = iret
-#endif /* SIGNALS & MPI */
+#endif /* MPI */
+
   end do
 
 ! add one empty line
@@ -477,6 +595,11 @@ program amun
 ! write down the restart dump
 !
   call write_restart_data()
+
+! a label to go to if there are any problems, but since all modules have been
+! initialized, we have to finalize them first
+!
+10 continue
 
 #ifdef FORCE
 ! finalize forcing module
@@ -578,30 +701,30 @@ program amun
 
 ! print info about termination due to a signal
 !
-    if (iterm .ge. 1 .and. iterm .le. 32) then
+    if (iterm >= 1 .and. iterm <= 32) then
       write (*,'(a)') ''
       write (*,"(1x,a,i2)") "Terminating program after receiving a" //         &
                                          " termination signal no. ", iterm
       write (*,"(1x,a)") "Restart files have been successfully written."
     end if
-    if (iterm .eq. 100) then
+    if (iterm == 100) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "Terminating program after exceeding the" //          &
                                                             " execution time."
       write (*,"(1x,a)") "Restart files have been successfully written."
     end if
-    if (iterm .ge. 101) then
+    if (iterm >= 101) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "The initial conditions for the selected problem" //  &
                          " could not be set."
       write (*,"(1x,a)") "Program has been terminated."
     end if
-    if (iterm .ge. 120 .and. iterm .lt. 125) then
+    if (iterm >= 120 .and. iterm < 125) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "Problem with restarting job from restart snapshots."
       write (*,"(1x,a)") "Program has been terminated."
     end if
-    if (iterm .ge. 125 .and. iterm .lt. 130) then
+    if (iterm >= 125 .and. iterm < 130) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "Problem with storing snapshots."
       write (*,"(1x,a)") "Program has been terminated."
@@ -629,7 +752,11 @@ end program
 !
 !===============================================================================
 !
-! terminate: subroutine sets the iterm variable after receiving a signal
+! function TERMINATE:
+! ------------------
+!
+!   Function sets variable iterm after receiving a signal.
+!
 !
 !===============================================================================
 !

@@ -236,7 +236,7 @@ module mpitools
 !
 !===============================================================================
 !
-  subroutine setup_mpi(div, per)
+  subroutine setup_mpi(div, per, set)
 
 ! include external procedures and variables
 !
@@ -252,6 +252,7 @@ module mpitools
 !
     integer, dimension(3), intent(in) :: div
     logical, dimension(3), intent(in) :: per
+    logical              , intent(in) :: set
 
 ! local variables
 !
@@ -264,108 +265,114 @@ module mpitools
 !
     call start_timer(imi)
 
-! check if the total number of chunks in division corresponds to the number of
-! processes, if not try to find the best division
-!
-    if (nprocs .ne. product(div(:))) then
-
-      if (master) then
-        write(*,*) 'The number of MPI processes does not correspond to'        &
-                                              // ' the number of domain chunks!'
-        write(*,*) 'Looking for the best division...'
-      end if
-
-! try to find the best division
-!
-      pdims(:) = 1
-      iret      = 0
-
-      do while(product(pdims(:)) .lt. nprocs)
-#ifdef R3D
-        iret = mod(iret, 3) + 1
-#else /* R3D */
-        iret = mod(iret, 2) + 1
-#endif /* R3D */
-        pdims(iret) = 2 * pdims(iret)
-      end do
-
-! check if the best division found
-!
-      if (product(pdims(:)) .ne. nprocs) then
-
-        if (master) then
-          write(*,*) 'Improssible to find the best domain division! Exiting...'
-          write(*,*)
-        end if
-
-        call finalize_mpitools()
-        stop
-
-      end if
-
-      if (master) then
-        write(*,*) 'Found the best division:', pdims(:)
-        write(*,*)
-      end if
-
-    else
-
-! substitute div(:) to pdims(:)
-!
-      pdims(:) = div(:)
-
-    end if
-
 ! set the periodic flag
 !
     periodic(:) = per(:)
 
+! if set = .true. set the MPI domain
+!
+    if (set) then
+
+! check if the total number of chunks in division corresponds to the number of
+! processes, if not try to find the best division
+!
+      if (nprocs .ne. product(div(:))) then
+
+        if (master) then
+          write(*,*) 'The number of MPI processes does not correspond to'      &
+                                            // ' the number of domain chunks!'
+          write(*,*) 'Looking for the best division...'
+        end if
+
+! try to find the best division
+!
+        pdims(:) = 1
+        iret      = 0
+
+        do while(product(pdims(:)) .lt. nprocs)
+#ifdef R3D
+          iret = mod(iret, 3) + 1
+#else /* R3D */
+          iret = mod(iret, 2) + 1
+#endif /* R3D */
+          pdims(iret) = 2 * pdims(iret)
+        end do
+
+! check if the best division found
+!
+        if (product(pdims(:)) .ne. nprocs) then
+
+          if (master) then
+            write(*,*) 'Improssible to find the best domain division! Exiting...'
+            write(*,*)
+          end if
+
+          call finalize_mpitools()
+          stop
+
+        end if
+
+        if (master) then
+          write(*,*) 'Found the best division:', pdims(:)
+          write(*,*)
+        end if
+
+      else
+
+! substitute div(:) to pdims(:)
+!
+        pdims(:) = div(:)
+
+      end if
+
 ! set up the Cartesian geometry
 !
-    call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)              &
+      call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)            &
                                                        , .true., comm3d, iret)
 
-    if (iret .ne. mpi_success) then
+      if (iret .ne. mpi_success) then
 
-      if (master) then
-        write(*,*) 'The MPI could not create the Cartesian geometry! Exiting...'
-        write(*,*)
+        if (master) then
+          write(*,*) 'The MPI could not create the Cartesian geometry! Exiting...'
+          write(*,*)
+        end if
+        stop
+
       end if
-      stop
-
-    end if
 
 ! assign process coordinate
 !
-    call mpi_cart_coords(comm3d, nproc, 3, pcoords(:), iret)
+      call mpi_cart_coords(comm3d, nproc, 3, pcoords(:), iret)
 
-    if (iret .ne. mpi_success) then
+      if (iret .ne. mpi_success) then
 
-      if (master) then
-        write(*,*) 'The MPI could not assign process coordinates! Exiting...'
-        write(*,*)
+        if (master) then
+          write(*,*) 'The MPI could not assign process coordinates! Exiting...'
+          write(*,*)
+        end if
+        stop
+
       end if
-      stop
-
-    end if
 
 ! set the neighbors
 !
-    if (pdims(1) .gt. 1) then
-      call mpi_cart_shift(comm3d, 0, 1, pneighs(1,1), pneighs(1,2), iret)
-    end if
-    if (pdims(2) .gt. 1) then
-      call mpi_cart_shift(comm3d, 1, 1, pneighs(2,1), pneighs(2,2), iret)
-    end if
-    if (pdims(3) .gt. 1) then
-      call mpi_cart_shift(comm3d, 2, 1, pneighs(3,1), pneighs(3,2), iret)
-    end if
+      if (pdims(1) .gt. 1) then
+        call mpi_cart_shift(comm3d, 0, 1, pneighs(1,1), pneighs(1,2), iret)
+      end if
+      if (pdims(2) .gt. 1) then
+        call mpi_cart_shift(comm3d, 1, 1, pneighs(2,1), pneighs(2,2), iret)
+      end if
+      if (pdims(3) .gt. 1) then
+        call mpi_cart_shift(comm3d, 2, 1, pneighs(3,1), pneighs(3,2), iret)
+      end if
 
 ! set parity flag
 !
-    pparity(1) = mod(pcoords(1), 2)
-    pparity(2) = mod(pcoords(2), 2)
-    pparity(3) = mod(pcoords(3), 2)
+      pparity(1) = mod(pcoords(1), 2)
+      pparity(2) = mod(pcoords(2), 2)
+      pparity(3) = mod(pcoords(3), 2)
+
+    end if
 
 ! stop time accounting for the MPI initialization
 !
