@@ -234,7 +234,7 @@ parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o coordinates.o equations.o error.o     \
                    parameters.o variables.o
 refinement.o     : refinement.F90 blocks.o coordinates.o parameters.o          \
-                   scheme.o variables.o
+                   variables.o
 scheme.o         : scheme.F90 blocks.o coordinates.o interpolations.o          \
                    variables.o
 random.o         : random.F90 mpitools.o parameters.o
