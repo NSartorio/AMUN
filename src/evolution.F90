@@ -371,10 +371,8 @@ module evolution
 !
     use blocks     , only : block_data, list_data
     use boundaries , only : boundary_variables
-    use boundaries , only : boundary_correct_fluxes
     use coordinates, only : im, jm, km
     use coordinates, only : adx, ady, adz
-    use scheme     , only : update_flux
     use variables  , only : nt, nfl
 
 ! local variables are not implicit by default
@@ -397,34 +395,9 @@ module evolution
 !-------------------------------------------------------------------------------
 !
 #ifdef CONSERVATIVE
-! iterate over all data blocks and calculate the first step of
-! the RK2 integration
+! update fluxes for the first step of the RK2 integration
 !
-    pblock => list_data
-    do while (associated(pblock))
-
-! obtain dx, dy, and dz for the current block
-!
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
-
-! calculate the flux from U0
-!
-      do n = 1, NDIMS
-        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
-      end do
-
-! assign pointer to the next block
-!
-      pblock => pblock%next
-
-    end do
-
-! correct the numerical fluxes between neighboring blocks which are at different
-! levels
-!
-    call boundary_correct_fluxes()
+    call update_fluxes()
 
 ! update the solution using numerical fluxes stored in the data blocks
 !
@@ -488,34 +461,9 @@ module evolution
 !
     call boundary_variables()
 
-! iterate over all data blocks and calculate the second step of
-! the RK2 integration
+! update fluxes for the second step of the RK2 integration
 !
-    pblock => list_data
-    do while (associated(pblock))
-
-! obtain dx, dy, and dz for the current block
-!
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
-
-! calculate the flux from U0
-!
-      do n = 1, NDIMS
-        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
-      end do
-
-! assign pointer to the next block
-!
-      pblock => pblock%next
-
-    end do
-
-! correct the numerical fluxes between neighboring blocks which are at different
-! levels
-!
-    call boundary_correct_fluxes()
+    call update_fluxes()
 
 ! update the solution using numerical fluxes stored in the data blocks
 !
@@ -583,6 +531,74 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine advance_rk2
+!
+!===============================================================================
+!
+! subroutine UPDATE_FLUXES:
+! ------------------------
+!
+!   Subroutine iterates over all data blocks and calculates the numerical
+!   fluxes for each block.  After the fluxes are updated, they are corrected
+!   for blocks which have neighbours at higher refinement level.
+!
+!
+!===============================================================================
+!
+  subroutine update_fluxes()
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data, list_data
+    use boundaries , only : boundary_correct_fluxes
+    use coordinates, only : adx, ady, adz
+    use scheme     , only : update_flux
+    use variables  , only : nt, nfl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer    :: pblock
+
+! local vectors
+!
+    real, dimension(3)           :: dx
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dx(1) = adx(pblock%meta%level)
+      dx(2) = ady(pblock%meta%level)
+      dx(3) = adz(pblock%meta%level)
+
+! update the flux for the current block
+!
+      do n = 1, NDIMS
+        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
+      end do
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! correct the numerical fluxes of the blocks which have neighbours at higher
+! level
+!
+    call boundary_correct_fluxes()
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_fluxes
 !
 !===============================================================================
 !
