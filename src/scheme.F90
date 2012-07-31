@@ -605,6 +605,7 @@ module scheme
 !
   subroutine hll(n, h, q, f)
 
+    use equations     , only : prim2cons
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : ivx, ivy, ivz
@@ -730,6 +731,7 @@ module scheme
 !
   subroutine hllc(n, h, q, f)
 
+    use equations     , only : prim2cons
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -934,6 +936,7 @@ module scheme
 !
   subroutine hlld(n, h, q, f)
 
+    use equations     , only : prim2cons
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : idn, imx, imy, imz, ivx, ivy, ivz
@@ -1181,6 +1184,7 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
+    use equations     , only : prim2cons
     use equations     , only : gamma
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -2132,70 +2136,6 @@ module scheme
 !-------------------------------------------------------------------------------
 !
   end subroutine fluxspeed
-!
-!===============================================================================
-!
-! prim2cons: subroutine converts primitive variables to conservative
-!
-!===============================================================================
-!
-  subroutine prim2cons(n, q, u)
-
-    use equations, only : gammam1i
-    use variables, only : nvr
-    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr, ien
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-    implicit none
-
-! input/output arguments
-!
-    integer               , intent(in)  :: n
-    real, dimension(nvr,n), intent(in)  :: q
-    real, dimension(nvr,n), intent(out) :: u
-
-! local variables
-!
-    integer :: i
-    real    :: ei, ek, em
-!
-!-------------------------------------------------------------------------------
-!
-    do i = 1, n
-      u(idn,i) = q(idn,i)
-      u(imx,i) = q(idn,i) * q(ivx,i)
-      u(imy,i) = q(idn,i) * q(ivy,i)
-      u(imz,i) = q(idn,i) * q(ivz,i)
-#ifdef ADI
-      ei       = gammam1i * q(ipr,i)
-      ek       = 0.5 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      u(ien,i) = ei + ek
-#endif /* ADI */
-#ifdef MHD
-#ifdef ADI
-      em       = 0.5 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      u(ien,i) = u(ien,i) + em
-#endif /* ADI */
-      u(ibx,i) = q(ibx,i)
-      u(iby,i) = q(iby,i)
-      u(ibz,i) = q(ibz,i)
-#ifdef GLM
-      u(iph,i) = q(iph,i)
-#endif /* GLM */
-#endif /* MHD */
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine prim2cons
 !
 !===============================================================================
 !
