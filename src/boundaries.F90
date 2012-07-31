@@ -1612,7 +1612,7 @@ module boundaries
     integer :: idir, iside, iface
     integer :: is, js, ks
 #ifdef MPI
-    integer :: irecv, isend, nblocks, itag, l
+    integer :: irecv, isend, nblocks, itag, l, iret
 
 ! local arrays
 !
@@ -1875,7 +1875,7 @@ module boundaries
 
 ! send data buffer
 !
-              call send_arra_real(size(rbuf(:,:,:,:)), irecv, itag, rbuf(:,:,:,:), iret)
+              call send_real_array(size(rbuf(:,:,:,:)), irecv, itag, rbuf(:,:,:,:), iret)
 
             end if ! isend = nproc
 
