@@ -515,7 +515,7 @@ module evolution
 ! update the flux for the current block
 !
       do n = 1, NDIMS
-        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
+        call update_flux(n, dx(n), pblock%q(:,:,:,:), pblock%f(n,:,:,:,:))
       end do
 
 ! assign pointer to the next block

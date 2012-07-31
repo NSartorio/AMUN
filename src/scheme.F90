@@ -43,18 +43,18 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine update_flux(idir, dh, u, f)
+  subroutine update_flux(idir, dx, q, f)
 
     use coordinates, only : im, jm, km
-    use variables    , only : nqt, nfl
-    use variables    , only : idn, imx, imy, imz
+    use variables  , only : nqt, nfl
+    use variables  , only : idn, ivx, ivy, ivz, imx, imy, imz
 #ifdef ADI
-    use variables    , only : ien
+    use variables  , only : ipr, ien
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use variables  , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use variables  , only : iph
 #endif /* GLM */
 #endif /* MHD */
 
@@ -63,8 +63,8 @@ module scheme
 ! input arguments
 !
     integer                      , intent(in)  :: idir
-    real                         , intent(in)  :: dh
-    real, dimension(nqt,im,jm,km), intent(in)  :: u
+    real                         , intent(in)  :: dx
+    real, dimension(nqt,im,jm,km), intent(in)  :: q
     real, dimension(nqt,im,jm,km), intent(out) :: f
 
 ! local variables
@@ -73,10 +73,10 @@ module scheme
 
 ! local temporary arrays
 !
-    real, dimension(nqt,im)       :: ux, fx
-    real, dimension(nqt,jm)       :: uy, fy
+    real, dimension(nqt,im)       :: qx, fx
+    real, dimension(nqt,jm)       :: qy, fy
 #if NDIMS == 3
-    real, dimension(nqt,km)       :: uz, fz
+    real, dimension(nqt,km)       :: qz, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -98,19 +98,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
           do i = 1, im
-            ux(idn,i) = u(idn,i,j,k)
-            ux(imx,i) = u(imx,i,j,k)
-            ux(imy,i) = u(imy,i,j,k)
-            ux(imz,i) = u(imz,i,j,k)
+            qx(idn,i) = q(idn,i,j,k)
+            qx(imx,i) = q(ivx,i,j,k)
+            qx(imy,i) = q(ivy,i,j,k)
+            qx(imz,i) = q(ivz,i,j,k)
 #ifdef ADI
-            ux(ien,i) = u(ien,i,j,k)
+            qx(ien,i) = q(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-            ux(ibx,i) = u(ibx,i,j,k)
-            ux(iby,i) = u(iby,i,j,k)
-            ux(ibz,i) = u(ibz,i,j,k)
+            qx(ibx,i) = q(ibx,i,j,k)
+            qx(iby,i) = q(iby,i,j,k)
+            qx(ibz,i) = q(ibz,i,j,k)
 #ifdef GLM
-            ux(iph,i) = u(iph,i,j,k)
+            qx(iph,i) = q(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
           end do
@@ -118,16 +118,16 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-          call hll (im, dh, ux(:,:), fx(:,:))
+          call hll (im, dx, qx(:,:), fx(:,:))
 #endif /* HLL */
 #ifdef HLLC
-          call hllc(im, dh, ux(:,:), fx(:,:))
+          call hllc(im, dx, qx(:,:), fx(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-          call hlld(im, dh, ux(:,:), fx(:,:))
+          call hlld(im, dx, qx(:,:), fx(:,:))
 #endif /* HLLD */
 #ifdef ROE
-          call roe (im, dh, ux(:,:), fx(:,:))
+          call roe (im, dx, qx(:,:), fx(:,:))
 #endif /* ROE */
 
 ! insert the flux for a given stencil
@@ -171,19 +171,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
           do j = 1, jm
-            uy(idn,j) = u(idn,i,j,k)
-            uy(imx,j) = u(imy,i,j,k)
-            uy(imy,j) = u(imz,i,j,k)
-            uy(imz,j) = u(imx,i,j,k)
+            qy(idn,j) = q(idn,i,j,k)
+            qy(ivx,j) = q(ivy,i,j,k)
+            qy(ivy,j) = q(ivz,i,j,k)
+            qy(ivz,j) = q(ivx,i,j,k)
 #ifdef ADI
-            uy(ien,j) = u(ien,i,j,k)
+            qy(ien,j) = q(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-            uy(ibx,j) = u(iby,i,j,k)
-            uy(iby,j) = u(ibz,i,j,k)
-            uy(ibz,j) = u(ibx,i,j,k)
+            qy(ibx,j) = q(iby,i,j,k)
+            qy(iby,j) = q(ibz,i,j,k)
+            qy(ibz,j) = q(ibx,i,j,k)
 #ifdef GLM
-            uy(iph,j) = u(iph,i,j,k)
+            qy(iph,j) = q(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
           end do
@@ -191,16 +191,16 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-          call hll (jm, dh, uy(:,:), fy(:,:))
+          call hll (jm, dx, qy(:,:), fy(:,:))
 #endif /* HLL */
 #ifdef HLLC
-          call hllc(jm, dh, uy(:,:), fy(:,:))
+          call hllc(jm, dx, qy(:,:), fy(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-          call hlld(jm, dh, uy(:,:), fy(:,:))
+          call hlld(jm, dx, qy(:,:), fy(:,:))
 #endif /* HLLD */
 #ifdef ROE
-          call roe (jm, dh, uy(:,:), fy(:,:))
+          call roe (jm, dx, qy(:,:), fy(:,:))
 #endif /* ROE */
 
 ! insert the flux for a given stencil
@@ -245,19 +245,19 @@ module scheme
 ! copy directional vectors of variables for the one dimensional solver
 !
           do k = 1, km
-            uz(idn,k) = u(idn,i,j,k)
-            uz(imx,k) = u(imz,i,j,k)
-            uz(imy,k) = u(imx,i,j,k)
-            uz(imz,k) = u(imy,i,j,k)
+            qz(idn,k) = q(idn,i,j,k)
+            qz(ivx,k) = q(ivz,i,j,k)
+            qz(ivy,k) = q(ivx,i,j,k)
+            qz(ivz,k) = q(ivy,i,j,k)
 #ifdef ADI
-            uz(ien,k) = u(ien,i,j,k)
+            qz(ien,k) = q(ien,i,j,k)
 #endif /* ADI */
 #ifdef MHD
-            uz(ibx,k) = u(ibz,i,j,k)
-            uz(iby,k) = u(ibx,i,j,k)
-            uz(ibz,k) = u(iby,i,j,k)
+            qz(ibx,k) = q(ibz,i,j,k)
+            qz(iby,k) = q(ibx,i,j,k)
+            qz(ibz,k) = q(iby,i,j,k)
 #ifdef GLM
-            uz(iph,k) = u(iph,i,j,k)
+            qz(iph,k) = q(iph,i,j,k)
 #endif /* GLM */
 #endif /* MHD */
           end do
@@ -265,16 +265,16 @@ module scheme
 ! execute solver (returns fluxes for the update)
 !
 #ifdef HLL
-          call hll (km, dh, uz(:,:), fz(:,:))
+          call hll (km, dx, qz(:,:), fz(:,:))
 #endif /* HLL */
 #ifdef HLLC
-          call hllc(km, dh, uz(:,:), fz(:,:))
+          call hllc(km, dx, qz(:,:), fz(:,:))
 #endif /* HLLC */
 #ifdef HLLD
-          call hlld(km, dh, uz(:,:), fz(:,:))
+          call hlld(km, dx, qz(:,:), fz(:,:))
 #endif /* HLLD */
 #ifdef ROE
-          call roe (km, dh, uz(:,:), fz(:,:))
+          call roe (km, dx, qz(:,:), fz(:,:))
 #endif /* ROE */
 
 ! insert the flux for a given stencil
@@ -732,7 +732,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hllc(n, h, u, f)
+  subroutine hllc(n, h, q, f)
 
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -744,13 +744,13 @@ module scheme
 !
     integer               , intent(in)  :: n
     real                  , intent(in)  :: h
-    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nvr,n), intent(in)  :: q
     real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
     integer                :: p, i, ip1
-    real, dimension(nvr,n) :: ql, qr, q, ul, ur
+    real, dimension(nvr,n) :: ql, qr, ul, ur
     real, dimension(nfl,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr, cm
     real                   :: sl, sr, sm, sml, smr, srmv, slmv, srmm, slmm     &
@@ -759,10 +759,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! obtain the primitive variables
-!
-    call cons2prim(n, u(:,:), q(:,:))
-
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
