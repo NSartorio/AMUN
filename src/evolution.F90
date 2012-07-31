@@ -394,7 +394,6 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef CONSERVATIVE
 ! update fluxes for the first step of the RK2 integration
 !
     call update_fluxes()
@@ -526,7 +525,6 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
-#endif /* CONSERVATIVE */
 
 !-------------------------------------------------------------------------------
 !
