@@ -726,7 +726,7 @@ module evolution
 
 ! obtain the maximum speed for the current block
 !
-        cm = maxspeed(pdata%u(:,:,:,:))
+        cm = maxspeed(pdata%q(:,:,:,:))
 
 ! compare global and local maximum speeds
 !

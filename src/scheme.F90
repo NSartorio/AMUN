@@ -603,7 +603,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hll(n, h, u, f)
+  subroutine hll(n, h, q, f)
 
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -624,23 +624,19 @@ module scheme
 !
     integer               , intent(in)  :: n
     real                  , intent(in)  :: h
-    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nvr,n), intent(in)  :: q
     real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
     integer                :: p, i, ip1
-    real, dimension(nvr,n) :: q, ql, qr, ul, ur
+    real, dimension(nvr,n) :: ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real                   :: al, ar, ap, div
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the primitive variables
-!
-    call cons2prim(n, u(:,:), q(:,:))
-
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
@@ -936,7 +932,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine hlld(n, h, u, f)
+  subroutine hlld(n, h, q, f)
 
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -952,13 +948,13 @@ module scheme
 !
     integer               , intent(in)  :: n
     real                  , intent(in)  :: h
-    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nvr,n), intent(in)  :: q
     real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
     integer                :: p, i, ip1
-    real, dimension(nvr,n) :: q, ql, qr, ul, ur
+    real, dimension(nvr,n) :: ql, qr, ul, ur
     real, dimension(nqt,n) :: fl, fr, fn
     real, dimension(n)     :: cl, cr
     real, dimension(nvr)   :: u1l, u1r, u2
@@ -967,10 +963,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the primitive variables
-!
-    call cons2prim(n, u, q)
-
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
@@ -1220,10 +1212,6 @@ module scheme
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the primitive variables
-!
-    call cons2prim(n, u, q)
-
 ! reconstruct the left and right states of the primitive variables
 !
     do p = 1, nfl
@@ -1539,7 +1527,7 @@ module scheme
 !
 !===============================================================================
 !
-  subroutine roe(n, h, u, f)
+  subroutine roe(n, h, q, f)
 
     use equations     , only : gamma
     use interpolations, only : reconstruct
@@ -1561,13 +1549,13 @@ module scheme
 !
     integer               , intent(in)  :: n
     real                  , intent(in)  :: h
-    real, dimension(nvr,n), intent(in)  :: u
+    real, dimension(nvr,n), intent(in)  :: q
     real, dimension(nqt,n), intent(out) :: f
 
 ! local variables
 !
     integer                  :: p, i, ip1
-    real, dimension(nvr,n)   :: q, ql, qr, ul, ur
+    real, dimension(nvr,n)   :: ql, qr, ul, ur
     real, dimension(nqt,n)   :: fl, fr, fn
     real, dimension(n)       :: cl, cr
     real, dimension(nqt)     :: qi, ci, et, du
@@ -1585,10 +1573,6 @@ module scheme
     ci(:)   = 0.0d0
     li(:,:) = 0.0d0
     ri(:,:) = 0.0d0
-
-! calculate the primitive variables
-!
-    call cons2prim(n, u(:,:), q(:,:))
 
 ! reconstruct the left and right states of the primitive variables
 !
@@ -2151,72 +2135,6 @@ module scheme
 !
 !===============================================================================
 !
-! cons2prim: subroutine converts primitive variables to conservative
-!
-!===============================================================================
-!
-  subroutine cons2prim(n, u, q)
-
-    use equations, only : gammam1
-    use variables, only : nvr
-    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr, ien
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-    implicit none
-
-! input/output arguments
-!
-    integer               , intent(in)  :: n
-    real, dimension(nvr,n), intent(in)  :: u
-    real, dimension(nvr,n), intent(out) :: q
-
-! local variables
-!
-    integer :: i
-    real    :: dni, ei, ek, em
-!
-!-------------------------------------------------------------------------------
-!
-    do i = 1, n
-      dni      = 1.0 / u(idn,i)
-
-      q(idn,i) =       u(idn,i)
-      q(ivx,i) = dni * u(imx,i)
-      q(ivy,i) = dni * u(imy,i)
-      q(ivz,i) = dni * u(imz,i)
-#ifdef ADI
-      ek       = 0.5 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      ei       = u(ien,i) - ek
-#ifdef MHD
-      em       = 0.5 * sum(u(ibx:ibz,i) * u(ibx:ibz,i))
-      ei       = ei - em
-#endif /* MHD */
-      q(ipr,i) = gammam1 * ei
-#endif /* ADI */
-#ifdef MHD
-      q(ibx,i) = u(ibx,i)
-      q(iby,i) = u(iby,i)
-      q(ibz,i) = u(ibz,i)
-#ifdef GLM
-      q(iph,i) = u(iph,i)
-#endif /* GLM */
-#endif /* MHD */
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine cons2prim
-!
-!===============================================================================
-!
 ! prim2cons: subroutine converts primitive variables to conservative
 !
 !===============================================================================
@@ -2285,7 +2203,7 @@ module scheme
 !
 !===============================================================================
 !
-  function maxspeed(u)
+  function maxspeed(q)
 
     use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
 #ifdef ADI
@@ -2307,7 +2225,7 @@ module scheme
 
 ! input arguments
 !
-    real, dimension(nqt,im,jm,km), intent(in)  :: u
+    real, dimension(nqt,im,jm,km), intent(in)  :: q
 
 ! local variables
 !
@@ -2317,10 +2235,6 @@ module scheme
     real    :: bb
 #endif /* MHD */
     real    :: maxspeed
-
-! local arrays
-!
-    real, dimension(nvr,im)       :: q
 !
 !-------------------------------------------------------------------------------
 !
@@ -2331,30 +2245,28 @@ module scheme
     do k = kb, ke
       do j = jb, je
 
-        call cons2prim(im, u(1:nqt,1:im,j,k), q(1:nqt,1:im))
-
         do i = ib, ie
 
 ! calculate the velocity
 !
-          vv = sum(q(ivx:ivz,i)**2)
+          vv = sum(q(ivx:ivz,i,j,k)**2)
           v  = sqrt(vv)
 #ifdef MHD
-          bb = sum(q(ibx:ibz,i)**2)
+          bb = sum(q(ibx:ibz,i,j,k)**2)
 #endif /* MHD */
 
 ! calculate the maximum characteristic speed
 !
 #ifdef MHD
 #ifdef ADI
-          c = sqrt((gamma * q(ipr,i) + bb) / q(idn,i))
+          c = sqrt((gamma * q(ipr,i,j,k) + bb) / q(idn,i,j,k))
 #endif /* ADI */
 #ifdef ISO
-          c = sqrt(csnd2 + bb / q(idn,i))
+          c = sqrt(csnd2 + bb / q(idn,i,j,k))
 #endif /* ISO */
 #else /* MHD */
 #ifdef ADI
-          c = sqrt(gamma * q(ipr,i) / q(idn,i))
+          c = sqrt(gamma * q(ipr,i,j,k) / q(idn,i,j,k))
 #endif /* ADI */
 #ifdef ISO
           c = csnd
