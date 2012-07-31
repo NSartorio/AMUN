@@ -605,7 +605,7 @@ module scheme
 !
   subroutine hll(n, h, q, f)
 
-    use equations     , only : prim2cons
+    use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : ivx, ivy, ivz
@@ -731,7 +731,7 @@ module scheme
 !
   subroutine hllc(n, h, q, f)
 
-    use equations     , only : prim2cons
+    use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : idn, imx, imy, imz, ien, ivx, ivy, ivz, ipr
@@ -936,7 +936,7 @@ module scheme
 !
   subroutine hlld(n, h, q, f)
 
-    use equations     , only : prim2cons
+    use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
     use variables     , only : idn, imx, imy, imz, ivx, ivy, ivz
@@ -1184,7 +1184,7 @@ module scheme
 !
   subroutine hlld(n, h, u, f)
 
-    use equations     , only : prim2cons
+    use equations     , only : prim2cons, fluxspeed
     use equations     , only : gamma
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -1533,6 +1533,7 @@ module scheme
 !
   subroutine roe(n, h, q, f)
 
+    use equations     , only : prim2cons, fluxspeed
     use equations     , only : gamma
     use interpolations, only : reconstruct
     use variables     , only : nvr, nfl, nqt
@@ -2031,111 +2032,6 @@ module scheme
 #endif /* ISO */
 #endif /* MHD */
 #endif /* ROE */
-!
-!===============================================================================
-!
-! fluxspeed: subroutine computes fluxes and speeds for a given set of equations
-!
-!===============================================================================
-!
-  subroutine fluxspeed(n, q, u, f, c)
-
-#ifdef ADI
-    use equations, only : gamma
-#endif /* ADI */
-#ifdef ISO
-    use equations, only : csnd, csnd2
-#endif /* ISO */
-    use variables, only : nvr, nqt
-    use variables, only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables, only : ipr, ien
-#endif /* ADI */
-#ifdef MHD
-    use variables, only : ibx, iby, ibz
-#ifdef GLM
-    use variables, only : iph
-#endif /* GLM */
-#endif /* MHD */
-
-    implicit none
-
-! input/output arguments
-!
-    integer               , intent(in)  :: n
-    real, dimension(nvr,n), intent(in)  :: q, u
-    real, dimension(nqt,n), intent(out) :: f
-    real, dimension(n)    , intent(out) :: c
-
-! local variables
-!
-    integer :: i
-    real    :: bb, pm, vb, cs, cb, ca
-!
-!-------------------------------------------------------------------------------
-!
-! sweep over all points
-!
-    do i = 1, n
-
-! compute fluxes
-!
-      f(idn,i) = u(imx,i)
-#ifdef ADI
-      f(imx,i) = q(ivx,i) * u(imx,i) + q(ipr,i)
-#endif /* ADI */
-#ifdef ISO
-      f(imx,i) = q(ivx,i) * u(imx,i) + q(idn,i) * csnd2
-#endif /* ISO */
-      f(imy,i) = q(ivx,i) * u(imy,i)
-      f(imz,i) = q(ivx,i) * u(imz,i)
-#ifdef ADI
-      f(ien,i) = q(ivx,i) * (u(ien,i) + q(ipr,i))
-#endif /* ADI */
-#ifdef MHD
-      bb       = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      pm       = 0.5 * bb
-      vb       = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
-      f(imx,i) = f(imx,i) - q(ibx,i) * q(ibx,i) + pm
-      f(imy,i) = f(imy,i) - q(ibx,i) * q(iby,i)
-      f(imz,i) = f(imz,i) - q(ibx,i) * q(ibz,i)
-#ifdef ADI
-      f(ien,i) = f(ien,i) + q(ivx,i) * pm - q(ibx,i) * vb
-#endif /* ADI */
-      f(ibx,i) = 0.0d0
-      f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
-      f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
-#ifdef GLM
-      f(ibx,i) = q(iph,i)
-      f(iph,i) = q(ibx,i)
-#endif /* GLM */
-#endif /* MHD */
-
-! compute speeds
-!
-#ifdef MHD
-#ifdef ADI
-      cs = gamma * q(ipr,i)
-#endif /* ADI */
-#ifdef ISO
-      cs = csnd2 * q(idn,i)
-#endif /* ISO */
-      cb = cs + bb
-      ca = q(ibx,i) * q(ibx,i)
-      c(i) = sqrt(0.5 * (cb + sqrt(max(0.0, cb * cb - 4.0 * cs * ca))) / q(idn,i))
-#else /* MHD */
-#ifdef ADI
-      c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
-#endif /* ADI */
-#ifdef ISO
-      c(i) = csnd
-#endif /* ISO */
-#endif /* MHD */
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine fluxspeed
 !
 !===============================================================================
 !
