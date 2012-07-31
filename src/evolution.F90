@@ -164,10 +164,6 @@ module evolution
     end if ! toplev > 1
 #endif /* REFINE */
 
-! find new time step
-!
-    call find_new_timestep()
-
 ! update solution using numerical fluxes stored in data blocks
 !
     pblock => list_data
@@ -182,6 +178,10 @@ module evolution
       pblock => pblock%next
 
     end do
+
+! find new time step
+!
+    call find_new_timestep()
 
 !-------------------------------------------------------------------------------
 !
