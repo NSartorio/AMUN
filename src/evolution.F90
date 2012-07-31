@@ -53,7 +53,7 @@ module evolution
 
 ! declare public subroutines
 !
-  public :: initialize_evolution, evolve, find_new_timestep
+  public :: initialize_evolution, advance, evolve, find_new_timestep
 
 ! declare public variables
 !
@@ -106,6 +106,82 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_evolution
+!
+!===============================================================================
+!
+! subroutine ADVANCE:
+! ------------------
+!
+!   Subroutine advances the solution by one time step using the selected
+!   time integration method.
+!
+!
+!===============================================================================
+!
+  subroutine advance()
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data, list_data
+    use boundaries , only : boundary_variables
+#ifdef REFINE
+    use coordinates, only : toplev
+#endif /* REFINE */
+    use equations  , only : update_primitive_variables
+    use mesh       , only : update_mesh
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    type(block_data), pointer :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef RK2
+    call advance_rk2()
+#endif /* RK2 */
+
+#ifdef REFINE
+! chec if we need to perform the refinement step
+!
+    if (toplev > 1) then
+
+! check refinement and refine
+!
+      call update_mesh()
+
+! update boundaries
+!
+      call boundary_variables()
+
+    end if ! toplev > 1
+#endif /* REFINE */
+
+! find new time step
+!
+    call find_new_timestep()
+
+! update solution using numerical fluxes stored in data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! convert conserved variables to primitive ones for the current block
+!
+      call update_primitive_variables(pblock%u, pblock%q)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine advance
 !
 !===============================================================================
 !
@@ -274,6 +350,236 @@ module evolution
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
+!===============================================================================
+!
+! subroutine ADVANCE_RK2:
+! ----------------------
+!
+!   Subroutine advances the solution by one time step using the 2nd order
+!   Runge-Kutta time integration method.
+!
+!
+!===============================================================================
+!
+  subroutine advance_rk2()
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data, list_data
+    use boundaries , only : boundary_variables
+    use boundaries , only : boundary_correct_fluxes
+    use coordinates, only : im, jm, km
+    use coordinates, only : adx, ady, adz
+    use scheme     , only : update_flux
+    use variables  , only : nt, nfl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer    :: pblock
+
+! local variables
+!
+    integer                      :: i, j, k, im1, jm1, km1
+
+! local arrays
+!
+    real, dimension(3)           :: dx
+    real, dimension(nt,im,jm,km) :: du
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef CONSERVATIVE
+! iterate over all data blocks and calculate the first step of
+! the RK2 integration
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dx(1) = adx(pblock%meta%level)
+      dx(2) = ady(pblock%meta%level)
+      dx(3) = adz(pblock%meta%level)
+
+! calculate the flux from U0
+!
+      do n = 1, NDIMS
+        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
+      end do
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! correct the numerical fluxes between neighboring blocks which are at different
+! levels
+!
+    call boundary_correct_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dx(1) = adx(pblock%meta%level)
+      dx(2) = ady(pblock%meta%level)
+      dx(3) = adz(pblock%meta%level)
+
+! reset the increment array du
+!
+      du(:,:,:,:) = 0.0d0
+
+! perform update along the X direction
+!
+      do i = 2, im
+        im1 = i - 1
+
+        du(:,i,:,:) = du(:,i,:,:) - (pblock%f(1,:,i,:,:) - pblock%f(1,:,im1,:,:)) / dx(1)
+      end do
+      du(:,1,:,:) = du(:,1,:,:) - pblock%f(1,:,1,:,:) / dx(1)
+
+! perform update along the Y direction
+!
+      do j = 2, jm
+        jm1 = j - 1
+
+        du(:,:,j,:) = du(:,:,j,:) - (pblock%f(2,:,:,j,:) - pblock%f(2,:,:,jm1,:)) / dx(2)
+      end do
+      du(:,:,1,:) = du(:,:,1,:) - pblock%f(2,:,:,1,:) / dx(2)
+
+#if NDIMS == 3
+! perform update along the Z direction
+!
+      do k = 2, km
+        km1 = k - 1
+
+        du(:,:,:,k) = du(:,:,:,k) - (pblock%f(3,:,:,:,k) - pblock%f(3,:,:,:,km1)) / dx(3)
+      end do
+      du(:,:,:,1) = du(:,:,:,1) - pblock%f(3,:,:,:,1) / dx(3)
+#endif /* NDIMS == 3 */
+
+! update the solution for the fluid variables
+!
+      pblock%u1(1:nfl,:,:,:) = pblock%u0(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
+
+! update the conservative variable pointer
+!
+      pblock%u => pblock%u1
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update boundaries
+!
+    call boundary_variables()
+
+! iterate over all data blocks and calculate the second step of
+! the RK2 integration
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dx(1) = adx(pblock%meta%level)
+      dx(2) = ady(pblock%meta%level)
+      dx(3) = adz(pblock%meta%level)
+
+! calculate the flux from U0
+!
+      do n = 1, NDIMS
+        call update_flux(n, dx(n), pblock%u(:,:,:,:), pblock%f(n,:,:,:,:))
+      end do
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! correct the numerical fluxes between neighboring blocks which are at different
+! levels
+!
+    call boundary_correct_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dx(1) = adx(pblock%meta%level)
+      dx(2) = ady(pblock%meta%level)
+      dx(3) = adz(pblock%meta%level)
+
+! reset the increment array du
+!
+      du(:,:,:,:) = 0.0d0
+
+! perform update along the X direction
+!
+      do i = 2, im
+        im1 = i - 1
+
+        du(:,i,:,:) = du(:,i,:,:) - (pblock%f(1,:,i,:,:) - pblock%f(1,:,im1,:,:)) / dx(1)
+      end do
+      du(:,1,:,:) = du(:,1,:,:) - pblock%f(1,:,1,:,:) / dx(1)
+
+! perform update along the Y direction
+!
+      do j = 2, jm
+        jm1 = j - 1
+
+        du(:,:,j,:) = du(:,:,j,:) - (pblock%f(2,:,:,j,:) - pblock%f(2,:,:,jm1,:)) / dx(2)
+      end do
+      du(:,:,1,:) = du(:,:,1,:) - pblock%f(2,:,:,1,:) / dx(2)
+
+#if NDIMS == 3
+! perform update along the Z direction
+!
+      do k = 2, km
+        km1 = k - 1
+
+        du(:,:,:,k) = du(:,:,:,k) - (pblock%f(3,:,:,:,k) - pblock%f(3,:,:,:,km1)) / dx(3)
+      end do
+      du(:,:,:,1) = du(:,:,:,1) - pblock%f(3,:,:,:,1) / dx(3)
+#endif /* NDIMS == 3 */
+
+! update the solution for the fluid variables
+!
+      pblock%u0(1:nfl,:,:,:) = 0.5d0 * (pblock%u0(1:nfl,:,:,:) + pblock%u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
+
+! update the conservative variable pointer
+!
+      pblock%u => pblock%u0
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update boundaries
+!
+    call boundary_variables()
+#endif /* CONSERVATIVE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine advance_rk2
+!
 !===============================================================================
 !
 ! find_new_timestep: subroutine updates the maximum speed among the leafs and
