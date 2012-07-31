@@ -53,7 +53,7 @@ module evolution
 
 ! declare public subroutines
 !
-  public :: initialize_evolution, advance, evolve, find_new_timestep
+  public :: initialize_evolution, advance, evolve
 
 ! declare public variables
 !
@@ -102,6 +102,10 @@ module evolution
 !
     decay = exp(- alpha_p * cfl)
 #endif /* MHD & GLM */
+
+! calculate the initial time step
+!
+    call find_new_timestep()
 
 !-------------------------------------------------------------------------------
 !

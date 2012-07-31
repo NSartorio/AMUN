@@ -38,7 +38,7 @@ program amun
   use boundaries    , only : initialize_boundaries
   use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations
-  use evolution     , only : initialize_evolution, advance, evolve, find_new_timestep
+  use evolution     , only : initialize_evolution, advance
   use evolution     , only : n, t, dt, dtn, cfl
 #ifdef FORCE
   use forcing       , only : initialize_forcing, clear_forcing
@@ -360,10 +360,6 @@ program amun
 !
     call store_mesh_stats(n, t)
 
-! find new time step
-!
-    call find_new_timestep()
-
 ! store integrals
 !
     call store_integrals()
@@ -392,10 +388,6 @@ program amun
 !
     call redistribute_blocks()
 #endif /* MPI */
-
-! find new time step
-!
-    call find_new_timestep()
 
   end if
 
