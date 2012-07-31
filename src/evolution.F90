@@ -131,7 +131,6 @@ module evolution
 #ifdef REFINE
     use coordinates, only : toplev
 #endif /* REFINE */
-    use equations  , only : update_primitive_variables
     use mesh       , only : update_mesh
 
 ! local variables are not implicit by default
@@ -145,6 +144,7 @@ module evolution
 !-------------------------------------------------------------------------------
 !
 #ifdef RK2
+! advance the solution using the 2nd order Runge-Kutta method
     call advance_rk2()
 #endif /* RK2 */
 
@@ -164,20 +164,9 @@ module evolution
     end if ! toplev > 1
 #endif /* REFINE */
 
-! update solution using numerical fluxes stored in data blocks
+! update primitive variables
 !
-    pblock => list_data
-    do while (associated(pblock))
-
-! convert conserved variables to primitive ones for the current block
-!
-      call update_primitive_variables(pblock%u, pblock%q)
-
-! assign pointer to the next block
-!
-      pblock => pblock%next
-
-    end do
+    call update_variables()
 
 ! find new time step
 !
@@ -427,6 +416,10 @@ module evolution
 !
     call boundary_variables()
 
+! update primitive variables
+!
+    call update_variables()
+
 ! update fluxes for the second step of the RK2 integration
 !
     call update_fluxes()
@@ -539,6 +532,53 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_fluxes
+!
+!===============================================================================
+!
+! subroutine UPDATE_VARIABLES:
+! ---------------------------
+!
+!   Subroutine iterates over all data blocks and converts the conservative
+!   variables to their primitive representation.
+!
+!
+!===============================================================================
+!
+  subroutine update_variables()
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data, list_data
+    use equations  , only : update_primitive_variables
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer :: pblock
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! convert conserved variables to primitive ones for the current block
+!
+      call update_primitive_variables(pblock%u, pblock%q)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_variables
 !
 !===============================================================================
 !
