@@ -373,7 +373,7 @@ module evolution
     use boundaries , only : boundary_variables
     use coordinates, only : im, jm, km
     use coordinates, only : adx, ady, adz
-    use variables  , only : nt, nfl
+    use variables  , only : nfl
 
 ! local variables are not implicit by default
 !
@@ -383,14 +383,10 @@ module evolution
 !
     type(block_data), pointer    :: pblock
 
-! local variables
-!
-    integer                      :: i, j, k, im1, jm1, km1
-
 ! local arrays
 !
-    real, dimension(3)           :: dx
-    real, dimension(nt,im,jm,km) :: du
+    real, dimension(3)            :: dh
+    real, dimension(nfl,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -405,46 +401,17 @@ module evolution
 
 ! obtain dx, dy, and dz for the current block
 !
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
+      dh(1) = dt / adx(pblock%meta%level)
+      dh(2) = dt / ady(pblock%meta%level)
+      dh(3) = dt / adz(pblock%meta%level)
 
-! reset the increment array du
+! calculate variable increment for the current block
 !
-      du(:,:,:,:) = 0.0d0
-
-! perform update along the X direction
-!
-      do i = 2, im
-        im1 = i - 1
-
-        du(:,i,:,:) = du(:,i,:,:) - (pblock%f(1,:,i,:,:) - pblock%f(1,:,im1,:,:)) / dx(1)
-      end do
-      du(:,1,:,:) = du(:,1,:,:) - pblock%f(1,:,1,:,:) / dx(1)
-
-! perform update along the Y direction
-!
-      do j = 2, jm
-        jm1 = j - 1
-
-        du(:,:,j,:) = du(:,:,j,:) - (pblock%f(2,:,:,j,:) - pblock%f(2,:,:,jm1,:)) / dx(2)
-      end do
-      du(:,:,1,:) = du(:,:,1,:) - pblock%f(2,:,:,1,:) / dx(2)
-
-#if NDIMS == 3
-! perform update along the Z direction
-!
-      do k = 2, km
-        km1 = k - 1
-
-        du(:,:,:,k) = du(:,:,:,k) - (pblock%f(3,:,:,:,k) - pblock%f(3,:,:,:,km1)) / dx(3)
-      end do
-      du(:,:,:,1) = du(:,:,:,1) - pblock%f(3,:,:,:,1) / dx(3)
-#endif /* NDIMS == 3 */
+      call update_interval(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
-      pblock%u1(1:nfl,:,:,:) = pblock%u0(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:)
+      pblock%u1(1:nfl,:,:,:) = pblock%u0(1:nfl,:,:,:) + du(1:nfl,:,:,:)
 
 ! update the conservative variable pointer
 !
@@ -471,46 +438,18 @@ module evolution
 
 ! obtain dx, dy, and dz for the current block
 !
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
+      dh(1) = dt / adx(pblock%meta%level)
+      dh(2) = dt / ady(pblock%meta%level)
+      dh(3) = dt / adz(pblock%meta%level)
 
-! reset the increment array du
+! calculate variable increment for the current block
 !
-      du(:,:,:,:) = 0.0d0
-
-! perform update along the X direction
-!
-      do i = 2, im
-        im1 = i - 1
-
-        du(:,i,:,:) = du(:,i,:,:) - (pblock%f(1,:,i,:,:) - pblock%f(1,:,im1,:,:)) / dx(1)
-      end do
-      du(:,1,:,:) = du(:,1,:,:) - pblock%f(1,:,1,:,:) / dx(1)
-
-! perform update along the Y direction
-!
-      do j = 2, jm
-        jm1 = j - 1
-
-        du(:,:,j,:) = du(:,:,j,:) - (pblock%f(2,:,:,j,:) - pblock%f(2,:,:,jm1,:)) / dx(2)
-      end do
-      du(:,:,1,:) = du(:,:,1,:) - pblock%f(2,:,:,1,:) / dx(2)
-
-#if NDIMS == 3
-! perform update along the Z direction
-!
-      do k = 2, km
-        km1 = k - 1
-
-        du(:,:,:,k) = du(:,:,:,k) - (pblock%f(3,:,:,:,k) - pblock%f(3,:,:,:,km1)) / dx(3)
-      end do
-      du(:,:,:,1) = du(:,:,:,1) - pblock%f(3,:,:,:,1) / dx(3)
-#endif /* NDIMS == 3 */
+      call update_interval(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
-      pblock%u0(1:nfl,:,:,:) = 0.5d0 * (pblock%u0(1:nfl,:,:,:) + pblock%u1(1:nfl,:,:,:) + dt * du(1:nfl,:,:,:))
+      pblock%u0(1:nfl,:,:,:) = 0.5d0 * (pblock%u0(1:nfl,:,:,:)                 &
+                                   + pblock%u1(1:nfl,:,:,:) + du(1:nfl,:,:,:))
 
 ! update the conservative variable pointer
 !
@@ -550,7 +489,6 @@ module evolution
     use boundaries , only : boundary_correct_fluxes
     use coordinates, only : adx, ady, adz
     use scheme     , only : update_flux
-    use variables  , only : nt, nfl
 
 ! local variables are not implicit by default
 !
@@ -558,11 +496,15 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer    :: pblock
+    type(block_data), pointer :: pblock
 
 ! local vectors
 !
-    real, dimension(3)           :: dx
+    real, dimension(3)        :: dx
+
+! local variables
+!
+    integer                   :: n
 !
 !-------------------------------------------------------------------------------
 !
@@ -597,6 +539,70 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_fluxes
+!
+!===============================================================================
+!
+! subroutine UPDATE_INTERVAL:
+! --------------------------
+!
+!   Subroutine calculate the conservative variable interval from fluxes.
+!
+!
+!===============================================================================
+!
+  subroutine update_interval(dh, f, du)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km
+    use variables  , only : nfl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real, dimension(3)                 , intent(in)    :: dh
+    real, dimension(NDIMS,nfl,im,jm,km), intent(in)    :: f
+    real, dimension(      nfl,im,jm,km), intent(inout) :: du
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! reset the increment array du
+!
+    du(:,:,:,:) = 0.0d0
+
+! perform update along the X direction
+!
+    do i = 2, im
+      du(:,i,:,:) = du(:,i,:,:) - dh(1) * (f(1,:,i,:,:) - f(1,:,i-1,:,:))
+    end do
+    du(:,1,:,:) = du(:,1,:,:) - dh(1) * f(1,:,1,:,:)
+
+! perform update along the Y direction
+!
+    do j = 2, jm
+      du(:,:,j,:) = du(:,:,j,:) - dh(2) * (f(2,:,:,j,:) - f(2,:,:,j-1,:))
+    end do
+    du(:,:,1,:) = du(:,:,1,:) - dh(2) * f(2,:,:,1,:)
+
+#if NDIMS == 3
+! perform update along the Z direction
+!
+    do k = 2, km
+      du(:,:,:,k) = du(:,:,:,k) - dh(3) * (f(3,:,:,:,k) - f(3,:,:,:,k-1))
+    end do
+    du(:,:,:,1) = du(:,:,:,1) - dh(3) * f(3,:,:,:,1)
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_interval
 !
 !===============================================================================
 !
