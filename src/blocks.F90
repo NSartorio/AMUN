@@ -134,10 +134,14 @@ module blocks
                                  !
     type(block_meta), pointer :: meta
 
-                                 ! an allocatable array to store all conserved
+                                 ! a pointer to the array conserved variables
+                                 !
+    real, dimension(:,:,:,:)  , pointer     :: u
+
+                                 ! an allocatable arrays to store all conserved
                                  ! variables
                                  !
-    real, dimension(:,:,:,:)  , allocatable :: u
+    real, dimension(:,:,:,:)  , allocatable :: u0, u1
 
                                  ! an allocatable array to store all primitive
                                  ! variables
@@ -1040,11 +1044,16 @@ module blocks
 
 ! allocate space for conserved variables
 !
-    allocate(pdata%u(nvars,nx,ny,nz))
+    allocate(pdata%u0(nvars,nx,ny,nz))
+    allocate(pdata%u1(nvars,nx,ny,nz))
 
 ! allocate space for primitive variables
 !
     allocate(pdata%q(nvars,nx,ny,nz))
+
+! initiate the array pointer
+!
+    pdata%u => pdata%u0
 
 ! allocate space for the numerical fluxes
 !
@@ -1097,7 +1106,8 @@ module blocks
 
 ! deallocate conservative variables
 !
-      if (allocated(pdata%u)) deallocate(pdata%u)
+      if (allocated(pdata%u0)) deallocate(pdata%u0)
+      if (allocated(pdata%u1)) deallocate(pdata%u1)
 
 ! deallocate primitive variables
 !
@@ -1109,6 +1119,7 @@ module blocks
 
 ! nullify pointers
 !
+      nullify(pdata%u)
       nullify(pdata%next)
       nullify(pdata%prev)
       nullify(pdata%meta)
