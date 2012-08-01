@@ -185,7 +185,7 @@ module evolution
 ! include external procedures
 !
     use boundaries    , only : boundary_variables
-    use scheme        , only : update_interval
+    use schemes       , only : update_increment
 
 ! include external variables
 !
@@ -226,7 +226,7 @@ module evolution
 
 ! calculate variable increment for the current block
 !
-      call update_interval(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
@@ -267,7 +267,7 @@ module evolution
 
 ! calculate variable increment for the current block
 !
-      call update_interval(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
@@ -309,7 +309,7 @@ module evolution
 ! include external procedures
 !
     use boundaries    , only : boundary_correct_fluxes
-    use scheme        , only : update_flux
+    use schemes       , only : update_flux
 
 ! include external variables
 !
@@ -517,4 +517,4 @@ module evolution
 
 !===============================================================================
 !
-end module
+end module evolution
