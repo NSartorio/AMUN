@@ -311,6 +311,93 @@ module equations
 !
 !===============================================================================
 !
+! function MAXSPEED:
+! -----------------
+!
+!   Function scans the variable array and returns the maximum speed in the
+!   system.
+!
+!   Arguments:
+!
+!     q - the array of primitive variables;
+!
+!
+!===============================================================================
+!
+  function maxspeed(q)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
+    use variables  , only : nt
+    use variables  , only : ivx, ivz
+#ifdef ADI
+    use variables  , only : idn, ipr
+#endif /* ADI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real, dimension(nt,im,jm,km), intent(in) :: q
+
+! return variable
+!
+    real     :: maxspeed
+
+! local variables
+!
+    integer  :: i, j, k
+    real     :: vv, v, c
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    maxspeed = 0.0d0
+
+! iterate over all positions
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! calculate the velocity amplitude
+!
+          vv = sum(q(ivx:ivz,i,j,k) * q(ivx:ivz,i,j,k))
+          v  = sqrt(vv)
+
+#ifdef ADI
+! calculate the adiabatic speed of sound
+!
+          c = sqrt(gamma * q(ipr,i,j,k) / q(idn,i,j,k))
+#endif /* ADI */
+
+! calculate the maximum speed
+!
+#ifdef ISO
+          maxspeed = max(maxspeed, v + csnd)
+#endif /* ISO */
+#ifdef ADI
+          maxspeed = max(maxspeed, v + c)
+#endif /* ADI */
+
+        end do
+      end do
+    end do
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed
+!
+!===============================================================================
+!
 ! subroutine UPDATE_PRIMITIVE_VARIABLES:
 ! -------------------------------------
 !
@@ -631,6 +718,92 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine fluxspeed
+!
+!===============================================================================
+!
+! function MAXSPEED:
+! -----------------
+!
+!   Function scans the variable array and returns the maximum speed in the
+!   system.
+!
+!   Arguments:
+!
+!     q - the array of primitive variables;
+!
+!
+!===============================================================================
+!
+  function maxspeed()
+
+! include external procedures and variables
+!
+    use mesh      , only : im, jm, km, ib, ie, jb, je, kb, ke
+    use variables , only : nt
+    use variables , only : idn, ivx, ivz, ibx, ibz
+#ifdef ADI
+    use variables , only : ipr
+#endif /* ADI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real, dimension(nt,im,jm,km), intent(in) :: q
+
+! return variable
+!
+    real     :: maxspeed
+
+! local variables
+!
+    integer  :: i, j, k
+    real     :: vv, bb, v, c
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    maxspeed = 0.0d0
+
+! iterate over all positions
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! calculate the velocity amplitude
+!
+          vv = sum(q(ivx:ivz,i,j,k) * q(ivx:ivz,i,j,k))
+          v  = sqrt(vv)
+          bb = sum(q(ibx:ibz,i,j,k) * q(ibx:ibz,i,j,k))
+
+! calculate the fast magnetosonic speed
+!
+#ifdef ISO
+          c = sqrt(csnd2 + bb / q(idn,i,j,k))
+#endif /* ISO */
+#ifdef ADI
+          c = sqrt((gamma * q(ipr,i,j,k) + bb) / q(idn,i,j,k))
+#endif /* ADI */
+
+! calculate the maximum of speed
+!
+          maxspeed = max(maxspeed, v + c)
+
+        end do
+      end do
+    end do
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed
 #endif /* MHD */
 
 !===============================================================================

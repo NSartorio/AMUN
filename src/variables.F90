@@ -55,6 +55,10 @@ module variables
 #endif /* MHD */
   integer(kind=4), parameter :: nvr = nqt
   integer(kind=4), parameter :: nt  = nqt
+
+! the maximum characteristic speed in the domain
+!
+  real           , save      :: cmax = 0.0d+0
 !
 !===============================================================================
 !

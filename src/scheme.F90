@@ -29,10 +29,6 @@ module scheme
 
   implicit none
 
-! the maximal speed in the system
-!
-  real, save :: cmax
-
   contains
 #ifdef CONSERVATIVE
 !
@@ -616,6 +612,7 @@ module scheme
     use variables     , only : ibx, iby, ibz
 #ifdef GLM
     use variables     , only : iph
+    use variables     , only : cmax
 #endif /* GLM */
 #endif /* MHD */
 
@@ -943,6 +940,7 @@ module scheme
     use variables     , only : ibx, iby, ibz
 #ifdef GLM
     use variables     , only : iph
+    use variables     , only : cmax
 #endif /* GLM */
 
     implicit none
@@ -1192,6 +1190,7 @@ module scheme
     use variables     , only : ibx, iby, ibz
 #ifdef GLM
     use variables     , only : iph
+    use variables     , only : cmax
 #endif /* GLM */
 
     implicit none
@@ -1545,6 +1544,7 @@ module scheme
     use variables     , only : ibx, iby, ibz
 #ifdef GLM
     use variables     , only : iph
+    use variables     , only : cmax
 #endif /* GLM */
 #endif /* MHD */
 
@@ -2032,93 +2032,6 @@ module scheme
 #endif /* ISO */
 #endif /* MHD */
 #endif /* ROE */
-!
-!===============================================================================
-!
-! maxspeed: function to calculate maximum speed in the system
-!
-!===============================================================================
-!
-  function maxspeed(q)
-
-    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
-#ifdef ADI
-    use equations  , only : gamma
-#endif /* ADI */
-#ifdef ISO
-    use equations  , only : csnd, csnd2
-#endif /* ISO */
-    use variables    , only : nvr, nqt
-    use variables    , only : idn, ivx, ivz
-#ifdef ADI
-    use variables    , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables    , only : ibx, iby, ibz
-#endif /* MHD */
-
-    implicit none
-
-! input arguments
-!
-    real, dimension(nqt,im,jm,km), intent(in)  :: q
-
-! local variables
-!
-    integer :: i, j, k
-    real    :: vv, v, c
-#ifdef MHD
-    real    :: bb
-#endif /* MHD */
-    real    :: maxspeed
-!
-!-------------------------------------------------------------------------------
-!
-    maxspeed = 0.0
-
-! iterate over all points and calculate maximum speed
-!
-    do k = kb, ke
-      do j = jb, je
-
-        do i = ib, ie
-
-! calculate the velocity
-!
-          vv = sum(q(ivx:ivz,i,j,k)**2)
-          v  = sqrt(vv)
-#ifdef MHD
-          bb = sum(q(ibx:ibz,i,j,k)**2)
-#endif /* MHD */
-
-! calculate the maximum characteristic speed
-!
-#ifdef MHD
-#ifdef ADI
-          c = sqrt((gamma * q(ipr,i,j,k) + bb) / q(idn,i,j,k))
-#endif /* ADI */
-#ifdef ISO
-          c = sqrt(csnd2 + bb / q(idn,i,j,k))
-#endif /* ISO */
-#else /* MHD */
-#ifdef ADI
-          c = sqrt(gamma * q(ipr,i,j,k) / q(idn,i,j,k))
-#endif /* ADI */
-#ifdef ISO
-          c = csnd
-#endif /* ISO */
-#endif /* MHD */
-
-! calculate maximum of the speed
-!
-          maxspeed = max(maxspeed, v + c)
-        end do
-      end do
-    end do
-!
-!-------------------------------------------------------------------------------
-!
-  end function maxspeed
 
 !===============================================================================
 !

@@ -493,10 +493,11 @@ module evolution
     use blocks     , only : block_meta, block_data, list_meta, list_data
     use coordinates, only : toplev
     use coordinates, only : adx, ady, adz
+    use equations  , only : maxspeed
 #ifdef MPI
     use mpitools   , only : reduce_maximum_real
 #endif /* MPI */
-    use scheme  , only : maxspeed, cmax
+    use variables  , only : cmax
 
     implicit none
 
