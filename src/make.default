@@ -54,14 +54,9 @@ SHAPE        = N
 #  EQS           - set of equations to solve: HYDRO or MHD
 #  EOS           - equation of state: ADI of ISO for adiabatic or isothermal,
 #                  respectively
-#  CONSERVATIVE  - build fully conservative adaptive mesh scheme, otherwise
-#                  build a bit faster and significantly less memory consuming
-#                  non-conservative scheme; in the case of uniform mesh, both
-#                  schemes should be fully conservative
 #
 EQS          = HYDRO
 EOS          = ADI
-CONSERVATIVE = Y
 
 # source terms:
 #
