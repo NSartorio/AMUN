@@ -86,6 +86,12 @@ ifeq ($(SPACE),MP9)
 FFLAGS  += -DMP
 endif
 
+# positivity corrections in the reconstruction
+#
+ifeq ($(FIX_POSITIVITY),Y)
+FFLAGS  += -DFIX_POSITIVITY
+endif
+
 # output data format
 #
 FFLAGS  += -D${OUTPUT}
