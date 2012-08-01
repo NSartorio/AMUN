@@ -1330,4 +1330,78 @@ module interpolations
 !
 !===============================================================================
 !
+! subroutine FIX_POSITIVITY:
+! -------------------------
+!
+!   Subroutine scans the input arrays of the left and right states fl(:) and
+!   fr(:) for negative values.  If it finds a negative value, it repeates the
+!   state reconstruction from f(:) using the zeroth order interpolation.
+!
+!   Arguments:
+!
+!     n  - the length of vectors f, fl, and fr;
+!     f  - the cell centered vector representation;
+!     fl - the left state reconstruction;
+!     fr - the right state reconstruction;
+!
+!
+!===============================================================================
+!
+  subroutine fix_positivity(n, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer           , intent(in)    :: n
+    real, dimension(n), intent(in)    :: f
+    real, dimension(n), intent(inout) :: fl, fr
+
+! local variables
+!
+    integer :: i, im1, ip1
+    real    :: fmn, fmx
+!
+!------------------------------------------------------------------------------
+!
+! look for negative values in the states along the vector
+!
+    do i = 1, n
+
+! check if there is a negative value in the left or right states
+!
+      if (min(fl(i), fr(i)) .le. 0.0d0) then
+
+! calculate the left and right indices
+!
+        im1 = max(1, i - 1)
+        ip1 = min(n, i + 1)
+
+! prepare the allowed interval
+!
+        fmn = min(f(i), f(ip1))
+        fmx = max(f(i), f(ip1))
+
+! limit the states using the zeroth-order reconstruction
+!
+        if ((fl(i) .lt. fmn) .or. (fl(i) .gt. fmx)) then
+          fl(i  ) = f(i)
+          fr(im1) = f(i)
+        end if
+
+        if ((fr(i) .lt. fmn) .or. (fr(i) .gt. fmx)) then
+          fl(ip1) = f(ip1)
+          fr(i  ) = f(ip1)
+        end if
+      end if
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine fix_positivity
+
+!===============================================================================
+!
 end module interpolations
