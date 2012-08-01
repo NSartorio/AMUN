@@ -308,7 +308,7 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_correct_fluxes
+    use boundaries    , only : boundary_fluxes
     use schemes       , only : update_flux
 
 ! include external variables
@@ -360,7 +360,7 @@ module evolution
 ! correct the numerical fluxes of the blocks which have neighbours at higher
 ! level
 !
-    call boundary_correct_fluxes()
+    call boundary_fluxes()
 
 !-------------------------------------------------------------------------------
 !

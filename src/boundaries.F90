@@ -1583,14 +1583,14 @@ module boundaries
 !
 !===============================================================================
 !
-! boundary_correct_fluxes: subroutine sweeps over all leaf blocks and if it
+! boundary_fluxes: subroutine sweeps over all leaf blocks and if it
 !                          finds that two neighbors lay at different levels, it
 !                          corrects the numerical fluxes of block at lower level
 !                          copying the flux from higher level neighbor
 !
 !===============================================================================
 !
-  subroutine boundary_correct_fluxes()
+  subroutine boundary_fluxes()
 
     use blocks   , only : block_meta, block_data, list_meta
     use blocks   , only : nsides, nfaces
@@ -2005,7 +2005,7 @@ module boundaries
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine boundary_correct_fluxes
+  end subroutine boundary_fluxes
 !
 !===============================================================================
 !
