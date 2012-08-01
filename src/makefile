@@ -163,12 +163,12 @@ default: $(name).x
 sources = blocks.F90 boundaries.F90 constants.F90 coordinates.F90 domains.F90  \
           driver.F90 equations.F90 error.F90 evolution.F90 forcing.F90         \
           integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
-          parameters.F90 problems.F90 random.F90 refinement.F90 scheme.F90     \
+          parameters.F90 problems.F90 random.F90 refinement.F90 schemes.F90    \
           timers.F90 variables.F90
 objects = blocks.o boundaries.o constants.o coordinates.o domains.o driver.o   \
           equations.o error.o evolution.o forcing.o integrals.o                \
           interpolations.o io.o mesh.o mpitools.o parameters.o problems.o      \
-          random.o refinement.o scheme.o timers.o variables.o
+          random.o refinement.o schemes.o timers.o variables.o
 files   = $(sources) makefile make.default license.txt hosts
 
 $(name).x: $(objects)
@@ -213,7 +213,7 @@ driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
 equations.o      : equations.F90 coordinates.o parameters.o variables.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
-                   equations.o mesh.o mpitools.o parameters.o scheme.o         \
+                   equations.o mesh.o mpitools.o parameters.o schemes.o        \
                    variables.o
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
 forcing.o        : forcing.F90 constants.o coordinates.o mpitools.o            \
@@ -233,7 +233,7 @@ problems.o       : problems.F90 blocks.o coordinates.o equations.o error.o     \
                    parameters.o variables.o
 refinement.o     : refinement.F90 blocks.o coordinates.o parameters.o          \
                    variables.o
-scheme.o         : scheme.F90 blocks.o coordinates.o interpolations.o          \
+schemes.o        : schemes.F90 blocks.o coordinates.o interpolations.o         \
                    variables.o
 random.o         : random.F90 mpitools.o parameters.o
 timers.o         : timers.F90
