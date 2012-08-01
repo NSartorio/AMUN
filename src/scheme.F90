@@ -310,6 +310,70 @@ module scheme
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux
+!
+!===============================================================================
+!
+! subroutine UPDATE_INTERVAL:
+! --------------------------
+!
+!   Subroutine calculate the conservative variable interval from fluxes.
+!
+!
+!===============================================================================
+!
+  subroutine update_interval(dh, f, du)
+
+! include external procedures and variables
+!
+    use coordinates   , only : im, jm, km
+    use variables     , only : nfl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real, dimension(3)                 , intent(in)    :: dh
+    real, dimension(NDIMS,nfl,im,jm,km), intent(in)    :: f
+    real, dimension(      nfl,im,jm,km), intent(inout) :: du
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! reset the increment array du
+!
+    du(:,:,:,:) = 0.0d0
+
+! perform update along the X direction
+!
+    do i = 2, im
+      du(:,i,:,:) = du(:,i,:,:) - dh(1) * (f(1,:,i,:,:) - f(1,:,i-1,:,:))
+    end do
+    du(:,1,:,:) = du(:,1,:,:) - dh(1) * f(1,:,1,:,:)
+
+! perform update along the Y direction
+!
+    do j = 2, jm
+      du(:,:,j,:) = du(:,:,j,:) - dh(2) * (f(2,:,:,j,:) - f(2,:,:,j-1,:))
+    end do
+    du(:,:,1,:) = du(:,:,1,:) - dh(2) * f(2,:,:,1,:)
+
+#if NDIMS == 3
+! perform update along the Z direction
+!
+    do k = 2, km
+      du(:,:,:,k) = du(:,:,:,k) - dh(3) * (f(3,:,:,:,k) - f(3,:,:,:,k-1))
+    end do
+    du(:,:,:,1) = du(:,:,:,1) - dh(3) * f(3,:,:,:,1)
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_interval
 #else /* CONSERVATIVE */
 !
 !===============================================================================

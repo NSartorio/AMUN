@@ -23,7 +23,10 @@
 !!
 !! module: EVOLUTION
 !!
-!!  This module performs the time integration using different methods.
+!!  This module constains subroutines to perform the time integration using
+!!  different methods preserving the conservation and estimates the new time
+!!  step from the stability condition.
+!!
 !!
 !!******************************************************************************
 !
@@ -35,17 +38,14 @@ module evolution
 
 ! evolution parameters
 !
-  real   , save :: cfl   = 0.5d0
+  real   , save :: cfl     = 0.5d+0
 
-#if defined MHD && defined GLM
-! coefficient controlling the decay of scalar potential Psi
+! time variables
 !
-  real   , save :: alpha_p = 0.5d0
-  real   , save :: decay   = 1.0d0
-#endif /* MHD & GLM */
-
-  integer, save :: n
-  real   , save :: t, dt, dtn, dxmin
+  integer, save :: n       = 0
+  real   , save :: t       = 0.0d+0
+  real   , save :: dt      = 1.0d+0
+  real   , save :: dtn     = 1.0d+0
 
 ! by default everything is private
 !
@@ -57,7 +57,7 @@ module evolution
 
 ! declare public variables
 !
-  public :: n, cfl, t, dt, dtn, dxmin
+  public :: cfl, n, t, dt, dtn
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -72,16 +72,16 @@ module evolution
 ! subroutine INITIALIZE_EVOLUTION:
 ! -------------------------------
 !
-!   Subroutine initializes the EVOLUTION module by setting its parameters.
+!   Subroutine initializes module EVOLUTION by setting its parameters.
 !
 !
 !===============================================================================
 !
   subroutine initialize_evolution()
 
-! include external procedures and variables
+! include external procedures
 !
-    use parameters, only : get_parameter_real
+    use parameters    , only : get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -93,19 +93,9 @@ module evolution
 !
     call get_parameter_real("cfl", cfl)
 
-#if defined MHD && defined GLM
-! get the value of the stability coefficient
-!
-    call get_parameter_real("alpha_p", alpha_p)
-
-! calculate decay factor for magnetic field divergence scalar
-!
-    decay = exp(- alpha_p * cfl)
-#endif /* MHD & GLM */
-
 ! calculate the initial time step
 !
-    call find_new_timestep()
+    call new_time_step()
 
 !-------------------------------------------------------------------------------
 !
@@ -116,22 +106,23 @@ module evolution
 ! subroutine ADVANCE:
 ! ------------------
 !
-!   Subroutine advances the solution by one time step using the selected
-!   time integration method.
+!   Subroutine advances the solution by one time step using the selected time
+!   integration method.
 !
 !
 !===============================================================================
 !
   subroutine advance()
 
-! include external procedures and variables
+! include external procedures
 !
-    use blocks     , only : block_data, list_data
-    use boundaries , only : boundary_variables
-#ifdef REFINE
-    use coordinates, only : toplev
-#endif /* REFINE */
-    use mesh       , only : update_mesh
+    use boundaries    , only : boundary_variables
+    use mesh          , only : update_mesh
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : toplev
 
 ! local variables are not implicit by default
 !
@@ -148,7 +139,6 @@ module evolution
     call advance_rk2()
 #endif /* RK2 */
 
-#ifdef REFINE
 ! chec if we need to perform the refinement step
 !
     if (toplev > 1) then
@@ -162,7 +152,6 @@ module evolution
       call boundary_variables()
 
     end if ! toplev > 1
-#endif /* REFINE */
 
 ! update primitive variables
 !
@@ -170,7 +159,7 @@ module evolution
 
 ! find new time step
 !
-    call find_new_timestep()
+    call new_time_step()
 
 !-------------------------------------------------------------------------------
 !
@@ -193,13 +182,17 @@ module evolution
 !
   subroutine advance_rk2()
 
-! include external procedures and variables
+! include external procedures
 !
-    use blocks     , only : block_data, list_data
-    use boundaries , only : boundary_variables
-    use coordinates, only : im, jm, km
-    use coordinates, only : adx, ady, adz
-    use variables  , only : nfl
+    use boundaries    , only : boundary_variables
+    use scheme        , only : update_interval
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : adx, ady, adz
+    use coordinates   , only : im, jm, km
+    use variables     , only : nfl
 
 ! local variables are not implicit by default
 !
@@ -313,12 +306,15 @@ module evolution
 !
   subroutine update_fluxes()
 
-! include external procedures and variables
+! include external procedures
 !
-    use blocks     , only : block_data, list_data
-    use boundaries , only : boundary_correct_fluxes
-    use coordinates, only : adx, ady, adz
-    use scheme     , only : update_flux
+    use boundaries    , only : boundary_correct_fluxes
+    use scheme        , only : update_flux
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : adx, ady, adz
 
 ! local variables are not implicit by default
 !
@@ -383,10 +379,13 @@ module evolution
 !
   subroutine update_variables()
 
-! include external procedures and variables
+! include external procedures
 !
-    use blocks     , only : block_data, list_data
-    use equations  , only : update_primitive_variables
+    use equations     , only : update_primitive_variables
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
 
 ! local variables are not implicit by default
 !
@@ -419,162 +418,77 @@ module evolution
 !
 !===============================================================================
 !
-! subroutine UPDATE_INTERVAL:
-! --------------------------
+! subroutine NEW_TIME_STEP:
+! ------------------------
 !
-!   Subroutine calculate the conservative variable interval from fluxes.
+!   Subroutine estimates the new time step from the maximum speed in the system
+!   and source term constraints.
 !
 !
 !===============================================================================
 !
-  subroutine update_interval(dh, f, du)
+  subroutine new_time_step()
 
-! include external procedures and variables
+! include external procedures
 !
-    use coordinates, only : im, jm, km
-    use variables  , only : nfl
+    use equations     , only : maxspeed
+#ifdef MPI
+    use mpitools      , only : reduce_maximum_real
+#endif /* MPI */
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : adx, ady, adz
+    use coordinates   , only : toplev
+    use variables     , only : cmax
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! subroutine arguments
+! local pointers
 !
-    real, dimension(3)                 , intent(in)    :: dh
-    real, dimension(NDIMS,nfl,im,jm,km), intent(in)    :: f
-    real, dimension(      nfl,im,jm,km), intent(inout) :: du
-
-! local variables
-!
-    integer :: i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-! reset the increment array du
-!
-    du(:,:,:,:) = 0.0d0
-
-! perform update along the X direction
-!
-    do i = 2, im
-      du(:,i,:,:) = du(:,i,:,:) - dh(1) * (f(1,:,i,:,:) - f(1,:,i-1,:,:))
-    end do
-    du(:,1,:,:) = du(:,1,:,:) - dh(1) * f(1,:,1,:,:)
-
-! perform update along the Y direction
-!
-    do j = 2, jm
-      du(:,:,j,:) = du(:,:,j,:) - dh(2) * (f(2,:,:,j,:) - f(2,:,:,j-1,:))
-    end do
-    du(:,:,1,:) = du(:,:,1,:) - dh(2) * f(2,:,:,1,:)
-
-#if NDIMS == 3
-! perform update along the Z direction
-!
-    do k = 2, km
-      du(:,:,:,k) = du(:,:,:,k) - dh(3) * (f(3,:,:,:,k) - f(3,:,:,:,k-1))
-    end do
-    du(:,:,:,1) = du(:,:,:,1) - dh(3) * f(3,:,:,:,1)
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_interval
-!
-!===============================================================================
-!
-! find_new_timestep: subroutine updates the maximum speed among the leafs and
-!                    calculates new time step
-!
-!===============================================================================
-!
-  subroutine find_new_timestep()
-
-    use blocks     , only : block_meta, block_data, list_meta, list_data
-    use coordinates, only : toplev
-    use coordinates, only : adx, ady, adz
-    use equations  , only : maxspeed
-#ifdef MPI
-    use mpitools   , only : reduce_maximum_real
-#endif /* MPI */
-    use variables  , only : cmax
-
-    implicit none
+    type(block_data), pointer :: pblock
 
 ! local variables
 !
     integer                   :: iret
-    real                      :: cm
     integer(kind=4)           :: lev
+    real                      :: cm, dx_min
 
-! local pointers
+! local parameters
 !
-    type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
+    real, parameter           :: eps = tiny(cmax)
 !
 !-------------------------------------------------------------------------------
 !
-! reset the maximum speed, and highest level
+! reset the maximum speed, and the highest level
 !
-    cmax   = 1.0d-16
+    cmax   = eps
     lev    = 1
 
-! if toplev > 1, find the highest level
-!
-    if (toplev .gt. 1) then
-
-! iterate over all meta blocks and find the highest level with leafs
-!
-      pmeta => list_meta
-      do while (associated(pmeta))
-
-! check if the metablock is a leaf, if so obtaind the highest level
-!
-        if (pmeta%leaf) lev = max(lev, pmeta%level)
-
-! associate the pointer with the next block
-!
-        pmeta => pmeta%next
-
-      end do ! meta blocks
-
-    end if ! toplev > 1
-
-! find the smallest spacial step
-!
-#if NDIMS == 2
-    dxmin = min(adx(lev), ady(lev))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    dxmin = min(adx(lev), ady(lev), adz(lev))
-#endif /* NDIMS == 3 */
-
 ! iterate over all data blocks in order to find the maximum speed among them
+! and the highest level which is required to obtain the spatial step
 !
-    pdata => list_data
-    do while (associated(pdata))
-
-! check if this block is a leaf
-!
-      if (pdata%meta%leaf) then
+    pblock => list_data
+    do while (associated(pblock))
 
 ! find the maximum level occupied by blocks (can be smaller than toplev)
 !
-
+      lev = max(lev, pblock%meta%level)
 
 ! obtain the maximum speed for the current block
 !
-        cm = maxspeed(pdata%q(:,:,:,:))
+      cm = maxspeed(pblock%q(:,:,:,:))
 
 ! compare global and local maximum speeds
 !
-        cmax = max(cmax, cm)
-
-      end if ! leaf
+      cmax = max(cmax, cm)
 
 ! assiociate the pointer with the next block
 !
-      pdata => pdata%next
+      pblock => pblock%next
 
     end do
 
@@ -584,13 +498,22 @@ module evolution
     call reduce_maximum_real(cmax, iret)
 #endif /* MPI */
 
-! calcilate new time step
+! find the smallest spatial step
 !
-    dtn = dxmin / max(cmax, 1.0d-16)
+#if NDIMS == 2
+    dx_min = min(adx(lev), ady(lev))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    dx_min = min(adx(lev), ady(lev), adz(lev))
+#endif /* NDIMS == 3 */
+
+! calcilate the new time step
+!
+    dtn = dx_min / max(cmax, eps)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine find_new_timestep
+  end subroutine new_time_step
 
 !===============================================================================
 !
