@@ -36,8 +36,8 @@ module refinement
 
 ! refinement criterion parameters
 !
-  real             , save :: crefmin = 2.0d-1
-  real             , save :: crefmax = 5.0d-1
+  real             , save :: crefmin = 4.0d-2
+  real             , save :: crefmax = 6.0d-2
   real             , save :: epsref  = 1.0d-2
 
 ! by default everything is private
