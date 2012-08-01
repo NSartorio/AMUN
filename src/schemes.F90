@@ -375,6 +375,7 @@ module schemes
 !          Conservation Laws",
 !         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
 !
+!
 !===============================================================================
 !
   subroutine riemann(n, h, q, f)
@@ -507,6 +508,7 @@ module schemes
 !     [1] Toro, E. F., Spruce, M., & Speares, W.
 !         "Restoration of the contact surface in the HLL-Riemann solver",
 !         Shock Waves, 1994, Volume 4, Issue 1, pp. 25-34
+!
 !
 !===============================================================================
 !
@@ -694,10 +696,7 @@ module schemes
 ! subroutine RIEMANN:
 ! ------------------
 !
-!   Subroutine solves one dimensional Riemann problem using the HLLC method,
-!   by Toro.  In the HLLC method the tangential components of the velocity are
-!   discontinuous, which in the HLLCC method they are continuous and calculated
-!   from the HLL average.
+!   Subroutine solves one dimensional Riemann problem using the Roes method.
 !
 !   Arguments:
 !
@@ -708,10 +707,14 @@ module schemes
 !
 !   References:
 !
-!     [1] Roe, P. L., 1981, Journal of Computational Physics, 43, 357
-!     [2] Toro, E. F., Spruce, M., & Speares, W.
-!         "Restoration of the contact surface in the HLL-Riemann solver",
-!         Shock Waves, 1994, Volume 4, Issue 1, pp. 25-34
+!     [1] Roe, P. L.,
+!         "Approximate Riemann Solvers, Parameter Vectors, and Difference
+!          Schemes",
+!         Journal of Computational Physics, 1981, 43, pp. 357-372
+!     [2] Toro, E. F.,
+!         "Riemann Solvers and Numerical Methods for Fluid dynamics",
+!         2009, Springer-Verlag, Berlin, Heidelberg
+!
 !
 !===============================================================================
 !
@@ -760,12 +763,6 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
-! reset the eigensystem values
-!
-    ci(:)   = 0.0d0
-    li(:,:) = 0.0d0
-    ri(:,:) = 0.0d0
-
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nt
@@ -777,7 +774,9 @@ module schemes
 ! if so, correct the states
 !
     call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+#ifdef ADI
     call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+#endif /* ADI */
 #endif /* FIX_POSITIVITY */
 
 ! calculate corresponding conserved variables of the left and right states
@@ -790,13 +789,18 @@ module schemes
     call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
     call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
 
+! reset the eigensystem values
+!
+    li(:,:) = 0.0d0
+    ri(:,:) = 0.0d0
+
 ! iterate over all points
 !
     do i = 1, n
 
 ! calculate conserved states difference
 !
-      du(:) = ur(:,i) - ul(:,i)
+      du(:)   = ur(:,i) - ul(:,i)
 
 ! calculate Roe variables for the eigenproblem solution
 !
@@ -806,7 +810,7 @@ module schemes
       sfl     = sdl / sds
       sfr     = sdr / sds
 
-! prepare the Roe intermediate state
+! prepare the Roe average vector (eq. 11.60 in [2])
 !
       qi(idn) = sdl * sdr
       qi(ivx) = sfl * ql(ivx,i) + sfr * qr(ivx,i)
@@ -846,46 +850,59 @@ module schemes
 !
 !===============================================================================
 !
-! eigensystem: subroutine computes eigenvalues and eigenmatrices for a given
-!              set of equations and input variables
+! subroutine EIGENSYSTEM:
+! ----------------------
+!
+!   Subroutine computes eigenvalues and eigenmatrices for a given set of
+!   equations and input variables.
+!
+!   Arguments:
+!
+!     q - the Roe average vector;
+!     c - the vector of eigenvalues;
+!     r - the right eigenmatrix;
+!     l - the left eigenmatrix;
+!
 !
 !===============================================================================
 !
 #ifdef ADI
   subroutine eigensystem(q, c, r, l)
 
-    use equations, only : gamma
-    use variables, only : nqt
-    use variables, only : idn, ivx, ivy, ivz
-    use variables, only : ien
+! include external variables
+!
+    use equations     , only : gammam1
+    use variables     , only : nt
+    use variables     , only : idn, ivx, ivy, ivz, ien
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
-    real, dimension(nqt)    , intent(in)    :: q
-    real, dimension(nqt)    , intent(inout) :: c
-    real, dimension(nqt,nqt), intent(inout) :: l, r
+    real, dimension(nt)   , intent(in)    :: q
+    real, dimension(nt)   , intent(inout) :: c
+    real, dimension(nt,nt), intent(inout) :: l, r
 
 ! local variables
 !
-    real :: gm, vv, vh, c2, na, cc, vc, ng, nd, nv, nh, nc
+    real :: vv, vh, c2, na, cc, vc, ng, nd, nv, nh, nc
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate characteristic speeds and useful variables
 !
-    gm = gamma - 1.0d0
     vv = sum(q(ivx:ivz)**2)
     vh = 0.5d0 * vv
-    c2 = gm * (q(ien) - vh)
+    c2 = gammam1 * (q(ien) - vh)
     na = 0.5d0 / c2
     cc = sqrt(c2)
     vc = q(ivx) * cc
-    ng = na * gm
+    ng = na * gammam1
     nd = 2.0 * ng
     nv = na * vc
-    nh = na * gm * vh
+    nh = na * gammam1 * vh
     nc = na * cc
 
 ! prepare eigenvalues
@@ -955,17 +972,21 @@ module schemes
 #ifdef ISO
   subroutine eigensystem(q, c, r, l)
 
-    use equations, only : csnd
-    use variables, only : nqt
-    use variables, only : idn, ivx, ivy, ivz
+! include external variables
+!
+    use equations     , only : csnd
+    use variables     , only : nt
+    use variables     , only : idn, ivx, ivy, ivz, ien
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
-    real, dimension(nqt)    , intent(in)    :: q
-    real, dimension(nqt)    , intent(inout) :: c
-    real, dimension(nqt,nqt), intent(inout) :: l, r
+    real, dimension(nt)   , intent(in)    :: q
+    real, dimension(nt)   , intent(inout) :: c
+    real, dimension(nt,nt), intent(inout) :: l, r
 
 ! local variables
 !

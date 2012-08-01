@@ -233,7 +233,7 @@ problems.o       : problems.F90 blocks.o coordinates.o equations.o error.o     \
                    parameters.o variables.o
 refinement.o     : refinement.F90 blocks.o coordinates.o parameters.o          \
                    variables.o
-schemes.o        : schemes.F90 blocks.o coordinates.o interpolations.o         \
+schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o      \
                    variables.o
 random.o         : random.F90 mpitools.o parameters.o
 timers.o         : timers.F90
