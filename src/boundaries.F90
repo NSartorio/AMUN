@@ -144,10 +144,10 @@ module boundaries
     use coordinates, only : ng, nd, nh, toplev
     use coordinates, only : im, jm, km
     use coordinates, only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
+    use mpitools   , only : periodic
 #ifdef MPI
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nproc, nprocs
-    use mpitools   , only : periodic
     use variables, only : nqt
 #endif /* MPI */
 

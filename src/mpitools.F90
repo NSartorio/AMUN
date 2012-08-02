@@ -260,7 +260,6 @@ module mpitools
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef MPI
 ! start time accounting for the MPI initialization
 !
     call start_timer(imi)
@@ -269,6 +268,7 @@ module mpitools
 !
     periodic(:) = per(:)
 
+#ifdef MPI
 ! if set = .true. set the MPI domain
 !
     if (set) then
@@ -373,11 +373,11 @@ module mpitools
       pparity(3) = mod(pcoords(3), 2)
 
     end if
+#endif /* MPI */
 
 ! stop time accounting for the MPI initialization
 !
     call stop_timer(imi)
-#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !

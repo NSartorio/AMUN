@@ -430,6 +430,7 @@ program amun
 ! reset the termination flag
 !
   iterm = 0
+  iret  = 0
 
 ! stop time accounting for the initialization
 !
