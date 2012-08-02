@@ -138,34 +138,18 @@ module boundaries
 ! subroutine BOUNDARY_VARIABLES:
 ! -----------------------------
 !
-!   Subroutine over all leaf blocks and updates the boundaries of conserved
-!   variables.
+!   Subroutine updates the ghost zones of the data blocks from their neighbours
+!   or applies the specific boundary conditions.
 !
 !
 !===============================================================================
 !
   subroutine boundary_variables()
 
-! include external procedures
-!
-#ifdef MPI
-    use mpitools      , only : send_real_array, receive_real_array
-#endif /* MPI */
-
 ! include external variables
 !
-    use blocks        , only : ndims, nsides, nfaces
-    use blocks        , only : block_meta, block_data, list_meta
-    use blocks        , only : block_info, pointer_info
     use coordinates   , only : toplev
-    use coordinates   , only : ng, nd, nh, im, jm, km
-    use coordinates   , only : ib, jb, kb, ie, je, ke
-    use coordinates   , only : ibu, jbu, kbu, iel, jel, kel
     use mpitools      , only : periodic
-#ifdef MPI
-    use mpitools      , only : nproc, nprocs, npmax
-    use variables     , only : nt
-#endif /* MPI */
 
 ! local variables are not implicit by default
 !
@@ -173,26 +157,7 @@ module boundaries
 
 ! local variables
 !
-    integer :: idir, iside, iface, nside, nface, level
-    integer :: iret
-    integer :: il, jl, kl, iu, ju, ku
-#ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
-
-! local arrays
-!
-    integer     , dimension(0:npmax,0:npmax)        :: block_counter
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-    type(block_data), pointer :: pdata
-#ifdef MPI
-    type(block_info), pointer :: pinfo
-    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
-#endif /* MPI */
+    integer :: idir, ilev
 !
 !-------------------------------------------------------------------------------
 !
@@ -200,73 +165,59 @@ module boundaries
 !
     call update_corners()
 
-! start from the top level and go down
+! step down from the top level
 !
-    do level = toplev, 1, -1
+    do ilev = toplev, 1, -1
 
 ! iterate over all directions
 !
       do idir = 1, NDIMS
 
-!!
-!! update specific boundary conditions (those without neighbours)
-!!
-! first update boundaries which don't have neighbors and which are not periodic
+! update boundaries which don't have neighbors and which are not periodic
 !
-        if (.not. periodic(idir)) then
+        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
 
-          call specific_boundaries(level, idir)
-
-        end if ! not periodic
-
-        call copy_boundaries(level, idir)
+! copy boundaries between blocks at the same levels
+!
+        call copy_boundaries(ilev, idir)
 
       end do ! directions
 
-!!
-!! then RESTRICT blocks from higher levels
-!!
-! iterate over all directions
-!
-      do idir = 1, NDIMS
-        call restrict_boundaries(level - 1, idir)
-      end do ! directions
-
-    end do ! level
-
-! go from the first level up and prolong the boundaries
-!
-    do level = 1, toplev
-
-!!
-!! then PROLONG blocks from lower levels
-!!
-! iterate over all directions
-!
-      do idir = 1, NDIMS
-        call prolong_boundaries(level, idir)
-      end do ! directions
-
-!!
-!! finally COPY blocks between the same levels once again
-!!
-! iterate over all directions
+! restrict blocks from higher level neighbours
 !
       do idir = 1, NDIMS
 
-! first update boundaries which don't have neighbors and which are not periodic
+        call restrict_boundaries(ilev - 1, idir)
+
+      end do
+
+    end do ! levels
+
+! step up from the first level
 !
-        if (.not. periodic(idir)) then
+    do ilev = 1, toplev
 
-          call specific_boundaries(level, idir)
+! prolong boundaries from lower level neighbours
+!
+      do idir = 1, NDIMS
 
-        end if ! not periodic
+        call prolong_boundaries(ilev, idir)
 
-        call copy_boundaries(level, idir)
+      end do
 
-      end do ! directions
+      do idir = 1, NDIMS
 
-    end do ! level
+! update boundaries which don't have neighbors and which are not periodic
+!
+        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
+
+! copy boundaries between blocks at the same levels
+!
+        call copy_boundaries(ilev, idir)
+
+      end do
+
+    end do ! levels
 
 !-------------------------------------------------------------------------------
 !
