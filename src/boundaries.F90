@@ -677,11 +677,11 @@ module boundaries
 !
               select case(idir)
               case(1)
-                allocate(rbuf(nblocks,nqt,nd,jm,km))
+                allocate(rbuf(nblocks,nt,nd,jm,km))
               case(2)
-                allocate(rbuf(nblocks,nqt,im,nd,km))
+                allocate(rbuf(nblocks,nt,im,nd,km))
               case(3)
-                allocate(rbuf(nblocks,nqt,im,jm,nd))
+                allocate(rbuf(nblocks,nt,im,jm,nd))
               end select
 
 ! if isend == nproc we are sending data
@@ -1068,11 +1068,11 @@ module boundaries
 !
           select case(idir)
           case(1)
-            allocate(rbuf(nblocks,nqt,nh+2,jm,km))
+            allocate(rbuf(nblocks,nt,nh+2,jm,km))
           case(2)
-            allocate(rbuf(nblocks,nqt,im,nh+2,km))
+            allocate(rbuf(nblocks,nt,im,nh+2,km))
           case(3)
-            allocate(rbuf(nblocks,nqt,im,jm,nh+2))
+            allocate(rbuf(nblocks,nt,im,jm,nh+2))
           end select
 
 ! if isend == nproc we are sending data
@@ -1448,12 +1448,12 @@ module boundaries
 !
           select case(idir)
           case(1)
-            allocate(rbuf(nblocks,nqt,ng,jm,km))
+            allocate(rbuf(nblocks,nt,ng,jm,km))
           case(2)
-            allocate(rbuf(nblocks,nqt,im,ng,km))
+            allocate(rbuf(nblocks,nt,im,ng,km))
 #if NDIMS == 3
           case(3)
-            allocate(rbuf(nblocks,nqt,im,jm,ng))
+            allocate(rbuf(nblocks,nt,im,jm,ng))
 #endif /* NDIMS == 3 */
           end select
 
