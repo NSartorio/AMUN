@@ -152,6 +152,13 @@ module blocks
                                  !
     real, dimension(:,:,:,:,:), allocatable :: f
 
+#ifdef DEBUG
+                                 ! an allocatable array to store refinement
+                                 ! values
+                                 !
+    real, dimension(:,:,:)    , allocatable :: c
+#endif /* DEBUG */
+
   end type block_data
 
 ! define the INFO block structure
@@ -1059,6 +1066,12 @@ module blocks
 !
     if (nflux .gt. 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
 
+#ifdef DEBUG
+! allocate space for the refinement values
+!
+    allocate(pdata%c(nx,ny,nz))
+#endif /* DEBUG */
+
 ! increase the number of allocated meta blocks
 !
     dblocks = dblocks + 1
@@ -1116,6 +1129,12 @@ module blocks
 ! deallocate numerical fluxes
 !
       if (allocated(pdata%f)) deallocate(pdata%f)
+
+#ifdef DEBUG
+! deallocate the refinement array
+!
+      if (allocated(pdata%c)) deallocate(pdata%c)
+#endif /* DEBUG */
 
 ! nullify pointers
 !

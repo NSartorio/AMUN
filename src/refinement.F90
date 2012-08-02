@@ -134,8 +134,8 @@ module refinement
 
 ! local variables
 !
-    integer :: i, j, k, im2, jm2, km2, ip2, jp2, kp2
-    real    :: cref, fl, fr, fc, fx, fy, fz
+    integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
+    real    :: cref, fl, fr, fc, fx, fy, fz, cc
 
 ! local arrays
 !
@@ -151,140 +151,79 @@ module refinement
 !
     do k = kb, ke
 #if NDIMS == 3
-      km2 = k - 2
-      kp2 = k + 2
+      km1 = k - 1
+      kp1 = k + 1
 #endif /* NDIMS == 3 */
       do j = jb, je
-        jm2 = j - 2
-        jp2 = j + 2
+        jm1 = j - 1
+        jp1 = j + 1
         do i = ib, ie
-          im2 = i - 2
-          ip2 = i + 2
+          im1 = i - 1
+          ip1 = i + 1
+
+          cc = 0.0d0
 
 ! density
 !
-          fr   = pdata%q(idn,ip2,j,k) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,im2,j,k) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,ip2,j,k) + pdata%q(idn,im2,j,k)                   &
+          fr   = pdata%q(idn,ip1,j,k) - pdata%q(idn,i,j,k)
+          fl   = pdata%q(idn,im1,j,k) - pdata%q(idn,i,j,k)
+          fc   = pdata%q(idn,ip1,j,k) + pdata%q(idn,im1,j,k)                   &
                                                   + 2.0d0 * pdata%q(idn,i,j,k)
           fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          fr   = pdata%q(idn,i,jp2,k) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,i,jm2,k) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,i,jp2,k) + pdata%q(idn,i,jm2,k)                   &
+          fr   = pdata%q(idn,i,jp1,k) - pdata%q(idn,i,j,k)
+          fl   = pdata%q(idn,i,jm1,k) - pdata%q(idn,i,j,k)
+          fc   = pdata%q(idn,i,jp1,k) + pdata%q(idn,i,jm1,k)                   &
                                                   + 2.0d0 * pdata%q(idn,i,j,k)
           fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
+          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          fr   = pdata%q(idn,i,j,kp2) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,i,j,km2) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,i,j,kp2) + pdata%q(idn,i,j,km2)                   &
+          fr   = pdata%q(idn,i,j,kp1) - pdata%q(idn,i,j,k)
+          fl   = pdata%q(idn,i,j,km1) - pdata%q(idn,i,j,k)
+          fc   = pdata%q(idn,i,j,kp1) + pdata%q(idn,i,j,km1)                   &
                                                   + 2.0d0 * pdata%q(idn,i,j,k)
           fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
+          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
 #ifdef ADI
 ! pressure
 !
-          fr   = pdata%q(ipr,ip2,j,k) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,im2,j,k) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,ip2,j,k) + pdata%q(ipr,im2,j,k)                   &
+          fr   = pdata%q(ipr,ip1,j,k) - pdata%q(ipr,i,j,k)
+          fl   = pdata%q(ipr,im1,j,k) - pdata%q(ipr,i,j,k)
+          fc   = pdata%q(ipr,ip1,j,k) + pdata%q(ipr,im1,j,k)                   &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
           fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          fr   = pdata%q(ipr,i,jp2,k) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,i,jm2,k) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,i,jp2,k) + pdata%q(ipr,i,jm2,k)                   &
+          fr   = pdata%q(ipr,i,jp1,k) - pdata%q(ipr,i,j,k)
+          fl   = pdata%q(ipr,i,jm1,k) - pdata%q(ipr,i,j,k)
+          fc   = pdata%q(ipr,i,jp1,k) + pdata%q(ipr,i,jm1,k)                   &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
           fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
+          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          fr   = pdata%q(ipr,i,j,kp2) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,i,j,km2) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,i,j,kp2) + pdata%q(ipr,i,j,km2)                   &
+          fr   = pdata%q(ipr,i,j,kp1) - pdata%q(ipr,i,j,k)
+          fl   = pdata%q(ipr,i,j,km1) - pdata%q(ipr,i,j,k)
+          fc   = pdata%q(ipr,i,j,kp1) + pdata%q(ipr,i,j,km1)                   &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
           fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
+          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
 #endif /* NDIMS == 3 */
 
 #endif /* ADI */
-#ifdef MHD
-! X magnetic component
-!
-          fr   = pdata%q(ibx,ip2,j,k) - pdata%q(ibx,i,j,k)
-          fl   = pdata%q(ibx,im2,j,k) - pdata%q(ibx,i,j,k)
-          fc   = abs(pdata%q(ibx,ip2,j,k)) + abs(pdata%q(ibx,im2,j,k))         &
-                                             + 2.0d0 * abs(pdata%q(ibx,i,j,k))
-          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          fr   = pdata%q(ibx,i,jp2,k) - pdata%q(ibx,i,j,k)
-          fl   = pdata%q(ibx,i,jm2,k) - pdata%q(ibx,i,j,k)
-          fc   = abs(pdata%q(ibx,i,jp2,k)) + abs(pdata%q(ibx,i,jm2,k))         &
-                                             + 2.0d0 * abs(pdata%q(ibx,i,j,k))
-          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-#if NDIMS == 2
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-          fr   = pdata%q(ibx,i,j,kp2) - pdata%q(ibx,i,j,k)
-          fl   = pdata%q(ibx,i,j,km2) - pdata%q(ibx,i,j,k)
-          fc   = abs(pdata%q(ibx,i,j,kp2)) + abs(pdata%q(ibx,i,j,km2))         &
-                                             + 2.0d0 * abs(pdata%q(ibx,i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
-#endif /* NDIMS == 3 */
 
-! Y magnetic component
+! find the block maximum refinement value
 !
-          fr   = pdata%q(iby,ip2,j,k) - pdata%q(iby,i,j,k)
-          fl   = pdata%q(iby,im2,j,k) - pdata%q(iby,i,j,k)
-          fc   = abs(pdata%q(iby,ip2,j,k)) + abs(pdata%q(iby,im2,j,k))         &
-                                             + 2.0d0 * abs(pdata%q(iby,i,j,k))
-          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          fr   = pdata%q(iby,i,jp2,k) - pdata%q(iby,i,j,k)
-          fl   = pdata%q(iby,i,jm2,k) - pdata%q(iby,i,j,k)
-          fc   = abs(pdata%q(iby,i,jp2,k)) + abs(pdata%q(iby,i,jm2,k))         &
-                                             + 2.0d0 * abs(pdata%q(iby,i,j,k))
-          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-#if NDIMS == 2
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-          fr   = pdata%q(iby,i,j,kp2) - pdata%q(iby,i,j,k)
-          fl   = pdata%q(iby,i,j,km2) - pdata%q(iby,i,j,k)
-          fc   = abs(pdata%q(iby,i,j,kp2)) + abs(pdata%q(iby,i,j,km2))         &
-                                             + 2.0d0 * abs(pdata%q(iby,i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
-#endif /* NDIMS == 3 */
+          cref = max(cref, cc)
 
-! Z magnetic component
+#ifdef DEBUG
+! store the refinement values
 !
-          fr   = pdata%q(ibz,ip2,j,k) - pdata%q(ibz,i,j,k)
-          fl   = pdata%q(ibz,im2,j,k) - pdata%q(ibz,i,j,k)
-          fc   = abs(pdata%q(ibz,ip2,j,k)) + abs(pdata%q(ibz,im2,j,k))         &
-                                             + 2.0d0 * abs(pdata%q(ibz,i,j,k))
-          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          fr   = pdata%q(ibz,i,jp2,k) - pdata%q(ibz,i,j,k)
-          fl   = pdata%q(ibz,i,jm2,k) - pdata%q(ibz,i,j,k)
-          fc   = abs(pdata%q(ibz,i,jp2,k)) + abs(pdata%q(ibz,i,jm2,k))         &
-                                             + 2.0d0 * abs(pdata%q(ibz,i,j,k))
-          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-#if NDIMS == 2
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy)))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-          fr   = pdata%q(ibz,i,j,kp2) - pdata%q(ibz,i,j,k)
-          fl   = pdata%q(ibz,i,j,km2) - pdata%q(ibz,i,j,k)
-          fc   = abs(pdata%q(ibz,i,j,kp2)) + abs(pdata%q(ibz,i,j,km2))         &
-                                             + 2.0d0 * abs(pdata%q(ibz,i,j,k))
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * (fc + 1.0e-8))
-          cref = max(cref, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
-#endif /* NDIMS == 3 */
+          pdata%c(i,j,k) = cc
+#endif /* DEBUG */
 
-#endif /* MHD */
         end do
       end do
     end do

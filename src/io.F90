@@ -3162,6 +3162,9 @@ module io
     real(kind=4), dimension(:,:,:,:), allocatable :: bpsi
 #endif /* GLM */
 #endif /* MHD */
+#ifdef DEBUG
+    real(kind=4), dimension(:,:,:,:), allocatable :: cref
+#endif /* DEBUG */
 
 ! local pointers
 !
@@ -3207,6 +3210,9 @@ module io
       allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
 #endif /* GLM */
 #endif /* MHD */
+#ifdef DEBUG
+      allocate(cref(dm(1),dm(2),dm(3),dm(4)))
+#endif /* DEBUG */
 
 ! iterate over the data blocks on current processor
 !
@@ -3231,6 +3237,9 @@ module io
         bpsi(l,1:in,1:jn,1:kn) = real(pdata%q(iph,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* GLM */
 #endif /* MHD */
+#ifdef DEBUG
+        cref(l,1:in,1:jn,1:kn) = real(pdata%c(    ib:ie,jb:je,kb:ke),kind=4)
+#endif /* DEBUG */
 
 ! increase the block number
 !
@@ -3259,6 +3268,9 @@ module io
       call write_array4_float_h5(gid, 'bpsi', dm(:), bpsi(:,:,:,:))
 #endif /* GLM */
 #endif /* MHD */
+#ifdef DEBUG
+      call write_array4_float_h5(gid, 'cref', dm(:), cref(:,:,:,:))
+#endif /* DEBUG */
 
 ! deallocate the temporary arrays
 !
@@ -3274,6 +3286,9 @@ module io
       if (allocated(magy)) deallocate(magy)
       if (allocated(magz)) deallocate(magz)
 #endif /* MHD */
+#ifdef DEBUG
+      if (allocated(cref)) deallocate(cref)
+#endif /* DEBUG */
 
     end if ! dblocks > 0
 
