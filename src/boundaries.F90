@@ -53,16 +53,20 @@ module boundaries
 !
 !   Subroutine initializes the module BOUNDARIES by setting its parameters.
 !
+!
 !===============================================================================
 !
   subroutine initialize_boundaries()
 
-! include external procedures and variables
+! include external procedures
+!
+    use parameters    , only : get_parameter_string
+
+! include external variables
 !
 #ifdef MPI
-    use mpitools  , only : pdims, pcoords, periodic
+    use mpitools      , only : pdims, pcoords, periodic
 #endif /* MPI */
-    use parameters, only : get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -131,27 +135,39 @@ module boundaries
 !
 !===============================================================================
 !
-! boundary_variables: subroutine sweeps over all leaf blocks and performs
-!                     their conserved variables boundary update
+! subroutine BOUNDARY_VARIABLES:
+! -----------------------------
+!
+!   Subroutine over all leaf blocks and updates the boundaries of conserved
+!   variables.
+!
 !
 !===============================================================================
 !
   subroutine boundary_variables()
 
-    use blocks   , only : ndims, nsides, nfaces
-    use blocks   , only : block_meta, block_data, block_info, pointer_info     &
-                        , list_meta
-    use coordinates, only : ng, nd, nh, toplev
-    use coordinates, only : im, jm, km
-    use coordinates, only : ib, ibu, iel, ie, jb, jbu, jel, je, kb, kbu, kel, ke
-    use mpitools   , only : periodic
+! include external procedures
+!
 #ifdef MPI
-    use mpitools , only : send_real_array, receive_real_array
-    use mpitools , only : nproc, nprocs
-    use variables, only : nqt
+    use mpitools      , only : send_real_array, receive_real_array
 #endif /* MPI */
 
-! declare variables
+! include external variables
+!
+    use blocks        , only : ndims, nsides, nfaces
+    use blocks        , only : block_meta, block_data, list_meta, list_data
+    use blocks        , only : block_info, pointer_info
+    use coordinates   , only : toplev
+    use coordinates   , only : ng, nd, nh, im, jm, km
+    use coordinates   , only : ib, jb, kb, ie, je, ke
+    use coordinates   , only : ibu, jbu, kbu, iel, jel, kel
+    use mpitools      , only : periodic
+#ifdef MPI
+    use mpitools      , only : nproc, nprocs, npmax
+#endif /* MPI */
+    use variables     , only : nt
+
+! local variables are not implicit by default
 !
     implicit none
 
@@ -165,7 +181,7 @@ module boundaries
 
 ! local arrays
 !
-    integer     , dimension(0:nprocs-1,0:nprocs-1)    :: block_counter
+    integer     , dimension(0:npmax,0:npmax)        :: block_counter
     real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
 #endif /* MPI */
 
@@ -175,7 +191,7 @@ module boundaries
     type(block_data), pointer :: pdata
 #ifdef MPI
     type(block_info), pointer :: pinfo
-    type(pointer_info), dimension(0:nprocs-1,0:nprocs-1) :: block_array
+    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -184,13 +200,13 @@ module boundaries
 !
     do level = toplev, 1, -1
 
-!!
-!! first COPY blocks between the same levels
-!!
 ! iterate over all directions
 !
       do idir = 1, NDIMS
 
+!!
+!! update specific boundary conditions (those without neighbours)
+!!
 ! first update boundaries which don't have neighbors and which are not periodic
 !
         if (.not. periodic(idir)) then
@@ -255,6 +271,9 @@ module boundaries
         end do
 #endif /* MPI */
 
+!!
+!! update boundaries between blocks at the same level
+!!
 ! assign the pointer with the first block on in the list
 !
         pmeta => list_meta

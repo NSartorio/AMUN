@@ -46,7 +46,7 @@ module mpitools
 ! MPI global variables
 !
   integer(kind=4), save                 :: comm3d
-  integer(kind=4), save                 :: nproc, nprocs
+  integer(kind=4), save                 :: nproc, nprocs, npmax
   integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
   integer(kind=4), save, dimension(3,2) :: pneighs
   logical        , save, dimension(3)   :: periodic
@@ -109,6 +109,7 @@ module mpitools
 !
     nproc        =  0
     nprocs       =  1
+    npmax        =  0
     pdims(:)     =  1
     pcoords(:)   =  0
     pparity(:)   =  0
@@ -155,6 +156,10 @@ module mpitools
 ! set the master flag
 !
     master = (nproc .eq. 0)
+
+! calculate the index of the last processor
+!
+    npmax  = nprocs - 1
 
 ! store the MPI pool handles
 !
