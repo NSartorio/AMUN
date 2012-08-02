@@ -215,49 +215,7 @@ module boundaries
 !
         if (.not. periodic(idir)) then
 
-! associate a pointer with the first meta block
-!
-          pmeta => list_meta
-
-! iterate over all meta blocks
-!
-          do while(associated(pmeta))
-
-! check if the current meta block is a leaf
-!
-            if (pmeta%leaf .and. pmeta%level .eq. level) then
-
-#ifdef MPI
-! check if the current block belongs to the current processor
-!
-              if (pmeta%cpu .eq. nproc) then
-#endif /* MPI */
-
-! iterate over all neighbors
-!
-                do iside = 1, nsides
-
-! associate a pointer with the current neighbor
-!
-                  pneigh => pmeta%neigh(idir,iside,1)%ptr
-
-! check if the neighbor is not associated; it means that this is a specific
-! boundary
-!
-                  if (.not. associated(pneigh))                                &
-                               call boundary_specific(pmeta%data, idir, iside)
-
-                end do ! sides
-#ifdef MPI
-              end if ! current cpu
-#endif /* MPI */
-            end if ! leaf
-
-! associate the pointer with the next meta block
-!
-            pmeta => pmeta%next
-
-          end do ! meta blocks
+          call specific_boundaries(level, idir)
 
         end if ! not periodic
 
@@ -300,49 +258,7 @@ module boundaries
 !
         if (.not. periodic(idir)) then
 
-! associate a pointer with the first meta block
-!
-          pmeta => list_meta
-
-! iterate over all meta blocks
-!
-          do while(associated(pmeta))
-
-! check if the current meta block is a leaf
-!
-            if (pmeta%leaf .and. pmeta%level .eq. level) then
-
-#ifdef MPI
-! check if the current block belongs to the current processor
-!
-              if (pmeta%cpu .eq. nproc) then
-#endif /* MPI */
-
-! iterate over all neighbors
-!
-                do iside = 1, nsides
-
-! associate a pointer with the current neighbor
-!
-                  pneigh => pmeta%neigh(idir,iside,1)%ptr
-
-! check if the neighbor is not associated; it means that this is a specific
-! boundary
-!
-                  if (.not. associated(pneigh))                                &
-                               call boundary_specific(pmeta%data, idir, iside)
-
-                end do ! sides
-#ifdef MPI
-              end if ! current cpu
-#endif /* MPI */
-            end if ! leaf
-
-! associate the pointer with the next meta block
-!
-            pmeta => pmeta%next
-
-          end do ! meta blocks
+          call specific_boundaries(level, idir)
 
         end if ! not periodic
 
@@ -463,6 +379,93 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine update_corners
+!
+!===============================================================================
+!
+! subroutine SPECIFIC_BOUNDARIES:
+! ------------------------------
+!
+!   Subroutine scans over all leaf blocks in order to find blocks without
+!   neighbours, then updates the boundaries for selected type.
+!
+!
+!===============================================================================
+!
+  subroutine specific_boundaries(ilev, idir)
+
+! include external variables
+!
+    use blocks        , only : block_meta, list_meta
+    use blocks        , only : nsides
+#ifdef MPI
+    use mpitools      , only : nproc
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(in)       :: ilev, idir
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh
+
+! local variables
+!
+    integer                   :: iside
+!
+!-------------------------------------------------------------------------------
+!
+! assign the pointer to the first block on the list
+!
+    pmeta => list_meta
+
+! scan all data blocks until the last is reached
+!
+    do while(associated(pmeta))
+
+! check if the current meta block is a leaf
+!
+      if (pmeta%leaf .and. pmeta%level == ilev) then
+
+#ifdef MPI
+! check if the current block belongs to the local process
+!
+        if (pmeta%cpu == nproc) then
+#endif /* MPI */
+
+! iterate over all neighbors
+!
+          do iside = 1, nsides
+
+! assign a neighbour pointer to the current neighbour
+!
+            pneigh => pmeta%neigh(idir,iside,1)%ptr
+
+! make sure that the neighbour is not associated, then apply specific boundaries
+!
+            if (.not. associated(pneigh))                                      &
+                               call boundary_specific(pmeta%data, idir, iside)
+
+          end do ! sides
+
+#ifdef MPI
+        end if ! local process
+#endif /* MPI */
+      end if ! leaf
+
+! assign the pointer to the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine specific_boundaries
 !
 !===============================================================================
 !
