@@ -155,7 +155,7 @@ module boundaries
 ! include external variables
 !
     use blocks        , only : ndims, nsides, nfaces
-    use blocks        , only : block_meta, block_data, list_meta, list_data
+    use blocks        , only : block_meta, block_data, list_meta
     use blocks        , only : block_info, pointer_info
     use coordinates   , only : toplev
     use coordinates   , only : ng, nd, nh, im, jm, km
@@ -164,8 +164,8 @@ module boundaries
     use mpitools      , only : periodic
 #ifdef MPI
     use mpitools      , only : nproc, nprocs, npmax
-#endif /* MPI */
     use variables     , only : nt
+#endif /* MPI */
 
 ! local variables are not implicit by default
 !
@@ -196,6 +196,10 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! 1. FIRST FILL OUT THE CORNERS WITH THE EXTRAPOLATED VARIABLES
+!
+    call update_corners()
+
 ! start from the top level and go down
 !
     do level = toplev, 1, -1
@@ -1599,6 +1603,114 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine boundary_variables
+!
+!===============================================================================
+!
+! subroutine UPDATE_CORNERS:
+! -------------------------
+!
+!   Subroutine scans over all data blocks and updates their edges and corners.
+!   This is required since the boundary update by restriction leaves the corners
+!   untouched in some cases, which may result in unphysical values, like
+!   negative density or pressure.  The edge/corner update should not influence
+!   the solution, but just assures, that the variables are physical in all
+!   cells.
+!
+!
+!===============================================================================
+!
+  subroutine update_corners()
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im, jm, km
+    use coordinates   , only : ib, jb, kb, ie, je, ke
+    use coordinates   , only : ibl, jbl, kbl, iel, jel, kel
+    use coordinates   , only : ibu, jbu, kbu, ieu, jeu, keu
+    use variables     , only : nt
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer :: n, i, j, k
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! assign the pointer to the first block on the list
+!
+    pdata => list_data
+
+! scan all data blocks until the last is reached
+!
+    do while(associated(pdata))
+
+! iterate over all variables
+!
+      do n = 1, nt
+
+! edges
+!
+#if NDIMS == 3
+        do i = 1, im
+
+          pdata%u(n,i,  1:jbl,  1:kbl) = pdata%u(n,i,jb,kb)
+          pdata%u(n,i,jeu:jm ,  1:kbl) = pdata%u(n,i,je,kb)
+          pdata%u(n,i,  1:jbl,keu:km ) = pdata%u(n,i,jb,ke)
+          pdata%u(n,i,jeu:jm ,keu:km ) = pdata%u(n,i,je,ke)
+
+        end do
+
+        do j = 1, jm
+
+          pdata%u(n,  1:ibl,j,  1:kbl) = pdata%u(n,ib,j,kb)
+          pdata%u(n,ieu:im ,j,  1:kbl) = pdata%u(n,ie,j,kb)
+          pdata%u(n,  1:ibl,j,keu:km ) = pdata%u(n,ib,j,ke)
+          pdata%u(n,ieu:im ,j,keu:km ) = pdata%u(n,ie,j,ke)
+
+        end do
+#endif /* == 3 */
+
+        do k = 1, km
+
+          pdata%u(n,  1:ibl,  1:jbl,k) = pdata%u(n,ib,jb,k)
+          pdata%u(n,ieu:im ,  1:jbl,k) = pdata%u(n,ie,jb,k)
+          pdata%u(n,  1:ibl,jeu:jm ,k) = pdata%u(n,ib,je,k)
+          pdata%u(n,ieu:im ,jeu:jm ,k) = pdata%u(n,ie,je,k)
+
+        end do
+
+! corners
+!
+#if NDIMS == 3
+        pdata%u(n,  1:ibl,  1:jbl,  1:kbl) = pdata%u(n,ib,jb,kb)
+        pdata%u(n,ieu:im ,  1:jbl,  1:kbl) = pdata%u(n,ie,jb,kb)
+        pdata%u(n,  1:ibl,jeu:jm ,  1:kbl) = pdata%u(n,ib,je,kb)
+        pdata%u(n,ieu:im ,jeu:jm ,  1:kbl) = pdata%u(n,ie,je,kb)
+        pdata%u(n,  1:ibl,  1:jbl,keu:km ) = pdata%u(n,ib,jb,ke)
+        pdata%u(n,ieu:im ,  1:jbl,keu:km ) = pdata%u(n,ie,jb,ke)
+        pdata%u(n,  1:ibl,jeu:jm ,keu:km ) = pdata%u(n,ib,je,ke)
+        pdata%u(n,ieu:im ,jeu:jm ,keu:km ) = pdata%u(n,ie,je,ke)
+#endif /* == 3 */
+
+      end do
+
+! assign the pointer to the next block on the list
+!
+      pdata => pdata%next
+
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_corners
 !
 !===============================================================================
 !
