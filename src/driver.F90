@@ -45,8 +45,8 @@ program amun
 #endif /* FORCE */
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
-  use io            , only : write_data, write_restart_data, restart_job
-  use io            , only : nfile
+  use io            , only : initialize_io, write_data, write_restart_data     &
+                           , restart_job
   use mesh          , only : initialize_mesh, clear_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
@@ -79,9 +79,8 @@ program amun
 !
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
-  character             :: store = "p"
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
-  real                  :: dtout = 1.0d0, dtini = 1.0d-8
+  real                  :: dtini = 1.0d-8
   real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
 
 ! temporary variables
@@ -102,7 +101,6 @@ program amun
 ! local snapshot file counters
 !
   integer               :: nrun = 1
-  integer               :: no   = 0
 
 ! iteration and time variables
 !
@@ -271,11 +269,6 @@ program amun
   per(3) = (lbnd == "periodic") .and. (ubnd == "periodic")
 #endif /* R3D */
 
-! get the type of snapshot files and interval between snapshots
-!
-  call get_parameter_string ("store", store)
-  call get_parameter_real   ("dtout", dtout)
-
 ! get the execution termination parameters
 !
   call get_parameter_integer("nmax" , nmax)
@@ -332,6 +325,10 @@ program amun
 !
   call initialize_refinement()
 
+! initialize module IO
+!
+  call initialize_io()
+
 ! reset number of iterations and time, etc.
 !
   n    = 0
@@ -359,14 +356,6 @@ program amun
 ! store mesh statistics
 !
     call store_mesh_stats(n, t)
-
-! store integrals
-!
-    call store_integrals()
-
-! write down the initial state
-!
-    call write_data()
 
   else
 
@@ -518,9 +507,7 @@ program amun
 
 ! store data
 !
-    if (dtout > 0.0d0 .and. nfile < (int(t/dtout))) then
-      call write_data()
-    end if
+    call write_data()
 
 ! get current time in seconds
 !

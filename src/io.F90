@@ -21,41 +21,96 @@
 !!
 !!******************************************************************************
 !!
-!! module: IO - handling the data input and output for storing the snapshots
-!!              and restarting the jobs
+!! module: IO
+!!
+!!  This module handles data storage and job restart from restart files.
+!!
 !!
 !!******************************************************************************
 !
 module io
 
+! include external procedures
+!
   use blocks, only : pointer_meta
 
+! module variables are not implicit by default
+!
   implicit none
+
+! data file type
+!
+  character         , save :: ftype = "p"
+
+! the interval of the snapshots storing
+!
+  real              , save :: dtout = 1.0d+0
+
+! all module parameters
+!
+  integer           , save :: nres    = -1
+  character(len=255), save :: respath = "./"
 
 ! counters for the stored data and restart files
 !
-  integer(kind=4), save :: nfile = -1, nrest = 0
+  integer(kind=4)   , save :: nfile = 0, nrest = 0
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
-  integer(kind=4), save :: rtoplev = 1, rncpus = 1
+  integer(kind=4)   , save :: rtoplev = 1, rncpus = 1
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
 !
-  integer(kind=4), save :: ucor = 1, dcor = 1
-
-! data file type
-!
-  character      , save :: ftype = 'p'
-  integer(kind=4), save :: nres  = -1
+  integer(kind=4)   , save :: ucor = 1, dcor = 1
 
 ! array of pointer used during job restart
 !
   type(pointer_meta), dimension(:), allocatable, save :: block_array
 
   contains
+!
+!===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
+!
+! subroutine INITIALIZE_IO:
+! ------------------------
+!
+!   Subroutine initializes module IO by setting its parameters.
+!
+!
+!===============================================================================
+!
+  subroutine initialize_io()
+
+! include external procedures
+!
+    use parameters, only : get_parameter_integer, get_parameter_real           &
+                         , get_parameter_string
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! read values of the module parameters
+!
+    call get_parameter_integer("nres"   , nres   )
+    call get_parameter_string ("respath", respath)
+
+! get the interval between snapshots
+!
+    call get_parameter_string ("ftype"  , ftype  )
+    call get_parameter_real   ("dtout"  , dtout  )
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_io
 !
 !===============================================================================
 !
@@ -69,19 +124,25 @@ module io
 !
   subroutine write_data()
 
+    use evolution, only : t
+
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! increase the file counter
+! exit the subroutine, if the time of the next snapshot is not reached
 !
-    nfile = nfile + 1
+    if (dtout <= 0.0d+0 .or. nfile > (int(t / dtout))) return
 
 #ifdef HDF5
 ! store data file
 !
     call write_data_h5(ftype)
 #endif /* HDF5 */
+
+! increase the file counter
+!
+    nfile = nfile + 1
 
 !-------------------------------------------------------------------------------
 !
@@ -147,8 +208,12 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine restart_job
-#ifdef HDF5
 !
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+#ifdef HDF5
 !===============================================================================
 !
 ! write_data_h5: wrapper subroutine for the HDF5 format

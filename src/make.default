@@ -78,7 +78,7 @@ RESISTIVITY  = N
 #  FLUX           - flux approximation: HLL, HLLC, HLLD, ROE
 #  FLUXEMF        - electromotive force approximation: GLM
 #  FIX_POSITIVITY - checks if the positive variables are negative and reduces
-#                  their reconstruction if necessary;
+#                   their reconstruction if necessary;
 #
 SOLVER         = GODUNOV
 TIME           = RK2
