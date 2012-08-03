@@ -428,7 +428,7 @@ module evolution
 !
     use equations     , only : maxspeed
 #ifdef MPI
-    use mpitools      , only : reduce_maximum_real
+    use mpitools      , only : reduce_maximum_real, reduce_maximum_integer
 #endif /* MPI */
 
 ! include external variables
@@ -490,7 +490,8 @@ module evolution
 #ifdef MPI
 ! find maximum speed in the system from all processors
 !
-    call reduce_maximum_real(cmax, iret)
+    call reduce_maximum_real   (cmax, iret)
+    call reduce_maximum_integer(lev , iret)
 #endif /* MPI */
 
 ! find the smallest spatial step
