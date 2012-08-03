@@ -420,6 +420,10 @@ module parameters
     c = index(line, '#')
     i = index(line, '"')
     j = index(line, '"', back = .true.)
+    if (i == 0 .and. j == 0) then
+      i = index(line, "'")
+      j = index(line, "'", back = .true.)
+    end if
 
 ! remove the length of the in-line comment from the length of line
 !
