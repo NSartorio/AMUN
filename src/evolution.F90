@@ -121,16 +121,11 @@ module evolution
 
 ! include external variables
 !
-    use blocks        , only : block_data, list_data
     use coordinates   , only : toplev
 
 ! local variables are not implicit by default
 !
     implicit none
-
-! local variables
-!
-    type(block_data), pointer :: pblock
 !
 !-------------------------------------------------------------------------------
 !
