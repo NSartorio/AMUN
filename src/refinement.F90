@@ -36,9 +36,9 @@ module refinement
 
 ! refinement criterion parameters
 !
-  real             , save :: crefmin = 4.0d-2
-  real             , save :: crefmax = 6.0d-2
-  real             , save :: epsref  = 1.0d-2
+  real, save :: crefmin = 4.0d-2
+  real, save :: crefmax = 2.0d-1
+  real, save :: epsref  = 1.0d-2
 
 ! by default everything is private
 !
@@ -61,7 +61,7 @@ module refinement
 ! subroutine INITIALIZE_REFINEMENT:
 ! --------------------------------
 !
-!   Subroutine prepares module REFINEMENT.
+!   Subroutine initializes module REFINEMENT.
 !
 !
 !===============================================================================
@@ -80,9 +80,9 @@ module refinement
 !
 ! get the refinement parameters
 !
-    call get_parameter_real  ("crefmin", crefmin)
-    call get_parameter_real  ("crefmax", crefmax)
-    call get_parameter_real  ("epsref" , epsref )
+    call get_parameter_real("crefmin", crefmin)
+    call get_parameter_real("crefmax", crefmax)
+    call get_parameter_real("epsref" , epsref )
 
 !-------------------------------------------------------------------------------
 !
@@ -95,23 +95,23 @@ module refinement
 !
 !   Function scans the given data block and checks for the refinement
 !   criterion.  It returns +1 if the criterion is met, which indicates that
-!   the block needs to be refined, 0 if there is no need for the refinement, and
-!   -1 if the block can be derefined.
+!   the block needs to be refined, 0 if there is no need for the refinement,
+!   and -1 if the block can be derefined.
 !
 !   Arguments:
 !
 !     pdata - pointer to the datablock structure of the currently initialized
 !             block;
 !
+!
 !===============================================================================
 !
   function check_refinement_criterion(pdata) result(criterion)
 
-! include external procedures and variables
+! include external variables
 !
     use blocks     , only : block_data
-    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
-    use variables  , only : nvr, nqt
+    use coordinates, only : ib, jb, kb, ie, je, ke
     use variables  , only : idn
 #ifdef ADI
     use variables  , only : ipr
@@ -126,20 +126,17 @@ module refinement
 
 ! input arguments
 !
-    type(block_data), pointer, intent(inout) :: pdata
+    type(block_data), pointer, intent(in) :: pdata
 
 ! return variable
 !
-    integer(kind=4) :: criterion
+    integer(kind=4)                       :: criterion
 
 ! local variables
 !
     integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
-    real    :: cref, fl, fr, fc, fx, fy, fz, cc
-
-! local arrays
-!
-    real, parameter :: cf  = 1.0d0 / NDIMS
+    real    :: fl, fr, fc, fx, fy, fz
+    real    :: cloc, cref
 !
 !-------------------------------------------------------------------------------
 !
@@ -161,7 +158,9 @@ module refinement
           im1 = i - 1
           ip1 = i + 1
 
-          cc = 0.0d0
+! reset the local criterion value
+!
+          cloc = 0.0d0
 
 ! density
 !
@@ -176,7 +175,7 @@ module refinement
                                                   + 2.0d0 * pdata%q(idn,i,j,k)
           fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy)))
+          cloc = max(cloc, fx, fy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
           fr   = pdata%q(idn,i,j,kp1) - pdata%q(idn,i,j,k)
@@ -184,7 +183,7 @@ module refinement
           fc   = pdata%q(idn,i,j,kp1) + pdata%q(idn,i,j,km1)                   &
                                                   + 2.0d0 * pdata%q(idn,i,j,k)
           fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
+          cloc = max(cloc, fx, fy, fz)
 #endif /* NDIMS == 3 */
 
 #ifdef ADI
@@ -201,7 +200,7 @@ module refinement
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
           fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy)))
+          cloc = max(cloc, fx, fy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
           fr   = pdata%q(ipr,i,j,kp1) - pdata%q(ipr,i,j,k)
@@ -209,19 +208,18 @@ module refinement
           fc   = pdata%q(ipr,i,j,kp1) + pdata%q(ipr,i,j,km1)                   &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
           fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cc   = max(cc, sqrt(cf * (fx * fx + fy * fy + fz * fz)))
+          cloc = max(cloc, fx, fy, fz)
 #endif /* NDIMS == 3 */
-
 #endif /* ADI */
 
 ! find the block maximum refinement value
 !
-          cref = max(cref, cc)
+          cref = max(cref, cloc)
 
 #ifdef DEBUG
-! store the refinement values
+! store the refinement criterion value
 !
-          pdata%c(i,j,k) = cc
+          pdata%c(i,j,k) = cloc
 #endif /* DEBUG */
 
         end do
@@ -232,13 +230,15 @@ module refinement
 !
     criterion = 0
 
-    if (cref >= crefmax) then
+    if (cref > crefmax) then
       criterion =  1
     end if
-    if (cref <= crefmin) then
+    if (cref < crefmin) then
       criterion = -1
     end if
 
+! return the refinement flag
+!
     return
 
 !-------------------------------------------------------------------------------
