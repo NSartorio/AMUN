@@ -3120,6 +3120,9 @@ module io
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
+#ifdef DEBUG
+    use refinement   , only : check_refinement_criterion
+#endif /* DEBUG */
     use variables    , only : nqt
     use variables    , only : idn, ivx, ivy, ivz
 #ifdef ADI
@@ -3238,6 +3241,11 @@ module io
 #endif /* GLM */
 #endif /* MHD */
 #ifdef DEBUG
+
+! update the refinement criterion values for this block
+!
+        i = check_refinement_criterion(pdata)
+
         cref(l,1:in,1:jn,1:kn) = real(pdata%c(    ib:ie,jb:je,kb:ke),kind=4)
 #endif /* DEBUG */
 
