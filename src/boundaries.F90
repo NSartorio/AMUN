@@ -2761,7 +2761,6 @@ module boundaries
     use coordinates  , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
                             , jbl, je, jeu, kb, kbl, ke, keu
     use error        , only : print_warning
-    use interpolations, only : limiter
     use variables    , only : nvr, nfl, idn, imx, imy, imz
 #ifdef MHD
     use variables    , only : ibx, iby, ibz
