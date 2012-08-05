@@ -41,9 +41,13 @@ module interpolations
   real, save :: rad   = 1.0d0
   real, save :: eps   = epsilon(rad)
 
-! by default everything is public
+! by default everything is private
 !
-  public
+  private
+
+! declare public subroutines
+!
+  public :: initialize_interpolations, reconstruct, minmod
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -89,12 +93,23 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_interpolations
-!
 #ifdef TVD
+!
 !===============================================================================
 !
-! reconstruct: subroutine for the reconstruction of the values at the right and
-!              left interfaces of cells from their cell centered representation
+! subroutine RECONSTRUCT:
+! ----------------------
+!
+!   Subroutine reconstructs the interface states using the second order TVD
+!   method with a limiter selected through a compilation flag LIMITER.
+!
+!   Arguments:
+!
+!     n  - the length of the input vector;
+!     h  - the spatial step; this is required for some reconstruction methods;
+!     f  - the input vector of cell averaged values;
+!     fl - the left side state reconstructed for location (i+1/2);
+!     fr - the right side state reconstructed for location (i+1/2);
 !
 !===============================================================================
 !
@@ -113,60 +128,77 @@ module interpolations
 
 ! local variables
 !
-    integer            :: i
-    real               :: df, ds
-    real, dimension(n) :: dfl, dfr
+    integer            :: i, im1, ip1
+    real               :: df, ds, dm, dp
 !
 !-------------------------------------------------------------------------------
 !
-!! second order TVD interpolation
-!!
-! calculate the left and right derivatives
-!
-    do i = 1, n - 1
-      dfr(i  ) = f(i+1) - f(i)
-      dfl(i+1) = dfr(i)
-    end do
-    dfl(1) = dfr(1)
-    dfr(n) = dfl(n)
-
 ! interpolate the values at i-1/2 and i+1/2
 !
     do i = 1, n
+
+! prepare indices
+!
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+! calculate derivatives
+!
+      dm = f(i  ) - f(im1)
+      dp = f(ip1) - f(i  )
+
+! obtain the limited derivative
+!
 #ifdef MINMOD
-      df = 0.5d0 * minmod(dfr(i), dfl(i))
+      df = 0.5d0 * minmod(dm, dp)
 
-      fl(i) = f(i) + df
-      fr(i) = f(i) - df
+! interpolate the states
+!
+      fl(i  ) = f(i) + df
+      fr(im1) = f(i) - df
 #endif /* MINMOD */
+
 #ifdef LF
-      ds = dfr(i) * dfl(i)
+! obtain the sign change detector
+!
+      ds = dm * dp
 
-      if (ds .gt. eps) then
-        df  = ds / (dfr(i) + dfl(i))
+! depending on the sign change choose the proper slope
+!
+      if (ds > 0.0d0) then
 
-        fl(i) = f(i) + df
-        fr(i) = f(i) - df
+! calculate derivative
+!
+        df  = ds / (dm + dp)
+
+! interpolate the states
+!
+        fl(i  ) = f(i) + df
+        fr(im1) = f(i) - df
+
       else
-        fl(i) = f(i)
-        fr(i) = f(i)
+
+! copy the states
+!
+        fl(i  ) = f(i)
+        fr(im1) = f(i)
+
       end if
 #endif /* LF */
+
     end do
 
-! shift i-1/2 to the left
+! prepare the last point
 !
-    do i = 1, n - 1
-      fr(i) = fr(i+1)
-    end do
+    fl(1) = f(1)
     fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct
-!
 #endif /* TVD */
 #ifdef WENO3
+!
 !===============================================================================
 !
 ! reconstruct: subroutine for the reconstruction of the values at the right and
@@ -381,32 +413,36 @@ module interpolations
 !
 !===============================================================================
 !
-! minmod: function returns the minimum module value among two arguments
+! subroutine MINMOD:
+! -----------------
+!
+!   Function returns the minimum module value among two arguments.
+!
+!   Arguments:
+!
+!     a, b - two real values;
+!
 !
 !===============================================================================
 !
   real function minmod(a, b)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
 !
     real, intent(in) :: a, b
-
-! local parameters
-!
-    real, parameter  :: epsp = epsilon(a), epsm = - epsilon(a)
 !
 !-------------------------------------------------------------------------------
 !
-    minmod = 0.0d0
+! calculate the minimal module value
+!
+    minmod = (sign(0.5d0, a) + sign(0.5d0, b)) * min(abs(a), abs(b))
 
-    if ((a .gt. epsp) .and. (b .gt. epsp)) then
-      minmod = min(a, b)
-    else if ((a .lt. epsm) .and. (b .lt. epsm)) then
-      minmod = max(a, b)
-    end if
-
+! return the value
+!
     return
 
 !-------------------------------------------------------------------------------
