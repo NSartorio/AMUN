@@ -1044,7 +1044,7 @@ module mesh
     use blocks        , only : block_meta, block_data, nchild
     use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates   , only : ib, ie, jb, je, kb, ke
-    use interpolations, only : minmod
+    use interpolations, only : minmod3
     use variables     , only : nqt
 
     implicit none
@@ -1121,25 +1121,25 @@ module mesh
 
           do p = 1, nqt
 
-            dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
             dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
-            dux = 0.125d0 * minmod(dur, dul)
+            dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
+            dux = 0.125d0 * minmod3(dul, dur)
 
-            dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
             dul = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
-            duy = 0.125d0 * minmod(dur, dul)
+            dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
+            duy = 0.125d0 * minmod3(dul, dur)
 
 #if NDIMS == 3
-            dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
             dul = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
-            duz = 0.125d0 * minmod(dur, dul)
+            dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
+            duz = 0.125d0 * minmod3(dul, dur)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - dux - duy
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + dux - duy
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - dux + duy
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + dux + duy
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy)
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy)
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) + (duy - dux)
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy)
 #endif /* NDIMS == 2 */
 
 #if NDIMS == 3

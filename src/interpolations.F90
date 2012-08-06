@@ -47,7 +47,7 @@ module interpolations
 
 ! declare public subroutines
 !
-  public :: initialize_interpolations, reconstruct, minmod
+  public :: initialize_interpolations, reconstruct, minmod, minmod3
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -157,7 +157,14 @@ module interpolations
       fl(i  ) = f(i) + df
       fr(im1) = f(i) - df
 #endif /* MINMOD */
+#ifdef MC
+      df = 0.5d0 * minmod3(dm, dp)
 
+! interpolate the states
+!
+      fl(i  ) = f(i) + df
+      fr(im1) = f(i) - df
+#endif /* MC */
 #ifdef LF
 ! obtain the sign change detector
 !
@@ -448,6 +455,46 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end function minmod
+!
+!===============================================================================
+!
+! subroutine MINMOD3:
+! ------------------
+!
+!   Function returns the minimum module value among two arguments and their
+!   average.
+!
+!   Arguments:
+!
+!     a, b - two real values;
+!
+!
+!===============================================================================
+!
+  real function minmod3(a, b)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real, intent(in) :: a, b
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the minimal module value
+!
+    minmod3 = (sign(1.0d+0, a) + sign(1.0d+0, b))                              &
+                                   * min(abs(a), abs(b), 0.25d+0 * abs(a + b))
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function minmod3
 !
 !===============================================================================
 !

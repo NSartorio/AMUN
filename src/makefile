@@ -73,6 +73,9 @@ endif
 ifeq ($(SPACE),MINMOD)
 FFLAGS  += -DTVD
 endif
+ifeq ($(SPACE),MC)
+FFLAGS  += -DTVD
+endif
 ifeq ($(SPACE),LF)
 FFLAGS  += -DTVD
 endif

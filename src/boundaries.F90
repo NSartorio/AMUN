@@ -2429,12 +2429,12 @@ module boundaries
 !
   subroutine boundary_prolong(pdata, u, idir, iside, iface)
 
-    use blocks       , only : block_data
-    use coordinates   , only : ng, im, ih, ib, ie, ieu                          &
-                            , nd, jm, jh, jb, je, jeu                          &
-                            , nh, km, kh, kb, ke, keu
-    use interpolations, only : minmod
-    use variables    , only : nqt
+    use blocks        , only : block_data
+    use coordinates   , only : ng, im, ih, ib, ie, ieu                         &
+                             , nd, jm, jh, jb, je, jeu                         &
+                             , nh, km, kh, kb, ke, keu
+    use interpolations, only : minmod3
+    use variables     , only : nqt
 
     implicit none
 
@@ -2689,7 +2689,7 @@ module boundaries
 
     end select
 
-! update variable boundaries  with the linear interpolation
+! update variable boundaries with the linear interpolation
 !
 #if NDIMS == 2
     do k = 1, km
@@ -2709,25 +2709,25 @@ module boundaries
 
           do q = 1, nqt
 
-            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
             dul = u(q,i  ,j,k) - u(q,i-1,j,k)
-            dux = 0.25d0 * minmod(dur, dul)
+            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
+            dux = 0.25d0 * minmod3(dul, dur)
 
-            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
             dul = u(q,i,j  ,k) - u(q,i,j-1,k)
-            duy = 0.25d0 * minmod(dur, dul)
+            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
+            duy = 0.25d0 * minmod3(dul, dur)
 
 #if NDIMS == 3
-            dur = u(q,i,j,k+1) - u(q,i,j,k  )
             dul = u(q,i,j,k  ) - u(q,i,j,k-1)
-            duz = 0.25d0 * minmod(dur, dul)
+            dur = u(q,i,j,k+1) - u(q,i,j,k  )
+            duz = 0.25d0 * minmod3(dul, dur)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - dux - duy
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + dux - duy
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) - dux + duy
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + dux + duy
+            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy)
+            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy)
+            pdata%u(q,it,jp,kt) = u(q,i,j,k) + (duy - dux)
+            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
             pdata%u(q,it,jt,kt) = u(q,i,j,k) - dux - duy - duz
