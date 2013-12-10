@@ -1072,7 +1072,7 @@ module schemes
 
 ! include external procedures
 !
-    use equations     , only : prim2cons, fluxspeed
+    use equations     , only : prim2cons, fluxspeed, cmax
     use interpolations, only : reconstruct
 #ifdef FIX_POSITIVITY
     use interpolations, only : fix_positivity
@@ -1088,7 +1088,6 @@ module schemes
     use variables     , only : ibx, iby, ibz
 #ifdef GLM
     use variables     , only : iph
-    use variables     , only : cmax
 #endif /* GLM */
 
 ! local variables are not implicit by default

@@ -426,7 +426,7 @@ module evolution
 
 ! include external procedures
 !
-    use equations     , only : maxspeed
+    use equations     , only : maxspeed, cmax, cmax2
 #ifdef MPI
     use mpitools      , only : reduce_maximum_real, reduce_maximum_integer
 #endif /* MPI */
@@ -436,7 +436,6 @@ module evolution
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
     use coordinates   , only : toplev
-    use variables     , only : cmax
 
 ! local variables are not implicit by default
 !
@@ -493,6 +492,10 @@ module evolution
     call reduce_maximum_real   (cmax, iret)
     call reduce_maximum_integer(lev , iret)
 #endif /* MPI */
+
+! calculate squared cmax
+!
+    cmax2 = cmax * cmax
 
 ! find the smallest spatial step
 !

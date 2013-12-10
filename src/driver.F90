@@ -37,7 +37,7 @@ program amun
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries
   use coordinates   , only : initialize_coordinates, finalize_coordinates
-  use equations     , only : initialize_equations
+  use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, advance
   use evolution     , only : n, t, dt, dtn, cfl
 #ifdef FORCE
@@ -225,29 +225,13 @@ program amun
 !
   iterm = 0
 
-! print configuration information
+! initialize module EQUATIONS
 !
-  if (master) then
+  call initialize_equations(master, iret)
 
-    write (*,"(1x,a)"         ) "Physics:"
-    write (*,"(4x,a,1x,a)"    ) "equations              =",                    &
-#ifdef HYDRO
-    "HD"
-#endif /* HYDRO */
-#ifdef MHD
-    "MHD"
-#endif /* MHD */
-    write (*,"(4x,a,1x,a)"    ) "equation of state      =",                    &
-#ifdef ADI
-    "adiabatic"
-#endif /* ADI */
-#ifdef ISO
-    "isothermal"
-#endif /* ISO */
-    write (*,"(4x,a,1x,a)"    ) "geometry               =",                    &
-    "rectangular"
-
-  end if
+! jump to the end if the equations could not be initialized
+!
+  if (iret > 0) go to 30
 
 ! check if the domain is periodic
 !
@@ -308,10 +292,6 @@ program amun
 ! initialize module INTERPOLATIONS
 !
   call initialize_interpolations()
-
-! initialize module EQUATIONS
-!
-  call initialize_equations()
 
 ! initialize boundaries
 !
@@ -715,6 +695,14 @@ program amun
     write (*,'(a)') ''
 
   end if
+
+! finalize module EQUATIONS
+!
+  call finalize_equations(iret)
+
+! jump point
+!
+  30 continue
 
 ! finalize parameters
 !

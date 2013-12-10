@@ -23,9 +23,23 @@
 !!
 !! module: EQUATIONS
 !!
-!!  This module handles supported sets of equations, provides subroutines to
-!!  convert between conserved and primitive variables, calculate flux and
-!!  characteristic speeds.
+!!  This module provides interface for the systems of equations.  Any set of
+!!  equations gives us some basic informations, such as the number of variables,
+!!  the primitive and conservative variable definitions, the conversion between
+!!  those variables, the flux and characteristic speeds defined in terms of
+!!  primitive variables.  All this information is provided by this module.
+!!
+!!  In order to implement a new set of equations, we need to:
+!!
+!!  1) define the number of independent variables (or equations) nv;
+!!  2) define the variable indices and names (both primitive and conservative);
+!!  3) provide subroutines for primitive-conservative variable conversion and
+!!     point them to corresponding pointers;
+!!  4) provide a subroutine to calculate physical fluxes and characteristic
+!!     speeds;
+!!  5) provide a subroutine to calculate the maximum speed;
+!!  6) optionally, define and read all physical constants related to a given
+!!     system;
 !!
 !!******************************************************************************
 !
@@ -35,25 +49,72 @@ module equations
 !
   implicit none
 
-#ifdef ADI
+! pointers to the conversion procedures
+!
+  procedure(prim2cons_hd_iso), pointer, save :: prim2cons => null()
+  procedure(cons2prim_hd_iso), pointer, save :: cons2prim => null()
+
+! pointer to the flux procedure
+!
+  procedure(fluxspeed_hd_iso), pointer, save :: fluxspeed => null()
+
+! pointer to the maxspeed procedure
+!
+  procedure(maxspeed_hd_iso) , pointer, save :: maxspeed  => null()
+
+
+! the system of equations and the equation of state
+!
+  character(len=32), save :: eqsys = "hydrodynamic"
+  character(len=32), save :: eos   = "adiabatic"
+
+! the number of independent variables
+!
+  integer(kind=4)  , save :: nv  = 0
+
+! variable indices
+!
+  integer(kind=4)  , save :: idn = -1
+  integer(kind=4)  , save :: ivx = -1, ivy = -1, ivz = -1
+  integer(kind=4)  , save :: imx = -1, imy = -1, imz = -1
+  integer(kind=4)  , save :: ibx = -1, iby = -1, ibz = -1
+  integer(kind=4)  , save :: ibp = -1
+  integer(kind=4)  , save :: ipr = -1, ien = -1
+
+! variable names
+!
+  character(len=4), dimension(:), allocatable, save :: pvars, cvars
+
 ! adiabatic heat ratio
 !
-  real, save :: gamma = 5.0d0 / 3.0d0
+  real(kind=8)     , save :: gamma   = 5.0d+00 / 3.0d+00
 
 ! additional adiabatic parameters
 !
-  real, save :: gammam1 = 2.0d0 / 3.0d0, gammam1i = 1.5d0
-#endif /* ADI */
+  real(kind=8)     , save :: gammam1 = 2.0d+00 / 3.0d+00, gammam1i = 1.5d+00
 
-#ifdef ISO
 ! isothermal speed of sound and its second power
 !
-  real, save :: csnd  = 1.0d0, csnd2 = 1.0d0
-#endif /* ISO */
+  real(kind=8)     , save :: csnd    = 1.0d+00, csnd2   = 1.0d+00
 
-! by default everything is public
+! maximum speed in the system
 !
-  public
+  real(kind=8)     , save :: cmax    = 0.0d+00, cmax2   = 0.0d+00
+
+! by default everything is private
+!
+  private
+
+! declare public variables and subroutines
+!
+  public :: initialize_equations, finalize_equations
+  public :: prim2cons, cons2prim
+  public :: fluxspeed
+  public :: maxspeed, reset_maxspeed, get_maxspeed
+  public :: update_primitive_variables
+  public :: gamma
+  public :: csnd
+  public :: cmax, cmax2
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -64,35 +125,274 @@ module equations
 ! subroutine INITIALIZE_EQUATIONS:
 ! -------------------------------
 !
-!   Subroutine sets the default values of module parameters and obtains their
-!   values from the PARAMETERS module.
+!   Subroutine initiate the module by setting module parameters and subroutine
+!   pointers.
+!
+!   Arguments:
+!
+!     verbose - a logical flag turning the information printing;
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine initialize_equations()
+  subroutine initialize_equations(verbose, iret)
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_real
+    use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
+! local variables
+!
+    character(len=255)     :: name_eqsys = ""
+    character(len=255)     :: name_eos   = ""
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef ADI
+! get the system of equations
+!
+    call get_parameter_string("equation_system"   , eqsys)
+
+! get the equation of state
+!
+    call get_parameter_string("equation_of_state" , eos  )
+
+! depending on the system of equations initialize the module variables
+!
+    select case(trim(eqsys))
+
+!--- HYDRODYNAMICS ---
+!
+    case("hd", "HD", "hydro", "HYDRO", "hydrodynamic", "HYDRODYNAMIC")
+
+! the name of equation system
+!
+      name_eqsys = "HD"
+
+! initialize the number of variables (density + 3 components of velocity)
+!
+      nv  = 4
+
+! initialize the variable indices
+!
+      idn = 1
+      ivx = 2
+      ivy = 3
+      ivz = 4
+      imx = 2
+      imy = 3
+      imz = 4
+
+! depending on the equation of state complete the initialization
+!
+      select case(trim(eos))
+
+      case("iso", "ISO", "isothermal", "ISOTHERMAL")
+
+! the type of equation of state
+!
+        name_eos  = "isothermal"
+
+! set pointers to subroutines
+!
+        prim2cons => prim2cons_hd_iso
+        cons2prim => cons2prim_hd_iso
+        fluxspeed => fluxspeed_hd_iso
+        maxspeed  => maxspeed_hd_iso
+
+      case("adi", "ADI", "adiabatic", "ADIABATIC")
+
+! the type of equation of state
+!
+        name_eos  = "adiabatic"
+
+! include the pressure/energy in the number of variables
+!
+        nv  = nv + 1
+
+! initialize the pressure and energy indices
+!
+        ipr = nv
+        ien = nv
+
+! set pointers to subroutines
+!
+        prim2cons => prim2cons_hd_adi
+        cons2prim => cons2prim_hd_adi
+        fluxspeed => fluxspeed_hd_adi
+        maxspeed  => maxspeed_hd_adi
+
+! warn about the unimplemented equation of state
+!
+      case default
+
+        if (verbose) then
+          write (*,"(1x,a)") "The selected equation of state is not " //       &
+                             "implemented: " // trim(eos)
+          write (*,*)
+        end if
+        iret = 110
+        return
+
+      end select
+
+! allocate arrays for variable names
+!
+      allocate(pvars(nv), cvars(nv))
+
+! fill in the primitive variable names
+!
+      pvars(idn) = 'dens'
+      pvars(ivx) = 'velx'
+      pvars(ivy) = 'vely'
+      pvars(ivz) = 'velz'
+      if (ipr > 0) pvars(ipr) = 'pres'
+
+! fill in the conservative variable names
+!
+      cvars(idn) = 'dens'
+      cvars(imx) = 'momx'
+      cvars(imy) = 'momy'
+      cvars(imz) = 'momz'
+      if (ien > 0) cvars(ien) = 'ener'
+
+!--- MAGNETOHYDRODYNAMICS ---
+!
+    case("mhd", "MHD", "magnetohydrodynamic", "MAGNETOHYDRODYNAMIC")
+
+! the name of equation system
+!
+      name_eqsys = "MHD"
+
+! initialize the number of variables (density + 3 components of velocity
+!                                             + 3 components of magnetic field)
+!
+      nv  = 8
+
+! initialize the variable indices
+!
+      idn = 1
+      ivx = 2
+      ivy = 3
+      ivz = 4
+      imx = 2
+      imy = 3
+      imz = 4
+      ibx = 5
+      iby = 6
+      ibz = 7
+      ibp = 8
+
+! depending on the equation of state complete the initialization
+!
+      select case(trim(eos))
+
+      case("iso", "ISO", "isothermal", "ISOTHERMAL")
+
+! the type of equation of state
+!
+        name_eos  = "isothermal"
+
+! set pointers to the subroutines
+!
+        prim2cons => prim2cons_mhd_iso
+        cons2prim => cons2prim_mhd_iso
+        fluxspeed => fluxspeed_mhd_iso
+        maxspeed  => maxspeed_mhd_iso
+
+      case("adi", "ADI", "adiabatic", "ADIABATIC")
+
+! the type of equation of state
+!
+        name_eos  = "adiabatic"
+
+! increase the number of variables by the pressure/energy
+!
+        nv  = nv + 1
+
+! initialize the pressure and energy indices
+!
+        ipr = nv
+        ien = nv
+
+! set pointers to subroutines
+!
+        prim2cons => prim2cons_mhd_adi
+        cons2prim => cons2prim_mhd_adi
+        fluxspeed => fluxspeed_mhd_adi
+        maxspeed  => maxspeed_mhd_adi
+
+      case default
+
+        if (verbose) then
+          write (*,"(1x,a)") "The selected equation of state is not " //       &
+                             "implemented: " // trim(eos)
+          write (*,*)
+        end if
+        iret = 110
+        return
+
+      end select
+
+! allocate arrays for variable names
+!
+      allocate(pvars(nv), cvars(nv))
+
+! fill in the primitive variable names
+!
+      pvars(idn) = 'dens'
+      pvars(ivx) = 'velx'
+      pvars(ivy) = 'vely'
+      pvars(ivz) = 'velz'
+      pvars(ibx) = 'magx'
+      pvars(iby) = 'magy'
+      pvars(ibz) = 'magz'
+      pvars(ibp) = 'bpsi'
+      if (ipr > 0) pvars(ipr) = 'pres'
+
+! fill in the conservative variable names
+!
+      cvars(idn) = 'dens'
+      cvars(imx) = 'momx'
+      cvars(imy) = 'momy'
+      cvars(imz) = 'momz'
+      cvars(ibx) = 'magx'
+      cvars(iby) = 'magy'
+      cvars(ibz) = 'magz'
+      cvars(ibp) = 'bpsi'
+      if (ien > 0) cvars(ien) = 'ener'
+
+!--- EQUATION SYSTEM NOT IMPLEMENTED ---
+!
+    case default
+
+      if (verbose) then
+        write (*,"(1x,a)") "The selected equation system is not " //           &
+                           "implemented: " // trim(eqsys)
+        write (*,*)
+      end if
+      iret = 100
+      return
+
+    end select
+
 ! obtain the adiabatic specific heat ratio
 !
     call get_parameter_real("gamma" , gamma )
 
 ! calculate additional parameters
 !
-    gammam1  = gamma - 1.0d0
-    gammam1i = 1.0d0 / gammam1
-#endif /* ADI */
+    gammam1  = gamma - 1.0d+00
+    gammam1i = 1.0d+00 / gammam1
 
-#ifdef ISO
 ! obtain the isothermal sound speed
 !
     call get_parameter_real("csnd"  , csnd  )
@@ -100,38 +400,132 @@ module equations
 ! calculate additional parameters
 !
     csnd2 = csnd * csnd
-#endif /* ISO */
+
+! print information about the equation module
+!
+    if (verbose) then
+
+      write (*,"(1x,a)"         ) "Physics:"
+      write (*,"(4x,a,1x,a)"    ) "equation system        =", trim(name_eqsys)
+      write (*,"(4x,a,1x,a)"    ) "equation of state      =", trim(name_eos)
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_equations
-#ifdef HYDRO
 !
 !===============================================================================
 !
-! subroutine CONS2PRIM:
-! --------------------
+! subroutine FINALIZE_EQUATIONS:
+! -----------------------------
 !
-!   Subroutine converts the conservative representation of variables to
-!   its corresponding primitive representation.
+!   Subroutine releases memory used by the module.
 !
 !   Arguments:
 !
-!     n - the length of input and output vectors;
-!     u - the input array of conservative variables;
-!     q - the output array of primitive variables;
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine cons2prim(n, u, q)
+  subroutine finalize_equations(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! deallocate variable name arrays
+!
+    if (allocated(pvars)) deallocate(pvars)
+    if (allocated(cvars)) deallocate(cvars)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_equations
+!
+!===============================================================================
+!
+! subroutine RESET_MAXSPEED:
+! -------------------------
+!
+!   Subroutine resets the maximum speed in the domain to zero.
+!
+!
+!===============================================================================
+!
+  subroutine reset_maxspeed()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    cmax = 0.0d+00
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reset_maxspeed
+!
+!===============================================================================
+!
+! function GET_MAXSPEED:
+! -----------------
+!
+!   Function returns the maximum speed in the domain.
+!
+!
+!===============================================================================
+!
+  real(kind=8) function get_maxspeed()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+! return the maximum speed
+!
+    get_maxspeed = cmax
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_maxspeed
+!
+!===============================================================================
+!
+! subroutine UPDATE_PRIMITIVE_VARIABLES:
+! -------------------------------------
+!
+!   Subroutine updates primitive variables from their conservative
+!   representation.  This process is done once after advance of the conserved
+!   variables due to their evolution in time.
+!
+!   Arguments:
+!
+!     uu - the input array of conservative variables;
+!     qq - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine update_primitive_variables(uu, qq)
 
 ! include external procedures and variables
 !
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
+    use coordinates, only : im, jm, km
 
 ! local variables are not implicit by default
 !
@@ -139,44 +533,52 @@ module equations
 
 ! input/output arguments
 !
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: u
-    real, dimension(nt,n), intent(out) :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: uu
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: qq
 
-! local variables
+! temporary variables
 !
-    integer :: i
-#ifdef ADI
-    real    :: ek, ei
-#endif /* ADI */
+    integer                        :: j, k
+
+! temporary array to store conserved variable vector
+!
+    real(kind=8), dimension(nv,im) :: u
 !
 !-------------------------------------------------------------------------------
 !
-    do i = 1, n
+! update primitive variables
+!
+    do k = 1, km
+      do j = 1, jm
 
-      q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
-#ifdef ADI
-      ek       = 0.5d0 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      ei       = u(ien,i) - ek
-      q(ipr,i) = gammam1 * ei
-#endif /* ADI */
+! copy variables to temporary array of conserved variables
+!
+        u(1:nv,1:im) = uu(1:nv,1:im,j,k)
 
-    end do
+! convert conserved variables to primitive ones
+!
+        call cons2prim(im, u(1:nv,1:im), qq(1:nv,1:im,j,k))
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine cons2prim
+  end subroutine update_primitive_variables
+!
+!*******************************************************************************
+!
+! ISOTHERMAL HYDRODYNAMIC EQUATIONS
+!
+!*******************************************************************************
 !
 !===============================================================================
 !
-! subroutine PRIM2CONS:
-! --------------------
+! subroutine PRIM2CONS_HD_ISO:
+! ---------------------------
 !
-!   Subroutine converts the primitive variable representation to its
-!   corresponding conservative representation.
+!   Subroutine converts primitive variables to their corresponding
+!   conservative representation.
 !
 !   Arguments:
 !
@@ -186,15 +588,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine prim2cons(n, q, u)
-
-! include external procedures and variables
-!
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
+  subroutine prim2cons_hd_iso(n, q, u)
 
 ! local variables are not implicit by default
 !
@@ -202,16 +596,13 @@ module equations
 
 ! input/output arguments
 !
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: u
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: u
 
 ! local variables
 !
     integer :: i
-#ifdef ADI
-    real    :: ek, ei
-#endif /* ADI */
 !
 !-------------------------------------------------------------------------------
 !
@@ -221,25 +612,67 @@ module equations
       u(imx,i) = q(idn,i) * q(ivx,i)
       u(imy,i) = q(idn,i) * q(ivy,i)
       u(imz,i) = q(idn,i) * q(ivz,i)
-#ifdef ADI
-      ek       = 0.5d0 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      ei       = gammam1i * q(ipr,i)
-      u(ien,i) = ei + ek
-#endif /* ADI */
 
-    end do
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine prim2cons
+  end subroutine prim2cons_hd_iso
 !
 !===============================================================================
 !
-! subroutine FLUXSPEED:
-! --------------------
+! subroutine CONS2PRIM_HD_ISO:
+! ---------------------------
 !
-!   Subroutine calculates fluxes and characteristic speeds from primitive and
-!   conservative variables.
+!   Subroutine converts conservative variables to their corresponding
+!   primitive representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     u - the input array of conservative variables;
+!     q - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine cons2prim_hd_iso(n, u, q)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: u
+    real(kind=8), dimension(nv,n), intent(out) :: q
+
+! local variables
+!
+    integer :: i
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      q(idn,i) = u(idn,i)
+      q(ivx,i) = u(imx,i) / u(idn,i)
+      q(ivy,i) = u(imy,i) / u(idn,i)
+      q(ivz,i) = u(imz,i) / u(idn,i)
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine cons2prim_hd_iso
+!
+!===============================================================================
+!
+! subroutine FLUXSPEED_HD_ISO:
+! ---------------------------
+!
+!   Subroutine calculates physical fluxes and characteristic speeds from a
+!   given equation system.
 !
 !   Arguments:
 !
@@ -251,15 +684,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine fluxspeed(n, q, u, f, c)
-
-! include external procedures and variables
-!
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
+  subroutine fluxspeed_hd_iso(n, q, u, f, c)
 
 ! local variables are not implicit by default
 !
@@ -267,10 +692,10 @@ module equations
 
 ! input/output arguments
 !
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: q, u
-    real, dimension(nt,n), intent(out) :: f
-    real, dimension(n)   , intent(out) :: c
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q, u
+    real(kind=8), dimension(nv,n), intent(out) :: f
+    real(kind=8), dimension(n)   , intent(out) :: c
 
 ! local variables
 !
@@ -286,36 +711,28 @@ module equations
       f(imx,i) = q(ivx,i) * u(imx,i)
       f(imy,i) = q(ivx,i) * u(imy,i)
       f(imz,i) = q(ivx,i) * u(imz,i)
-#ifdef ISO
       f(imx,i) = f(imx,i) + csnd2 * q(idn,i)
-#endif /* ISO */
-#ifdef ADI
-      f(imx,i) = f(imx,i) + q(ipr,i)
-      f(ien,i) = q(ivx,i) * (u(ien,i) + q(ipr,i))
-#endif /* ADI */
 
 ! calculate the speed of sound
 !
-#ifdef ADI
-      c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
-#endif /* ADI */
-#ifdef ISO
       c(i) = csnd
-#endif /* ISO */
 
-    end do
+! calculate the maximum speed
+!
+      cmax = max(cmax, abs(q(ivx,i)) + c(i))
+
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine fluxspeed
+  end subroutine fluxspeed_hd_iso
 !
 !===============================================================================
 !
-! function MAXSPEED:
-! -----------------
+! function MAXSPEED_HD_ISO:
+! ------------------------
 !
-!   Function scans the variable array and returns the maximum speed in the
-!   system.
+!   Function scans the variable array and returns the maximum speed in within.
 !
 !   Arguments:
 !
@@ -324,16 +741,11 @@ module equations
 !
 !===============================================================================
 !
-  function maxspeed(q)
+  function maxspeed_hd_iso(qq) result(maxspeed)
 
 ! include external procedures and variables
 !
     use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
-    use variables  , only : nt
-    use variables  , only : ivx, ivz
-#ifdef ADI
-    use variables  , only : idn, ipr
-#endif /* ADI */
 
 ! local variables are not implicit by default
 !
@@ -341,22 +753,22 @@ module equations
 
 ! input arguments
 !
-    real, dimension(nt,im,jm,km), intent(in) :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
 
-! return variable
+! return value
 !
-    real     :: maxspeed
+    real(kind=8) :: maxspeed
 
 ! local variables
 !
-    integer  :: i, j, k
-    real     :: vv, v, c
+    integer      :: i, j, k
+    real(kind=8) :: vv, v, c
 !
 !-------------------------------------------------------------------------------
 !
 ! reset the maximum speed
 !
-    maxspeed = 0.0d0
+    maxspeed = 0.0d+00
 
 ! iterate over all positions
 !
@@ -366,27 +778,16 @@ module equations
 
 ! calculate the velocity amplitude
 !
-          vv = sum(q(ivx:ivz,i,j,k) * q(ivx:ivz,i,j,k))
+          vv = sum(qq(ivx:ivz,i,j,k) * qq(ivx:ivz,i,j,k))
           v  = sqrt(vv)
-
-#ifdef ADI
-! calculate the adiabatic speed of sound
-!
-          c = sqrt(gamma * q(ipr,i,j,k) / q(idn,i,j,k))
-#endif /* ADI */
 
 ! calculate the maximum speed
 !
-#ifdef ISO
           maxspeed = max(maxspeed, v + csnd)
-#endif /* ISO */
-#ifdef ADI
-          maxspeed = max(maxspeed, v + c)
-#endif /* ADI */
 
-        end do
-      end do
-    end do
+        end do ! i = ib, ie
+      end do ! j = jb, je
+    end do ! k = kb, ke
 
 ! return the value
 !
@@ -394,173 +795,21 @@ module equations
 
 !-------------------------------------------------------------------------------
 !
-  end function maxspeed
+  end function maxspeed_hd_iso
+!
+!*******************************************************************************
+!
+! ADIABATIC HYDRODYNAMIC EQUATIONS
+!
+!*******************************************************************************
 !
 !===============================================================================
 !
-! subroutine UPDATE_PRIMITIVE_VARIABLES:
-! -------------------------------------
+! subroutine PRIM2CONS_HD_ADI:
+! ---------------------------
 !
-!   Subroutine updates primitive variables from their conservative
-!   representation.  This process is done ones after advance of the conserved
-!   variables due to their evolution in time.
-!
-!===============================================================================
-!
-  subroutine update_primitive_variables(uu, qq)
-
-! include external procedures and variables
-!
-    use coordinates, only : im, jm, km
-#ifdef DEBUG
-    use variables  , only : idn
-#ifdef ADI
-    use variables  , only : ipr
-#endif /* ADI */
-#endif /* DEBUG */
-    use variables  , only : nt
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    real, dimension(nt,im,jm,km), intent(in)    :: uu
-    real, dimension(nt,im,jm,km), intent(inout) :: qq
-
-! temporary variables
-!
-#ifdef DEBUG
-    integer                :: i
-#endif /* DEBUG */
-    integer                :: j, k
-
-! temporary array to store conserved variable vector
-!
-    real, dimension(nt,im) :: u
-!
-!-------------------------------------------------------------------------------
-!
-! update primitive variables
-!
-    do k = 1, km
-      do j = 1, jm
-
-! copy variables to temporary array of conserved variables
-!
-        u(1:nt,1:im) = uu(1:nt,1:im,j,k)
-
-! convert conserved variables to primitive ones
-!
-        call cons2prim(im, u(1:nt,1:im), qq(1:nt,1:im,j,k))
-
-#ifdef DEBUG
-! check the positivity of density and pressure
-!
-        do i = 1, im
-          if (qq(idn,i,j,k) <= 0.0d0) then
-            write(*,*)
-            write(*,*) 'Unphysical state: ρ ≤ 0', i, j, k
-            write(*,"('Q = ',4(1pe24.16))") qq(1:4 ,i,j,k)
-            write(*,"('    ',4(1pe24.16))") qq(5:nt,i,j,k)
-            stop
-          end if
-#ifdef ADI
-          if (qq(ipr,i,j,k) <= 0.0d0) then
-            write(*,*)
-            write(*,*) 'Unphysical state: p ≤ 0', i, j, k
-            write(*,"('Q = ',4(1pe24.16))") qq(1:4 ,i,j,k)
-            write(*,"('    ',4(1pe24.16))") qq(5:nt,i,j,k)
-            stop
-          end if
-#endif /* ADI */
-        end do
-#endif /* DEBUG */
-
-      end do
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_primitive_variables
-#endif /* HYDRO */
-#ifdef MHD
-!
-!===============================================================================
-!
-! subroutine CONS2PRIM:
-! --------------------
-!
-!   Subroutine converts the conservative representation of variables to
-!   its corresponding primitive representation.
-!
-!   Arguments:
-!
-!     n - the length of input and output vectors;
-!     u - the input array of conservative variables;
-!     q - the output array of primitive variables;
-!
-!===============================================================================
-!
-  subroutine cons2prim(n, u, q)
-
-! include external procedures and variables
-!
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz, ibx, iby, ibz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: u
-    real, dimension(nt,n), intent(out) :: q
-
-! local variables
-!
-    integer :: i
-#ifdef ADI
-    real    :: ei, ek, em
-#endif /* ADI */
-!
-!-------------------------------------------------------------------------------
-!
-    do i = 1, n
-
-      q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
-      q(ibx,i) = u(ibx,i)
-      q(iby,i) = u(iby,i)
-      q(ibz,i) = u(ibz,i)
-#ifdef ADI
-      ek       = 0.5d0 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      em       = 0.5d0 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      ei       = u(ien,i) - (ek + em)
-      q(ipr,i) = gammam1 * ei
-#endif /* ADI */
-
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine cons2prim
-!
-!===============================================================================
-!
-! subroutine PRIM2CONS:
-! --------------------
-!
-!   Subroutine converts the primitive variable representation to its
-!   corresponding conservative representation.
+!   Subroutine converts primitive variables to their corresponding
+!   conservative representation.
 !
 !   Arguments:
 !
@@ -570,15 +819,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine prim2cons(n, q, u)
-
-! include external procedures and variables
-!
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz, ibx, iby, ibz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
+  subroutine prim2cons_hd_adi(n, q, u)
 
 ! local variables are not implicit by default
 !
@@ -586,16 +827,257 @@ module equations
 
 ! input/output arguments
 !
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: u
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: u
 
 ! local variables
 !
     integer :: i
-#ifdef ADI
-    real    :: ei, ek, em
-#endif /* ADI */
+    real    :: ek, ei
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      u(idn,i) = q(idn,i)
+      u(imx,i) = q(idn,i) * q(ivx,i)
+      u(imy,i) = q(idn,i) * q(ivy,i)
+      u(imz,i) = q(idn,i) * q(ivz,i)
+      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ei       = gammam1i * q(ipr,i)
+      u(ien,i) = ei + ek
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prim2cons_hd_adi
+!
+!===============================================================================
+!
+! subroutine CONS2PRIM_HD_ADI:
+! ---------------------------
+!
+!   Subroutine converts conservative variables to their corresponding
+!   primitive representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     u - the input array of conservative variables;
+!     q - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine cons2prim_hd_adi(n, u, q)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: u
+    real(kind=8), dimension(nv,n), intent(out) :: q
+
+! local variables
+!
+    integer :: i
+    real    :: ek, ei
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      q(idn,i) = u(idn,i)
+      q(ivx,i) = u(imx,i) / u(idn,i)
+      q(ivy,i) = u(imy,i) / u(idn,i)
+      q(ivz,i) = u(imz,i) / u(idn,i)
+      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ei       = u(ien,i) - ek
+      q(ipr,i) = gammam1 * ei
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine cons2prim_hd_adi
+!
+!===============================================================================
+!
+! subroutine FLUXSPEED_HD_ADI:
+! ---------------------------
+!
+!   Subroutine calculates physical fluxes and characteristic speeds from a
+!   given equation system.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     q - the input array of primitive variables;
+!     u - the input array of conservative variables;
+!     f - the output vector of fluxes;
+!     c - the output vector of characteristic speeds;
+!
+!===============================================================================
+!
+  subroutine fluxspeed_hd_adi(n, q, u, f, c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q, u
+    real(kind=8), dimension(nv,n), intent(out) :: f
+    real(kind=8), dimension(n)   , intent(out) :: c
+
+! local variables
+!
+    integer :: i
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+! calculate the hydrodynamic fluxes
+!
+      f(idn,i) = u(imx,i)
+      f(imx,i) = q(ivx,i) * u(imx,i)
+      f(imy,i) = q(ivx,i) * u(imy,i)
+      f(imz,i) = q(ivx,i) * u(imz,i)
+      f(imx,i) = f(imx,i) + q(ipr,i)
+      f(ien,i) = q(ivx,i) * (u(ien,i) + q(ipr,i))
+
+! calculate the speed of sound
+!
+      c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
+
+! calculate the maximum speed
+!
+      cmax = max(cmax, abs(q(ivx,i)) + c(i))
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine fluxspeed_hd_adi
+!
+!===============================================================================
+!
+! function MAXSPEED_HD_ADI:
+! ------------------------
+!
+!   Function scans the variable array and returns the maximum speed in within.
+!
+!   Arguments:
+!
+!     q - the array of primitive variables;
+!
+!
+!===============================================================================
+!
+  function maxspeed_hd_adi(qq) result(maxspeed)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
+
+! return value
+!
+    real(kind=8) :: maxspeed
+
+! local variables
+!
+    integer      :: i, j, k
+    real(kind=8) :: vv, v, c
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    maxspeed = 0.0d+00
+
+! iterate over all positions
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! calculate the velocity amplitude
+!
+          vv = sum(qq(ivx:ivz,i,j,k) * qq(ivx:ivz,i,j,k))
+          v  = sqrt(vv)
+
+! calculate the adiabatic speed of sound
+!
+          c = sqrt(gamma * qq(ipr,i,j,k) / qq(idn,i,j,k))
+
+! calculate the maximum speed
+!
+          maxspeed = max(maxspeed, v + c)
+
+        end do ! i = ib, ie
+      end do ! j = jb, je
+    end do ! k = kb, ke
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed_hd_adi
+!
+!*******************************************************************************
+!
+! ISOTHERMAL MAGNETOHYDRODYNAMIC EQUATIONS
+!
+!*******************************************************************************
+!
+!===============================================================================
+!
+! subroutine PRIM2CONS_MHD_ISO:
+! ----------------------------
+!
+!   Subroutine converts primitive variables to their corresponding
+!   conservative representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     q - the input array of primitive variables;
+!     u - the output array of conservative variables;
+!
+!===============================================================================
+!
+  subroutine prim2cons_mhd_iso(n, q, u)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: u
+
+! local variables
+!
+    integer :: i
 !
 !-------------------------------------------------------------------------------
 !
@@ -608,26 +1090,72 @@ module equations
       u(ibx,i) = q(ibx,i)
       u(iby,i) = q(iby,i)
       u(ibz,i) = q(ibz,i)
-#ifdef ADI
-      ei       = gammam1i * q(ipr,i)
-      ek       = 0.5d0 * sum(u(imx:imz,i) * q(ivx:ivz,i))
-      em       = 0.5d0 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      u(ien,i) = ei + ek + em
-#endif /* ADI */
+      u(ibp,i) = q(ibp,i)
 
-    end do
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine prim2cons
+  end subroutine prim2cons_mhd_iso
 !
 !===============================================================================
 !
-! subroutine FLUXSPEED:
-! --------------------
+! subroutine CONS2PRIM_MHD_ISO:
+! ----------------------------
 !
-!   Subroutine calculates fluxes and characteristic speeds from primitive and
-!   conservative variables.
+!   Subroutine converts conservative variables to their corresponding
+!   primitive representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     u - the input array of conservative variables;
+!     q - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine cons2prim_mhd_iso(n, u, q)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: u
+    real(kind=8), dimension(nv,n), intent(out) :: q
+
+! local variables
+!
+    integer :: i
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      q(idn,i) = u(idn,i)
+      q(ivx,i) = u(imx,i) / u(idn,i)
+      q(ivy,i) = u(imy,i) / u(idn,i)
+      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ibx,i) = u(ibx,i)
+      q(iby,i) = u(iby,i)
+      q(ibz,i) = u(ibz,i)
+      q(ibp,i) = u(ibp,i)
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine cons2prim_mhd_iso
+!
+!===============================================================================
+!
+! subroutine FLUXSPEED_MHD_ISO:
+! ----------------------------
+!
+!   Subroutine calculates physical fluxes and characteristic speeds from a
+!   given equation system.
 !
 !   Arguments:
 !
@@ -639,16 +1167,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine fluxspeed(n, q, u, f, c)
-
-! include external procedures and variables
-!
-    use variables , only : nt
-    use variables , only : idn, imx, imy, imz, ivx, ivy, ivz
-    use variables , only : ibx, iby, ibz
-#ifdef ADI
-    use variables , only : ipr, ien
-#endif /* ADI */
+  subroutine fluxspeed_mhd_iso(n, q, u, f, c)
 
 ! local variables are not implicit by default
 !
@@ -656,16 +1175,16 @@ module equations
 
 ! input/output arguments
 !
-    integer              , intent(in)  :: n
-    real, dimension(nt,n), intent(in)  :: q, u
-    real, dimension(nt,n), intent(out) :: f
-    real, dimension(n)   , intent(out) :: c
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q, u
+    real(kind=8), dimension(nv,n), intent(out) :: f
+    real(kind=8), dimension(n)   , intent(out) :: c
 
 ! local variables
 !
-    integer :: i
-    real    :: bb, vb, pm, pt
-    real    :: cs2, ca2, cx2, cf2, cl2
+    integer      :: i
+    real(kind=8) :: bx2, by2, bz2, bb, pr, pt
+    real(kind=8) :: fa, fb, fc
 !
 !-------------------------------------------------------------------------------
 !
@@ -673,77 +1192,64 @@ module equations
 
 ! prepare pressures and scalar product
 !
-      bb = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      pm = 0.5d0 * bb
-#ifdef ADI
-      vb = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
-      pt = q(ipr,i)
-#endif /* ADI */
-#ifdef ISO
-      pt = csnd2 * q(idn,i)
-#endif /* ISO */
-      pt = pt + pm
+      bx2 = q(ibx,i) * q(ibx,i)
+      by2 = q(iby,i) * q(iby,i)
+      bz2 = q(ibz,i) * q(ibz,i)
+      bb  = bx2 + by2 + bz2
+      pr  = csnd2 * q(idn,i)
+      pt  = pr + 0.5d+00 * bb
 
 ! calculate the magnetohydrodynamic fluxes
 !
       f(idn,i) = u(imx,i)
-      f(imx,i) = q(ivx,i) * u(imx,i) - q(ibx,i) * q(ibx,i)
+      f(imx,i) = q(ivx,i) * u(imx,i) - bx2
       f(imy,i) = q(ivx,i) * u(imy,i) - q(ibx,i) * q(iby,i)
       f(imz,i) = q(ivx,i) * u(imz,i) - q(ibx,i) * q(ibz,i)
       f(imx,i) = f(imx,i) + pt
-#ifdef ADI
-      f(ien,i) = q(ivx,i) * (u(ien,i) + pt) - q(ibx,i) * vb
-#endif /* ADI */
-      f(ibx,i) = 0.0d0
+      f(ibx,i) = q(ibp,i)
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
+      f(ibp,i) = cmax2 * q(ibx,i)
 
 ! calculate the fast magnetosonic speed
 !
-#ifdef ADI
-      cs2 = gamma * q(ipr,i) / q(idn,i)
-#endif /* ADI */
-#ifdef ISO
-      cs2 = csnd2
-#endif /* ISO */
-      ca2 = sum(q(ibx:ibz,i) * q(ibx:ibz,i)) / q(idn,i)
-      cx2 = q(ibx,i) * q(ibx,i) / q(idn,i)
-      cf2 = cs2 + ca2
-      cl2 = max(0.0d0, cf2**2 - 4.0d0 * cs2 * cx2)
+      fa   = csnd2 * q(idn,i)
+      fb   = fa + bb
+      fc   = fb * fb - 4.0d+00 * fa * bx2
+      if (fc > 0.0d+00) then
+        c(i) = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+      else
+        c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
+      end if
 
-      c(i) = sqrt(0.5d0 * (cf2 + sqrt(cl2)))
+! calculate the maximum speed
+!
+      cmax = max(cmax, abs(q(ivx,i)) + c(i))
 
-    end do
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine fluxspeed
+  end subroutine fluxspeed_mhd_iso
 !
 !===============================================================================
 !
-! function MAXSPEED:
-! -----------------
+! function MAXSPEED_MHD_ISO:
+! -------------------------
 !
-!   Function scans the variable array and returns the maximum speed in the
-!   system.
+!   Function scans the variable array and returns the maximum speed in within.
 !
 !   Arguments:
 !
 !     q - the array of primitive variables;
 !
-!
 !===============================================================================
 !
-  function maxspeed()
+  function maxspeed_mhd_iso(qq) result(maxspeed)
 
 ! include external procedures and variables
 !
-    use mesh      , only : im, jm, km, ib, ie, jb, je, kb, ke
-    use variables , only : nt
-    use variables , only : idn, ivx, ivz, ibx, ibz
-#ifdef ADI
-    use variables , only : ipr
-#endif /* ADI */
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
 
 ! local variables are not implicit by default
 !
@@ -751,22 +1257,22 @@ module equations
 
 ! input arguments
 !
-    real, dimension(nt,im,jm,km), intent(in) :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
 
-! return variable
+! return value
 !
-    real     :: maxspeed
+    real(kind=8) :: maxspeed
 
 ! local variables
 !
-    integer  :: i, j, k
-    real     :: vv, bb, v, c
+    integer      :: i, j, k
+    real(kind=8) :: vv, bb, v, c
 !
 !-------------------------------------------------------------------------------
 !
 ! reset the maximum speed
 !
-    maxspeed = 0.0d0
+    maxspeed = 0.0d+00
 
 ! iterate over all positions
 !
@@ -776,26 +1282,21 @@ module equations
 
 ! calculate the velocity amplitude
 !
-          vv = sum(q(ivx:ivz,i,j,k) * q(ivx:ivz,i,j,k))
+          vv = sum(qq(ivx:ivz,i,j,k) * qq(ivx:ivz,i,j,k))
           v  = sqrt(vv)
-          bb = sum(q(ibx:ibz,i,j,k) * q(ibx:ibz,i,j,k))
+          bb = sum(qq(ibx:ibz,i,j,k) * qq(ibx:ibz,i,j,k))
 
 ! calculate the fast magnetosonic speed
 !
-#ifdef ISO
-          c = sqrt(csnd2 + bb / q(idn,i,j,k))
-#endif /* ISO */
-#ifdef ADI
-          c = sqrt((gamma * q(ipr,i,j,k) + bb) / q(idn,i,j,k))
-#endif /* ADI */
+          c = sqrt(csnd2 + bb / qq(idn,i,j,k))
 
 ! calculate the maximum of speed
 !
           maxspeed = max(maxspeed, v + c)
 
-        end do
-      end do
-    end do
+        end do ! i = ib, ie
+      end do ! j = jb, je
+    end do ! k = kb, ke
 
 ! return the value
 !
@@ -803,8 +1304,285 @@ module equations
 
 !-------------------------------------------------------------------------------
 !
-  end function maxspeed
-#endif /* MHD */
+  end function maxspeed_mhd_iso
+!
+!*******************************************************************************
+!
+! ADIABATIC MAGNETOHYDRODYNAMIC EQUATIONS
+!
+!*******************************************************************************
+!
+!===============================================================================
+!
+! subroutine PRIM2CONS_MHD_ADI:
+! ----------------------------
+!
+!   Subroutine converts primitive variables to their corresponding
+!   conservative representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     q - the input array of primitive variables;
+!     u - the output array of conservative variables;
+!
+!===============================================================================
+!
+  subroutine prim2cons_mhd_adi(n, q, u)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: u
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: ei, ek, em
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      u(idn,i) = q(idn,i)
+      u(imx,i) = q(idn,i) * q(ivx,i)
+      u(imy,i) = q(idn,i) * q(ivy,i)
+      u(imz,i) = q(idn,i) * q(ivz,i)
+      u(ibx,i) = q(ibx,i)
+      u(iby,i) = q(iby,i)
+      u(ibz,i) = q(ibz,i)
+      u(ibp,i) = q(ibp,i)
+      ei       = gammam1i * q(ipr,i)
+      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      em       = 0.5d+00 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
+      u(ien,i) = ei + ek + em
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prim2cons_mhd_adi
+!
+!===============================================================================
+!
+! subroutine CONS2PRIM_MHD_ADI:
+! ----------------------------
+!
+!   Subroutine converts conservative variables to their corresponding
+!   primitive representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     u - the input array of conservative variables;
+!     q - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine cons2prim_mhd_adi(n, u, q)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: u
+    real(kind=8), dimension(nv,n), intent(out) :: q
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: ei, ek, em
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+      q(idn,i) = u(idn,i)
+      q(ivx,i) = u(imx,i) / u(idn,i)
+      q(ivy,i) = u(imy,i) / u(idn,i)
+      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ibx,i) = u(ibx,i)
+      q(iby,i) = u(iby,i)
+      q(ibz,i) = u(ibz,i)
+      q(ibp,i) = u(ibp,i)
+      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      em       = 0.5d+00 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
+      ei       = u(ien,i) - (ek + em)
+      q(ipr,i) = gammam1 * ei
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine cons2prim_mhd_adi
+!
+!===============================================================================
+!
+! subroutine FLUXSPEED_MHD_ADI:
+! ----------------------------
+!
+!   Subroutine calculates physical fluxes and characteristic speeds from a
+!   given equation system.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     q - the input array of primitive variables;
+!     u - the input array of conservative variables;
+!     f - the output vector of fluxes;
+!     c - the output vector of characteristic speeds;
+!
+!===============================================================================
+!
+  subroutine fluxspeed_mhd_adi(n, q, u, f, c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q, u
+    real(kind=8), dimension(nv,n), intent(out) :: f
+    real(kind=8), dimension(n)   , intent(out) :: c
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: bx2, by2, bz2, bb, pr, pt
+    real(kind=8) :: vb
+    real(kind=8) :: fa, fb, fc
+!
+!-------------------------------------------------------------------------------
+!
+    do i = 1, n
+
+! prepare pressures and scalar product
+!
+      bx2 = q(ibx,i) * q(ibx,i)
+      by2 = q(iby,i) * q(iby,i)
+      bz2 = q(ibz,i) * q(ibz,i)
+      bb  = bx2 + by2 + bz2
+      vb  = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
+      pr  = q(ipr,i)
+      pt  = pr + 0.5d+00 * bb
+
+! calculate the magnetohydrodynamic fluxes
+!
+      f(idn,i) = u(imx,i)
+      f(imx,i) = q(ivx,i) * u(imx,i) - bx2
+      f(imy,i) = q(ivx,i) * u(imy,i) - q(ibx,i) * q(iby,i)
+      f(imz,i) = q(ivx,i) * u(imz,i) - q(ibx,i) * q(ibz,i)
+      f(imx,i) = f(imx,i) + pt
+      f(ibx,i) = q(ibp,i)
+      f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
+      f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
+      f(ibp,i) = cmax2 * q(ibx,i)
+      f(ien,i) = q(ivx,i) * (u(ien,i) + pt) - q(ibx,i) * vb
+
+! calculate the fast magnetosonic speed
+!
+      fa   = gamma * q(ipr,i)
+      fb   = fa + bb
+      fc   = fb * fb - 4.0d+00 * fa * bx2
+      if (fc > 0.0d+00) then
+        c(i) = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+      else
+        c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
+      end if
+
+! calculate the maximum speed
+!
+      cmax = max(cmax, abs(q(ivx,i)) + c(i))
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine fluxspeed_mhd_adi
+!
+!===============================================================================
+!
+! function MAXSPEED_MHD_ADI:
+! -------------------------
+!
+!   Function scans the variable array and returns the maximum speed in within.
+!
+!   Arguments:
+!
+!     q - the array of primitive variables;
+!
+!===============================================================================
+!
+  function maxspeed_mhd_adi(qq) result(maxspeed)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
+
+! return value
+!
+    real(kind=8) :: maxspeed
+
+! local variables
+!
+    integer      :: i, j, k
+    real(kind=8) :: vv, bb, v, c
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed
+!
+    maxspeed = 0.0d+00
+
+! iterate over all positions
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! calculate the velocity amplitude
+!
+          vv = sum(qq(ivx:ivz,i,j,k) * qq(ivx:ivz,i,j,k))
+          v  = sqrt(vv)
+          bb = sum(qq(ibx:ibz,i,j,k) * qq(ibx:ibz,i,j,k))
+
+! calculate the fast magnetosonic speed
+!
+          c = sqrt((gamma * qq(ipr,i,j,k) + bb) / qq(idn,i,j,k))
+
+! calculate the maximum of speed
+!
+          maxspeed = max(maxspeed, v + c)
+
+        end do ! i = ib, ie
+      end do ! j = jb, je
+    end do ! k = kb, ke
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed_mhd_adi
 
 !===============================================================================
 !
