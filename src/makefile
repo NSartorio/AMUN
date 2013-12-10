@@ -2,34 +2,42 @@
 #
 # include configuration
 #
-ifeq ($(wildcard make.config),make.config)
 $(info )
-$(info Using customized "$(wildcard make.config)" file.)
+ifeq ($(wildcard make.config),make.config)
+$(info Using customized file 'make.config'.)
 $(info )
 include make.config
 else
+$(warning Could not find customized file 'make.config'!)
 $(info )
-$(info Could not find the customized "make.config" file!)
+$(info File 'make.default' is an example with all available compilation time   \
+       options.  You can modify it, but it is better to copy it to a new file  \
+       'make.config' and then customize it.  This will also make disappear     \
+       the following 15 second pause every time you compile.)
 $(info )
-$(info Copy "make.default" to "make.config" and customize it, if you do not want the default configuration.)
-$(info )
-$(shell sleep 5)
+$(shell sleep 15)
 include make.default
 endif
 
 #-------------------------------------------------------------------------------
 #
-# host variables
+# host name
 #
-HOST    := $(shell hostname -f)
-OS      := $(shell uname)
-DATE    := $(shell date +%Y%m%d%H%M)
+HOST := $(shell hostname)
 
 include hosts/default
 ifeq ($(wildcard hosts/$(HOST)),hosts/$(HOST))
-$(info Using compiler setup from "hosts/$(HOST)" file.)
+$(info Using customized compiler setup from 'hosts/$(HOST)' file.)
 $(info )
 include hosts/$(HOST)
+else
+$(info Using default compiler setup from file 'hosts/default'.                 \
+       Do not modify it!)
+$(info Instead, copy this file to 'hosts/$(HOST)' and customize compilers and  \
+       compilation options there.  This will also get rid of the following     \
+       15 second pause every time you compile.)
+$(info )
+$(shell sleep 15)
 endif
 
 #-------------------------------------------------------------------------------
