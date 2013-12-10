@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2012 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2007-2013 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -314,7 +314,7 @@ module parameters
 
 ! the parameter counter
 !
-    integer                :: np
+    integer                :: np, nl
 
 ! local variables to store the line content, the parameter name and value
 !
@@ -325,6 +325,7 @@ module parameters
 ! initialize the parameter counter
 !
     np = 1
+    nl = 0
 
 ! open the parameter file
 !
@@ -334,6 +335,10 @@ module parameters
 !
 10  read(1, fmt = "(a)", end = 20) line
 
+! increase the line number
+!
+    nl = nl + 1
+
 ! if the line is empty or it's a comment, skip the counting
 !
     if ((len_trim(line) .eq. 0)                                                &
@@ -341,7 +346,17 @@ module parameters
 
 ! parse the line to get parameter name and value
 !
-    call parse_line(line, name, value)
+    call parse_line(line, name, value, iret)
+
+! check if the line was parsed successfuly
+!
+    if (iret > 0) then
+      write (*,"(1x,a,1x,a,'.')") "Wrong parameter format in"                  &
+                                                        , trim(adjustl(fname))
+      write (*,"(1x,'Line',i4,' : ',a)") nl, trim(line)
+      write (*,*)
+      go to 30
+    end if
 
 ! fill the arrays of parameter names and values
 !
@@ -372,7 +387,7 @@ module parameters
 
 ! set the return flag
 !
-    iret = 113
+    iret = 140
 
 !-------------------------------------------------------------------------------
 !
@@ -393,7 +408,7 @@ module parameters
 !
 !===============================================================================
 !
-  subroutine parse_line(line, name, value)
+  subroutine parse_line(line, name, value, iret)
 
 ! local variables are not implicit by default
 !
@@ -403,6 +418,7 @@ module parameters
 !
     character(len=*), intent(in)    :: line
     character(len=*), intent(inout) :: name, value
+    integer         , intent(out)   :: iret
 
 ! local indices to store positions in the input line
 !
@@ -410,6 +426,10 @@ module parameters
 !
 !-------------------------------------------------------------------------------
 !
+! reset the return flag
+!
+    iret = 0
+
 ! get the length of line
 !
     l = len_trim(line)
@@ -420,10 +440,6 @@ module parameters
     c = index(line, '#')
     i = index(line, '"')
     j = index(line, '"', back = .true.)
-    if (i == 0 .and. j == 0) then
-      i = index(line, "'")
-      j = index(line, "'", back = .true.)
-    end if
 
 ! remove the length of the in-line comment from the length of line
 !
@@ -448,6 +464,10 @@ module parameters
 ! extract the parameter value
 !
     value = trim(adjustl(line(i:j)))
+
+! check possible errors in formatting
+!
+    if (p <= 2 .or. len_trim(name) == 0 .or. len_trim(value) == 0) iret = 1
 
 !-------------------------------------------------------------------------------
 !
