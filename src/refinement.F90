@@ -112,13 +112,7 @@ module refinement
 !
     use blocks     , only : block_data
     use coordinates, only : ib, jb, kb, ie, je, ke
-    use variables  , only : idn
-#ifdef ADI
-    use variables  , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables  , only : ibx, iby, ibz
-#endif /* MHD */
+    use equations  , only : idn, ipr, ibx, iby, ibz
 
 ! local variables are not implicit by default
 !

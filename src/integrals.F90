@@ -146,12 +146,9 @@ module integrals
 #ifdef MPI
     use mpitools , only : reduce_sum_real_array
 #endif /* MPI */
-    use variables, only : idn, imx, imy, imz
-#ifdef ADI
-    use variables, only : ien
-#endif /* ADI */
+    use equations, only : idn, imx, imy, imz, ien
 #ifdef MHD
-    use variables, only : ibx, iby, ibz
+    use equations, only : ibx, iby, ibz
 #endif /* MHD */
 
     implicit none

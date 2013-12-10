@@ -1268,7 +1268,7 @@ module io
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use variables, only : nqt
+    use equations, only : nv
 
 ! declare variables
 !
@@ -1296,7 +1296,7 @@ module io
 ! initiate the output vector
 !
     dm(:) = 0
-    dm(2) = nqt
+    dm(2) = nv
 
 ! open the global attributes group
 !
@@ -2467,7 +2467,7 @@ module io
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
-    use variables, only : nqt
+    use equations, only : nv
 
 ! declare variables
 !
@@ -2515,13 +2515,13 @@ module io
         am(1) = get_dblocks()
         cm(1) = get_dblocks()
         dm(1) = get_dblocks()
-        dm(2) = nqt
+        dm(2) = nv
         dm(3) = im
         dm(4) = jm
         dm(5) = km
         qm(1) = get_dblocks()
         qm(2) = NDIMS
-        qm(3) = nqt
+        qm(3) = nv
         qm(4) = im
         qm(5) = jm
         qm(6) = km
@@ -2901,15 +2901,15 @@ module io
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-    use variables    , only : nvr, nqt
-    use variables    , only : idn, imx, imy, imz, ivx, ivy, ivz
+    use equations    , only : nv
+    use equations    , only : idn, imx, imy, imz, ivx, ivy, ivz
 #ifdef ADI
-    use variables    , only : ien, ipr
+    use equations    , only : ien, ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use equations    , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use equations    , only : ibp
 #endif /* GLM */
 #endif /* MHD */
 
@@ -3015,7 +3015,7 @@ module io
           magy(l,1:im,1:jm,1:km) = pdata%u(iby,1:im,1:jm,1:km)
           magz(l,1:im,1:jm,1:km) = pdata%u(ibz,1:im,1:jm,1:km)
 #ifdef GLM
-          bpsi(l,1:im,1:jm,1:km) = pdata%q(iph,1:im,1:jm,1:km)
+          bpsi(l,1:im,1:jm,1:km) = pdata%q(ibp,1:im,1:jm,1:km)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -3123,15 +3123,15 @@ module io
 #ifdef DEBUG
     use refinement   , only : check_refinement_criterion
 #endif /* DEBUG */
-    use variables    , only : nqt
-    use variables    , only : idn, ivx, ivy, ivz
+    use equations    , only : nv
+    use equations    , only : idn, ivx, ivy, ivz
 #ifdef ADI
-    use variables    , only : ipr
+    use equations    , only : ipr
 #endif /* ADI */
 #ifdef MHD
-    use variables    , only : ibx, iby, ibz
+    use equations    , only : ibx, iby, ibz
 #ifdef GLM
-    use variables    , only : iph
+    use equations    , only : ibp
 #endif /* GLM */
 #endif /* MHD */
 
@@ -3237,7 +3237,7 @@ module io
         magy(l,1:in,1:jn,1:kn) = real(pdata%q(iby,ib:ie,jb:je,kb:ke),kind=4)
         magz(l,1:in,1:jn,1:kn) = real(pdata%q(ibz,ib:ie,jb:je,kb:ke),kind=4)
 #ifdef GLM
-        bpsi(l,1:in,1:jn,1:kn) = real(pdata%q(iph,ib:ie,jb:je,kb:ke),kind=4)
+        bpsi(l,1:in,1:jn,1:kn) = real(pdata%q(ibp,ib:ie,jb:je,kb:ke),kind=4)
 #endif /* GLM */
 #endif /* MHD */
 #ifdef DEBUG

@@ -510,7 +510,7 @@ module forcing
     use constants, only : dpi
     use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
     use coordinates, only : ax, ay, az, advol
-    use variables, only : idn, imx, imy, imz
+    use equations  , only : idn, imx, imy, imz
 
     implicit none
 

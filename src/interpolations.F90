@@ -581,7 +581,6 @@ module interpolations
   subroutine divergence(b, db, dx, dy, dz)
 
     use coordinates, only : im, jm, km
-    use variables, only : nvr
 
     implicit none
 

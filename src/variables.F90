@@ -28,33 +28,6 @@
 module variables
 
   implicit none
-
-! parameters
-!
-  integer(kind=4), parameter :: inx =  1, iny =  2, inz =  3
-  integer(kind=4), parameter :: idn =  1, imx =  2, imy =  3, imz =  4 &
-                                        , ivx =  2, ivy =  3, ivz =  4
-#ifdef ISO
-  integer(kind=4), parameter :: nfl =  4
-#endif /* ISO */
-#ifdef ADI
-  integer(kind=4), parameter :: ien =  5, ipr =  5
-  integer(kind=4), parameter :: nfl =  5
-#endif /* ADI */
-#ifdef HYDRO
-  integer(kind=4), parameter :: nqt = nfl
-#endif /* HYDRO */
-#ifdef MHD
-  integer(kind=4), parameter :: ibx = nfl + 1, iby = ibx + 1, ibz = iby + 1
-#ifdef GLM
-  integer(kind=4), parameter :: iph =  ibz + 1
-  integer(kind=4), parameter :: nqt = iph
-#else /* GLM */
-  integer(kind=4), parameter :: nqt = ibz
-#endif /* GLM */
-#endif /* MHD */
-  integer(kind=4), parameter :: nvr = nqt
-  integer(kind=4), parameter :: nt  = nqt
 !
 !===============================================================================
 !

@@ -187,7 +187,7 @@ module evolution
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
     use coordinates   , only : im, jm, km
-    use variables     , only : nfl
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -199,8 +199,8 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(3)            :: dh
-    real, dimension(nfl,im,jm,km) :: du
+    real, dimension(3)           :: dh
+    real, dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -225,7 +225,7 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u1(1:nfl,:,:,:) = pblock%u0(1:nfl,:,:,:) + du(1:nfl,:,:,:)
+      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + du(1:nv,:,:,:)
 
 ! update the conservative variable pointer
 !
@@ -266,8 +266,8 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u0(1:nfl,:,:,:) = 0.5d0 * (pblock%u0(1:nfl,:,:,:)                 &
-                                   + pblock%u1(1:nfl,:,:,:) + du(1:nfl,:,:,:))
+      pblock%u0(1:nv,:,:,:) = 0.5d0 * (pblock%u0(1:nv,:,:,:)                 &
+                                   + pblock%u1(1:nv,:,:,:) + du(1:nv,:,:,:))
 
 ! update the conservative variable pointer
 !

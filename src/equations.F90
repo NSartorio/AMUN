@@ -115,6 +115,9 @@ module equations
   public :: gamma
   public :: csnd
   public :: cmax, cmax2
+  public :: nv
+  public :: idn, ivx, ivy, ivz, imx, imy, imz
+  public :: ibx, iby, ibz, ibp, ipr, ien
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !

@@ -247,7 +247,7 @@ module boundaries
     use coordinates   , only : ib, jb, kb, ie, je, ke
     use coordinates   , only : ibl, jbl, kbl, iel, jel, kel
     use coordinates   , only : ibu, jbu, kbu, ieu, jeu, keu
-    use variables     , only : nt
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -273,7 +273,7 @@ module boundaries
 
 ! iterate over all variables
 !
-      do n = 1, nt
+      do n = 1, nv
 
 ! edges
 !
@@ -450,7 +450,7 @@ module boundaries
     use mpitools      , only : periodic
 #ifdef MPI
     use mpitools      , only : nproc, nprocs, npmax
-    use variables     , only : nt
+    use equations     , only : nv
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -677,11 +677,11 @@ module boundaries
 !
               select case(idir)
               case(1)
-                allocate(rbuf(nblocks,nt,nd,jm,km))
+                allocate(rbuf(nblocks,nv,nd,jm,km))
               case(2)
-                allocate(rbuf(nblocks,nt,im,nd,km))
+                allocate(rbuf(nblocks,nv,im,nd,km))
               case(3)
-                allocate(rbuf(nblocks,nt,im,jm,nd))
+                allocate(rbuf(nblocks,nv,im,jm,nd))
               end select
 
 ! if isend == nproc we are sending data
@@ -839,7 +839,7 @@ module boundaries
     use mpitools      , only : periodic
 #ifdef MPI
     use mpitools      , only : nproc, nprocs, npmax
-    use variables     , only : nt
+    use equations     , only : nv
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1068,11 +1068,11 @@ module boundaries
 !
           select case(idir)
           case(1)
-            allocate(rbuf(nblocks,nt,nh+2,jm,km))
+            allocate(rbuf(nblocks,nv,nh+2,jm,km))
           case(2)
-            allocate(rbuf(nblocks,nt,im,nh+2,km))
+            allocate(rbuf(nblocks,nv,im,nh+2,km))
           case(3)
-            allocate(rbuf(nblocks,nt,im,jm,nh+2))
+            allocate(rbuf(nblocks,nv,im,jm,nh+2))
           end select
 
 ! if isend == nproc we are sending data
@@ -1239,7 +1239,7 @@ module boundaries
     use mpitools      , only : periodic
 #ifdef MPI
     use mpitools      , only : nproc, nprocs, npmax
-    use variables     , only : nt
+    use equations     , only : nv
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1448,12 +1448,12 @@ module boundaries
 !
           select case(idir)
           case(1)
-            allocate(rbuf(nblocks,nt,ng,jm,km))
+            allocate(rbuf(nblocks,nv,ng,jm,km))
           case(2)
-            allocate(rbuf(nblocks,nt,im,ng,km))
+            allocate(rbuf(nblocks,nv,im,ng,km))
 #if NDIMS == 3
           case(3)
-            allocate(rbuf(nblocks,nt,im,jm,ng))
+            allocate(rbuf(nblocks,nv,im,jm,ng))
 #endif /* NDIMS == 3 */
           end select
 
@@ -1601,7 +1601,7 @@ module boundaries
     use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
-    use variables, only : nqt
+    use equations, only : nv
 #endif /* MPI */
 
     implicit none
@@ -1800,12 +1800,12 @@ module boundaries
 !
             select case(idir)
             case(1)
-              allocate(rbuf(nblocks,nqt,jm,km))
+              allocate(rbuf(nblocks,nv,jm,km))
             case(2)
-              allocate(rbuf(nblocks,nqt,im,km))
+              allocate(rbuf(nblocks,nv,im,km))
 #if NDIMS == 3
             case(3)
-              allocate(rbuf(nblocks,nqt,im,jm))
+              allocate(rbuf(nblocks,nv,im,jm))
 #endif /* NDIMS == 3 */
             end select
 
@@ -2194,7 +2194,7 @@ module boundaries
 
     use blocks   , only : block_data
     use coordinates, only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
-    use variables, only : nqt
+    use equations, only : nv
 
     implicit none
 
@@ -2211,26 +2211,26 @@ module boundaries
     case(1)
 
       if (iside .eq. 1) then
-        pdata%u(1:nqt,  1:ibl,1:jm,1:km) = u(1:nqt,1:ng,1:jm,1:km)
+        pdata%u(1:nv,  1:ibl,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
       else
-        pdata%u(1:nqt,ieu:im ,1:jm,1:km) = u(1:nqt,1:ng,1:jm,1:km)
+        pdata%u(1:nv,ieu:im ,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
       end if
 
     case(2)
 
       if (iside .eq. 1) then
-        pdata%u(1:nqt,1:im,  1:jbl,1:km) = u(1:nqt,1:im,1:ng,1:km)
+        pdata%u(1:nv,1:im,  1:jbl,1:km) = u(1:nv,1:im,1:ng,1:km)
       else
-        pdata%u(1:nqt,1:im,jeu:jm ,1:km) = u(1:nqt,1:im,1:ng,1:km)
+        pdata%u(1:nv,1:im,jeu:jm ,1:km) = u(1:nv,1:im,1:ng,1:km)
       end if
 
 #if NDIMS == 3
     case(3)
 
       if (iside .eq. 1) then
-        pdata%u(1:nqt,1:im,1:jm,  1:kbl) = u(1:nqt,1:im,1:jm,1:ng)
+        pdata%u(1:nv,1:im,1:jm,  1:kbl) = u(1:nv,1:im,1:jm,1:ng)
       else
-        pdata%u(1:nqt,1:im,1:jm,keu:km ) = u(1:nqt,1:im,1:jm,1:ng)
+        pdata%u(1:nv,1:im,1:jm,keu:km ) = u(1:nv,1:im,1:jm,1:ng)
       end if
 #endif /* NDIMS == 3 */
 
@@ -2253,7 +2253,7 @@ module boundaries
     use coordinates, only : ng, im, ih, ib, ie, ieu           &
                         , nd, jm, jh, jb, je, jeu           &
                         , nh, km, kh, kb, ke, keu
-    use variables, only : nqt
+    use equations, only : nv
 
     implicit none
 
@@ -2434,7 +2434,7 @@ module boundaries
                              , nd, jm, jh, jb, je, jeu                         &
                              , nh, km, kh, kb, ke, keu
     use interpolations, only : minmod3
-    use variables     , only : nqt
+    use equations     , only : nv
 
     implicit none
 
@@ -2707,7 +2707,7 @@ module boundaries
           it = 2 * (i - il) + is
           ip = it + 1
 
-          do q = 1, nqt
+          do q = 1, nv
 
             dul = u(q,i  ,j,k) - u(q,i-1,j,k)
             dur = u(q,i+1,j,k) - u(q,i  ,j,k)
@@ -2760,14 +2760,9 @@ module boundaries
     use blocks       , only : block_data
     use coordinates  , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
                             , jbl, je, jeu, kb, kbl, ke, keu
+    use equations    , only : idn, imx, imy, imz, ibx, iby, ibz, ibp
     use error        , only : print_warning
-    use variables    , only : nvr, nfl, idn, imx, imy, imz
-#ifdef MHD
-    use variables    , only : ibx, iby, ibz
-#ifdef GLM
-    use variables    , only : iph
-#endif /* GLM */
-#endif /* MHD */
+    use equations    , only : nv
 
     implicit none
 
@@ -2824,7 +2819,7 @@ module boundaries
           pdata%u(  iby,i,:,:) = pdata%u(  iby,ib,:,:)
           pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ib,:,:)
 #ifdef GLM
-          pdata%u(  iph,i,:,:) = pdata%u(  iph,ib,:,:)
+          pdata%u(  ibp,i,:,:) = pdata%u(  ibp,ib,:,:)
 #endif /* GLM */
         end do
 
@@ -2869,7 +2864,7 @@ module boundaries
         do i = 1, ng
           pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
 #if defined MHD && defined GLM
-          pdata%u(iph,i,:,:) = 0.0d0
+          pdata%u(ibp,i,:,:) = 0.0d0
 #endif /* MHD & GLM */
         end do
 
@@ -2901,7 +2896,7 @@ module boundaries
           pdata%u(  iby,i,:,:) = pdata%u(  iby,ie,:,:)
           pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ie,:,:)
 #ifdef GLM
-          pdata%u(  iph,i,:,:) = pdata%u(  iph,ie,:,:)
+          pdata%u(  ibp,i,:,:) = pdata%u(  ibp,ie,:,:)
 #endif /* GLM */
         end do
 
@@ -2946,7 +2941,7 @@ module boundaries
         do i = ieu, im
           pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
 #if defined MHD && defined GLM
-          pdata%u(iph,i,:,:) = 0.0d0
+          pdata%u(ibp,i,:,:) = 0.0d0
 #endif /* MHD & GLM */
         end do
 
@@ -2978,7 +2973,7 @@ module boundaries
           pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,jb,:)
           pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,jb,:)
 #ifdef GLM
-          pdata%u(  iph,:,j,:) = pdata%u(  iph,:,jb,:)
+          pdata%u(  ibp,:,j,:) = pdata%u(  ibp,:,jb,:)
 #endif /* GLM */
         end do
 
@@ -3029,7 +3024,7 @@ module boundaries
           pdata%u(iby,:,j,:) =  0.0d0
           pdata%u(ibz,:,j,:) =  0.0d0
 #ifdef GLM
-          pdata%u(iph,:,j,:) =  0.0d0
+          pdata%u(ibp,:,j,:) =  0.0d0
 #endif /* GLM */
 #endif /* MHD */
         end do
@@ -3039,7 +3034,7 @@ module boundaries
         do j = 1, ng
           pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
 #if defined MHD && defined GLM
-          pdata%u(iph,:,j,:) = 0.0d0
+          pdata%u(ibp,:,j,:) = 0.0d0
 #endif /* MHD & GLM */
         end do
 
@@ -3071,7 +3066,7 @@ module boundaries
           pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,je,:)
           pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,je,:)
 #ifdef GLM
-          pdata%u(  iph,:,j,:) = pdata%u(  iph,:,je,:)
+          pdata%u(  ibp,:,j,:) = pdata%u(  ibp,:,je,:)
 #endif /* GLM */
         end do
 
@@ -3122,7 +3117,7 @@ module boundaries
           pdata%u(iby,:,j,:) =  0.0d0
           pdata%u(ibz,:,j,:) =  0.0d0
 #ifdef GLM
-          pdata%u(iph,:,j,:) =  0.0d0
+          pdata%u(ibp,:,j,:) =  0.0d0
 #endif /* GLM */
 #endif /* MHD */
         end do
@@ -3132,7 +3127,7 @@ module boundaries
         do j = jeu, jm
           pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
 #if defined MHD && defined GLM
-          pdata%u(iph,:,j,:) = 0.0d0
+          pdata%u(ibp,:,j,:) = 0.0d0
 #endif /* MHD & GLM */
         end do
 
@@ -3165,7 +3160,7 @@ module boundaries
           pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,kb)
           pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,kb)
 #ifdef GLM
-          pdata%u(  iph,:,:,k) = pdata%u(  iph,:,:,kb)
+          pdata%u(  ibp,:,:,k) = pdata%u(  ibp,:,:,kb)
 #endif /* GLM */
         end do
 
@@ -3202,7 +3197,7 @@ module boundaries
         do k = 1, ng
           pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
 #if defined MHD && defined GLM
-          pdata%u(iph,:,:,k) = 0.0d0
+          pdata%u(ibp,:,:,k) = 0.0d0
 #endif /* MHD & GLM */
         end do
 
@@ -3234,7 +3229,7 @@ module boundaries
           pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,ke)
           pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,ke)
 #ifdef GLM
-          pdata%u(  iph,:,:,k) = pdata%u(  iph,:,:,ke)
+          pdata%u(  ibp,:,:,k) = pdata%u(  ibp,:,:,ke)
 #endif /* GLM */
         end do
 
@@ -3271,7 +3266,7 @@ module boundaries
         do k = keu, km
           pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
 #if defined MHD && defined GLM
-          pdata%u(iph,:,:,k) = 0.0d0
+          pdata%u(ibp,:,:,k) = 0.0d0
 #endif /* MHD & GLM */
         end do
 

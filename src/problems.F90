@@ -163,18 +163,9 @@ module problems
     use coordinates, only : ax, ay, az, adx, ady, adz
     use equations  , only : prim2cons
     use equations  , only : gamma
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use parameters , only : get_parameter_real
-    use variables  , only : nt
-    use variables  , only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables  , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use variables  , only : ibx, iby, ibz
-#ifdef GLM
-    use variables  , only : iph
-#endif /* GLM */
-#endif /* MHD */
+    use equations  , only : nv
 
 ! local variables are not implicit by default
 !
@@ -207,7 +198,7 @@ module problems
 
 ! local arrays
 !
-    real, dimension(nt,im) :: q, u
+    real, dimension(nv,im) :: q, u
     real, dimension(im)    :: x
     real, dimension(jm)    :: y
     real, dimension(km)    :: z
@@ -287,9 +278,9 @@ module problems
 #ifdef MHD
 ! set the uniform magnetic field
 !
-    q(ibx,:) = bext(inx)
-    q(iby,:) = bext(iny)
-    q(ibz,:) = bext(inz)
+    q(ibx,:) = bext(1)
+    q(iby,:) = bext(2)
+    q(ibz,:) = bext(3)
 #endif /* MHD */
 
 ! iterate over all positions in the YZ plane
@@ -426,15 +417,15 @@ module problems
 
 ! convert the primitive variables to conservative ones
 !
-        call prim2cons(im, q(1:nt,1:im), u(1:nt,1:im))
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
 
 ! copy the conserved variables to the current block
 !
-        pdata%u(1:nt,1:im,j,k) = u(1:nt,1:im)
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
 
 ! copy the primitive variables to the current block
 !
-        pdata%q(1:nt,1:im,j,k) = q(1:nt,1:im)
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
 
       end do
     end do

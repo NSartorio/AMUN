@@ -55,7 +55,7 @@ module mesh
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates, only : toplev, im, jm, km
     use mpitools   , only : master, nprocs
-    use variables  , only : nqt, nvr
+    use equations  , only : nv
 
 ! local variables are not implicit by default
 !
@@ -78,7 +78,7 @@ module mesh
 !
 ! set data block dimensions
 !
-    call datablock_set_dims(nqt, nvr, im, jm, km)
+    call datablock_set_dims(nv, nv, im, jm, km)
 
 ! print general information about resolutions
 !
@@ -439,7 +439,7 @@ module mesh
     use mpitools , only : master, nprocs, nproc
 #endif /* MPI */
     use refinement , only : check_refinement_criterion
-    use variables, only : nqt
+    use equations  , only : nv
 
     implicit none
 
@@ -464,7 +464,7 @@ module mesh
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nqt,im,jm,km)   :: rbuf
+    real(kind=8)   , dimension(nv,im,jm,km)     :: rbuf
 #endif /* MPI */
 
 ! local pointers
@@ -912,7 +912,7 @@ module mesh
     use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
-    use variables, only : nqt
+    use equations, only : nv
 
     implicit none
 
@@ -931,7 +931,7 @@ module mesh
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nqt,im,jm,km)   :: rbuf
+    real(kind=8)   , dimension(nv,im,jm,km)   :: rbuf
 
 ! local pointers
 !
@@ -1045,7 +1045,7 @@ module mesh
     use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates   , only : ib, ie, jb, je, kb, ke
     use interpolations, only : minmod3
-    use variables     , only : nqt
+    use equations     , only : nv
 
     implicit none
 
@@ -1088,7 +1088,7 @@ module mesh
 
 ! allocate array for the expanded arrays
 !
-    allocate(u(nqt, dm(1), dm(2), dm(3)))
+    allocate(u(nv, dm(1), dm(2), dm(3)))
 
 ! prepare indices
 !
@@ -1119,7 +1119,7 @@ module mesh
           ic = 2 * (i - il) + 1
           ip = ic + 1
 
-          do p = 1, nqt
+          do p = 1, nv
 
             dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
             dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
@@ -1190,10 +1190,10 @@ module mesh
 ! copy data to the current child
 !
 #if NDIMS == 2
-      pchild%data%u(1:nqt,1:im,1:jm,1:km) = u(1:nqt,il:iu,jl:ju, 1:km)
+      pchild%data%u(1:nv,1:im,1:jm,1:km) = u(1:nv,il:iu,jl:ju, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      pchild%data%u(1:nqt,1:im,1:jm,1:km) = u(1:nqt,il:iu,jl:ju,kl:ku)
+      pchild%data%u(1:nv,1:im,1:jm,1:km) = u(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
     end do
@@ -1217,11 +1217,11 @@ module mesh
     use blocks     , only : block_meta, block_data, nchild
     use coordinates, only : ng, nh, in, jn, kn, im, jm, km
     use coordinates, only : ih, jh, kh, ib, jb, kb, ie, je, ke
-    use variables  , only : nfl
+    use equations  , only : nv
 #ifdef MHD
-    use variables  , only : ibx, iby, ibz
+    use equations  , only : ibx, iby, ibz
 #ifdef GLM
-    use variables  , only : iph
+    use equations  , only : ibp
 #endif /* GLM */
 #endif /* MHD */
 
@@ -1310,11 +1310,11 @@ module mesh
 ! the parent block
 !
 #if NDIMS == 2
-      pparent%u(1:nfl,is:it,js:jt,1) =                                         &
-                                   0.25 * (pchild%u(1:nfl,il:iu:2,jl:ju:2,1)   &
-                                         + pchild%u(1:nfl,ip:iu:2,jl:ju:2,1)   &
-                                         + pchild%u(1:nfl,il:iu:2,jp:ju:2,1)   &
-                                         + pchild%u(1:nfl,ip:iu:2,jp:ju:2,1))
+      pparent%u(1:nv,is:it,js:jt,1) =                                         &
+                                   0.25 * (pchild%u(1:nv,il:iu:2,jl:ju:2,1)   &
+                                         + pchild%u(1:nv,ip:iu:2,jl:ju:2,1)   &
+                                         + pchild%u(1:nv,il:iu:2,jp:ju:2,1)   &
+                                         + pchild%u(1:nv,ip:iu:2,jp:ju:2,1))
 
 #ifdef MHD
       pparent%u(ibx:ibz,is:it,js:jt,1) =                                       &
@@ -1323,24 +1323,24 @@ module mesh
                                        + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,1)   &
                                        + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,1))
 #ifdef GLM
-      pparent%u(iph    ,is:it,js:jt,1) =                                       &
-                                 0.25 * (pchild%u(iph    ,il:iu:2,jl:ju:2,1)   &
-                                       + pchild%u(iph    ,ip:iu:2,jl:ju:2,1)   &
-                                       + pchild%u(iph    ,il:iu:2,jp:ju:2,1)   &
-                                       + pchild%u(iph    ,ip:iu:2,jp:ju:2,1))
+      pparent%u(ibp    ,is:it,js:jt,1) =                                       &
+                                 0.25 * (pchild%u(ibp    ,il:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibp    ,ip:iu:2,jl:ju:2,1)   &
+                                       + pchild%u(ibp    ,il:iu:2,jp:ju:2,1)   &
+                                       + pchild%u(ibp    ,ip:iu:2,jp:ju:2,1))
 #endif /* GLM */
 #endif /* MHD */
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      pparent%u(1:nfl,is:it,js:jt,ks:kt) =                                     &
-                             0.125 * (pchild%u(1:nfl,il:iu:2,jl:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nfl,ip:iu:2,jl:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nfl,il:iu:2,jp:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nfl,il:iu:2,jl:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nfl,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nfl,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nfl,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(1:nv,is:it,js:jt,ks:kt) =                                     &
+                             0.125 * (pchild%u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                    + pchild%u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                    + pchild%u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))
 #ifdef MHD
       pparent%u(ibx:ibz,is:it,js:jt,ks:kt) =                                   &
                            0.125 * (pchild%u(ibx:ibz,il:iu:2,jl:ju:2,kl:ku:2)  &
@@ -1352,15 +1352,15 @@ module mesh
                                   + pchild%u(ibx:ibz,il:iu:2,jp:ju:2,kp:ku:2)  &
                                   + pchild%u(ibx:ibz,ip:iu:2,jp:ju:2,kp:ku:2))
 #ifdef GLM
-      pparent%u(iph    ,is:it,js:jt,ks:kt) =                                   &
-                           0.125 * (pchild%u(iph    ,il:iu:2,jl:ju:2,kl:ku:2)  &
-                                  + pchild%u(iph    ,ip:iu:2,jl:ju:2,kl:ku:2)  &
-                                  + pchild%u(iph    ,il:iu:2,jp:ju:2,kl:ku:2)  &
-                                  + pchild%u(iph    ,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                  + pchild%u(iph    ,il:iu:2,jl:ju:2,kp:ku:2)  &
-                                  + pchild%u(iph    ,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                  + pchild%u(iph    ,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                  + pchild%u(iph    ,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(ibp    ,is:it,js:jt,ks:kt) =                                   &
+                           0.125 * (pchild%u(ibp    ,il:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibp    ,ip:iu:2,jl:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibp    ,il:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibp    ,ip:iu:2,jp:ju:2,kl:ku:2)  &
+                                  + pchild%u(ibp    ,il:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibp    ,ip:iu:2,jl:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibp    ,il:iu:2,jp:ju:2,kp:ku:2)  &
+                                  + pchild%u(ibp    ,ip:iu:2,jp:ju:2,kp:ku:2))
 #endif /* GLM */
 #endif /* MHD */
 #endif /* NDIMS == 3 */

@@ -75,17 +75,11 @@ module schemes
 ! include external variables
 !
     use coordinates   , only : im, jm, km
-    use variables     , only : idn, ivx, ivy, ivz, imx, imy, imz
-#ifdef ADI
-    use variables     , only : ipr, ien
-#endif /* ADI */
+    use equations     , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
 #ifdef MHD
-    use variables     , only : ibx, iby, ibz
-#ifdef GLM
-    use variables     , only : iph
-#endif /* GLM */
+    use equations     , only : ibx, iby, ibz, ibp
 #endif /* MHD */
-    use variables     , only : nt
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -95,8 +89,8 @@ module schemes
 !
     integer                     , intent(in)    :: idir
     real                        , intent(in)    :: dx
-    real, dimension(nt,im,jm,km), intent(in)    :: q
-    real, dimension(nt,im,jm,km), intent(inout) :: f
+    real, dimension(nv,im,jm,km), intent(in)    :: q
+    real, dimension(nv,im,jm,km), intent(inout) :: f
 
 ! local variables
 !
@@ -104,10 +98,10 @@ module schemes
 
 ! local temporary arrays
 !
-    real, dimension(nt,im)       :: qx, fx
-    real, dimension(nt,jm)       :: qy, fy
+    real, dimension(nv,im)       :: qx, fx
+    real, dimension(nv,jm)       :: qy, fy
 #if NDIMS == 3
-    real, dimension(nt,km)       :: qz, fz
+    real, dimension(nv,km)       :: qz, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -140,13 +134,13 @@ module schemes
           qx(iby,1:im) = q(iby,1:im,j,k)
           qx(ibz,1:im) = q(ibz,1:im,j,k)
 #ifdef GLM
-          qx(iph,1:im) = q(iph,1:im,j,k)
+          qx(ibp,1:im) = q(ibp,1:im,j,k)
 #endif /* GLM */
 #endif /* MHD */
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, dx, qx(1:nt,1:im), fx(1:nt,1:im))
+          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -162,7 +156,7 @@ module schemes
           f(iby,1:im,j,k) = fx(iby,1:im)
           f(ibz,1:im,j,k) = fx(ibz,1:im)
 #ifdef GLM
-          f(iph,1:im,j,k) = fx(iph,1:im)
+          f(ibp,1:im,j,k) = fx(ibp,1:im)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -190,13 +184,13 @@ module schemes
           qy(iby,1:jm) = q(ibz,i,1:jm,k)
           qy(ibz,1:jm) = q(ibx,i,1:jm,k)
 #ifdef GLM
-          qy(iph,1:jm) = q(iph,i,1:jm,k)
+          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
 #endif /* GLM */
 #endif /* MHD */
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, dx, qy(1:nt,1:jm), fy(1:nt,1:jm))
+          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -212,7 +206,7 @@ module schemes
           f(iby,i,1:jm,k) = fy(ibx,1:jm)
           f(ibz,i,1:jm,k) = fy(iby,1:jm)
 #ifdef GLM
-          f(iph,i,1:jm,k) = fy(iph,1:jm)
+          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -241,13 +235,13 @@ module schemes
           qz(iby,1:km) = q(ibx,i,j,1:km)
           qz(ibz,1:km) = q(iby,i,j,1:km)
 #ifdef GLM
-          qz(iph,1:km) = q(iph,i,j,1:km)
+          qz(ibp,1:km) = q(ibp,i,j,1:km)
 #endif /* GLM */
 #endif /* MHD */
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, dx, qz(1:nt,1:km), fz(1:nt,1:km))
+          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
@@ -263,7 +257,7 @@ module schemes
           f(iby,i,j,1:km) = fz(ibz,1:km)
           f(ibz,i,j,1:km) = fz(ibx,1:km)
 #ifdef GLM
-          f(iph,i,j,k) = fz(iph,k)
+          f(ibp,i,j,k) = fz(ibp,k)
 #endif /* GLM */
 #endif /* MHD */
 
@@ -298,7 +292,7 @@ module schemes
 ! include external variables
 !
     use coordinates   , only : im, jm, km
-    use variables     , only : nfl
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -306,9 +300,9 @@ module schemes
 
 ! subroutine arguments
 !
-    real, dimension(3)                 , intent(in)    :: dh
-    real, dimension(NDIMS,nfl,im,jm,km), intent(in)    :: f
-    real, dimension(      nfl,im,jm,km), intent(inout) :: du
+    real, dimension(3)                , intent(in)    :: dh
+    real, dimension(NDIMS,nv,im,jm,km), intent(in)    :: f
+    real, dimension(      nv,im,jm,km), intent(inout) :: du
 
 ! local variables
 !
@@ -391,11 +385,8 @@ module schemes
 
 ! include external variables
 !
-    use variables     , only : nt
-    use variables     , only : ivx, ivy, ivz
-#ifdef ADI
-    use variables     , only : ien
-#endif /* ADI */
+    use equations     , only : nv
+    use equations     , only : ivx, ivy, ivz, ien
 
 ! local variables are not implicit by default
 !
@@ -405,8 +396,8 @@ module schemes
 !
     integer              , intent(in)  :: n
     real                 , intent(in)  :: h
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: f
+    real, dimension(nv,n), intent(in)  :: q
+    real, dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
@@ -415,14 +406,14 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ql, qr, ul, ur, fl, fr
+    real, dimension(nv,n) :: ql, qr, ul, ur, fl, fr
     real, dimension(n)    :: cl, cr
 !
 !-------------------------------------------------------------------------------
 !
 ! reconstruct the left and right states of primitive variables
 !
-    do p = 1, nt
+    do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
@@ -525,11 +516,8 @@ module schemes
 
 ! include external variables
 !
-    use variables     , only : nt
-    use variables     , only : idn, ivx, ivy, ivz, imx, imy, imz
-#ifdef ADI
-    use variables     , only : ipr, ien
-#endif /* ADI */
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
 
 ! local variables are not implicit by default
 !
@@ -539,8 +527,8 @@ module schemes
 !
     integer              , intent(in)  :: n
     real                 , intent(in)  :: h
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: f
+    real, dimension(nv,n), intent(in)  :: q
+    real, dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
@@ -551,15 +539,15 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ql, qr, ul, ur, fl, fr
+    real, dimension(nv,n) :: ql, qr, ul, ur, fl, fr
     real, dimension(n)    :: cl, cr
-    real, dimension(nt)   :: q1l, q1r, u1l, u1r
+    real, dimension(nv)   :: q1l, q1r, u1l, u1r
 !
 !-------------------------------------------------------------------------------
 !
 ! reconstruct the left and right states of primitive variables
 !
-    do p = 1, nt
+    do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
@@ -732,11 +720,8 @@ module schemes
 ! include external variables
 !
     use equations     , only : gamma
-    use variables     , only : nt
-    use variables     , only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use variables     , only : ipr, ien
-#endif /* ADI */
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, ipr, ien
 
 ! local variables are not implicit by default
 !
@@ -746,8 +731,8 @@ module schemes
 !
     integer              , intent(in)  :: n
     real                 , intent(in)  :: h
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: f
+    real, dimension(nv,n), intent(in)  :: q
+    real, dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
@@ -757,16 +742,16 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n)  :: ql, qr, ul, ur, fl, fr
+    real, dimension(nv,n)  :: ql, qr, ul, ur, fl, fr
     real, dimension(n)     :: cl, cr
-    real, dimension(nt,nt) :: li, ri
-    real, dimension(nt)    :: qi, ci, et, du
+    real, dimension(nv,nv) :: li, ri
+    real, dimension(nv)    :: qi, ci, et, du
 !
 !-------------------------------------------------------------------------------
 !
 ! reconstruct the left and right states of primitive variables
 !
-    do p = 1, nt
+    do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
@@ -829,7 +814,7 @@ module schemes
 ! calculate vector (Ur - Ul).L
 !
       et(:) = 0.0d0
-      do p = 1, nt
+      do p = 1, nv
         et(:) = et(:) + du(p) * li(p,:)
       end do
 
@@ -839,7 +824,7 @@ module schemes
 
 ! correct the flux by adding the term abs(lambda) R.(Ur - Ul).L
 !
-      do p = 1, nt
+      do p = 1, nv
         f(:,i) = f(:,i) - 0.5d0 * abs(ci(p)) * et(p) * ri(p,:)
       end do
 
@@ -873,8 +858,8 @@ module schemes
 ! include external variables
 !
     use equations     , only : gammam1
-    use variables     , only : nt
-    use variables     , only : idn, ivx, ivy, ivz, ien
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, ien
 
 ! local variables are not implicit by default
 !
@@ -882,9 +867,9 @@ module schemes
 
 ! subroutine arguments
 !
-    real, dimension(nt)   , intent(in)    :: q
-    real, dimension(nt)   , intent(inout) :: c
-    real, dimension(nt,nt), intent(inout) :: l, r
+    real, dimension(nv)   , intent(in)    :: q
+    real, dimension(nv)   , intent(inout) :: c
+    real, dimension(nv,nv), intent(inout) :: l, r
 
 ! local variables
 !
@@ -976,8 +961,8 @@ module schemes
 ! include external variables
 !
     use equations     , only : csnd
-    use variables     , only : nt
-    use variables     , only : idn, ivx, ivy, ivz, ien
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, ien
 
 ! local variables are not implicit by default
 !
@@ -985,9 +970,9 @@ module schemes
 
 ! subroutine arguments
 !
-    real, dimension(nt)   , intent(in)    :: q
-    real, dimension(nt)   , intent(inout) :: c
-    real, dimension(nt,nt), intent(inout) :: l, r
+    real, dimension(nv)   , intent(in)    :: q
+    real, dimension(nv)   , intent(inout) :: c
+    real, dimension(nv,nv), intent(inout) :: l, r
 
 ! local variables
 !
@@ -1080,14 +1065,14 @@ module schemes
 
 ! include external variables
 !
-    use variables     , only : nt
-    use variables     , only : ivx, ivy, ivz
+    use equations     , only : nv
+    use equations     , only : ivx, ivy, ivz
 #ifdef ADI
-    use variables     , only : ien
+    use equations     , only : ien
 #endif /* ADI */
-    use variables     , only : ibx, iby, ibz
+    use equations     , only : ibx, iby, ibz
 #ifdef GLM
-    use variables     , only : iph
+    use equations     , only : ibp
 #endif /* GLM */
 
 ! local variables are not implicit by default
@@ -1098,8 +1083,8 @@ module schemes
 !
     integer              , intent(in)  :: n
     real                 , intent(in)  :: h
-    real, dimension(nt,n), intent(in)  :: q
-    real, dimension(nt,n), intent(out) :: f
+    real, dimension(nv,n), intent(in)  :: q
+    real, dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
@@ -1108,14 +1093,14 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ql, qr, ul, ur, fl, fr
+    real, dimension(nv,n) :: ql, qr, ul, ur, fl, fr
     real, dimension(n)    :: cl, cr
 !
 !-------------------------------------------------------------------------------
 !
 ! reconstruct the left and right states of primitive variables
 !
-    do p = 1, nt
+    do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do
 
@@ -1128,16 +1113,16 @@ module schemes
 #ifdef GLM
 ! reconstruct the left and right states of the scalar potential
 !
-    call reconstruct(n, h, q(iph,:), ql(iph,:), qr(iph,:))
+    call reconstruct(n, h, q(ibp,:), ql(ibp,:), qr(ibp,:))
 
 ! obtain the state values for Bx and Psi for the GLM-MHD equations
 !
-    cl(:) = 0.5d0 * ((qr(ibx,:) + ql(ibx,:)) - (qr(iph,:) - ql(iph,:)) / cmax)
-    cr(:) = 0.5d0 * ((qr(iph,:) + ql(iph,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    cl(:) = 0.5d0 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
+    cr(:) = 0.5d0 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
     ql(ibx,:) = cl(:)
     qr(ibx,:) = cl(:)
-    ql(iph,:) = cr(:)
-    qr(iph,:) = cr(:)
+    ql(ibp,:) = cr(:)
+    qr(ibp,:) = cr(:)
 #endif /* GLM */
 
 #ifdef FIX_POSITIVITY
@@ -1239,10 +1224,10 @@ module schemes
 !
     use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct, fix_positivity
-    use variables     , only : nt
-    use variables     , only : idn, imx, imy, imz, ien
-    use variables     , only : ivx, ivy, ivz, ipr
-    use variables     , only : ibx, iby, ibz
+    use equations     , only : nv
+    use equations     , only : idn, imx, imy, imz, ien
+    use equations     , only : ivx, ivy, ivz, ipr
+    use equations     , only : ibx, iby, ibz
 
 ! local variables are not implicit by default
 !
@@ -1252,9 +1237,9 @@ module schemes
 !
     integer                 , intent(in)  :: n
     real                    , intent(in)  :: h
-    real   , dimension(nt,n), intent(in)  :: q
+    real   , dimension(nv,n), intent(in)  :: q
     real   , dimension(   n), intent(in)  :: b
-    real   , dimension(nt,n), intent(out) :: f
+    real   , dimension(nv,n), intent(out) :: f
     logical, dimension(n)   , intent(in)  :: s
 
 ! local variables
@@ -1271,9 +1256,9 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ul, ur, ql, qr, fl, fr
+    real, dimension(nv,n) :: ul, ur, ql, qr, fl, fr
     real, dimension(n)    :: cl, cr
-    real, dimension(nt)   :: q1l, q1r, u1l, u1r
+    real, dimension(nv)   :: q1l, q1r, u1l, u1r
 !
 !-------------------------------------------------------------------------------
 !
@@ -1282,7 +1267,7 @@ module schemes
     do p = 1, ibx - 1
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
-    do p = ibx + 1, nt
+    do p = ibx + 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
 
@@ -1809,10 +1794,10 @@ module schemes
     use equations     , only : gamma
     use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct, fix_positivity
-    use variables     , only : nt
-    use variables     , only : idn, imx, imy, imz, ien
-    use variables     , only : ivx, ivy, ivz, ipr
-    use variables     , only : ibx, iby, ibz
+    use equations     , only : nv
+    use equations     , only : idn, imx, imy, imz, ien
+    use equations     , only : ivx, ivy, ivz, ipr
+    use equations     , only : ibx, iby, ibz
 
 ! local variables are not implicit by default
 !
@@ -1822,9 +1807,9 @@ module schemes
 !
     integer                 , intent(in)  :: n
     real                    , intent(in)  :: h
-    real   , dimension(nt,n), intent(in)  :: q
+    real   , dimension(nv,n), intent(in)  :: q
     real   , dimension(   n), intent(in)  :: b
-    real   , dimension(nt,n), intent(out) :: f
+    real   , dimension(nv,n), intent(out) :: f
     logical, dimension(n)   , intent(in)  :: s
 
 ! local variables
@@ -1841,9 +1826,9 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ul, ur, ql, qr, fl, fr
+    real, dimension(nv,n) :: ul, ur, ql, qr, fl, fr
     real, dimension(n)    :: cl, cr
-    real, dimension(nt)   :: q1l, q1r, u1l, u1r, q2, u2
+    real, dimension(nv)   :: q1l, q1r, u1l, u1r, q2, u2
 !
 !-------------------------------------------------------------------------------
 !
@@ -1852,7 +1837,7 @@ module schemes
     do p = 1, ibx - 1
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
-    do p = ibx + 1, nt
+    do p = ibx + 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
 
@@ -2289,10 +2274,10 @@ module schemes
     use equations     , only : csnd
     use equations     , only : prim2cons, fluxspeed
     use interpolations, only : reconstruct, fix_positivity
-    use variables     , only : nt
-    use variables     , only : idn, imx, imy, imz
-    use variables     , only : ivx, ivy, ivz
-    use variables     , only : ibx, iby, ibz
+    use equations     , only : nv
+    use equations     , only : idn, imx, imy, imz
+    use equations     , only : ivx, ivy, ivz
+    use equations     , only : ibx, iby, ibz
 
 ! local variables are not implicit by default
 !
@@ -2302,9 +2287,9 @@ module schemes
 !
     integer                 , intent(in)  :: n
     real                    , intent(in)  :: h
-    real   , dimension(nt,n), intent(in)  :: q
+    real   , dimension(nv,n), intent(in)  :: q
     real   , dimension(   n), intent(in)  :: b
-    real   , dimension(nt,n), intent(out) :: f
+    real   , dimension(nv,n), intent(out) :: f
     logical, dimension(n)   , intent(in)  :: s
 
 ! local variables
@@ -2318,9 +2303,9 @@ module schemes
 
 ! local arrays to store the states
 !
-    real, dimension(nt,n) :: ul, ur, ql, qr, fl, fr
+    real, dimension(nv,n) :: ul, ur, ql, qr, fl, fr
     real, dimension(n)    :: cl, cr
-    real, dimension(nt)   :: u1l, u1r, u2
+    real, dimension(nv)   :: u1l, u1r, u2
 !
 !-------------------------------------------------------------------------------
 !
@@ -2329,7 +2314,7 @@ module schemes
     do p = 1, ibx - 1
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
-    do p = ibx + 1, nt
+    do p = ibx + 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:), s(:))
     end do
 
