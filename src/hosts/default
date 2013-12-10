@@ -40,9 +40,7 @@ ifeq ($(SIGNALS),Y)
 FFLAGS += -DSIGNALS
 endif
 
-ifeq ($(PREC),8)
-FFLAGS  += -default-real-${PREC} -default-double-${PREC}
-endif
+FFLAGS  += -default-real-8 -default-double-8
 
 ifeq ($(MPI),Y)
 FFLAGS  += -DMPI
