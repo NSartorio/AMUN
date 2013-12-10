@@ -22,12 +22,6 @@ SIGNALS      = N
 MPI          = N
 OMP          = N
 
-# precision flag:
-#
-#   PREC         - arithmetic precision: 4 for single, 8 for double precision
-#
-PREC         = 4
-
 # output data format
 #
 #   OUTPUT       - the format of output data; so far only HDF5

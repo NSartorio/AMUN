@@ -162,8 +162,8 @@ module integrals
 
 ! local variables
 !
-    integer         :: iret
-    real(kind=PREC) :: dvol
+    integer      :: iret
+    real(kind=8) :: dvol
 
 ! local arrays
 !

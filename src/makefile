@@ -104,10 +104,6 @@ ifneq ($(COMPRESS),NONE)
 FFLAGS  += -DCOMPRESS -D${COMPRESS}
 endif
 
-# precision
-#
-FFLAGS  += -DPREC=${PREC}
-
 # time integration method
 #
 FFLAGS  += -D${TIME}
