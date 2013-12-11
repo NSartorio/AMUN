@@ -1083,8 +1083,8 @@ module io
 
 ! regenerate coordinates
 !
-                call finalize_coordinates()
-                call initialize_coordinates(.false.)
+                call finalize_coordinates(err)
+                call initialize_coordinates(.false., err)
 
 ! calculate a factor to rescale the block coordinates
 !

@@ -273,6 +273,23 @@ program amun
 !
   call initialize_random(nprocs, nproc)
 
+! initialize geometry modules and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Geometry:"
+  end if
+
+! initialize module COORDINATES
+!
+  call initialize_coordinates(master, iret)
+
+! jump to the end if the equations could not be initialized
+!
+  if (iret > 0) go to 60
+
+! initialize physics modules and print info
+!
   if (master) then
     write (*,*)
     write (*,"(1x,a)"         ) "Physics:"
@@ -286,6 +303,8 @@ program amun
 !
   if (iret > 0) go to 50
 
+! initialize methods modules and print info
+!
   if (master) then
     write (*,*)
     write (*,"(1x,a)"         ) "Methods:"
@@ -310,10 +329,6 @@ program amun
 ! initialize block module
 !
   call initialize_blocks()
-
-! initialize module COORDINATES
-!
-  call initialize_coordinates(master)
 
 ! initialize module INTERPOLATIONS
 !
@@ -597,10 +612,6 @@ program amun
 !
   call clear_mesh()
 
-! finalize module COORDINATES
-!
-  call finalize_coordinates()
-
 ! deallocate block structure
 !
   call finalize_blocks()
@@ -741,6 +752,14 @@ program amun
 ! jump point
 !
   50 continue
+
+! finalize module COORDINATES
+!
+  call finalize_coordinates(iret)
+
+! jump point
+!
+  60 continue
 
 ! finalize parameters
 !

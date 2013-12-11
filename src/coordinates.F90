@@ -108,7 +108,7 @@ module coordinates
 !
 !===============================================================================
 !
-  subroutine initialize_coordinates(flag)
+  subroutine initialize_coordinates(verbose, iret)
 
 ! include external procedures and variables
 !
@@ -118,9 +118,10 @@ module coordinates
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    logical, intent(in) :: flag
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
 
 ! local variables
 !
@@ -312,7 +313,7 @@ module coordinates
 
 ! print general information about the level resolutions
 !
-    if (flag) then
+    if (verbose) then
 
 ! the base resolution
 !
@@ -338,8 +339,6 @@ module coordinates
 
 ! print info
 !
-      write(*,*)
-      write(*,"(1x,a)"         ) "Geometry:"
       write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", toplev
       write(*,"(4x,a,3(1x,i6))") "base configuration     =", ir, jr, kr
       write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(:)
@@ -362,12 +361,16 @@ module coordinates
 !
 !===============================================================================
 !
-  subroutine finalize_coordinates()
+  subroutine finalize_coordinates(iret)
 
 ! local variables are not implicit by default
 !
     implicit none
 
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
 !-------------------------------------------------------------------------------
 !
 ! deallocating coordinate variables
