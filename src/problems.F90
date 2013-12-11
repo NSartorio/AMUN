@@ -275,14 +275,6 @@ module problems
     q(ivy,:) = 0.0d0
     q(ivz,:) = 0.0d0
 
-! set the uniform magnetic field
-!
-    if (ibx > 0) then
-      q(ibx,:) = bext(1)
-      q(iby,:) = bext(2)
-      q(ibz,:) = bext(3)
-    end if
-
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
