@@ -43,22 +43,10 @@ NDIMS        = 2
 REFINE       = Y
 SHAPE        = N
 
-# source terms:
-#
-#  FORCING       - enables forcing terms, such as turbulence driving
-#  VISCOSITY     - enable fluid viscous terms
-#  RESISTIVITY   - enable resistivity terms
-#
-FORCING      = N
-VISCOSITY    = N
-RESISTIVITY  = N
-
 # methods
 #
-#  SOLVER         - family of solvers: GODUNOV
 #  SPACE          - spacial reconstruction: MINMOD, MC, LF, LIMO3, WENO3
 #
-SOLVER         = GODUNOV
 SPACE          = MINMOD
 
 #

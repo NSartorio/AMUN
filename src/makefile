@@ -89,18 +89,6 @@ endif
 #
 FFLAGS  += -D${SPACE}
 
-# source terms
-#
-ifeq ($(FORCING),Y)
-FFLAGS  += -DFORCE
-endif
-ifeq ($(VISCOSITY),Y)
-FFLAGS  += -DVISCOSITY
-endif
-ifeq ($(RESISTIVITY),Y)
-FFLAGS  += -DRESISTIVITY
-endif
-
 #-------------------------------------------------------------------------------
 
 .SUFFIXES:
@@ -116,14 +104,13 @@ name = amun
 default: $(name).x
 
 sources = blocks.F90 boundaries.F90 constants.F90 coordinates.F90 domains.F90  \
-          driver.F90 equations.F90 error.F90 evolution.F90 forcing.F90         \
-          integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
-          parameters.F90 problems.F90 random.F90 refinement.F90 schemes.F90    \
-          timers.F90
+          driver.F90 equations.F90 error.F90 evolution.F90 integrals.F90       \
+          interpolations.F90 io.F90 mesh.F90 mpitools.F90 parameters.F90       \
+          problems.F90 random.F90 refinement.F90 schemes.F90 timers.F90
 objects = blocks.o boundaries.o constants.o coordinates.o domains.o driver.o   \
-          equations.o error.o evolution.o forcing.o integrals.o                \
-          interpolations.o io.o mesh.o mpitools.o parameters.o problems.o      \
-          random.o refinement.o schemes.o timers.o
+          equations.o error.o evolution.o integrals.o interpolations.o io.o    \
+          mesh.o mpitools.o parameters.o problems.o random.o refinement.o      \
+          schemes.o timers.o
 files   = $(sources) makefile make.default license.txt hosts
 
 $(name).x: $(objects)
@@ -163,16 +150,14 @@ boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
 constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
-                   forcing.o integrals.o interpolations.o io.o mesh.o          \
-                   mpitools.o parameters.o problems.o random.o refinement.o    \
+                   integrals.o interpolations.o io.o mesh.o mpitools.o         \
+                   parameters.o problems.o random.o refinement.o    \
                    schemes.o
 equations.o      : equations.F90 coordinates.o parameters.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
                    equations.o mesh.o mpitools.o parameters.o schemes.o
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
-forcing.o        : forcing.F90 constants.o coordinates.o equations.o           \
-                   mpitools.o parameters.o random.o
 integrals.o      : integrals.F90 blocks.o coordinates.o equations.o \
                    evolution.o mpitools.o
 interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o
