@@ -2774,14 +2774,6 @@ module boundaries
 ! local variables
 !
     integer :: ii, i, j, k, it, jt, kt, is, js, ks
-#ifdef MHD
-    integer :: im1, ip1
-    integer :: jm1, jp1
-#if NDIMS == 3
-    integer :: km1, kp1
-#endif /* NDIMS == 3 */
-    real    :: dbm, dbp, dbx, dby, dbz
-#endif /* MHD */
 !
 !-------------------------------------------------------------------------------
 !
@@ -2809,63 +2801,10 @@ module boundaries
           pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do i = 1, ng
-          pdata%u(1:nfl,i,:,:) = pdata%u(1:nfl,ib,:,:)
-          pdata%u(  iby,i,:,:) = pdata%u(  iby,ib,:,:)
-          pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ib,:,:)
-#ifdef GLM
-          pdata%u(  ibp,i,:,:) = pdata%u(  ibp,ib,:,:)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do k = 1, km
-#if NDIMS == 3
-          km1 = max( 1, k-1)
-          kp1 = min(km, k+1)
-#endif /* NDIMS == 3 */
-          do j = 1, jm
-            jm1 = max( 1, j-1)
-            jp1 = min(jm, j+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(iby,ib,jp1,k) - pdata%u(iby,ib,j  ,k)
-            dbm = pdata%u(iby,ib,j  ,k) - pdata%u(iby,ib,jm1,k)
-            dby = limiter(dbp, dbm)
-#if NDIMS == 3
-            dbp = pdata%u(ibz,ib,j,kp1) - pdata%u(ibz,ib,j,k  )
-            dbm = pdata%u(ibz,ib,j,k  ) - pdata%u(ibz,ib,j,km1)
-            dbz = limiter(dbp, dbm)
-#endif /* NDIMS == 3 */
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do i = ng, 1, -1
-#if NDIMS == 2
-              pdata%u(ibx,i,j,k) = pdata%u(ibx,i+1,j,k) + dby
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-              pdata%u(ibx,i,j,k) = pdata%u(ibx,i+1,j,k) + dby + dbz
-#endif /* NDIMS == 3 */
-            end do
-          end do
-        end do
-#endif /* MHD */
-
       case default ! "open" as default boundary conditions
 
         do i = 1, ng
           pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
-#if defined MHD && defined GLM
-          pdata%u(ibp,i,:,:) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select
@@ -2886,63 +2825,10 @@ module boundaries
           pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do i = ieu, im
-          pdata%u(1:nfl,i,:,:) = pdata%u(1:nfl,ie,:,:)
-          pdata%u(  iby,i,:,:) = pdata%u(  iby,ie,:,:)
-          pdata%u(  ibz,i,:,:) = pdata%u(  ibz,ie,:,:)
-#ifdef GLM
-          pdata%u(  ibp,i,:,:) = pdata%u(  ibp,ie,:,:)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do k = 1, km
-#if NDIMS == 3
-          km1 = max( 1, k-1)
-          kp1 = min(km, k+1)
-#endif /* NDIMS == 3 */
-          do j = 1, jm
-            jm1 = max( 1, j-1)
-            jp1 = min(jm, j+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(iby,ie,jp1,k) - pdata%u(iby,ie,j  ,k)
-            dbm = pdata%u(iby,ie,j  ,k) - pdata%u(iby,ie,jm1,k)
-            dby = limiter(dbp, dbm)
-#if NDIMS == 3
-            dbp = pdata%u(ibz,ie,j,kp1) - pdata%u(ibz,ie,j,k  )
-            dbm = pdata%u(ibz,ie,j,k  ) - pdata%u(ibz,ie,j,km1)
-            dbz = limiter(dbp, dbm)
-#endif /* NDIMS == 3 */
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do i = ieu, im
-#if NDIMS == 2
-              pdata%u(ibx,i,j,k) = pdata%u(ibx,i-1,j,k) - dby
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-              pdata%u(ibx,i,j,k) = pdata%u(ibx,i-1,j,k) - dby - dbz
-#endif /* NDIMS == 3 */
-            end do
-          end do
-        end do
-#endif /* MHD */
-
       case default ! "open" as default boundary conditions
 
         do i = ieu, im
           pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
-#if defined MHD && defined GLM
-          pdata%u(ibp,i,:,:) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select
@@ -2963,79 +2849,10 @@ module boundaries
           pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do j = 1, ng
-          pdata%u(1:nfl,:,j,:) = pdata%u(1:nfl,:,jb,:)
-          pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,jb,:)
-          pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,jb,:)
-#ifdef GLM
-          pdata%u(  ibp,:,j,:) = pdata%u(  ibp,:,jb,:)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do k = 1, km
-#if NDIMS == 3
-          km1 = max( 1, k-1)
-          kp1 = min(km, k+1)
-#endif /* NDIMS == 3 */
-          do i = 1, im
-            im1 = max( 1, i-1)
-            ip1 = min(im, i+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(ibx,ip1,jb,k) - pdata%u(ibx,i  ,jb,k)
-            dbm = pdata%u(ibx,i  ,jb,k) - pdata%u(ibx,im1,jb,k)
-            dbx = limiter(dbp, dbm)
-#if NDIMS == 3
-            dbp = pdata%u(ibz,i,jb,kp1) - pdata%u(ibz,i,jb,k  )
-            dbm = pdata%u(ibz,i,jb,k  ) - pdata%u(ibz,i,jb,km1)
-            dbz = limiter(dbp, dbm)
-#endif /* NDIMS == 3 */
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do j = ng, 1, -1
-#if NDIMS == 2
-              pdata%u(iby,i,j,k) = pdata%u(iby,i,j+1,k) + dbx
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-              pdata%u(iby,i,j,k) = pdata%u(iby,i,j+1,k) + dbx + dbz
-#endif /* NDIMS == 3 */
-            end do
-          end do
-        end do
-#endif /* MHD */
-
-      case("fixed")
-
-        do j = 1, ng
-          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
-          pdata%u(idn,:,j,:) =  1.0d0
-          pdata%u(imx,:,j,:) =  0.0d0
-#ifdef MHD
-          pdata%u(ibx,:,j,:) = -1.0d0
-          pdata%u(iby,:,j,:) =  0.0d0
-          pdata%u(ibz,:,j,:) =  0.0d0
-#ifdef GLM
-          pdata%u(ibp,:,j,:) =  0.0d0
-#endif /* GLM */
-#endif /* MHD */
-        end do
-
       case default ! "open" as default boundary conditions
 
         do j = 1, ng
           pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
-#if defined MHD && defined GLM
-          pdata%u(ibp,:,j,:) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select
@@ -3056,79 +2873,10 @@ module boundaries
           pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do j = jeu, jm
-          pdata%u(1:nfl,:,j,:) = pdata%u(1:nfl,:,je,:)
-          pdata%u(  ibx,:,j,:) = pdata%u(  ibx,:,je,:)
-          pdata%u(  ibz,:,j,:) = pdata%u(  ibz,:,je,:)
-#ifdef GLM
-          pdata%u(  ibp,:,j,:) = pdata%u(  ibp,:,je,:)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do k = 1, km
-#if NDIMS == 3
-          km1 = max( 1, k-1)
-          kp1 = min(km, k+1)
-#endif /* NDIMS == 3 */
-          do i = 1, im
-            im1 = max( 1, i-1)
-            ip1 = min(im, i+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(ibx,ip1,je,k) - pdata%u(ibx,i  ,je,k)
-            dbm = pdata%u(ibx,i  ,je,k) - pdata%u(ibx,im1,je,k)
-            dbx = limiter(dbp, dbm)
-#if NDIMS == 3
-            dbp = pdata%u(ibz,i,je,kp1) - pdata%u(ibz,i,je,k  )
-            dbm = pdata%u(ibz,i,je,k  ) - pdata%u(ibz,i,je,km1)
-            dbz = limiter(dbp, dbm)
-#endif /* NDIMS == 3 */
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do j = jeu, jm
-#if NDIMS == 2
-              pdata%u(iby,i,j,k) = pdata%u(iby,i,j-1,k) - dbx
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-              pdata%u(iby,i,j,k) = pdata%u(iby,i,j-1,k) - dbx - dbz
-#endif /* NDIMS == 3 */
-            end do
-          end do
-        end do
-#endif /* MHD */
-
-      case("fixed")
-
-        do j = jeu, jm
-          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
-          pdata%u(idn,:,j,:) =  1.0d0
-          pdata%u(imx,:,j,:) =  0.0d0
-#ifdef MHD
-          pdata%u(ibx,:,j,:) =  1.0d0
-          pdata%u(iby,:,j,:) =  0.0d0
-          pdata%u(ibz,:,j,:) =  0.0d0
-#ifdef GLM
-          pdata%u(ibp,:,j,:) =  0.0d0
-#endif /* GLM */
-#endif /* MHD */
-        end do
-
       case default ! "open" as default boundary conditions
 
         do j = jeu, jm
           pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
-#if defined MHD && defined GLM
-          pdata%u(ibp,:,j,:) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select
@@ -3150,55 +2898,10 @@ module boundaries
           pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do k = 1, ng
-          pdata%u(1:nfl,:,:,k) = pdata%u(1:nfl,:,:,kb)
-          pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,kb)
-          pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,kb)
-#ifdef GLM
-          pdata%u(  ibp,:,:,k) = pdata%u(  ibp,:,:,kb)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do j = 1, jm
-          jm1 = max( 1, j-1)
-          jp1 = min(jm, j+1)
-          do i = 1, im
-            im1 = max( 1, i-1)
-            ip1 = min(im, i+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(ibx,ip1,j,kb) - pdata%u(ibx,i  ,j,kb)
-            dbm = pdata%u(ibx,i  ,j,kb) - pdata%u(ibx,im1,j,kb)
-            dbx = limiter(dbp, dbm)
-
-            dbp = pdata%u(iby,i,jp1,kb) - pdata%u(iby,i,j  ,kb)
-            dbm = pdata%u(iby,i,j  ,kb) - pdata%u(iby,i,jm1,kb)
-            dbz = limiter(dbp, dbm)
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do k = ng, 1, -1
-              pdata%u(ibz,i,j,k) = pdata%u(ibz,i,j,k+1) + dbx + dbz
-            end do
-          end do
-        end do
-#endif /* MHD */
-
       case default ! "open" as default boundary conditions
 
         do k = 1, ng
           pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
-#if defined MHD && defined GLM
-          pdata%u(ibp,:,:,k) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select
@@ -3219,55 +2922,10 @@ module boundaries
           pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
         end do
 
-#ifdef MHD
-      case("open", "divb")
-
-! update fluid variables and transverse components of magnetic field
-!
-        do k = keu, km
-          pdata%u(1:nfl,:,:,k) = pdata%u(1:nfl,:,:,ke)
-          pdata%u(  ibx,:,:,k) = pdata%u(  ibx,:,:,ke)
-          pdata%u(  iby,:,:,k) = pdata%u(  iby,:,:,ke)
-#ifdef GLM
-          pdata%u(  ibp,:,:,k) = pdata%u(  ibp,:,:,ke)
-#endif /* GLM */
-        end do
-
-! update normal component of magnetic field
-!
-        do j = 1, jm
-          jm1 = max( 1, j-1)
-          jp1 = min(jm, j+1)
-          do i = 1, im
-            im1 = max( 1, i-1)
-            ip1 = min(im, i+1)
-
-! calculate derivatives of transverse components of magnetic field
-!
-            dbp = pdata%u(ibx,ip1,j,ke) - pdata%u(ibx,i  ,j,ke)
-            dbm = pdata%u(ibx,i  ,j,ke) - pdata%u(ibx,im1,j,ke)
-            dbx = limiter(dbp, dbm)
-
-            dbp = pdata%u(iby,i,jp1,ke) - pdata%u(iby,i,j  ,ke)
-            dbm = pdata%u(iby,i,j  ,ke) - pdata%u(iby,i,jm1,ke)
-            dbz = limiter(dbp, dbm)
-
-! update normal component of magnetic field from the divergence free condition
-!
-            do k = keu, km
-              pdata%u(ibz,i,j,k) = pdata%u(ibz,i,j,k-1) - dbx - dbz
-            end do
-          end do
-        end do
-#endif /* MHD */
-
       case default ! "open" as default boundary conditions
 
         do k = keu, km
           pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
-#if defined MHD && defined GLM
-          pdata%u(ibp,:,:,k) = 0.0d0
-#endif /* MHD & GLM */
         end do
 
       end select

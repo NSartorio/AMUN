@@ -2902,16 +2902,8 @@ module io
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
     use equations    , only : nv
-    use equations    , only : idn, imx, imy, imz, ivx, ivy, ivz
-#ifdef ADI
-    use equations    , only : ien, ipr
-#endif /* ADI */
-#ifdef MHD
-    use equations    , only : ibx, iby, ibz
-#ifdef GLM
-    use equations    , only : ibp
-#endif /* GLM */
-#endif /* MHD */
+    use equations    , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
+    use equations    , only : ibx, iby, ibz, ibp
 
 ! declare variables
 !
@@ -3124,16 +3116,8 @@ module io
     use refinement   , only : check_refinement_criterion
 #endif /* DEBUG */
     use equations    , only : nv
-    use equations    , only : idn, ivx, ivy, ivz
-#ifdef ADI
-    use equations    , only : ipr
-#endif /* ADI */
-#ifdef MHD
-    use equations    , only : ibx, iby, ibz
-#ifdef GLM
-    use equations    , only : ibp
-#endif /* GLM */
-#endif /* MHD */
+    use equations    , only : idn, ivx, ivy, ivz, ipr
+    use equations    , only : ibx, iby, ibz, ibp
 
 ! declare variables
 !
