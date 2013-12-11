@@ -44,19 +44,6 @@ endif
 #
 # check flag conditions
 #
-ifeq ($(EQS),HYDRO)
-ifeq ($(FLUX),HLLD)
-FLUX = HLLC
-endif
-ifeq ($(EOS),ISO)
-FLUX = HLL
-endif
-endif
-ifeq ($(EQS),MHD)
-ifeq ($(FLUX),HLLC)
-FLUX = HLLD
-endif
-endif
 
 #-------------------------------------------------------------------------------
 #
@@ -88,12 +75,6 @@ ifeq ($(SPACE),LF)
 FFLAGS  += -DTVD
 endif
 
-# positivity corrections in the reconstruction
-#
-ifeq ($(FIX_POSITIVITY),Y)
-FFLAGS  += -DFIX_POSITIVITY
-endif
-
 # output data format
 #
 FFLAGS  += -D${OUTPUT}
@@ -103,10 +84,6 @@ FFLAGS  += -D${OUTPUT}
 ifneq ($(COMPRESS),NONE)
 FFLAGS  += -DCOMPRESS -D${COMPRESS}
 endif
-
-# time integration method
-#
-FFLAGS  += -D${TIME}
 
 # spacial reconstruction method
 #
@@ -119,16 +96,6 @@ FFLAGS  += -D${EQS}
 # equation of state
 #
 FFLAGS  += -D${EOS}
-
-# flux approximation method
-#
-FFLAGS  += -D${FLUX}
-
-# electromotive force approximation method
-#
-ifeq ($(EQS),MHD)
-FFLAGS  += -D${FLUXEMF}
-endif
 
 # source terms
 #

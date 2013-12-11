@@ -23,10 +23,9 @@
 !!
 !! module: EVOLUTION
 !!
-!!  This module constains subroutines to perform the time integration using
-!!  different methods preserving the conservation and estimates the new time
-!!  step from the stability condition.
-!!
+!!  This module provides an interface for temporal integration with
+!!  the stability handling.  New integration methods can be added by
+!!  implementing more evolve_* subroutines.
 !!
 !!******************************************************************************
 !
@@ -35,6 +34,10 @@ module evolution
 ! module variables are not implicit by default
 !
   implicit none
+
+! pointer to the temporal integration subroutine
+!
+  procedure(evolve_euler), pointer, save :: evolve => null()
 
 ! evolution parameters
 !
@@ -53,7 +56,8 @@ module evolution
 
 ! declare public subroutines
 !
-  public :: initialize_evolution, advance
+  public :: initialize_evolution, finalize_evolution
+  public :: advance
 
 ! declare public variables
 !
@@ -69,37 +73,118 @@ module evolution
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_EVOLUTION:
 ! -------------------------------
 !
 !   Subroutine initializes module EVOLUTION by setting its parameters.
 !
+!   Arguments:
+!
+!     verbose - a logical flag turning the information printing;
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine initialize_evolution()
+  subroutine initialize_evolution(verbose, iret)
 
 ! include external procedures
 !
-    use parameters    , only : get_parameter_real
+    use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
+! local variables
+!
+    character(len=255) :: integration = "rk2"
+    character(len=255) :: name_int    = ""
 !
 !-------------------------------------------------------------------------------
 !
-! get the value of the stability coefficient
+! get the integration method and the value of the CFL coefficient
 !
-    call get_parameter_real("cfl", cfl)
+    call get_parameter_string("time_advance", integration)
+    call get_parameter_real  ("cfl"         , cfl        )
 
-! calculate the initial time step
+! select the integration method, check the correctness of the integration
+! parameters and adjust the CFL coefficient if necessary
 !
-    call new_time_step()
+    select case(trim(integration))
+
+    case ("euler", "EULER")
+
+      name_int =  "1st order Euler method"
+      evolve   => evolve_euler
+
+    case ("rk2", "RK2")
+
+      name_int =  "2nd order Runge-Kutta method"
+      evolve   => evolve_rk2
+
+    case default
+
+      if (verbose) then
+        write (*,"(1x,a)") "The selected time advance method is not " //       &
+                           "implemented: " // trim(integration)
+        name_int =  "2nd order Runge-Kutta method"
+        evolve   => evolve_rk2
+      end if
+
+    end select
+
+! ! calculate the initial time step
+! !
+!     call new_time_step()
+
+! print information about the Riemann solver
+!
+    if (verbose) then
+
+      write (*,"(4x,a,1x,a)"    ) "time advance           =", trim(name_int)
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_evolution
+!
+!===============================================================================
+!
+! subroutine FINALIZE_EVOLUTION:
+! -----------------------------
+!
+!   Subroutine releases memory used by the module.
+!
+!   Arguments:
+!
+!     iret    - an integer flag for error return value;
+!
+!===============================================================================
+!
+  subroutine finalize_evolution(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_evolution
 !
 !===============================================================================
 !
@@ -129,10 +214,13 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef RK2
-! advance the solution using the 2nd order Runge-Kutta method
-    call advance_rk2()
-#endif /* RK2 */
+! find new time step
+!
+    call new_time_step()
+
+! advance the solution using the selected method
+!
+    call evolve()
 
 ! chec if we need to perform the refinement step
 !
@@ -152,10 +240,6 @@ module evolution
 !
     call update_variables()
 
-! find new time step
-!
-    call new_time_step()
-
 !-------------------------------------------------------------------------------
 !
   end subroutine advance
@@ -166,8 +250,94 @@ module evolution
 !!
 !===============================================================================
 !
-! subroutine ADVANCE_RK2:
-! ----------------------
+!===============================================================================
+!
+! subroutine EVOLVE_EULER:
+! -----------------------
+!
+!   Subroutine advances the solution by one time step using the 1st order
+!   Euler integration method.
+!
+!===============================================================================
+!
+  subroutine evolve_euler()
+
+! include external procedures
+!
+    use boundaries    , only : boundary_variables
+    use schemes       , only : update_increment
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : adx, ady, adz
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer    :: pblock
+
+! local arrays
+!
+    real, dimension(3)           :: dh
+    real, dimension(nv,im,jm,km) :: du
+!
+!-------------------------------------------------------------------------------
+!
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! obtain dx, dy, and dz for the current block
+!
+      dh(1) = dt / adx(pblock%meta%level)
+      dh(2) = dt / ady(pblock%meta%level)
+      dh(3) = dt / adz(pblock%meta%level)
+
+! calculate variable increment for the current block
+!
+      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+
+! update the solution for the fluid variables
+!
+      pblock%u0(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + du(1:nv,:,:,:)
+
+! update the conservative variable pointer
+!
+      pblock%u => pblock%u1
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update boundaries
+!
+    call boundary_variables()
+
+! update primitive variables
+!
+    call update_variables()
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_euler
+!
+!===============================================================================
+!
+! subroutine EVOLVE_RK2:
+! ---------------------
 !
 !   Subroutine advances the solution by one time step using the 2nd order
 !   Runge-Kutta time integration method.
@@ -175,7 +345,7 @@ module evolution
 !
 !===============================================================================
 !
-  subroutine advance_rk2()
+  subroutine evolve_rk2()
 
 ! include external procedures
 !
@@ -283,9 +453,13 @@ module evolution
 !
     call boundary_variables()
 
+! update primitive variables
+!
+    call update_variables()
+
 !-------------------------------------------------------------------------------
 !
-  end subroutine advance_rk2
+  end subroutine evolve_rk2
 !
 !===============================================================================
 !

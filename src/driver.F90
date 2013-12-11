@@ -38,8 +38,8 @@ program amun
   use boundaries    , only : initialize_boundaries
   use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations, finalize_equations
-  use evolution     , only : initialize_evolution, advance
-  use evolution     , only : n, t, dt, dtn, cfl
+  use evolution     , only : initialize_evolution, finalize_evolution
+  use evolution     , only : advance, n, t, dt, dtn, cfl
 #ifdef FORCE
   use forcing       , only : initialize_forcing, clear_forcing
 #endif /* FORCE */
@@ -284,12 +284,20 @@ program amun
 
 ! jump to the end if the equations could not be initialized
 !
-  if (iret > 0) go to 40
+  if (iret > 0) go to 50
 
   if (master) then
     write (*,*)
     write (*,"(1x,a)"         ) "Methods:"
   end if
+
+! initialize evolution
+!
+  call initialize_evolution(master, iret)
+
+! jump to the end if the schemes could not be initialized
+!
+  if (iret > 0) go to 40
 
 ! initialize module SCHEMES
 !
@@ -391,10 +399,6 @@ program amun
 !
   call initialize_forcing()
 #endif /* FORCE */
-
-! initialize evolution
-!
-  call initialize_evolution()
 
 #ifdef MPI
 ! reduce termination flag over all processors
@@ -722,13 +726,21 @@ program amun
 !
   30 continue
 
+! finalize module EVOLUTION
+!
+  call finalize_evolution(iret)
+
+! jump point
+!
+  40 continue
+
 ! finalize module EQUATIONS
 !
   call finalize_equations(iret)
 
 ! jump point
 !
-  40 continue
+  50 continue
 
 ! finalize parameters
 !

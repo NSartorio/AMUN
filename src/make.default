@@ -65,19 +65,10 @@ RESISTIVITY  = N
 # methods
 #
 #  SOLVER         - family of solvers: GODUNOV
-#  TIME           - time integration: EULER, RK2, RK3
 #  SPACE          - spacial reconstruction: MINMOD, MC, LF, LIMO3, WENO3
-#  FLUX           - flux approximation: HLL, HLLC, HLLD, ROE
-#  FLUXEMF        - electromotive force approximation: GLM
-#  FIX_POSITIVITY - checks if the positive variables are negative and reduces
-#                   their reconstruction if necessary;
 #
 SOLVER         = GODUNOV
-TIME           = RK2
 SPACE          = MINMOD
-FLUX           = HLL
-FLUXEMF        = GLM
-FIX_POSITIVITY = N
 
 #
 #-------------------------------------------------------------------------------
