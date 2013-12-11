@@ -52,7 +52,8 @@ program amun
 #ifdef MPI
   use mesh          , only : redistribute_blocks
 #endif /* MPI */
-  use mpitools      , only : initialize_mpitools, finalize_mpitools, setup_mpi
+  use mpitools      , only : initialize_mpitools, finalize_mpitools
+  use mpitools      , only : setup_mpi
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
   use mpitools      , only : reduce_maximum_integer
@@ -762,7 +763,7 @@ program amun
 !
   60 continue
 
-! finalize parameters
+! finalize modules PARAMETERS
 !
   call finalize_parameters()
 
