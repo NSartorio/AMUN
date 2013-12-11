@@ -207,7 +207,8 @@ constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    forcing.o integrals.o interpolations.o io.o mesh.o          \
-                   mpitools.o parameters.o problems.o random.o refinement.o
+                   mpitools.o parameters.o problems.o random.o refinement.o    \
+                   schemes.o
 equations.o      : equations.F90 coordinates.o parameters.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \

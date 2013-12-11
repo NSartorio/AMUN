@@ -416,6 +416,7 @@ module equations
       write (*,"(1x,a)"         ) "Physics:"
       write (*,"(4x,a,1x,a)"    ) "equation system        =", trim(name_eqsys)
       write (*,"(4x,a,1x,a)"    ) "equation of state      =", trim(name_eos)
+      write (*,*)
 
     end if
 

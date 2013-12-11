@@ -48,6 +48,7 @@ module interpolations
 ! declare public subroutines
 !
   public :: initialize_interpolations, reconstruct, minmod, minmod3
+  public :: fix_positivity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !

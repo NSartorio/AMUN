@@ -67,6 +67,7 @@ program amun
   use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement
+  use schemes       , only : initialize_schemes, finalize_schemes
   use timers        , only : initialize_timers, start_timer, stop_timer        &
                           , set_timer, get_timer, get_timer_total              &
                           , timer_enabled, timer_description, ntimers
@@ -278,6 +279,14 @@ program amun
   call initialize_equations(master, iret)
 
 ! jump to the end if the equations could not be initialized
+!
+  if (iret > 0) go to 40
+
+! initialize module SCHEMES
+!
+  call initialize_schemes(master, iret)
+
+! jump to the end if the schemes could not be initialized
 !
   if (iret > 0) go to 30
 
@@ -696,13 +705,21 @@ program amun
 
   end if
 
+! finalize module SCHEMES
+!
+  call finalize_schemes(iret)
+
+! jump point
+!
+  30 continue
+
 ! finalize module EQUATIONS
 !
   call finalize_equations(iret)
 
 ! jump point
 !
-  30 continue
+  40 continue
 
 ! finalize parameters
 !
