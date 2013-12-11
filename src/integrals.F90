@@ -139,9 +139,6 @@ module integrals
     use coordinates, only : ib, ie, jb, je, kb, ke
     use coordinates, only : advol
     use evolution, only : n, t, dt
-#ifdef FORCE
-    use forcing  , only : fcor, finp
-#endif /* FORCE */
     use mpitools , only : master
 #ifdef MPI
     use mpitools , only : reduce_sum_real_array
@@ -201,27 +198,16 @@ module integrals
       pdata => pdata%next
     end do
 
-#ifdef FORCE
-! update the force-force correlation
-!
-    arr(9) = fcor
-
-#endif /* FORCE */
 #ifdef MPI
 ! sum the integrals from all processors
 !
     call reduce_sum_real_array(narr, arr(:), iret)
-
 #endif /* MPI */
+
 ! calculate the internal energy
 !
     if (ien > 0) arr(8) = arr(5) - arr(6) - arr(7)
-#ifdef FORCE
-! update the force-force correlation
-!
-    arr(10) = finp
 
-#endif /* FORCE */
 ! close integrals.dat
 !
     if (master) then

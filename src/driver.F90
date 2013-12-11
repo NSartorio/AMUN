@@ -40,9 +40,6 @@ program amun
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, n, t, dt, dtn, cfl
-#ifdef FORCE
-  use forcing       , only : initialize_forcing, clear_forcing
-#endif /* FORCE */
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
@@ -403,20 +400,6 @@ program amun
 
   end if
 
-#ifdef FORCE
-! if the forcing time step is larger than the initial time step decrease it
-!
-  fdt = min(fdt, 0.1d0 * dtini)
-
-! round the initial time step to the integer number of forcing time steps
-!
-  dt  = fdt * floor(dt / fdt)
-
-! initialize forcing module
-!
-  call initialize_forcing()
-#endif /* FORCE */
-
 #ifdef MPI
 ! reduce termination flag over all processors
 !
@@ -500,12 +483,6 @@ program amun
 ! compute new time step
 !
     dt = min(cfl * dtn, 2.0d0 * dt)
-
-#ifdef FORCE
-! limit the time step to the integer number of forcing time steps
-!
-    dt = fdt * floor(dt / fdt)
-#endif /* FORCE */
 
 ! advance the iteration number and time
 !
@@ -600,12 +577,6 @@ program amun
 !
 10 continue
 
-#ifdef FORCE
-! finalize forcing module
-!
-  call clear_forcing()
-
-#endif /* FORCE */
 ! clear up the integrals module
 !
   call clear_integrals()
