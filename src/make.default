@@ -43,15 +43,6 @@ NDIMS        = 2
 REFINE       = Y
 SHAPE        = N
 
-# physics:
-#
-#  EQS           - set of equations to solve: HYDRO or MHD
-#  EOS           - equation of state: ADI of ISO for adiabatic or isothermal,
-#                  respectively
-#
-EQS          = HYDRO
-EOS          = ADI
-
 # source terms:
 #
 #  FORCING       - enables forcing terms, such as turbulence driving

@@ -180,31 +180,31 @@ module refinement
           cloc = max(cloc, fx, fy, fz)
 #endif /* NDIMS == 3 */
 
-#ifdef ADI
+          if (ipr > 0) then
 ! pressure
 !
-          fr   = pdata%q(ipr,ip1,j,k) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,im1,j,k) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,ip1,j,k) + pdata%q(ipr,im1,j,k)                   &
+            fr   = pdata%q(ipr,ip1,j,k) - pdata%q(ipr,i,j,k)
+            fl   = pdata%q(ipr,im1,j,k) - pdata%q(ipr,i,j,k)
+            fc   = pdata%q(ipr,ip1,j,k) + pdata%q(ipr,im1,j,k)                 &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
-          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          fr   = pdata%q(ipr,i,jp1,k) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,i,jm1,k) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,i,jp1,k) + pdata%q(ipr,i,jm1,k)                   &
+            fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            fr   = pdata%q(ipr,i,jp1,k) - pdata%q(ipr,i,j,k)
+            fl   = pdata%q(ipr,i,jm1,k) - pdata%q(ipr,i,j,k)
+            fc   = pdata%q(ipr,i,jp1,k) + pdata%q(ipr,i,jm1,k)                 &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
-          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #if NDIMS == 2
-          cloc = max(cloc, fx, fy)
+            cloc = max(cloc, fx, fy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-          fr   = pdata%q(ipr,i,j,kp1) - pdata%q(ipr,i,j,k)
-          fl   = pdata%q(ipr,i,j,km1) - pdata%q(ipr,i,j,k)
-          fc   = pdata%q(ipr,i,j,kp1) + pdata%q(ipr,i,j,km1)                   &
+            fr   = pdata%q(ipr,i,j,kp1) - pdata%q(ipr,i,j,k)
+            fl   = pdata%q(ipr,i,j,km1) - pdata%q(ipr,i,j,k)
+            fc   = pdata%q(ipr,i,j,kp1) + pdata%q(ipr,i,j,km1)                 &
                                                   + 2.0d0 * pdata%q(ipr,i,j,k)
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cloc = max(cloc, fx, fy, fz)
+            fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            cloc = max(cloc, fx, fy, fz)
 #endif /* NDIMS == 3 */
-#endif /* ADI */
+          end if
 
 ! find the block maximum refinement value
 !

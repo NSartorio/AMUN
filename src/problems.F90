@@ -178,14 +178,10 @@ module problems
 ! default parameter values
 !
     real   , save :: dens = 1.0d0, ratio = 1.0e2, radius = 0.1d0
-#ifdef ADI
     real   , save :: csnd = 0.40824829046386301635d0
-#endif /* ADI */
     logical, save :: first = .true.
     real   , save :: dn_amb, dn_ovr
-#ifdef ADI
     real   , save :: pr_amb, pr_ovr
-#endif /* ADI */
     real   , save :: rad
 
 ! local variables
@@ -214,26 +210,21 @@ module problems
       call get_parameter_real("dens"  , dens  )
       call get_parameter_real("ratio" , ratio )
       call get_parameter_real("radius", radius)
-#ifdef ADI
       call get_parameter_real("csnd"  , csnd  )
-#endif /* ADI */
 
 ! calculate the overdense and ambient region densities
 !
       dn_amb = dens
-#ifdef ISO
-      dn_ovr = dn_amb * ratio
-#endif /* ISO */
-#ifdef ADI
-      dn_ovr = dn_amb
-#endif /* ADI */
-
-#ifdef ADI
+      if (ipr > 0) then
+        dn_ovr = dn_amb
 ! calculate parallel and perpendicular pressures from sound speeds
 !
-      pr_amb = dens * csnd * csnd / gamma
-      pr_ovr = pr_amb * ratio
-#endif /* ADI */
+        pr_amb = dens * csnd * csnd / gamma
+        pr_ovr = pr_amb * ratio
+
+      else
+        dn_ovr = dn_amb * ratio
+      end if
 
 ! calculate the square of radius
 !
@@ -315,9 +306,7 @@ module problems
 ! set the initial density and pressure
 !
           q(idn,i) = dn_amb
-#ifdef ADI
-          q(ipr,i) = pr_amb
-#endif /* ADI */
+          if (ipr > 0) q(ipr,i) = pr_amb
 
 ! set the initial pressure in cells laying completely within the radius
 !
@@ -327,11 +316,9 @@ module problems
 !
             q(idn,i) = dn_ovr
 
-#ifdef ADI
 ! set the overpressure region pressure
 !
-            q(ipr,i) = pr_ovr
-#endif /* ADI */
+            if (ipr > 0) q(ipr,i) = pr_ovr
 
 ! set the initial pressure in the cell completely outside the radius
 !
@@ -341,11 +328,9 @@ module problems
 !
             q(idn,i) = dn_amb
 
-#ifdef ADI
 ! set the ambient medium pressure
 !
-            q(ipr,i) = pr_amb
-#endif /* ADI */
+            if (ipr > 0) q(ipr,i) = pr_amb
 
 ! integrate density or pressure in cells which are crossed by the circule with
 ! the given radius
@@ -360,11 +345,9 @@ module problems
 !
             q(idn,i) = dn_amb
 
-#ifdef ADI
 ! set the ambient medium pressure
 !
-            q(ipr,i) = pr_amb
-#endif /* ADI */
+            if (ipr > 0) q(ipr,i) = pr_amb
 #else /* R3D */
 ! calculate the bounds of area integration
 !
@@ -396,11 +379,9 @@ module problems
 !
             q(idn,i) = fc_ovr * dn_ovr + fc_amb * dn_amb
 
-#ifdef ADI
 ! integrate the pressure over the edge cells
 !
-            q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
-#endif /* ADI */
+            if (ipr > 0) q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
 #endif /* R3D */
 
           end if

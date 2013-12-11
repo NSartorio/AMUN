@@ -89,14 +89,6 @@ endif
 #
 FFLAGS  += -D${SPACE}
 
-# set of equations
-#
-FFLAGS  += -D${EQS}
-
-# equation of state
-#
-FFLAGS  += -D${EOS}
-
 # source terms
 #
 ifeq ($(FORCING),Y)
@@ -105,10 +97,8 @@ endif
 ifeq ($(VISCOSITY),Y)
 FFLAGS  += -DVISCOSITY
 endif
-ifeq ($(EQS),MHD)
 ifeq ($(RESISTIVITY),Y)
 FFLAGS  += -DRESISTIVITY
-endif
 endif
 
 #-------------------------------------------------------------------------------

@@ -185,9 +185,9 @@ module integrals
       arr(2) = arr(2) + sum(pdata%u(imx,ib:ie,jb:je,kb:ke)) * dvol
       arr(3) = arr(3) + sum(pdata%u(imy,ib:ie,jb:je,kb:ke)) * dvol
       arr(4) = arr(4) + sum(pdata%u(imz,ib:ie,jb:je,kb:ke)) * dvol
-#ifdef ADI
-      arr(5) = arr(5) + sum(pdata%u(ien,ib:ie,jb:je,kb:ke)) * dvol
-#endif /* ADI */
+      if (ien > 0) then
+        arr(5) = arr(5) + sum(pdata%u(ien,ib:ie,jb:je,kb:ke)) * dvol
+      end if
       arr(6) = arr(6) + sum((pdata%u(imx,ib:ie,jb:je,kb:ke)**2                 &
                            + pdata%u(imy,ib:ie,jb:je,kb:ke)**2                 &
                            + pdata%u(imz,ib:ie,jb:je,kb:ke)**2)                &
@@ -213,12 +213,9 @@ module integrals
     call reduce_sum_real_array(narr, arr(:), iret)
 
 #endif /* MPI */
-#ifdef ADI
 ! calculate the internal energy
 !
-    arr(8) = arr(5) - arr(6) - arr(7)
-
-#endif /* ADI */
+    if (ien > 0) arr(8) = arr(5) - arr(6) - arr(7)
 #ifdef FORCE
 ! update the force-force correlation
 !
