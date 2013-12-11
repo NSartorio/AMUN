@@ -23,8 +23,10 @@
 !!
 !! module: TIMERS
 !!
-!!  This module handles the execution time counting for different parts of the
-!!  program.
+!!  This module handles the execution time counting.  Its general
+!!  implementation allows to insert up to 128 counters which will measure
+!!  time spent on the execution of the bounded code block.  Each timer
+!!  can be described.
 !!
 !!******************************************************************************
 !
@@ -50,8 +52,9 @@ module timers
 
 ! declare public subroutines and variables
 !
-  public :: initialize_timers, set_timer, start_timer, stop_timer, get_timer   &
-          , get_timer_total, ntimers, timer_enabled, timer_description
+  public :: initialize_timers, finalize_timers
+  public :: set_timer, start_timer, stop_timer, get_timer, get_timer_total
+  public :: ntimers, timer_enabled, timer_description
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -64,6 +67,7 @@ module timers
 !
 !   Subroutine initializes module TIMERS and allocates memory to store
 !   execution times.
+!
 !
 !===============================================================================
 !
@@ -81,7 +85,7 @@ module timers
 
 ! initialize the flags signifying that the counter is used
 !
-    flag(:)   = .false.
+    flag(:)        = .false.
 
 ! initialize flag  desciptions
 !
@@ -89,21 +93,44 @@ module timers
 
 ! initialize the next available timer
 !
-    ntimer    = 1
+    ntimer         = 1
 
 ! reset timers
 !
-    times(:)  = 0
-    tstart(:) = 0
-    tstop(:)  = 0
+    times(:)       = 0
+    tstart(:)      = 0
+    tstop(:)       = 0
 
 ! prepare the conversion factor
 !
-    conv = 1.0d0 / ticks
+    conv           = 1.0d+00 / max(1, ticks)
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_timers
+!
+!===============================================================================
+!
+! subroutine FINALIZE_TIMERS:
+! --------------------------
+!
+!   Subroutine finalizes module.
+!
+!
+!===============================================================================
+!
+  subroutine finalize_timers()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_timers
 !
 !===============================================================================
 !
@@ -138,7 +165,7 @@ module timers
 
 ! check if the timer didn't exceed the number of avalaible timers
 !
-    if (ntimer .le. ntimers) then
+    if (ntimer <= ntimers) then
 
 ! set the timer description
 !
@@ -216,7 +243,7 @@ module timers
 !
     call system_clock(tstop(timer))
 
-    times(timer) = times(timer) + tstop(timer) - tstart(timer)
+    times(timer) = times(timer) + (tstop(timer) - tstart(timer))
 
 !-------------------------------------------------------------------------------
 !
@@ -352,6 +379,7 @@ module timers
 !
 !   Function returns the total execution time.
 !
+!
 !===============================================================================
 !
   function get_timer_total()
@@ -376,7 +404,7 @@ module timers
 
 ! estimate the total execution time
 !
-    get_timer_total = conv * max(1, tend - tbegin)
+    get_timer_total = conv * max(0, tend - tbegin)
 
 ! return the value
 !

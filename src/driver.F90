@@ -68,9 +68,10 @@ program amun
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement
   use schemes       , only : initialize_schemes, finalize_schemes
-  use timers        , only : initialize_timers, start_timer, stop_timer        &
-                          , set_timer, get_timer, get_timer_total              &
-                          , timer_enabled, timer_description, ntimers
+  use timers        , only : initialize_timers, finalize_timers
+  use timers        , only : start_timer, stop_timer, set_timer, get_timer
+  use timers        , only : get_timer_total, timer_enabled, timer_description
+  use timers        , only : ntimers
 
 ! module variables are not implicit by default
 !
@@ -145,7 +146,7 @@ program amun
 !
   iterm = 0
 
-! initialize module TIMES
+! initialize module TIMERS
 !
   call initialize_timers()
 
@@ -768,6 +769,10 @@ program amun
 ! finalize module MPITOOLS
 !
   call finalize_mpitools()
+
+! finalize module TIMERS
+!
+  call finalize_timers()
 
 !-------------------------------------------------------------------------------
 !
