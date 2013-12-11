@@ -225,14 +225,6 @@ program amun
 !
   iterm = 0
 
-! initialize module EQUATIONS
-!
-  call initialize_equations(master, iret)
-
-! jump to the end if the equations could not be initialized
-!
-  if (iret > 0) go to 30
-
 ! check if the domain is periodic
 !
   lbnd = "periodic"
@@ -280,6 +272,14 @@ program amun
 ! initialize the random number generator
 !
   call initialize_random(nprocs, nproc)
+
+! initialize module EQUATIONS
+!
+  call initialize_equations(master, iret)
+
+! jump to the end if the equations could not be initialized
+!
+  if (iret > 0) go to 30
 
 ! initialize block module
 !
