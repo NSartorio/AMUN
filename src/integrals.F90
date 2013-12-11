@@ -147,9 +147,7 @@ module integrals
     use mpitools , only : reduce_sum_real_array
 #endif /* MPI */
     use equations, only : idn, imx, imy, imz, ien
-#ifdef MHD
     use equations, only : ibx, iby, ibz
-#endif /* MHD */
 
     implicit none
 
@@ -194,11 +192,11 @@ module integrals
                            + pdata%u(imy,ib:ie,jb:je,kb:ke)**2                 &
                            + pdata%u(imz,ib:ie,jb:je,kb:ke)**2)                &
                            / pdata%u(idn,ib:ie,jb:je,kb:ke)) * 0.5d0 * dvol
-#ifdef MHD
-      arr(7) = arr(7) + sum(pdata%u(ibx,ib:ie,jb:je,kb:ke)**2                  &
-                          + pdata%u(iby,ib:ie,jb:je,kb:ke)**2                  &
-                          + pdata%u(ibz,ib:ie,jb:je,kb:ke)**2) * 0.5d0 * dvol
-#endif /* MHD */
+      if (ibx > 0) then
+        arr(7) = arr(7) + sum(pdata%u(ibx,ib:ie,jb:je,kb:ke)**2                &
+                            + pdata%u(iby,ib:ie,jb:je,kb:ke)**2                &
+                            + pdata%u(ibz,ib:ie,jb:je,kb:ke)**2) * 0.5d0 * dvol
+      end if
 
       pdata => pdata%next
     end do
