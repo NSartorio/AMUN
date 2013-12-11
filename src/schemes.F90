@@ -241,7 +241,6 @@ module schemes
 !
     if (verbose) then
 
-      write (*,"(1x,a)"         ) "Methods:"
       write (*,"(4x,a,1x,a)"    ) "Riemann solver         =", trim(name_sol)
 
     end if

@@ -131,8 +131,8 @@ module parameters
 
 ! print information about the file from which the parameters will be read
 !
-    write(*,*) 'Reading parameters from ' // trim(fname)
     write(*,*)
+    write(*,*) 'Reading parameters from ' // trim(fname)
 
 ! check if the file exists
 !

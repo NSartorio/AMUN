@@ -188,7 +188,6 @@ program amun
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
-    write (*,*)
 
   end if
 
@@ -274,6 +273,11 @@ program amun
 !
   call initialize_random(nprocs, nproc)
 
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Physics:"
+  end if
+
 ! initialize module EQUATIONS
 !
   call initialize_equations(master, iret)
@@ -281,6 +285,11 @@ program amun
 ! jump to the end if the equations could not be initialized
 !
   if (iret > 0) go to 40
+
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Methods:"
+  end if
 
 ! initialize module SCHEMES
 !
