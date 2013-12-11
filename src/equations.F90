@@ -119,6 +119,7 @@ module equations
   public :: idn, ivx, ivy, ivz, imx, imy, imz
   public :: ibx, iby, ibz, ibp, ipr, ien
   public :: eqsys, eos
+  public :: pvars, cvars
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !

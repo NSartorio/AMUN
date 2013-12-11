@@ -2895,15 +2895,14 @@ module io
 
 ! references to other modules
 !
-    use blocks       , only : block_data, list_data
-    use blocks       , only : get_dblocks
+    use blocks     , only : block_data, list_data
+    use blocks     , only : get_dblocks
     use coordinates, only : im, jm, km
-    use error        , only : print_error
-    use hdf5         , only : hid_t, hsize_t
-    use hdf5         , only : h5gcreate_f, h5gclose_f
-    use equations    , only : nv
-    use equations    , only : idn, imx, imy, imz, ivx, ivy, ivz, ipr, ien
-    use equations    , only : ibx, iby, ibz, ibp
+    use equations  , only : nv, cvars, pvars
+    use equations  , only : ivx, ivy, ivz, ipr
+    use error      , only : print_error
+    use hdf5       , only : hid_t, hsize_t
+    use hdf5       , only : h5gcreate_f, h5gclose_f
 
 ! declare variables
 !
@@ -2921,22 +2920,11 @@ module io
 ! local variables
 !
     integer           :: err
-    integer(kind=4)   :: i, j, k, l
+    integer(kind=4)   :: i, j, k, l, n
 
 ! local allocatable arrays
 !
-    real(kind=8), dimension(:,:,:,:), allocatable :: dens
-    real(kind=8), dimension(:,:,:,:), allocatable :: momx, momy, momz
-    real(kind=8), dimension(:,:,:,:), allocatable :: velx, vely, velz
-#ifdef ADI
-    real(kind=8), dimension(:,:,:,:), allocatable :: ener, pres
-#endif /* ADI */
-#ifdef MHD
-    real(kind=8), dimension(:,:,:,:), allocatable :: magx, magy, magz
-#ifdef GLM
-    real(kind=8), dimension(:,:,:,:), allocatable :: bpsi
-#endif /* GLM */
-#endif /* MHD */
+    real(kind=8), dimension(:,:,:,:), allocatable :: qarr
 
 ! local pointers
 !
@@ -2965,99 +2953,122 @@ module io
 
 ! allocate arrays to store variables from all datablocks
 !
-        allocate(dens(dm(1),dm(2),dm(3),dm(4)))
-        allocate(momx(dm(1),dm(2),dm(3),dm(4)))
-        allocate(momy(dm(1),dm(2),dm(3),dm(4)))
-        allocate(momz(dm(1),dm(2),dm(3),dm(4)))
-        allocate(velx(dm(1),dm(2),dm(3),dm(4)))
-        allocate(vely(dm(1),dm(2),dm(3),dm(4)))
-        allocate(velz(dm(1),dm(2),dm(3),dm(4)))
-#ifdef ADI
-        allocate(ener(dm(1),dm(2),dm(3),dm(4)))
-        allocate(pres(dm(1),dm(2),dm(3),dm(4)))
-#endif /* ADI */
-#ifdef MHD
-        allocate(magx(dm(1),dm(2),dm(3),dm(4)))
-        allocate(magy(dm(1),dm(2),dm(3),dm(4)))
-        allocate(magz(dm(1),dm(2),dm(3),dm(4)))
-#ifdef GLM
-        allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
-#endif /* GLM */
-#endif /* MHD */
+        allocate(qarr(dm(1),dm(2),dm(3),dm(4)))
+
+! iterate over all conserved variables
+!
+        do n = 1, nv
 
 ! iterate over all data blocks and fill in the arrays
 !
-        l = 1
-        pdata => list_data
-        do while(associated(pdata))
+          l = 1
+          pdata => list_data
+          do while(associated(pdata))
 
-          dens(l,1:im,1:jm,1:km) = pdata%u(idn,1:im,1:jm,1:km)
-          momx(l,1:im,1:jm,1:km) = pdata%u(imx,1:im,1:jm,1:km)
-          momy(l,1:im,1:jm,1:km) = pdata%u(imy,1:im,1:jm,1:km)
-          momz(l,1:im,1:jm,1:km) = pdata%u(imz,1:im,1:jm,1:km)
-          velx(l,1:im,1:jm,1:km) = pdata%q(ivx,1:im,1:jm,1:km)
-          vely(l,1:im,1:jm,1:km) = pdata%q(ivy,1:im,1:jm,1:km)
-          velz(l,1:im,1:jm,1:km) = pdata%q(ivz,1:im,1:jm,1:km)
-#ifdef ADI
-          ener(l,1:im,1:jm,1:km) = pdata%u(ien,1:im,1:jm,1:km)
-          pres(l,1:im,1:jm,1:km) = pdata%q(ipr,1:im,1:jm,1:km)
-#endif /* ADI */
-#ifdef MHD
-          magx(l,1:im,1:jm,1:km) = pdata%u(ibx,1:im,1:jm,1:km)
-          magy(l,1:im,1:jm,1:km) = pdata%u(iby,1:im,1:jm,1:km)
-          magz(l,1:im,1:jm,1:km) = pdata%u(ibz,1:im,1:jm,1:km)
-#ifdef GLM
-          bpsi(l,1:im,1:jm,1:km) = pdata%q(ibp,1:im,1:jm,1:km)
-#endif /* GLM */
-#endif /* MHD */
+            qarr(l,1:im,1:jm,1:km) = pdata%u(n,1:im,1:jm,1:km)
 
-          l = l + 1
-          pdata => pdata%next
-        end do
+            l = l + 1
+            pdata => pdata%next
+
+          end do ! pdata=>list_data
 
 ! write the variables to the HDF5 file
 !
-        call write_array4_double_h5(gid, 'dens', dm, dens)
-        call write_array4_double_h5(gid, 'momx', dm, momx)
-        call write_array4_double_h5(gid, 'momy', dm, momy)
-        call write_array4_double_h5(gid, 'momz', dm, momz)
-        call write_array4_double_h5(gid, 'velx', dm, velx)
-        call write_array4_double_h5(gid, 'vely', dm, vely)
-        call write_array4_double_h5(gid, 'velz', dm, velz)
-#ifdef ADI
-        call write_array4_double_h5(gid, 'ener', dm, ener)
-        call write_array4_double_h5(gid, 'pres', dm, pres)
-#endif /* ADI */
-#ifdef MHD
-        call write_array4_double_h5(gid, 'magx', dm, magx)
-        call write_array4_double_h5(gid, 'magy', dm, magy)
-        call write_array4_double_h5(gid, 'magz', dm, magz)
-#ifdef GLM
-        call write_array4_double_h5(gid, 'bpsi', dm, bpsi)
-#endif /* GLM */
-#endif /* MHD */
+          call write_array4_double_h5(gid, trim(cvars(n)), dm, qarr)
+
+        end do ! n = 1, nv
+
+! store velocity components
+!
+        if (ivx > 0) then
+
+! iterate over all data blocks and fill in the arrays
+!
+          l = 1
+          pdata => list_data
+          do while(associated(pdata))
+
+            qarr(l,1:im,1:jm,1:km) = pdata%u(ivx,1:im,1:jm,1:km)
+
+            l = l + 1
+            pdata => pdata%next
+
+          end do ! pdata=>list_data
+
+! write the variables to the HDF5 file
+!
+          call write_array4_double_h5(gid, trim(pvars(ivx)), dm, qarr)
+
+        end if ! ivx > 0
+
+        if (ivy > 0) then
+
+! iterate over all data blocks and fill in the arrays
+!
+          l = 1
+          pdata => list_data
+          do while(associated(pdata))
+
+            qarr(l,1:im,1:jm,1:km) = pdata%u(ivy,1:im,1:jm,1:km)
+
+            l = l + 1
+            pdata => pdata%next
+
+          end do ! pdata=>list_data
+
+! write the variables to the HDF5 file
+!
+          call write_array4_double_h5(gid, trim(pvars(ivy)), dm, qarr)
+
+        end if ! ivy > 0
+
+        if (ivz > 0) then
+
+! iterate over all data blocks and fill in the arrays
+!
+          l = 1
+          pdata => list_data
+          do while(associated(pdata))
+
+            qarr(l,1:im,1:jm,1:km) = pdata%u(ivz,1:im,1:jm,1:km)
+
+            l = l + 1
+            pdata => pdata%next
+
+          end do ! pdata=>list_data
+
+! write the variables to the HDF5 file
+!
+          call write_array4_double_h5(gid, trim(pvars(ivz)), dm, qarr)
+
+        end if ! ivz > 0
+
+! store pressure
+!
+        if (ipr > 0) then
+
+! iterate over all data blocks and fill in the arrays
+!
+          l = 1
+          pdata => list_data
+          do while(associated(pdata))
+
+            qarr(l,1:im,1:jm,1:km) = pdata%u(ipr,1:im,1:jm,1:km)
+
+            l = l + 1
+            pdata => pdata%next
+
+          end do ! pdata=>list_data
+
+! write the variables to the HDF5 file
+!
+          call write_array4_double_h5(gid, trim(pvars(ipr)), dm, qarr)
+
+        end if ! ipr > 0
 
 ! deallocate allocatable arrays
 !
-        if (allocated(dens)) deallocate(dens)
-        if (allocated(momx)) deallocate(momx)
-        if (allocated(momy)) deallocate(momy)
-        if (allocated(momz)) deallocate(momz)
-        if (allocated(velx)) deallocate(velx)
-        if (allocated(vely)) deallocate(vely)
-        if (allocated(velz)) deallocate(velz)
-#ifdef ADI
-        if (allocated(ener)) deallocate(ener)
-        if (allocated(pres)) deallocate(pres)
-#endif /* ADI */
-#ifdef MHD
-        if (allocated(magx)) deallocate(magx)
-        if (allocated(magy)) deallocate(magy)
-        if (allocated(magz)) deallocate(magz)
-#ifdef GLM
-        if (allocated(bpsi)) deallocate(bpsi)
-#endif /* GLM */
-#endif /* MHD */
+        if (allocated(qarr)) deallocate(qarr)
 
       end if ! dblocks > 0
 
@@ -3115,9 +3126,7 @@ module io
 #ifdef DEBUG
     use refinement   , only : check_refinement_criterion
 #endif /* DEBUG */
-    use equations    , only : nv
-    use equations    , only : idn, ivx, ivy, ivz, ipr
-    use equations    , only : ibx, iby, ibz, ibp
+    use equations    , only : nv, pvars
 
 ! declare variables
 !
@@ -3135,23 +3144,11 @@ module io
 ! local variables
 !
     integer           :: err
-    integer(kind=4)   :: i, j, k, l
+    integer(kind=4)   :: i, j, k, l, n
 
 ! local allocatable arrays
 !
-    real(kind=4), dimension(:,:,:,:), allocatable :: dens, velx, vely, velz
-#ifdef ADI
-    real(kind=4), dimension(:,:,:,:), allocatable :: pres
-#endif /* ADI */
-#ifdef MHD
-    real(kind=4), dimension(:,:,:,:), allocatable :: magx, magy, magz
-#ifdef GLM
-    real(kind=4), dimension(:,:,:,:), allocatable :: bpsi
-#endif /* GLM */
-#endif /* MHD */
-#ifdef DEBUG
-    real(kind=4), dimension(:,:,:,:), allocatable :: cref
-#endif /* DEBUG */
+    real(kind=4), dimension(:,:,:,:), allocatable :: qarr
 
 ! local pointers
 !
@@ -3182,105 +3179,41 @@ module io
 
 ! allocate arrays to store the variables from current processor data blocks
 !
-      allocate(dens(dm(1),dm(2),dm(3),dm(4)))
-      allocate(velx(dm(1),dm(2),dm(3),dm(4)))
-      allocate(vely(dm(1),dm(2),dm(3),dm(4)))
-      allocate(velz(dm(1),dm(2),dm(3),dm(4)))
-#ifdef ADI
-      allocate(pres(dm(1),dm(2),dm(3),dm(4)))
-#endif /* ADI */
-#ifdef MHD
-      allocate(magx(dm(1),dm(2),dm(3),dm(4)))
-      allocate(magy(dm(1),dm(2),dm(3),dm(4)))
-      allocate(magz(dm(1),dm(2),dm(3),dm(4)))
-#ifdef GLM
-      allocate(bpsi(dm(1),dm(2),dm(3),dm(4)))
-#endif /* GLM */
-#endif /* MHD */
-#ifdef DEBUG
-      allocate(cref(dm(1),dm(2),dm(3),dm(4)))
-#endif /* DEBUG */
+      allocate(qarr(dm(1),dm(2),dm(3),dm(4)))
+
+! iterate over all primitive variables
+!
+      do n = 1, nv
 
 ! iterate over the data blocks on current processor
 !
-      l = 1
-      pdata => list_data
-      do while(associated(pdata))
+        l = 1
+        pdata => list_data
+        do while(associated(pdata))
 
 ! copy the primitive variables to the stored arrays
 !
-        dens(l,1:in,1:jn,1:kn) = real(pdata%q(idn,ib:ie,jb:je,kb:ke),kind=4)
-        velx(l,1:in,1:jn,1:kn) = real(pdata%q(ivx,ib:ie,jb:je,kb:ke),kind=4)
-        vely(l,1:in,1:jn,1:kn) = real(pdata%q(ivy,ib:ie,jb:je,kb:ke),kind=4)
-        velz(l,1:in,1:jn,1:kn) = real(pdata%q(ivz,ib:ie,jb:je,kb:ke),kind=4)
-#ifdef ADI
-        pres(l,1:in,1:jn,1:kn) = real(pdata%q(ipr,ib:ie,jb:je,kb:ke),kind=4)
-#endif /* ADI */
-#ifdef MHD
-        magx(l,1:in,1:jn,1:kn) = real(pdata%q(ibx,ib:ie,jb:je,kb:ke),kind=4)
-        magy(l,1:in,1:jn,1:kn) = real(pdata%q(iby,ib:ie,jb:je,kb:ke),kind=4)
-        magz(l,1:in,1:jn,1:kn) = real(pdata%q(ibz,ib:ie,jb:je,kb:ke),kind=4)
-#ifdef GLM
-        bpsi(l,1:in,1:jn,1:kn) = real(pdata%q(ibp,ib:ie,jb:je,kb:ke),kind=4)
-#endif /* GLM */
-#endif /* MHD */
-#ifdef DEBUG
-
-! update the refinement criterion values for this block
-!
-        i = check_refinement_criterion(pdata)
-
-        cref(l,1:in,1:jn,1:kn) = real(pdata%c(    ib:ie,jb:je,kb:ke),kind=4)
-#endif /* DEBUG */
+          qarr(l,1:in,1:jn,1:kn) = real(pdata%q(n,ib:ie,jb:je,kb:ke), kind=4)
 
 ! increase the block number
 !
-        l = l + 1
+          l = l + 1
 
 ! associate the data block pointer with the next block
 !
-        pdata => pdata%next
+          pdata => pdata%next
 
-      end do
+        end do ! pdata=>list_data
 
 ! store the primitive variables in the HDF5 file
 !
-      call write_array4_float_h5(gid, 'dens', dm(:), dens(:,:,:,:))
-      call write_array4_float_h5(gid, 'velx', dm(:), velx(:,:,:,:))
-      call write_array4_float_h5(gid, 'vely', dm(:), vely(:,:,:,:))
-      call write_array4_float_h5(gid, 'velz', dm(:), velz(:,:,:,:))
-#ifdef ADI
-      call write_array4_float_h5(gid, 'pres', dm(:), pres(:,:,:,:))
-#endif /* ADI */
-#ifdef MHD
-      call write_array4_float_h5(gid, 'magx', dm(:), magx(:,:,:,:))
-      call write_array4_float_h5(gid, 'magy', dm(:), magy(:,:,:,:))
-      call write_array4_float_h5(gid, 'magz', dm(:), magz(:,:,:,:))
-#ifdef GLM
-      call write_array4_float_h5(gid, 'bpsi', dm(:), bpsi(:,:,:,:))
-#endif /* GLM */
-#endif /* MHD */
-#ifdef DEBUG
-      call write_array4_float_h5(gid, 'cref', dm(:), cref(:,:,:,:))
-#endif /* DEBUG */
+        call write_array4_float_h5(gid, trim(pvars(n)), dm(:), qarr(:,:,:,:))
+
+      end do ! n = 1, nv
 
 ! deallocate the temporary arrays
 !
-      if (allocated(dens)) deallocate(dens)
-      if (allocated(velx)) deallocate(velx)
-      if (allocated(vely)) deallocate(vely)
-      if (allocated(velz)) deallocate(velz)
-#ifdef ADI
-      if (allocated(pres)) deallocate(pres)
-#endif /* ADI */
-#ifdef MHD
-      if (allocated(magx)) deallocate(magx)
-      if (allocated(magy)) deallocate(magy)
-      if (allocated(magz)) deallocate(magz)
-#endif /* MHD */
-#ifdef DEBUG
-      if (allocated(cref)) deallocate(cref)
-#endif /* DEBUG */
+      if (allocated(qarr)) deallocate(qarr)
 
     end if ! dblocks > 0
 
