@@ -219,6 +219,16 @@ module schemes
 !
         select case(trim(solver))
 
+        case ("hllc", "HLLC")
+
+! set the solver name
+!
+          name_sol =  "HLLC"
+
+! set the solver pointer
+!
+          riemann  => riemann_mhd_adi_hllc
+
 ! in the case of unknown Riemann solver, revert to HLL
 !
         case default
@@ -1701,6 +1711,328 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_adi_hll
+!
+!===============================================================================
+!
+! subroutine RIEMANN_HLLC:
+! -----------------------
+!
+!   Subroutine solves one dimensional Riemann problem using the HLLC
+!   method by Gurski or Li.  The HLLC and HLLC-C differ by definitions of
+!   the tangential components of the velocity and magnetic field.
+!
+!   Arguments:
+!
+!     n - the length of input vectors;
+!     h - the spatial step;
+!     q - the input array of primitive variables;
+!     b - the input vector of the normal magnetic field component;
+!     f - the output array of fluxes;
+!     s - the input array of shock indicators;
+!
+!   References:
+!
+!     [1] Gurski, K. F.,
+!         "An HLLC-Type Approximate Riemann Solver for Ideal
+!          Magnetohydrodynamics",
+!         SIAM Journal on Scientific Computing, 2004, Volume 25, Issue 6,
+!         pp. 2165–2187
+!     [2] Li, S.,
+!         "An HLLC Riemann solver for magneto-hydrodynamics",
+!         Journal of Computational Physics, 2005, Volume 203, Issue 1,
+!         pp. 344-357
+!
+!===============================================================================
+!
+  subroutine riemann_mhd_adi_hllc(n, h, q, f)
+
+! include external procedures
+!
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
+    use equations     , only : imx, imy, imz, ien
+    use equations     , only : cmax
+    use equations     , only : prim2cons, fluxspeed
+    use interpolations, only : reconstruct, fix_positivity
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8)                 , intent(in)  :: h
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                       :: p, i
+    real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
+    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: wl, wr, ui
+    real(kind=8), dimension(n)    :: cl, cr
+!
+!-------------------------------------------------------------------------------
+!
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
+    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    ql(ibx,:) = cl(:)
+    qr(ibx,:) = cl(:)
+    ql(ibp,:) = cr(:)
+    qr(ibp,:) = cr(:)
+
+! check if the reconstruction doesn't give the negative density or pressure,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+! calculate corresponding conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at the states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+
+! iterate over all points
+!
+    do i = 1, n
+
+! estimate the minimum and maximum speeds
+!
+      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
+      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+
+! calculate the HLLC flux
+!
+      if (sl >= 0.0d+00) then
+
+        f(:,i) = fl(:,i)
+
+      else if (sr <= 0.0d+00) then
+
+        f(:,i) = fr(:,i)
+
+      else ! sl < 0 < sr
+
+! speed difference
+!
+        srml = sr - sl
+
+! calculate vectors of the left and right-going waves
+!
+        wl(:)  = sl * ul(:,i) - fl(:,i)
+        wr(:)  = sr * ur(:,i) - fr(:,i)
+
+! the speed of contact discontinuity
+!
+        dn =  wr(idn) - wl(idn)
+        sm = (wr(imx) - wl(imx)) / dn
+
+! square of Bx, i.e. Bₓ²
+!
+        bx = ql(ibx,i)
+        b2 = ql(ibx,i) * qr(ibx,i)
+
+! separate the cases when Bₓ = 0 and Bₓ ≠ 0
+!
+        if (b2 > 0.0d+00) then
+
+! the total pressure, constant across the contact discontinuity
+!
+          pt = 0.5d+00 * ((wl(idn) * sm - wl(imx))                             &
+                        + (wr(idn) * sm - wr(imx))) + b2
+
+! constant intermediate state tangential components of velocity and
+! magnetic field
+!
+          vy = (wr(imy) - wl(imy)) / dn
+          vz = (wr(imz) - wl(imz)) / dn
+          by = (wr(iby) - wl(iby)) / srml
+          bz = (wr(ibz) - wl(ibz)) / srml
+
+! scalar product of velocity and magnetic field for the intermediate states
+!
+          vb = sm * bx + vy * by + vz * bz
+
+! separate intermediate states depending on the sign of the advection speed
+!
+          if (sm > 0.0d+00) then ! sm > 0
+
+! the left speed difference
+!
+            slmm    =  sl - sm
+
+! conservative variables for the left intermediate state
+!
+            ui(idn) =  wl(idn) / slmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * vy
+            ui(imz) =  ui(idn) * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  ql(ibp,i)
+            ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
+
+! the left intermediate flux
+!
+            f(:,i)  = sl * ui(:) - wl(:)
+
+          else if (sm < 0.0d+00) then ! sm < 0
+
+! the right speed difference
+!
+            srmm    =  sr - sm
+
+! conservative variables for the right intermediate state
+!
+            ui(idn) =  wr(idn) / srmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * vy
+            ui(imz) =  ui(idn) * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  qr(ibp,i)
+            ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
+
+! the right intermediate flux
+!
+            f(:,i)  = sr * ui(:) - wr(:)
+
+          else ! sm = 0
+
+! conservative variables for the left intermediate state
+!
+            ui(idn) =  wl(idn) / sl
+            ui(imx) =  0.0d+00
+            ui(imy) =  ui(idn) * vy
+            ui(imz) =  ui(idn) * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  ql(ibp,i)
+            ui(ien) = (wl(ien) - bx * vb) / sl
+
+! the left intermediate flux
+!
+            f(:,i)  = sl * ui(:) - wl(:)
+
+! conservative variables for the right intermediate state
+!
+            ui(idn) =  wr(idn) / sr
+            ui(imx) =  0.0d+00
+            ui(imy) =  ui(idn) * vy
+            ui(imz) =  ui(idn) * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  qr(ibp,i)
+            ui(ien) = (wr(ien) - bx * vb) / sr
+
+! the right intermediate flux
+!
+            f(:,i)  = 0.5d+00 * (f(:,i) + (sr * ui(:) - wr(:)))
+
+          end if ! sm = 0
+
+        else ! Bₓ = 0
+
+! the total pressure, constant across the contact discontinuity
+!
+          pt = 0.5d+00 * ((wl(idn) * sm - wl(imx))                             &
+                        + (wr(idn) * sm - wr(imx)))
+
+! separate intermediate states depending on the sign of the advection speed
+!
+          if (sm > 0.0d+00) then ! sm > 0
+
+! the left speed difference
+!
+            slmm    =  sl - sm
+
+! conservative variables for the left intermediate state
+!
+            ui(idn) =  wl(idn) / slmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * ql(ivy,i)
+            ui(imz) =  ui(idn) * ql(ivz,i)
+            ui(ibx) =  0.0d+00
+            ui(iby) =  wl(iby) / slmm
+            ui(ibz) =  wl(ibz) / slmm
+            ui(ibp) =  ql(ibp,i)
+            ui(ien) = (wl(ien) + sm * pt) / slmm
+
+! the left intermediate flux
+!
+            f(:,i)  = sl * ui(:) - wl(:)
+
+          else if (sm < 0.0d+00) then ! sm < 0
+
+! the right speed difference
+!
+            srmm    =  sr - sm
+
+! conservative variables for the right intermediate state
+!
+            ui(idn) =  wr(idn) / srmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * qr(ivy,i)
+            ui(imz) =  ui(idn) * qr(ivz,i)
+            ui(ibx) =  0.0d+00
+            ui(iby) =  wr(iby) / srmm
+            ui(ibz) =  wr(ibz) / srmm
+            ui(ibp) =  qr(ibp,i)
+            ui(ien) = (wr(ien) + sm * pt) / srmm
+
+! the right intermediate flux
+!
+            f(:,i)  = sr * ui(:) - wr(:)
+
+          else ! sm = 0
+
+! intermediate flux is constant across the contact discontinuity and all except
+! the parallel momentum flux are zero
+!
+            f(idn,i) =   0.0d+00
+            f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
+            f(imy,i) =   0.0d+00
+            f(imz,i) =   0.0d+00
+            f(ibx,i) = fl(ibx,i)
+            f(iby,i) =   0.0d+00
+            f(ibz,i) =   0.0d+00
+            f(ibp,i) = fl(ibp,i)
+            f(ien,i) =   0.0d+00
+
+          end if ! sm = 0
+
+        end if ! Bₓ = 0
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_mhd_adi_hllc
 
 !===============================================================================
 !
