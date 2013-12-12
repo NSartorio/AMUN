@@ -39,7 +39,8 @@ program amun
   use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
-  use evolution     , only : advance, n, t, dt, dtn, cfl
+  use evolution     , only : advance, new_time_step
+  use evolution     , only : n, t, dt
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
@@ -80,7 +81,6 @@ program amun
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
-  real                  :: dtini = 1.0d-8
   real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
 
 ! temporary variables
@@ -251,10 +251,6 @@ program amun
   call get_parameter_real   ("trun" , trun)
   call get_parameter_real   ("tsav" , tsav)
 
-! get the initial time step
-!
-  call get_parameter_real   ("dtini", dtini)
-
 ! get integral calculation interval
 !
   call get_parameter_integer("ndat" , ndat)
@@ -349,13 +345,6 @@ program amun
 !
   call initialize_io()
 
-! reset number of iterations and time, etc.
-!
-  n    = 0
-  t    = 0.0
-  dt   = cfl * dtini
-  dtn  = dtini
-
 ! check if we initiate new problem or restart previous job
 !
   if (nres < 0) then
@@ -376,6 +365,10 @@ program amun
 ! store mesh statistics
 !
     call store_mesh_stats(n, t)
+
+! calculate new timestep
+!
+    call new_time_step()
 
   else
 
@@ -480,19 +473,15 @@ program amun
 !
   do while((nsteps < nmax) .and. (t <= tmax) .and. (iterm == 0))
 
-! compute new time step
-!
-    dt = min(cfl * dtn, 2.0d0 * dt)
-
-! advance the iteration number and time
-!
-    t  = t + dt
-    n  = n + 1
-    nsteps = nsteps + 1
-
 ! performe one step evolution
 !
     call advance()
+
+! advance the iteration number and time
+!
+    t      = t + dt
+    n      = n + 1
+    nsteps = nsteps + 1
 
 ! store mesh statistics
 !

@@ -41,14 +41,14 @@ module evolution
 
 ! evolution parameters
 !
-  real   , save :: cfl     = 0.5d+0
+  real   , save :: cfl     = 0.5d+00
 
 ! time variables
 !
   integer, save :: n       = 0
-  real   , save :: t       = 0.0d+0
-  real   , save :: dt      = 1.0d+0
-  real   , save :: dtn     = 1.0d+0
+  real   , save :: t       = 0.0d+00
+  real   , save :: dt      = 1.0d+00
+  real   , save :: dtn     = 1.0d+00
 
 ! by default everything is private
 !
@@ -57,7 +57,7 @@ module evolution
 ! declare public subroutines
 !
   public :: initialize_evolution, finalize_evolution
-  public :: advance
+  public :: advance, new_time_step
 
 ! declare public variables
 !
@@ -683,6 +683,10 @@ module evolution
 ! calcilate the new time step
 !
     dtn = dx_min / max(cmax, eps)
+
+! calculate the new time step
+!
+    dt  = cfl * dtn
 
 !-------------------------------------------------------------------------------
 !
