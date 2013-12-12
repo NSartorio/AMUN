@@ -35,11 +35,18 @@ module interpolations
 !
   implicit none
 
+! pointers to the reconstruction and limiter procedures
+!
+  procedure(reconstruct), pointer, save :: reconstruct_states => null()
+  procedure(limit_mm)   , pointer, save :: limit_derivatives  => null()
+
 ! module parameters
 !
-  real, save :: kappa = 1.0d0
-  real, save :: rad   = 1.0d0
-  real, save :: eps   = epsilon(rad)
+  real(kind=8), save :: eps        = epsilon(1.0d+00)
+
+! flags for reconstruction corrections
+!
+  logical     , save :: positivity = .false.
 
 ! by default everything is private
 !
@@ -47,8 +54,10 @@ module interpolations
 
 ! declare public subroutines
 !
-  public :: initialize_interpolations, reconstruct, minmod, minmod3
+  public :: initialize_interpolations, finalize_interpolations
+  public :: reconstruct
   public :: fix_positivity
+  public :: minmod, minmod3
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -65,44 +74,136 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine initialize_interpolations()
+  subroutine initialize_interpolations(verbose, iret)
 
 ! include external procedures
 !
-    use parameters, only : get_parameter_real
+    use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
     implicit none
 
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
 ! local variables
 !
-    real :: cfl = 0.5d0
+    character(len=255) :: reconstruction = "tvd"
+    character(len=255) :: limiter        = "mm"
+    character(len=255) :: positivity_fix = "off"
+    character(len=255) :: name_rec       = ""
+    character(len=255) :: name_lim       = ""
 !
 !-------------------------------------------------------------------------------
 !
-! obtain the interpolation coefficients
+! obtain the user defined interpolation methods and coefficients
 !
-    call get_parameter_real("rad", rad)
-    call get_parameter_real("eps", eps)
-    call get_parameter_real("cfl", cfl)
+    call get_parameter_string("reconstruction", reconstruction)
+    call get_parameter_string("limiter"       , limiter       )
+    call get_parameter_string("fix_positivity", positivity_fix)
+    call get_parameter_real  ("eps"           , eps           )
 
-! calculate κ = (1 - ν) / ν
+! select the reconstruction method
 !
-    kappa = (1.0d0 - cfl) / cfl
+    select case(trim(reconstruction))
+    case ("tvd", "TVD")
+      name_rec           =  "2nd order TVD"
+      reconstruct_states => reconstruct_tvd
+    case default
+      if (verbose) then
+        write (*,"(1x,a)") "The selected reconstruction method is not " //     &
+                           "implemented: " // trim(reconstruction)
+        stop
+      end if
+    end select
+
+! select the limiter
+!
+    select case(trim(limiter))
+    case ("mm")
+      name_lim           =  "MinMod"
+      limit_derivatives  => limit_mm
+    case ("mc")
+      name_lim           =  "McCormic"
+      limit_derivatives  => limit_mc
+    case ("lf")
+      name_lim           =  "Lax-Friedrichs"
+      limit_derivatives  => limit_lf
+    case default
+      if (verbose) then
+        write (*,"(1x,a)") "The selected limiter is not implemented: " //      &
+                           trim(limiter)
+        stop
+      end if
+    end select
+
+! check additional reconstruction limiting
+!
+    select case(trim(positivity_fix))
+    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+      positivity = .true.
+    case default
+      positivity = .false.
+    end select
+
+! print informations about the reconstruction methods and parameters
+!
+    if (verbose) then
+
+      write (*,"(4x,a,1x,a)"    ) "reconstruction         =", trim(name_rec)
+      write (*,"(4x,a,1x,a)"    ) "limiter                =", trim(name_lim)
+      write (*,"(4x,a,1x,a)"    ) "fix positivity         =", trim(positivity_fix)
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_interpolations
-#ifdef TVD
+!
+!===============================================================================
+!
+! subroutine FINALIZE_INTERPOLATIONS:
+! ----------------------------------
+!
+!   Subroutine finalizes the interpolation module by releasing all memory used
+!   by its module variables.
+!
+!
+!===============================================================================
+!
+  subroutine finalize_interpolations(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! release the procedure pointers
+!
+    nullify(reconstruct_states)
+    nullify(limit_derivatives)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_interpolations
 !
 !===============================================================================
 !
 ! subroutine RECONSTRUCT:
 ! ----------------------
 !
-!   Subroutine reconstructs the interface states using the second order TVD
-!   method with a limiter selected through a compilation flag LIMITER.
+!   Subroutine calls a reconstruction procedure, depending on the compilation
+!   flag SPACE, in order to interpolate the left and right states from their
+!   cell integrals.  These states are required by any approximate Riemann
+!   solver.
 !
 !   Arguments:
 !
@@ -120,320 +221,262 @@ module interpolations
 !
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
-    integer           , intent(in)  :: n
-    real              , intent(in)  :: h
-    real, dimension(n), intent(in)  :: f
-    real, dimension(n), intent(out) :: fl, fr
-
-! local variables
-!
-    integer            :: i, im1, ip1
-    real               :: df, ds, dm, dp
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
 !
 !-------------------------------------------------------------------------------
 !
-! interpolate the values at i-1/2 and i+1/2
+! reconstruct the states using the selected subroutine
 !
-    do i = 1, n
+    call reconstruct_states(n, h, f(:), fl(:), fr(:))
 
-! prepare indices
+!-------------------------------------------------------------------------------
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-
-! calculate derivatives
+  end subroutine reconstruct
 !
-      dm = f(i  ) - f(im1)
-      dp = f(ip1) - f(i  )
-
-! obtain the limited derivative
+!===============================================================================
 !
-#ifdef MINMOD
-      df = 0.5d0 * minmod(dm, dp)
-
-! interpolate the states
+! subroutine RECONSTRUCT_TVD:
+! --------------------------
 !
-      fl(i  ) = f(i) + df
-      fr(im1) = f(i) - df
-#endif /* MINMOD */
-#ifdef MC
-      df = 0.5d0 * minmod3(dm, dp)
-
-! interpolate the states
+!   Subroutine reconstructs the interface states using the second order TVD
+!   method with a selected limiter.
 !
-      fl(i  ) = f(i) + df
-      fr(im1) = f(i) - df
-#endif /* MC */
-#ifdef LF
-! obtain the sign change detector
+!   Arguments are described in subroutine reconstruct().
 !
-      ds = dm * dp
-
-! depending on the sign change choose the proper slope
 !
-      if (ds > 0.0d0) then
-
-! calculate derivative
+!===============================================================================
 !
-        df  = ds / (dm + dp)
+  subroutine reconstruct_tvd(n, h, f, fl, fr)
 
-! interpolate the states
+! local variables are not implicit by default
 !
-        fl(i  ) = f(i) + df
-        fr(im1) = f(i) - df
+    implicit none
 
-      else
-
-! copy the states
+! subroutine arguments
 !
-        fl(i  ) = f(i)
-        fr(im1) = f(i)
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
 
-      end if
-#endif /* LF */
+! local variables
+!
+    integer                    :: i, im1
+    real(kind=8), dimension(n) :: df
+!
+!-------------------------------------------------------------------------------
+!
+! calculate limited derivative
+!
+    call limit_derivatives(n, f(:), df(:))
 
-    end do
+! calculate the left- and right-side interface interpolations
+!
+    do i = 2, n
 
-! prepare the last point
+! update the left and right-side interpolation states
+!
+      fl(i  ) = f(i) + df(i)
+      fr(i-1) = f(i) - df(i)
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
 !
     fl(1) = f(1)
     fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine reconstruct
-#endif /* TVD */
-#ifdef WENO3
+  end subroutine reconstruct_tvd
 !
 !===============================================================================
 !
-! reconstruct: subroutine for the reconstruction of the values at the right and
-!              left interfaces of cells from their cell centered representation;
-!              the subroutine implements the improved 3rd order WENO scheme as
-!              described in Yamaleev & Carpenter, 2009, Journal of Computational
-!              Physics, 228, 3025
+! subroutine LIMIT_MM:
+! -------------------
+!
+!   Subroutine calculates the local derivative applying the minmod TVD limiter.
 !
 !===============================================================================
 !
-  subroutine reconstruct(n, h, f, fl, fr)
+  subroutine limit_mm(n, f, df)
 
-! local variables are not implicit by default
-!
     implicit none
 
 ! input/output arguments
 !
-    integer           , intent(in)  :: n
-    real              , intent(in)  :: h
-    real, dimension(n), intent(in)  :: f
-    real, dimension(n), intent(out) :: fl, fr
+    integer                   , intent(in)  :: n
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: df
 
 ! local variables
 !
-    integer         :: i, im1, ip1
-    real            :: h2, dfp, dfm, fp, fm, bp, bm, ap, am, wp, wm, ww
+    integer                    :: i, ip1
+    real(kind=8)               :: ds
+    real(kind=8), dimension(n) :: dfl, dfr
+!
+!------------------------------------------------------------------------------
+!
+! calculate the left- and right-side derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
 
-! weight coefficients
-!
-    real, parameter :: dp = 2.0d0 / 3.0d0, dm = 1.0d0 / 3.0d0
-!
-!-------------------------------------------------------------------------------
-!
-! prepare fixed parameters
-!
-    h2    = h * h
+      dfr(i  ) = f(ip1) - f(i)
+      dfl(ip1) = dfr(i)
+    end do
+    dfl(1) = 0.0d+00
+    dfr(n) = 0.0d+00
 
-! prepare initial left derivative
-!
-    dfp   = f(2) - f(1)
-    fp    = f(1)
-    fr(n) = f(n)
-
-!! third order WENO interpolation
-!!
-! interpolate the values at i-1/2 and i+1/2
+! second order interpolation
 !
     do i = 1, n
 
-! prepare indices
-!
-      im1     = max(1, i - 1)
-      ip1     = min(n, i + 1)
+      df(i) = (sign(2.5d-01, dfl(i)) + sign(2.5d-01, dfr(i)))                  &
+                                               * min(abs(dfl(i)), abs(dfr(i)))
 
-! calculate left and right derivatives
-!
-      dfm     = dfp
-      dfp     = f(ip1) - f(i  )
-      ww      = (dfp - dfm)**2
-
-! calculate corresponding betas
-!
-      bp      = dfp * dfp
-      bm      = dfm * dfm
-
-! calculate improved alphas
-!
-      ap      = 1.0d0 + ww / (bp + h2)
-      am      = 1.0d0 + ww / (bm + h2)
-
-! calculate weights
-!
-      wp      = dp * am
-      wm      = dm * ap
-      ww      = 2.0d0 * (wp + wm)
-
-! calculate right and left sides interpolations
-!
-      fm      = - f(ip1) + 3.0d0 * f(i  )
-
-! calculate the left state
-!
-      fr(im1) = (wp * fp + wm * fm) / ww
-
-! calculate weights
-!
-      wp      = dp * ap
-      wm      = dm * am
-      ww      = 2.0d0 * (wp + wm)
-
-! calculate right and left sides interpolations
-!
-      fp      =   f(i  ) +         f(ip1)
-      fm      = - f(im1) + 3.0d0 * f(i  )
-
-! calculate the left state
-!
-      fl(i  ) = (wp * fp + wm * fm) / ww
-
-    end do
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine reconstruct
-!
-#endif /* WENO3 */
-#ifdef LIMO3
-!===============================================================================
-!
-! reconstruct: subroutine for the reconstruction of the values at the right and
-!              left interfaces of cells from their cell centered representation
+  end subroutine limit_mm
 !
 !===============================================================================
 !
-  subroutine reconstruct(n, h, f, fl, fr)
+! subroutine LIMIT_MC:
+! -------------------
+!
+!   Subroutine calculates the local derivative applying the McCormic TVD
+! limiter.
+!
+!===============================================================================
+!
+  subroutine limit_mc(n, f, df)
 
-! local variables are not implicit by default
-!
     implicit none
 
 ! input/output arguments
 !
-    integer           , intent(in)  :: n
-    real              , intent(in)  :: h
-    real, dimension(n), intent(in)  :: f
-    real, dimension(n), intent(out) :: fl, fr
+    integer                   , intent(in)  :: n
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: df
 
 ! local variables
 !
-    integer            :: i
-    real               :: df, ds
-    integer            :: im1, ip1
-    real               :: rdx, rdx2, dfr, dfl, th, et, f0, f1, f2, ft, xi
+    integer                    :: i, ip1
+    real(kind=8)               :: ds
+    real(kind=8), dimension(n) :: dfl, dfr
 !
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 !
-!! third order interpolation
-!!
-! prepare parameters
+! calculate the left- and right-side derivatives
 !
-    rdx  = rad * h
-    rdx2 = rdx * rdx
+    do i = 1, n - 1
+      ip1      = i + 1
 
+      dfr(i  ) = f(ip1) - f(i)
+      dfl(ip1) = dfr(i)
+    end do
+    dfl(1) = 0.0d+00
+    dfr(n) = 0.0d+00
+
+! second order interpolation
+!
     do i = 1, n
 
-! prepare indices
-!
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      df(i) = (sign(5.0d-01, dfr(i)) + sign(5.0d-01, dfl(i)))                  &
+                                      * min(abs(dfr(i)), abs(dfl(i))           &
+                                             , 2.5d-01 * abs(dfr(i) + dfl(i)))
 
-! prepare differences
-!
-      dfr = f(ip1) - f(i  )
-      dfl = f(i  ) - f(im1)
-
-      et = (dfl * dfl + dfr * dfr) / rdx2
-      xi = max(0.0d0, min(1.0d0, 0.5d0 + 0.5d0 * (et - 1.0d0) / eps))
-
-! calculate values at i+1/2
-!
-      if (dfr .ne. 0.0d0) then
-        th = dfl / dfr
-      else
-        th = dfl / eps
-      end if
-
-      f1 = (2.0d0 + th) / 3.0d0
-
-      if (th .ge. 0.0d0) then
-        f2 = max(0.0d0, min(f1, 2.0d0 * th, 1.6d0))
-      else
-        f2 = max(0.0d0, min(f1, - 0.5d0 * th))
-      end if
-
-      f0 = f1 + xi * (f2 - f1)
-
-      fl(i) = f(i) + 0.5d0 * dfr * f0
-
-! calculate values at i-1/2
-!
-      if (dfl .ne. 0.0d0) then
-        th = dfr / dfl
-      else
-        th = dfr / eps
-      end if
-
-      f1 = (2.0d0 + th) / 3.0d0
-
-      if (th .ge. 0.0d0) then
-        f2 = max(0.0d0, min(f1, 2.0d0 * th, 1.6d0))
-      else
-        f2 = max(0.0d0, min(f1, - 0.5d0 * th))
-      end if
-
-      f0 = f1 + xi * (f2 - f1)
-
-      fr(im1) = f(i) - 0.5d0 * dfl * f0
-
-    end do
-
-! update boundaries
-!
-    fl(1) = f(1)
-    fr(n) = f(n)
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine reconstruct
-!
-#endif /* LIMO3 */
+  end subroutine limit_mc
 !
 !===============================================================================
 !
-! subroutine MINMOD:
-! -----------------
+! subroutine LIMIT_LF:
+! -------------------
+!
+!   Subroutine calculates the local derivative applying the Lax-Friendrich TVD
+!   limiter.
+!
+!===============================================================================
+!
+  subroutine limit_lf(n, f, df)
+
+    implicit none
+
+! input/output arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: df
+
+! local variables
+!
+    integer                    :: i, ip1
+    real(kind=8)               :: ds
+    real(kind=8), dimension(n) :: dfl, dfr
+!
+!------------------------------------------------------------------------------
+!
+! calculate the left- and right-side derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+
+      dfr(i  ) = f(ip1) - f(i)
+      dfl(ip1) = dfr(i)
+    end do
+    dfl(1) = 0.0d+00
+    dfr(n) = 0.0d+00
+
+! second order interpolation
+!
+    do i = 1, n
+
+! calculate the monotonicity indicator
+!
+      ds = dfr(i) * dfl(i)
+
+! if the region is monotonic calculate limited derivative, otherwise set zero
+!
+      if (ds > 0.0d+00) then
+
+! use selected limiter
+!
+        df(i) = ds / (dfr(i) + dfl(i))
+      else
+        df(i) = 0.0d+00
+      end if
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine limit_lf
+!
+!===============================================================================
+!
+! function MINMOD:
+! ---------------
 !
 !   Function returns the minimum module value among two arguments.
 !
 !   Arguments:
 !
-!     a, b - two real values;
-!
+!     a, b - the input values;
 !
 !===============================================================================
 !
-  real function minmod(a, b)
+  real(kind=8) function minmod(a, b)
 
 ! local variables are not implicit by default
 !
@@ -441,16 +484,12 @@ module interpolations
 
 ! input arguments
 !
-    real, intent(in) :: a, b
+    real(kind=8), intent(in) :: a, b
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the minimal module value
-!
-    minmod = (sign(0.5d0, a) + sign(0.5d0, b)) * min(abs(a), abs(b))
+    minmod = (sign(0.5d+00, a) + sign(0.5d+00, b)) * min(abs(a), abs(b))
 
-! return the value
-!
     return
 
 !-------------------------------------------------------------------------------
@@ -472,7 +511,7 @@ module interpolations
 !
 !===============================================================================
 !
-  real function minmod3(a, b)
+  real(kind=8) function minmod3(a, b)
 
 ! local variables are not implicit by default
 !
@@ -480,14 +519,14 @@ module interpolations
 
 ! input arguments
 !
-    real, intent(in) :: a, b
+    real(kind=8), intent(in) :: a, b
 !
 !-------------------------------------------------------------------------------
 !
 ! calculate the minimal module value
 !
-    minmod3 = (sign(1.0d+0, a) + sign(1.0d+0, b))                              &
-                                   * min(abs(a), abs(b), 0.25d+0 * abs(a + b))
+    minmod3 = (sign(1.0d+00, a) + sign(1.0d+00, b))                            &
+                                   * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
 
 ! return the value
 !
@@ -506,14 +545,6 @@ module interpolations
 !   fr(:) for negative values.  If it finds a negative value, it repeates the
 !   state reconstruction from f(:) using the zeroth order interpolation.
 !
-!   Arguments:
-!
-!     n  - the length of vectors f, fl, and fr;
-!     f  - the cell centered vector representation;
-!     fl - the left state reconstruction;
-!     fr - the right state reconstruction;
-!
-!
 !===============================================================================
 !
   subroutine fix_positivity(n, f, fl, fr)
@@ -524,114 +555,62 @@ module interpolations
 
 ! input/output arguments
 !
-    integer           , intent(in)    :: n
-    real, dimension(n), intent(in)    :: f
-    real, dimension(n), intent(inout) :: fl, fr
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(in)    :: f
+    real(kind=8), dimension(n), intent(inout) :: fl, fr
 
 ! local variables
 !
-    integer :: i, im1, ip1
-    real    :: fmn, fmx
+    integer      :: i, im1, ip1
+    real(kind=8) :: fmn, fmx
 !
 !------------------------------------------------------------------------------
 !
+! check positivity only if desired
+!
+    if (positivity) then
+
 ! look for negative values in the states along the vector
 !
-    do i = 1, n
+      do i = 1, n
 
-! check if there is a negative value in the left or right states
+! check if the left state has a negative value
 !
-      if (min(fl(i), fr(i)) .le. 0.0d0) then
+        if (fl(i) <= 0.0d+00) then
 
-! calculate the left and right indices
+! calculate the left neighbour index
 !
-        im1 = max(1, i - 1)
-        ip1 = min(n, i + 1)
-
-! prepare the allowed interval
-!
-        fmn = min(f(i), f(ip1))
-        fmx = max(f(i), f(ip1))
+          im1 = max(1, i - 1)
 
 ! limit the states using the zeroth-order reconstruction
 !
-        if ((fl(i) .lt. fmn) .or. (fl(i) .gt. fmx)) then
           fl(i  ) = f(i)
           fr(im1) = f(i)
-        end if
 
-        if ((fr(i) .lt. fmn) .or. (fr(i) .gt. fmx)) then
+        end if ! fl ≤ 0
+
+! check if the right state has a negative value
+!
+        if (fr(i) <= 0.0d+00) then
+
+! calculate the right neighbour index
+!
+          ip1 = min(n, i + 1)
+
+! limit the states using the zeroth-order reconstruction
+!
           fl(ip1) = f(ip1)
           fr(i  ) = f(ip1)
-        end if
-      end if
-    end do
+
+        end if ! fr ≤ 0
+
+      end do ! i = 1, n
+
+    end if ! positivity == .true.
 
 !-------------------------------------------------------------------------------
 !
   end subroutine fix_positivity
-!
-!===============================================================================
-!
-! divergence: function calculates divergence of the input staggered field
-!             [Bx(i+1/2,j,k), By(i,j+1/2,k), Bz(i,j,k+1/2)] -> div B
-!
-!===============================================================================
-!
-  subroutine divergence(b, db, dx, dy, dz)
-
-    use coordinates, only : im, jm, km
-
-    implicit none
-
-! input and output variables
-!
-    real, dimension(3,im,jm,km), intent(in)  :: b
-    real, dimension(  im,jm,km), intent(out) :: db
-    real, optional             , intent(in)  :: dx, dy, dz
-
-! local  variables
-!
-    integer :: i, j, k
-    real    :: dxi, dyi, dzi
-!
-!------------------------------------------------------------------------------
-!
-! check optional arguments
-!
-    dxi = 1.0
-    dyi = 1.0
-    dzi = 1.0
-
-    if (present(dx)) dxi = 1.0 / dx
-    if (present(dy)) dyi = 1.0 / dy
-    if (present(dz)) dzi = 1.0 / dz
-
-! reset output array
-!
-    db(:,:,:) = 0.0
-
-! iterate over all points
-!
-#if NDIMS == 3
-    do k = 2, km
-      do j = 2, jm
-        do i = 2, im
-          db(i,j,k) = dxi * (b(1,i,j,k) - b(1,i-1,j,k))                        &
-                    + dyi * (b(2,i,j,k) - b(2,i,j-1,k))                        &
-                    + dzi * (b(3,i,j,k) - b(3,i,j,k-1))
-#else /* NDIMS == 3 */
-    do k = 1, km
-      do j = 2, jm
-        do i = 2, im
-          db(i,j,k) = dxi * (b(1,i,j,k) - b(1,i-1,j,k))                        &
-                    + dyi * (b(2,i,j,k) - b(2,i,j-1,k))
-#endif /* NDIMS == 3 */
-        end do
-      end do
-    end do
-!
-  end subroutine divergence
 
 !===============================================================================
 !

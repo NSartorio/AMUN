@@ -41,7 +41,7 @@ program amun
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, n, t, dt, dtn, cfl
   use integrals     , only : init_integrals, clear_integrals, store_integrals
-  use interpolations, only : initialize_interpolations
+  use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
                            , restart_job
   use mesh          , only : initialize_mesh, clear_mesh
@@ -325,13 +325,13 @@ program amun
 !
   if (iret > 0) go to 30
 
+! initialize module INTERPOLATIONS
+!
+  call initialize_interpolations(master, iret)
+
 ! initialize block module
 !
   call initialize_blocks()
-
-! initialize module INTERPOLATIONS
-!
-  call initialize_interpolations()
 
 ! initialize boundaries
 !
@@ -701,6 +701,10 @@ program amun
     write (*,'(a)') ''
 
   end if
+
+! finalize module INTERPOLATIONS
+!
+  call finalize_interpolations(iret)
 
 ! finalize module SCHEMES
 !

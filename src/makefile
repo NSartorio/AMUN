@@ -63,18 +63,6 @@ ifeq ($(REFINE),Y)
 FFLAGS  += -DREFINE
 endif
 
-# check if reconstruction is TVD
-#
-ifeq ($(SPACE),MINMOD)
-FFLAGS  += -DTVD
-endif
-ifeq ($(SPACE),MC)
-FFLAGS  += -DTVD
-endif
-ifeq ($(SPACE),LF)
-FFLAGS  += -DTVD
-endif
-
 # output data format
 #
 FFLAGS  += -D${OUTPUT}
@@ -84,10 +72,6 @@ FFLAGS  += -D${OUTPUT}
 ifneq ($(COMPRESS),NONE)
 FFLAGS  += -DCOMPRESS -D${COMPRESS}
 endif
-
-# spacial reconstruction method
-#
-FFLAGS  += -D${SPACE}
 
 #-------------------------------------------------------------------------------
 

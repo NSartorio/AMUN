@@ -43,11 +43,5 @@ NDIMS        = 2
 REFINE       = Y
 SHAPE        = N
 
-# methods
-#
-#  SPACE          - spacial reconstruction: MINMOD, MC, LF, LIMO3, WENO3
-#
-SPACE          = MINMOD
-
 #
 #-------------------------------------------------------------------------------
