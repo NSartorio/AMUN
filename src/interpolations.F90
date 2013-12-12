@@ -111,6 +111,9 @@ module interpolations
     case ("tvd", "TVD")
       name_rec           =  "2nd order TVD"
       reconstruct_states => reconstruct_tvd
+    case ("weno3", "WENO3")
+      name_rec           =  "3rd order WENO"
+      reconstruct_states => reconstruct_weno3
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
@@ -306,6 +309,126 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_tvd
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_WENO3:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the third order
+!   Weighted Essentially Non-Oscillatory (WENO) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Yamaleev & Carpenter, 2009, J. Comput. Phys., 228, 3025
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno3(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1
+    real(kind=8) :: bp, bm, ap, am, wp, wm, ww
+    real(kind=8) :: dfl, dfr, df, fp, fm, fc, h2
+
+! selection weights
+!
+    real, parameter :: dp = 2.0d+00 / 3.0d+00, dm = 1.0d+00 / 3.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+! prepare common parameters
+!
+    h2 = h * h
+
+! iterate along the vector
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1     = max(1, i - 1)
+      ip1     = min(n, i + 1)
+
+! calculate the left and right derivatives
+!
+      dfl     = f(i  ) - f(im1)
+      dfr     = f(ip1) - f(i  )
+
+! calculate coefficient omega
+!
+      ww      = (dfr - dfl)**2
+
+! calculate corresponding betas
+!
+      bp      = dfr * dfr
+      bm      = dfl * dfl
+
+! calculate improved alphas
+!
+      ap      = 1.0d+00 + ww / (bp + h2)
+      am      = 1.0d+00 + ww / (bm + h2)
+
+! calculate weights
+!
+      wp      = dp * ap
+      wm      = dm * am
+      ww      = 2.0d+00 * (wp + wm)
+
+! calculate central interpolation
+!
+      fp      =   f(i  ) +         f(ip1)
+
+! calculate left side interpolation
+!
+      fm      = - f(im1) + 3.0d+00 * f(i  )
+
+! calculate the left state
+!
+      fl( i ) = (wp * fp + wm * fm) / ww
+
+! calculate weights
+!
+      wp      = dp * am
+      wm      = dm * ap
+      ww      = 2.0d+00 * (wp + wm)
+
+! calculate central interpolation
+!
+      fp      =   f(i  ) +         f(im1)
+
+! calculate right side interpolation
+!
+      fm      = - f(ip1) + 3.0d+00 * f(i  )
+
+! calculate the right state
+!
+      fr(im1) = (wp * fp + wm * fm) / ww
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = f (1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno3
 !
 !===============================================================================
 !
