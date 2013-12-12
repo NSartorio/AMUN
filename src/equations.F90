@@ -738,10 +738,6 @@ module equations
 !
       c(i) = csnd
 
-! calculate the maximum speed
-!
-      cmax = max(cmax, abs(q(ivx,i)) + c(i))
-
     end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
@@ -977,10 +973,6 @@ module equations
 ! calculate the speed of sound
 !
       c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
-
-! calculate the maximum speed
-!
-      cmax = max(cmax, abs(q(ivx,i)) + c(i))
 
     end do ! i = 1, n
 
@@ -1242,10 +1234,6 @@ module equations
       else
         c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
       end if
-
-! calculate the maximum speed
-!
-      cmax = max(cmax, abs(q(ivx,i)) + c(i))
 
     end do ! i = 1, n
 
@@ -1520,10 +1508,6 @@ module equations
       else
         c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
       end if
-
-! calculate the maximum speed
-!
-      cmax = max(cmax, abs(q(ivx,i)) + c(i))
 
     end do ! i = 1, n
 

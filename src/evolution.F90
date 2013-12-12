@@ -43,6 +43,11 @@ module evolution
 !
   real   , save :: cfl     = 0.5d+00
 
+! coefficient controlling the decay of scalar potential ѱ
+!
+  real   , save :: alpha   = 2.0d+00
+  real   , save :: decay   = 1.0d+00
+
 ! time variables
 !
   integer, save :: n       = 0
@@ -113,6 +118,7 @@ module evolution
 !
     call get_parameter_string("time_advance", integration)
     call get_parameter_real  ("cfl"         , cfl        )
+    call get_parameter_real  ("alpha"       , alpha      )
 
 ! select the integration method, check the correctness of the integration
 ! parameters and adjust the CFL coefficient if necessary
@@ -140,9 +146,9 @@ module evolution
 
     end select
 
-! ! calculate the initial time step
-! !
-!     call new_time_step()
+! calculate the decay factor for magnetic field divergence scalar source term
+!
+    decay = exp(- alpha * cfl)
 
 ! print information about the Riemann solver
 !
@@ -314,7 +320,11 @@ module evolution
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u1
+      pblock%u => pblock%u0
+
+! update ψ by its source term
+!
+      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
 
 ! assign pointer to the next block
 !
@@ -357,7 +367,7 @@ module evolution
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
     use coordinates   , only : im, jm, km
-    use equations     , only : nv
+    use equations     , only : nv, ibp
 
 ! local variables are not implicit by default
 !
@@ -442,6 +452,10 @@ module evolution
 ! update the conservative variable pointer
 !
       pblock%u => pblock%u0
+
+! update ψ by its source term
+!
+      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
 
 ! assign pointer to the next block
 !

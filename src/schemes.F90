@@ -578,7 +578,7 @@ module schemes
           qx(ivx,1:im) = q(ivx,1:im,j,k)
           qx(ivy,1:im) = q(ivy,1:im,j,k)
           qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ien,1:im) = q(ien,1:im,j,k)
+          qx(ipr,1:im) = q(ipr,1:im,j,k)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
@@ -608,7 +608,7 @@ module schemes
           qy(ivx,1:jm) = q(ivy,i,1:jm,k)
           qy(ivy,1:jm) = q(ivz,i,1:jm,k)
           qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ien,1:jm) = q(ien,i,1:jm,k)
+          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
@@ -639,7 +639,7 @@ module schemes
           qz(ivx,1:km) = q(ivz,i,j,1:km)
           qz(ivy,1:km) = q(ivx,i,j,1:km)
           qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ien,1:km) = q(ien,i,j,1:km)
+          qz(ipr,1:km) = q(ipr,i,j,1:km)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
@@ -916,7 +916,7 @@ module schemes
           qx(iby,1:im) = q(iby,1:im,j,k)
           qx(ibz,1:im) = q(ibz,1:im,j,k)
           qx(ibp,1:im) = q(ibp,1:im,j,k)
-          qx(ien,1:im) = q(ien,1:im,j,k)
+          qx(ipr,1:im) = q(ipr,1:im,j,k)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
@@ -954,7 +954,7 @@ module schemes
           qy(iby,1:jm) = q(ibz,i,1:jm,k)
           qy(ibz,1:jm) = q(ibx,i,1:jm,k)
           qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-          qy(ien,1:jm) = q(ien,i,1:jm,k)
+          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
@@ -993,7 +993,7 @@ module schemes
           qz(iby,1:km) = q(ibx,i,j,1:km)
           qz(ibz,1:km) = q(iby,i,j,1:km)
           qz(ibp,1:km) = q(ibp,i,j,1:km)
-          qz(ien,1:km) = q(ien,i,j,1:km)
+          qz(ipr,1:km) = q(ipr,i,j,1:km)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !

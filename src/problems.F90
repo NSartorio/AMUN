@@ -262,9 +262,18 @@ module problems
 
 ! set the uniform primitive variables
 !
-    q(ivx,:) = 0.0d0
-    q(ivy,:) = 0.0d0
-    q(ivz,:) = 0.0d0
+    q(ivx,:) = 0.0d+00
+    q(ivy,:) = 0.0d+00
+    q(ivz,:) = 0.0d+00
+
+! if magnetic field is present
+!
+    if (ibx > 0) then
+      q(ibx,:) = 1.0d+00 / sqrt(2.0d+00)
+      q(iby,:) = 1.0d+00 / sqrt(2.0d+00)
+      q(ibz,:) = 0.0d+00
+      q(ibp,:) = 0.0d+00
+    end if
 
 ! iterate over all positions in the YZ plane
 !
