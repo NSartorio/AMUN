@@ -155,9 +155,9 @@ module interpolations
 !
     if (verbose) then
 
-      write (*,"(4x,a,1x,a)"    ) "reconstruction         =", trim(name_rec)
-      write (*,"(4x,a,1x,a)"    ) "limiter                =", trim(name_lim)
-      write (*,"(4x,a,1x,a)"    ) "fix positivity         =", trim(positivity_fix)
+      write (*,"(4x,a14,9x,'=',1x,a)") "reconstruction", trim(name_rec)
+      write (*,"(4x,a14,9x,'=',1x,a)") "limiter       ", trim(name_lim)
+      write (*,"(4x,a14,9x,'=',1x,a)") "fix positivity", trim(positivity_fix)
 
     end if
 
