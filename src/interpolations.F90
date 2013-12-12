@@ -37,8 +37,8 @@ module interpolations
 
 ! pointers to the reconstruction and limiter procedures
 !
-  procedure(reconstruct), pointer, save :: reconstruct_states => null()
-  procedure(limit_mm)   , pointer, save :: limit_derivatives  => null()
+  procedure(reconstruct) , pointer, save :: reconstruct_states => null()
+  procedure(limiter_zero), pointer, save :: limiter => null()
 
 ! module parameters
 !
@@ -55,9 +55,9 @@ module interpolations
 ! declare public subroutines
 !
   public :: initialize_interpolations, finalize_interpolations
-  public :: reconstruct
+  public :: reconstruct, limiter
   public :: fix_positivity
-  public :: minmod, minmod3
+  public :: minmod3
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -91,53 +91,56 @@ module interpolations
 
 ! local variables
 !
-    character(len=255) :: reconstruction = "tvd"
-    character(len=255) :: limiter        = "mm"
-    character(len=255) :: positivity_fix = "off"
-    character(len=255) :: name_rec       = ""
-    character(len=255) :: name_lim       = ""
+    character(len=255) :: sreconstruction = "tvd"
+    character(len=255) :: slimiter        = "mm"
+    character(len=255) :: positivity_fix  = "off"
+    character(len=255) :: name_rec        = ""
+    character(len=255) :: name_lim        = ""
 !
 !-------------------------------------------------------------------------------
 !
 ! obtain the user defined interpolation methods and coefficients
 !
-    call get_parameter_string("reconstruction", reconstruction)
-    call get_parameter_string("limiter"       , limiter       )
-    call get_parameter_string("fix_positivity", positivity_fix)
-    call get_parameter_real  ("eps"           , eps           )
+    call get_parameter_string("reconstruction", sreconstruction)
+    call get_parameter_string("limiter"       , slimiter       )
+    call get_parameter_string("fix_positivity", positivity_fix )
+    call get_parameter_real  ("eps"           , eps            )
 
 ! select the reconstruction method
 !
-    select case(trim(reconstruction))
+    select case(trim(sreconstruction))
     case ("tvd", "TVD")
       name_rec           =  "2nd order TVD"
       reconstruct_states => reconstruct_tvd
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
-                           "implemented: " // trim(reconstruction)
+                           "implemented: " // trim(sreconstruction)
         stop
       end if
     end select
 
 ! select the limiter
 !
-    select case(trim(limiter))
-    case ("mm")
-      name_lim           =  "MinMod"
-      limit_derivatives  => limit_mm
-    case ("mc")
-      name_lim           =  "McCormic"
-      limit_derivatives  => limit_mc
-    case ("lf")
-      name_lim           =  "Lax-Friedrichs"
-      limit_derivatives  => limit_lf
+    select case(trim(slimiter))
+    case ("mm", "minmod")
+      name_lim           =  "minmod"
+      limiter            => limiter_minmod
+    case ("mc", "monotonized_central")
+      name_lim           =  "monotonized central"
+      limiter            => limiter_monotonized_central
+    case ("sb", "superbee")
+      name_lim           =  "superbee"
+      limiter            => limiter_superbee
+    case ("vl", "vanleer")
+      name_lim           =  "van Leer"
+      limiter            => limiter_vanleer
+    case ("va", "vanalbada")
+      name_lim           =  "van Albada"
+      limiter            => limiter_vanalbada
     case default
-      if (verbose) then
-        write (*,"(1x,a)") "The selected limiter is not implemented: " //      &
-                           trim(limiter)
-        stop
-      end if
+      name_lim           =  "zero derivative"
+      limiter            => limiter_zero
     end select
 
 ! check additional reconstruction limiting
@@ -189,7 +192,7 @@ module interpolations
 ! release the procedure pointers
 !
     nullify(reconstruct_states)
-    nullify(limit_derivatives)
+    nullify(limiter)
 
 !-------------------------------------------------------------------------------
 !
@@ -266,23 +269,33 @@ module interpolations
 
 ! local variables
 !
-    integer                    :: i, im1
-    real(kind=8), dimension(n) :: df
+    integer      ::  i, im1, ip1
+    real(kind=8) :: df, dfl, dfr
 !
 !-------------------------------------------------------------------------------
 !
-! calculate limited derivative
-!
-    call limit_derivatives(n, f(:), df(:))
-
 ! calculate the left- and right-side interface interpolations
 !
-    do i = 2, n
+    do i = 1, n
+
+! calculate left and right indices
+!
+      im1     = max(1, i - 1)
+      ip1     = min(n, i + 1)
+
+! calculate left and right side derivatives
+!
+      dfl     = f(i  ) - f(im1)
+      dfr     = f(ip1) - f(i  )
+
+! obtain the TVD limited derivative
+!
+      df      = limiter(0.5d+00, dfl, dfr)
 
 ! update the left and right-side interpolation states
 !
-      fl(i  ) = f(i) + df(i)
-      fr(i-1) = f(i) - df(i)
+      fl(i  ) = f(i) + df
+      fr(im1) = f(i) - df
 
     end do ! i = 1, n
 
@@ -297,186 +310,19 @@ module interpolations
 !
 !===============================================================================
 !
-! subroutine LIMIT_MM:
-! -------------------
+! function LIMITER_ZERO:
+! ---------------------
 !
-!   Subroutine calculates the local derivative applying the minmod TVD limiter.
-!
-!===============================================================================
-!
-  subroutine limit_mm(n, f, df)
-
-    implicit none
-
-! input/output arguments
-!
-    integer                   , intent(in)  :: n
-    real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(out) :: df
-
-! local variables
-!
-    integer                    :: i, ip1
-    real(kind=8)               :: ds
-    real(kind=8), dimension(n) :: dfl, dfr
-!
-!------------------------------------------------------------------------------
-!
-! calculate the left- and right-side derivatives
-!
-    do i = 1, n - 1
-      ip1      = i + 1
-
-      dfr(i  ) = f(ip1) - f(i)
-      dfl(ip1) = dfr(i)
-    end do
-    dfl(1) = 0.0d+00
-    dfr(n) = 0.0d+00
-
-! second order interpolation
-!
-    do i = 1, n
-
-      df(i) = (sign(2.5d-01, dfl(i)) + sign(2.5d-01, dfr(i)))                  &
-                                               * min(abs(dfl(i)), abs(dfr(i)))
-
-    end do ! i = 1, n
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine limit_mm
-!
-!===============================================================================
-!
-! subroutine LIMIT_MC:
-! -------------------
-!
-!   Subroutine calculates the local derivative applying the McCormic TVD
-! limiter.
-!
-!===============================================================================
-!
-  subroutine limit_mc(n, f, df)
-
-    implicit none
-
-! input/output arguments
-!
-    integer                   , intent(in)  :: n
-    real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(out) :: df
-
-! local variables
-!
-    integer                    :: i, ip1
-    real(kind=8)               :: ds
-    real(kind=8), dimension(n) :: dfl, dfr
-!
-!------------------------------------------------------------------------------
-!
-! calculate the left- and right-side derivatives
-!
-    do i = 1, n - 1
-      ip1      = i + 1
-
-      dfr(i  ) = f(ip1) - f(i)
-      dfl(ip1) = dfr(i)
-    end do
-    dfl(1) = 0.0d+00
-    dfr(n) = 0.0d+00
-
-! second order interpolation
-!
-    do i = 1, n
-
-      df(i) = (sign(5.0d-01, dfr(i)) + sign(5.0d-01, dfl(i)))                  &
-                                      * min(abs(dfr(i)), abs(dfl(i))           &
-                                             , 2.5d-01 * abs(dfr(i) + dfl(i)))
-
-    end do ! i = 1, n
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine limit_mc
-!
-!===============================================================================
-!
-! subroutine LIMIT_LF:
-! -------------------
-!
-!   Subroutine calculates the local derivative applying the Lax-Friendrich TVD
-!   limiter.
-!
-!===============================================================================
-!
-  subroutine limit_lf(n, f, df)
-
-    implicit none
-
-! input/output arguments
-!
-    integer                   , intent(in)  :: n
-    real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(out) :: df
-
-! local variables
-!
-    integer                    :: i, ip1
-    real(kind=8)               :: ds
-    real(kind=8), dimension(n) :: dfl, dfr
-!
-!------------------------------------------------------------------------------
-!
-! calculate the left- and right-side derivatives
-!
-    do i = 1, n - 1
-      ip1      = i + 1
-
-      dfr(i  ) = f(ip1) - f(i)
-      dfl(ip1) = dfr(i)
-    end do
-    dfl(1) = 0.0d+00
-    dfr(n) = 0.0d+00
-
-! second order interpolation
-!
-    do i = 1, n
-
-! calculate the monotonicity indicator
-!
-      ds = dfr(i) * dfl(i)
-
-! if the region is monotonic calculate limited derivative, otherwise set zero
-!
-      if (ds > 0.0d+00) then
-
-! use selected limiter
-!
-        df(i) = ds / (dfr(i) + dfl(i))
-      else
-        df(i) = 0.0d+00
-      end if
-
-    end do ! i = 1, n
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine limit_lf
-!
-!===============================================================================
-!
-! function MINMOD:
-! ---------------
-!
-!   Function returns the minimum module value among two arguments.
+!   Function returns zero.
 !
 !   Arguments:
 !
+!     x    - scaling factor;
 !     a, b - the input values;
 !
 !===============================================================================
 !
-  real(kind=8) function minmod(a, b)
+  function limiter_zero(x, a, b) result(c)
 
 ! local variables are not implicit by default
 !
@@ -484,17 +330,192 @@ module interpolations
 
 ! input arguments
 !
-    real(kind=8), intent(in) :: a, b
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
 !
 !-------------------------------------------------------------------------------
 !
-    minmod = (sign(0.5d+00, a) + sign(0.5d+00, b)) * min(abs(a), abs(b))
-
-    return
+    c = 0.0d+00
 
 !-------------------------------------------------------------------------------
 !
-  end function minmod
+  end function limiter_zero
+!
+!===============================================================================
+!
+! function LIMITER_MINMOD:
+! -----------------------
+!
+!   Function returns the minimum module value among two arguments using
+!   minmod limiter.
+!
+!   Arguments:
+!
+!     x    - scaling factor;
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  function limiter_minmod(x, a, b) result(c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
+!
+!-------------------------------------------------------------------------------
+!
+    c = 0.5d+00 * (sign(x, a) + sign(x, b)) * min(abs(a), abs(b))
+
+!-------------------------------------------------------------------------------
+!
+  end function limiter_minmod
+!
+!===============================================================================
+!
+! function LIMITER_MONOTONIZED_CENTRAL:
+! ------------------------------------
+!
+!   Function returns the minimum module value among two arguments using
+!   the monotonized central TVD limiter.
+!
+!   Arguments:
+!
+!     x    - scaling factor;
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  function limiter_monotonized_central(x, a, b) result(c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
+!
+!-------------------------------------------------------------------------------
+!
+    c = (sign(x, a) + sign(x, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
+
+!-------------------------------------------------------------------------------
+!
+  end function limiter_monotonized_central
+!
+!===============================================================================
+!
+! function LIMITER_SUPERBEE:
+! -------------------------
+!
+!   Function returns the minimum module value among two arguments using
+!   superbee limiter.
+!
+!   Arguments:
+!
+!     x    - scaling factor;
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  function limiter_superbee(x, a, b) result(c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
+!
+!-------------------------------------------------------------------------------
+!
+    c = 0.5d+00 * (sign(x, a) + sign(x, b))                                    &
+           * max(min(2.0d+00 * abs(a), abs(b)), min(abs(a), 2.0d+00 * abs(b)))
+
+!-------------------------------------------------------------------------------
+!
+  end function limiter_superbee
+!
+!===============================================================================
+!
+! function LIMITER_VANLEER:
+! ------------------------
+!
+!   Function returns the minimum module value among two arguments using
+!   van Leer's limiter.
+!
+!   Arguments:
+!
+!     x    - scaling factor;
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  function limiter_vanleer(x, a, b) result(c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
+!
+!-------------------------------------------------------------------------------
+!
+    c = a * b
+    if (c > 0.0d+00) then
+      c = 2.0d+00 * x * c / (a + b)
+    else
+      c = 0.0d+00
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end function limiter_vanleer
+!
+!===============================================================================
+!
+! function LIMITER_VANALBADA:
+! --------------------------
+!
+!   Function returns the minimum module value among two arguments using
+!   van Albada's limiter.
+!
+!   Arguments:
+!
+!     x    - scaling factor;
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  function limiter_vanalbada(x, a, b) result(c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: x, a, b
+    real(kind=8)             :: c
+!
+!-------------------------------------------------------------------------------
+!
+    c = x * a * b * (a + b) / max(eps, a * a + b * b)
+
+!-------------------------------------------------------------------------------
+!
+  end function limiter_vanalbada
 !
 !===============================================================================
 !
