@@ -1044,8 +1044,8 @@ module mesh
     use blocks        , only : block_meta, block_data, nchild
     use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates   , only : ib, ie, jb, je, kb, ke
-    use interpolations, only : minmod3
     use equations     , only : nv
+    use interpolations, only : limiter
 
     implicit none
 
@@ -1123,16 +1123,16 @@ module mesh
 
             dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
             dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
-            dux = 0.125d0 * minmod3(dul, dur)
+            dux = limiter(0.25d+00, dul, dur)
 
             dul = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
             dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
-            duy = 0.125d0 * minmod3(dul, dur)
+            duy = limiter(0.25d+00, dul, dur)
 
 #if NDIMS == 3
             dul = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
             dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
-            duz = 0.125d0 * minmod3(dul, dur)
+            duz = limiter(0.25d+00, dul, dur)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2

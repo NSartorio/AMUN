@@ -57,7 +57,6 @@ module interpolations
   public :: initialize_interpolations, finalize_interpolations
   public :: reconstruct, limiter
   public :: fix_positivity
-  public :: minmod3
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -516,46 +515,6 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end function limiter_vanalbada
-!
-!===============================================================================
-!
-! subroutine MINMOD3:
-! ------------------
-!
-!   Function returns the minimum module value among two arguments and their
-!   average.
-!
-!   Arguments:
-!
-!     a, b - two real values;
-!
-!
-!===============================================================================
-!
-  real(kind=8) function minmod3(a, b)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    real(kind=8), intent(in) :: a, b
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the minimal module value
-!
-    minmod3 = (sign(1.0d+00, a) + sign(1.0d+00, b))                            &
-                                   * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
-
-! return the value
-!
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function minmod3
 !
 !===============================================================================
 !

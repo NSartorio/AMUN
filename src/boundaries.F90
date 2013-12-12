@@ -2433,8 +2433,8 @@ module boundaries
     use coordinates   , only : ng, im, ih, ib, ie, ieu                         &
                              , nd, jm, jh, jb, je, jeu                         &
                              , nh, km, kh, kb, ke, keu
-    use interpolations, only : minmod3
     use equations     , only : nv
+    use interpolations, only : limiter
 
     implicit none
 
@@ -2711,16 +2711,16 @@ module boundaries
 
             dul = u(q,i  ,j,k) - u(q,i-1,j,k)
             dur = u(q,i+1,j,k) - u(q,i  ,j,k)
-            dux = 0.25d0 * minmod3(dul, dur)
+            dux = limiter(0.25d+00, dul, dur)
 
             dul = u(q,i,j  ,k) - u(q,i,j-1,k)
             dur = u(q,i,j+1,k) - u(q,i,j  ,k)
-            duy = 0.25d0 * minmod3(dul, dur)
+            duy = limiter(0.25d+00, dul, dur)
 
 #if NDIMS == 3
             dul = u(q,i,j,k  ) - u(q,i,j,k-1)
             dur = u(q,i,j,k+1) - u(q,i,j,k  )
-            duz = 0.25d0 * minmod3(dul, dur)
+            duz = limiter(0.25d+00, dul, dur)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
