@@ -229,6 +229,16 @@ module schemes
 !
           riemann  => riemann_mhd_adi_hllc
 
+        case ("hlld", "HLLD")
+
+! set the solver name
+!
+          name_sol =  "HLLD"
+
+! set the solver pointer
+!
+          riemann  => riemann_mhd_adi_hlld
+
 ! in the case of unknown Riemann solver, revert to HLL
 !
         case default
@@ -1714,8 +1724,8 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_HLLC:
-! -----------------------
+! subroutine RIEMANN_MHD_ADI_HLLC:
+! -------------------------------
 !
 !   Subroutine solves one dimensional Riemann problem using the HLLC
 !   method by Gurski or Li.  The HLLC and HLLC-C differ by definitions of
@@ -1726,9 +1736,7 @@ module schemes
 !     n - the length of input vectors;
 !     h - the spatial step;
 !     q - the input array of primitive variables;
-!     b - the input vector of the normal magnetic field component;
 !     f - the output array of fluxes;
-!     s - the input array of shock indicators;
 !
 !   References:
 !
@@ -2033,6 +2041,620 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_adi_hllc
+!
+!===============================================================================
+!
+! subroutine RIEMANN_MHD_ADI_HLLD:
+! -------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using the adiabatic HLLD
+!   method described by Miyoshi & Kusano.
+!
+!   Arguments:
+!
+!     n - the length of input vectors;
+!     h - the spatial step;
+!     q - the input array of primitive variables;
+!     f - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Miyoshi, T. & Kusano, K.,
+!         "A multi-state HLL approximate Riemann solver for ideal
+!          magnetohydrodynamics",
+!         Journal of Computational Physics, 2005, 208, pp. 315-344
+!
+!===============================================================================
+!
+  subroutine riemann_mhd_adi_hlld(n, h, q, f)
+
+! include external procedures
+!
+    use equations     , only : nv
+    use equations     , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
+    use equations     , only : imx, imy, imz, ien
+    use equations     , only : cmax
+    use equations     , only : prim2cons, fluxspeed
+    use interpolations, only : reconstruct, fix_positivity
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8)                 , intent(in)  :: h
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                       :: p, i
+    real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
+    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb, dv
+    real(kind=8)                  :: dnl, dnr, cal, car, sml, smr
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
+    real(kind=8), dimension(n)    :: cl, cr
+!
+!-------------------------------------------------------------------------------
+!
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
+    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
+    ql(ibx,:) = cl(:)
+    qr(ibx,:) = cl(:)
+    ql(ibp,:) = cr(:)
+    qr(ibp,:) = cr(:)
+
+! check if the reconstruction doesn't give the negative density or pressure,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+! calculate corresponding conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at the states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+
+! iterate over all points
+!
+    do i = 1, n
+
+! estimate the minimum and maximum speeds
+!
+      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
+      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+
+! calculate the HLLC flux
+!
+      if (sl >= 0.0d+00) then
+
+        f(:,i) = fl(:,i)
+
+      else if (sr <= 0.0d+00) then
+
+        f(:,i) = fr(:,i)
+
+      else ! sl < 0 < sr
+
+! speed difference
+!
+        srml = sr - sl
+
+! calculate vectors of the left and right-going waves
+!
+        wl(:)  = sl * ul(:,i) - fl(:,i)
+        wr(:)  = sr * ur(:,i) - fr(:,i)
+
+! the speed of contact discontinuity
+!
+        dn =  wr(idn) - wl(idn)
+        sm = (wr(imx) - wl(imx)) / dn
+
+! square of Bₓ, i.e. Bₓ²
+!
+        bx = ql(ibx,i)
+        b2 = ql(ibx,i) * qr(ibx,i)
+
+! if there is an Alvén wave, apply the full HLLD solver, otherwise revert to
+! the HLLC solver
+!
+        if (b2 > 0.0d+00) then ! Bₓ² > 0
+
+! the total pressure, constant across the contact discontinuity and Alfvén waves
+!
+          pt = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn + b2
+
+! speed differences
+!
+          slmm = sl - sm
+          srmm = sr - sm
+
+! left and right state densities
+!
+          dnl = wl(idn) / slmm
+          dnr = wr(idn) / srmm
+
+! left and right Alfvén speeds
+!
+          cal = - sqrt(b2 / dnl)
+          car =   sqrt(b2 / dnr)
+          sml = sm + cal
+          smr = sm + car
+
+! check degeneracy Sl* -> Sl or Sr* -> Sr
+!
+          if (min(sml - sl, sr - smr) > 0.0d+00) then ! no degeneracy
+
+! choose the correct state depending on the speed signs
+!
+            if (sml >= 0.0d+00) then ! sl* ≥ 0
+
+! primitive variables for the outer left intermediate state
+!
+              dv      =     slmm * wl(idn) - b2
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer left intermediate state
+!
+              ui(idn) = dnl
+              ui(imx) = dnl * sm
+              ui(imy) = dnl * vy
+              ui(imz) = dnl * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = ql(ibp,i)
+              ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
+
+! the outer left intermediate flux
+!
+              f(:,i)  = sl * ui(:) - wl(:)
+
+          else if (smr <= 0.0d+00) then ! sr* ≤ 0
+
+! primitive variables for the outer right intermediate state
+!
+              dv      =     srmm * wr(idn) - b2
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer right intermediate state
+!
+              ui(idn) = dnr
+              ui(imx) = dnr * sm
+              ui(imy) = dnr * vy
+              ui(imz) = dnr * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = qr(ibp,i)
+              ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
+
+! the outer right intermediate flux
+!
+              f(:,i)  = sr * ui(:) - wr(:)
+
+            else ! sl* < 0 < sr*
+
+! primitive variables for the outer left intermediate state
+!
+              dv      =     slmm * wl(idn) - b2
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer left intermediate state
+!
+              ui(idn) = dnl
+              ui(imx) = dnl * sm
+              ui(imy) = dnl * vy
+              ui(imz) = dnl * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = ql(ibp,i)
+              ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
+
+! vector of the left-going Alfvén wave
+!
+              wcl(:)  = (sml - sl) * ui(:) + wl(:)
+
+! primitive variables for the outer right intermediate state
+!
+              dv      =     srmm * wr(idn) - b2
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer right intermediate state
+!
+              ui(idn) = dnr
+              ui(imx) = dnr * sm
+              ui(imy) = dnr * vy
+              ui(imz) = dnr * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = qr(ibp,i)
+              ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
+
+! vector of the right-going Alfvén wave
+!
+              wcr(:)  = (smr - sr) * ui(:) + wr(:)
+
+! prepare constant primitive variables of the intermediate states
+!
+              dv      = car * dnr - cal * dnl
+              vy      = (wcr(imy) - wcl(imy)) / dv
+              vz      = (wcr(imz) - wcl(imz)) / dv
+              dv      = car       - cal
+              by      = (wcr(iby) - wcl(iby)) / dv
+              bz      = (wcr(ibz) - wcl(ibz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! choose the correct state depending on the sign of contact discontinuity
+! advection speed
+!
+              if (sm > 0.0d+00) then ! sm > 0
+
+! conservative variables for the inmost left intermediate state
+!
+                ui(idn) = dnl
+                ui(imx) = dnl * sm
+                ui(imy) = dnl * vy
+                ui(imz) = dnl * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = ql(ibp,i)
+                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / cal
+
+! the inmost left intermediate flux
+!
+                f(:,i)  = sml * ui(:) - wcl(:)
+
+              else if (sm < 0.0d+00) then ! sm < 0
+
+! conservative variables for the inmost right intermediate state
+!
+                ui(idn) = dnr
+                ui(imx) = dnr * sm
+                ui(imy) = dnr * vy
+                ui(imz) = dnr * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = qr(ibp,i)
+                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / car
+
+! the inmost right intermediate flux
+!
+                f(:,i)  = smr * ui(:) - wcr(:)
+
+              else ! sm = 0
+
+! conservative variables for the inmost left intermediate state
+!
+                ui(idn) = dnl
+                ui(imx) = 0.0d+00
+                ui(imy) = dnl * vy
+                ui(imz) = dnl * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = ql(ibp,i)
+                ui(ien) = (wcl(ien) - bx * vb) / cal
+
+! the inmost left intermediate flux
+!
+                f(:,i)  = cal * ui(:) - wcl(:)
+
+! conservative variables for the inmost right intermediate state
+!
+                ui(idn) = dnr
+                ui(imx) = 0.0d+00
+                ui(imy) = dnr * vy
+                ui(imz) = dnr * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = qr(ibp,i)
+                ui(ien) = (wcr(ien) - bx * vb) / car
+
+! the inmost right intermediate flux
+!
+                f(:,i)  = 0.5d+00 * (f(:,i) + (car * ui(:) - wcr(:)))
+
+              end if ! sm = 0
+
+            end if ! sl* < 0 < sr*
+
+          else ! one degeneracy
+
+! separate degeneracies
+!
+            if ((sml - sl) > 0.0d+00) then ! sr* > sr
+
+! primitive variables for the outer left intermediate state
+!
+              dv      =     slmm * wl(idn) - b2
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer left intermediate state
+!
+              ui(idn) = dnl
+              ui(imx) = dnl * sm
+              ui(imy) = dnl * vy
+              ui(imz) = dnl * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = ql(ibp,i)
+              ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
+
+! choose the correct state depending on the speed signs
+!
+              if (sml >= 0.0d+00) then ! sl* ≥ 0
+
+! the outer left intermediate flux
+!
+                f(:,i)  = sl * ui(:) - wl(:)
+
+              else ! sl* < 0
+
+! vector of the left-going Alfvén wave
+!
+                wcl(:)  = (sml - sl) * ui(:) + wl(:)
+
+! primitive variables for the inner left intermediate state
+!
+                dv      = srmm * dnr - cal * dnl
+                vy      = (wr(imy) - wcl(imy)) / dv
+                vz      = (wr(imz) - wcl(imz)) / dv
+                dv      = sr - sml
+                by      = (wr(iby) - wcl(iby)) / dv
+                bz      = (wr(ibz) - wcl(ibz)) / dv
+                vb      = sm * bx + vy * by + vz * bz
+
+! choose the correct state depending on the sign of contact discontinuity
+! advection speed
+!
+                if (sm >= 0.0d+00) then ! sm ≥ 0
+
+! conservative variables for the inner left intermediate state
+!
+                  ui(idn) = dnl
+                  ui(imx) = dnl * sm
+                  ui(imy) = dnl * vy
+                  ui(imz) = dnl * vz
+                  ui(ibx) = bx
+                  ui(iby) = by
+                  ui(ibz) = bz
+                  ui(ibp) = ql(ibp,i)
+                  ui(ien) = (wcl(ien) + sm * pt - bx * vb) / cal
+
+! the inner left intermediate flux
+!
+                  f(:,i)  = sml * ui(:) - wcl(:)
+
+                else ! sm < 0
+
+! vector of the left-going Alfvén wave
+!
+                  wcl(:)  = (sm - sml) * ui(:) + wcl(:)
+
+! calculate the average flux over the right inner intermediate state
+!
+                  f(:,i)  = (sm * wr(:) - sr * wcl(:)) / (sr - sm)
+
+                end if ! sm < 0
+
+              end if ! sl* < 0
+
+            else if ((sr - smr) > 0.0d+00) then ! sl* < sl
+
+! primitive variables for the outer right intermediate state
+!
+              dv      =     srmm * wr(idn) - b2
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vb      = sm * bx + vy * by + vz * bz
+
+! conservative variables for the outer right intermediate state
+!
+              ui(idn) = dnr
+              ui(imx) = dnr * sm
+              ui(imy) = dnr * vy
+              ui(imz) = dnr * vz
+              ui(ibx) = bx
+              ui(iby) = by
+              ui(ibz) = bz
+              ui(ibp) = qr(ibp,i)
+              ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
+
+! choose the correct state depending on the speed signs
+!
+              if (smr <= 0.0d+00) then ! sr* ≤ 0
+
+! the outer right intermediate flux
+!
+                f(:,i)  = sr * ui(:) - wr(:)
+
+              else ! sr* > 0
+
+! vector of the right-going Alfvén wave
+!
+                wcr(:)  = (smr - sr) * ui(:) + wr(:)
+
+! primitive variables for the inner right intermediate state
+!
+                dv      = slmm * dnl - car * dnr
+                vy      = (wl(imy) - wcr(imy)) / dv
+                vz      = (wl(imz) - wcr(imz)) / dv
+                dv      = sl - smr
+                by      = (wl(iby) - wcr(iby)) / dv
+                bz      = (wl(ibz) - wcr(ibz)) / dv
+                vb      = sm * bx + vy * by + vz * bz
+
+! choose the correct state depending on the sign of contact discontinuity
+! advection speed
+!
+                if (sm <= 0.0d+00) then ! sm ≤ 0
+
+! conservative variables for the inner left intermediate state
+!
+                  ui(idn) = dnr
+                  ui(imx) = dnr * sm
+                  ui(imy) = dnr * vy
+                  ui(imz) = dnr * vz
+                  ui(ibx) = bx
+                  ui(iby) = by
+                  ui(ibz) = bz
+                  ui(ibp) = qr(ibp,i)
+                  ui(ien) = (wcr(ien) + sm * pt - bx * vb) / car
+
+! the inner right intermediate flux
+!
+                  f(:,i)  = smr * ui(:) - wcr(:)
+
+                else ! sm > 0
+
+! vector of the right-going Alfvén wave
+!
+                  wcr(:)  = (sm - smr) * ui(:) + wcr(:)
+
+! calculate the average flux over the left inner intermediate state
+!
+                  f(:,i)  = (sm * wl(:) - sl * wcr(:)) / (sl - sm)
+
+                end if ! sm > 0
+
+              end if ! sr* > 0
+
+            else ! sl* < sl & sr* > sr
+
+! so far we revert to HLL flux in the case of degeneracies
+!
+              f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+
+            end if ! sl* < sl & sr* > sr
+
+          end if ! one degeneracy
+
+        else ! Bₓ² = 0
+
+! the total pressure, constant across the contact discontinuity
+!
+          pt = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn
+
+! separate intermediate states depending on the sign of the advection speed
+!
+          if (sm > 0.0d+00) then ! sm > 0
+
+! the left speed difference
+!
+            slmm    =  sl - sm
+
+! conservative variables for the left intermediate state
+!
+            ui(idn) =  wl(idn) / slmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * ql(ivy,i)
+            ui(imz) =  ui(idn) * ql(ivz,i)
+            ui(ibx) =  0.0d+00
+            ui(iby) =  wl(iby) / slmm
+            ui(ibz) =  wl(ibz) / slmm
+            ui(ibp) =  ql(ibp,i)
+            ui(ien) = (wl(ien) + sm * pt) / slmm
+
+! the left intermediate flux
+!
+            f(:,i)  = sl * ui(:) - wl(:)
+
+          else if (sm < 0.0d+00) then ! sm < 0
+
+! the right speed difference
+!
+            srmm    =  sr - sm
+
+! conservative variables for the right intermediate state
+!
+            ui(idn) =  wr(idn) / srmm
+            ui(imx) =  ui(idn) * sm
+            ui(imy) =  ui(idn) * qr(ivy,i)
+            ui(imz) =  ui(idn) * qr(ivz,i)
+            ui(ibx) =  0.0d+00
+            ui(iby) =  wr(iby) / srmm
+            ui(ibz) =  wr(ibz) / srmm
+            ui(ibp) =  qr(ibp,i)
+            ui(ien) = (wr(ien) + sm * pt) / srmm
+
+! the right intermediate flux
+!
+            f(:,i)  = sr * ui(:) - wr(:)
+
+          else ! sm = 0
+
+! intermediate flux is constant across the contact discontinuity and all except
+! the parallel momentum flux are zero
+!
+            f(idn,i) =   0.0d+00
+            f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
+            f(imy,i) =   0.0d+00
+            f(imz,i) =   0.0d+00
+            f(ibx,i) = fl(ibx,i)
+            f(iby,i) =   0.0d+00
+            f(ibz,i) =   0.0d+00
+            f(ibp,i) = fl(ibp,i)
+            f(ien,i) =   0.0d+00
+
+          end if ! sm = 0
+
+        end if ! Bₓ² = 0
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_mhd_adi_hlld
 
 !===============================================================================
 !
