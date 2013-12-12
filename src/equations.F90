@@ -453,6 +453,13 @@ module equations
     if (allocated(pvars)) deallocate(pvars)
     if (allocated(cvars)) deallocate(cvars)
 
+! release the procedure pointers
+!
+    nullify(prim2cons)
+    nullify(cons2prim)
+    nullify(fluxspeed)
+    nullify(maxspeed )
+
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_equations
