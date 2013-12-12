@@ -278,7 +278,7 @@ module evolution
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
     use coordinates   , only : im, jm, km
-    use equations     , only : nv
+    use equations     , only : nv, ibp
 
 ! local variables are not implicit by default
 !

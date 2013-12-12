@@ -295,11 +295,11 @@ module mpitools
         iret      = 0
 
         do while(product(pdims(:)) .lt. nprocs)
-#ifdef R3D
+#if NDIMS == 3
           iret = mod(iret, 3) + 1
-#else /* R3D */
+#else /* NDIMS == 3 */
           iret = mod(iret, 2) + 1
-#endif /* R3D */
+#endif /* NDIMS == 3 */
           pdims(iret) = 2 * pdims(iret)
         end do
 

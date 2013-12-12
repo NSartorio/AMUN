@@ -236,13 +236,13 @@ program amun
   call get_parameter_string("ylbndry" , lbnd)
   call get_parameter_string("yubndry" , ubnd)
   per(2) = (lbnd == "periodic") .and. (ubnd == "periodic")
-#ifdef R3D
+#if NDIMS == 3
   lbnd = "periodic"
   ubnd = "periodic"
   call get_parameter_string("zlbndry" , lbnd)
   call get_parameter_string("zubndry" , ubnd)
   per(3) = (lbnd == "periodic") .and. (ubnd == "periodic")
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
 ! get the execution termination parameters
 !

@@ -27,13 +27,29 @@
 !
 module constants
 
+! module variables are not implicit by default
+!
   implicit none
 
-! number Pi and its multiplications
+! π and its multiplications
 !
-  real, parameter :: hpi =  1.5707963267948965579989817342721d0
-  real, parameter ::  pi =  3.1415926535897931159979634685442d0
-  real, parameter :: dpi =  6.2831853071795862319959269370884d0
-  real, parameter :: qpi = 12.5663706143591724639918538741770d0
+  real(kind=8), parameter :: pi   = 3.14159265358979323846264338327950d+00
+  real(kind=8), parameter :: pi2  = 6.28318530717958647692528676655900d+00
+  real(kind=8), parameter :: pi4  = 1.25663706143591729538505735331180d+01
 
+! exp(-1/2)
+!
+  real(kind=8), parameter :: ehi  = 0.60653065971263342360379953499118d+00
+
+! conversion between angular units (degree to radian and radian to degree)
+!
+  real(kind=8), parameter :: d2r  = 1.74532925199432954743716805978693d-02
+  real(kind=8), parameter :: r2d  = 5.72957795130823228646477218717337d+01
+
+! by default everything is public
+!
+  public
+
+!===============================================================================
+!
 end module constants

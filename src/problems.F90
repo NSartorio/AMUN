@@ -159,13 +159,14 @@ module problems
 ! include external procedures and variables
 !
     use blocks     , only : block_data
+    use constants  , only : d2r
     use coordinates, only : im, jm, km
     use coordinates, only : ax, ay, az, adx, ady, adz
     use equations  , only : prim2cons
     use equations  , only : gamma
+    use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use parameters , only : get_parameter_real
-    use equations  , only : nv
 
 ! local variables are not implicit by default
 !
@@ -177,27 +178,34 @@ module problems
 
 ! default parameter values
 !
-    real   , save :: dens = 1.0d0, ratio = 1.0e2, radius = 0.1d0
-    real   , save :: csnd = 0.40824829046386301635d0
-    logical, save :: first = .true.
-    real   , save :: dn_amb, dn_ovr
-    real   , save :: pr_amb, pr_ovr
-    real   , save :: rad
+    real(kind=8), save :: dens   = 1.00d+00
+    real(kind=8), save :: ratio  = 1.00d+00
+    real(kind=8), save :: radius = 1.00d-01
+    real(kind=8), save :: csnd   = 4.0824829046386301635d-01
+    real(kind=8), save :: buni   = 1.00d+00
+    real(kind=8), save :: angle  = 4.50d+01
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: dn_amb, dn_ovr
+    real(kind=8), save :: pr_amb, pr_ovr
+    real(kind=8), save :: r2
 
 ! local variables
 !
     integer       :: i, j, k
-    real          :: xl, yl, zl, xu, yu, zu, rl, ru
-    real          :: xb, yb, xt, yt
-    real          :: dx, dy, dz, dxh, dyh, dzh, daxy
-    real          :: fc_amb, fc_ovr
+    real(kind=8)  :: xl, yl, zl, xu, yu, zu, rl, ru
+    real(kind=8)  :: xb, yb, xt, yt
+    real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, daxy
+    real(kind=8)  :: fc_amb, fc_ovr
 
 ! local arrays
 !
-    real, dimension(nv,im) :: q, u
-    real, dimension(im)    :: x
-    real, dimension(jm)    :: y
-    real, dimension(km)    :: z
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -211,12 +219,15 @@ module problems
       call get_parameter_real("ratio" , ratio )
       call get_parameter_real("radius", radius)
       call get_parameter_real("csnd"  , csnd  )
+      call get_parameter_real("buni"  , buni  )
+      call get_parameter_real("angle" , angle )
 
 ! calculate the overdense and ambient region densities
 !
       dn_amb = dens
       if (ipr > 0) then
         dn_ovr = dn_amb
+
 ! calculate parallel and perpendicular pressures from sound speeds
 !
         pr_amb = dens * csnd * csnd / gamma
@@ -228,22 +239,22 @@ module problems
 
 ! calculate the square of radius
 !
-      rad    = radius * radius
+      r2    = radius * radius
 
 ! reset the first execution flag
 !
       first = .false.
 
-    end if
+    end if ! first call
 
-! obtain block coordinates
+! prepare block coordinates
 !
     x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 #if NDIMS == 3
     z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
 #else /* NDIMS == 3 */
-    z(1:km) = 0.0d0
+    z(1:km) = 0.0d+00
 #endif /* NDIMS == 3 */
 
 ! calculate mesh intervals and areas
@@ -251,40 +262,48 @@ module problems
     dx   = adx(pdata%meta%level)
     dy   = ady(pdata%meta%level)
     dz   = adz(pdata%meta%level)
-    dxh  = 0.5d0 * dx
-    dyh  = 0.5d0 * dy
+    dxh  = 0.5d+00 * dx
+    dyh  = 0.5d+00 * dy
 #if NDIMS == 3
-    dzh  = 0.5d0 * dz
+    dzh  = 0.5d+00 * dz
 #else /* NDIMS == 3 */
-    dzh  = 1.0d0
+    dzh  = 1.0d+00
 #endif /* NDIMS == 3 */
     daxy = dx * dy
 
-! set the uniform primitive variables
+! set the ambient density and pressure
+!
+    q(idn,:) = dn_amb
+    if (ipr > 0) q(ipr,:) = pr_amb
+
+! reset velocity components
 !
     q(ivx,:) = 0.0d+00
     q(ivy,:) = 0.0d+00
     q(ivz,:) = 0.0d+00
 
-! if magnetic field is present
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
 !
     if (ibx > 0) then
-      q(ibx,:) = 1.0d+00 / sqrt(2.0d+00)
-      q(iby,:) = 1.0d+00 / sqrt(2.0d+00)
+
+      q(ibx,:) = buni * cos(d2r * angle)
+      q(iby,:) = buni * sin(d2r * angle)
       q(ibz,:) = 0.0d+00
       q(ibp,:) = 0.0d+00
+
     end if
 
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
 
-#ifdef R3D
+#if NDIMS == 3
 ! calculate the corner Z coordinates
 !
       zl = abs(z(k)) - dzh
       zu = abs(z(k)) + dzh
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
       do j = 1, jm
 
@@ -304,22 +323,18 @@ module problems
 
 ! calculate the minimum and maximum corner distances from the origin
 !
-#ifdef R3D
+#if NDIMS == 3
           rl = xl * xl + yl * yl + zl * zl
           ru = xu * xu + yu * yu + zu * zu
-#else /* R3D */
+#else /* NDIMS == 3 */
           rl = xl * xl + yl * yl
           ru = xu * xu + yu * yu
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
-! set the initial density and pressure
+! set the initial density and pressure in cells laying completely within
+! the blast radius
 !
-          q(idn,i) = dn_amb
-          if (ipr > 0) q(ipr,i) = pr_amb
-
-! set the initial pressure in cells laying completely within the radius
-!
-          if (ru .le. rad) then
+          if (ru <= r2) then
 
 ! set the overpressure region density
 !
@@ -331,7 +346,7 @@ module problems
 
 ! set the initial pressure in the cell completely outside the radius
 !
-          else if (rl .ge. rad) then
+          else if (rl >= r2) then
 
 ! set the ambient region density
 !
@@ -346,7 +361,7 @@ module problems
 !
           else
 
-#ifdef R3D
+#if NDIMS == 3
 ! in 3D simply set the ambient values since the integration is more complex
 !
 
@@ -357,32 +372,32 @@ module problems
 ! set the ambient medium pressure
 !
             if (ipr > 0) q(ipr,i) = pr_amb
-#else /* R3D */
+#else /* NDIMS == 3 */
 ! calculate the bounds of area integration
 !
-            xb = max(xl, sqrt(max(0.0d0, rad - yu * yu)))
-            xt = min(xu, sqrt(max(0.0d0, rad - yl * yl)))
-            yb = max(yl, sqrt(max(0.0d0, rad - xu * xu)))
-            yt = min(yu, sqrt(max(0.0d0, rad - xl * xl)))
+            xb = max(xl, sqrt(max(0.0d+00, r2 - yu * yu)))
+            xt = min(xu, sqrt(max(0.0d+00, r2 - yl * yl)))
+            yb = max(yl, sqrt(max(0.0d+00, r2 - xu * xu)))
+            yt = min(yu, sqrt(max(0.0d+00, r2 - xl * xl)))
 
 ! integrate the area below the circle within the current cell for both
 ! functions, y = f(x) and x = g(y), and then average them to be sure that we
 ! are getting the ideal symmetry
 !
-            fc_ovr = 0.5d0 * (rad * (asin(xt / radius) - asin(xb / radius))   &
+            fc_ovr = 0.5d+00 * (r2 * (asin(xt / radius) - asin(xb / radius))   &
                    + (xt * yb - xb * yt)) - yl * (xt - xb)
             fc_ovr = fc_ovr + (xb - xl) * dy
 
-            fc_amb = 0.5d0 * (rad * (asin(yt / radius) - asin(yb / radius))   &
+            fc_amb = 0.5d+00 * (r2 * (asin(yt / radius) - asin(yb / radius))   &
                    + (yt * xb - yb * xt)) - xl * (yt - yb)
             fc_amb = fc_amb + (yb - yl) * dx
 
-            fc_ovr = 0.5d0 * (fc_ovr + fc_amb)
+            fc_ovr = 0.5d+00 * (fc_ovr + fc_amb)
 
 ! normalize coefficients
 !
             fc_ovr = fc_ovr / daxy
-            fc_amb = 1.0d0 - fc_ovr
+            fc_amb = 1.0d+00 - fc_ovr
 
 ! integrate the density over the edge cells
 !
@@ -391,11 +406,11 @@ module problems
 ! integrate the pressure over the edge cells
 !
             if (ipr > 0) q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
-#endif /* R3D */
+#endif /* NDIMS == 3 */
 
           end if
 
-        end do
+        end do ! i = 1, im
 
 ! convert the primitive variables to conservative ones
 !
@@ -409,8 +424,8 @@ module problems
 !
         pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
 
-      end do
-    end do
+      end do ! j = 1, jm
+    end do ! k = 1, km
 
 !-------------------------------------------------------------------------------
 !
