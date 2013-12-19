@@ -254,6 +254,10 @@ module refinement
     integer      :: k, km1, kp1
     real(kind=4) :: fl, fr, fc, fx, fy, fz
     real(kind=4) :: eloc
+
+! local parameters
+!
+    real(kind=8), parameter :: eps = epsilon(1.0d+00)
 !
 !-------------------------------------------------------------------------------
 !
@@ -285,7 +289,7 @@ module refinement
             fl   = pdata%q(iqt,im1,j,k) - pdata%q(iqt,i  ,j,k)
             fc   = abs(pdata%q(iqt,ip1,j,k)) + abs(pdata%q(iqt,im1,j,k))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fx   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            fx   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 
 ! calculate the second derivative error along the Y direction
 !
@@ -293,7 +297,7 @@ module refinement
             fl   = pdata%q(iqt,i,jm1,k) - pdata%q(iqt,i,j  ,k)
             fc   = abs(pdata%q(iqt,i,jp1,k)) + abs(pdata%q(iqt,i,jm1,k))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fy   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            fy   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 
 #if NDIMS == 3
 ! calculate the second derivative error along the Z direction
@@ -302,7 +306,7 @@ module refinement
             fl   = pdata%q(iqt,i,j,km1) - pdata%q(iqt,i,j,k  )
             fc   = abs(pdata%q(iqt,i,j,kp1)) + abs(pdata%q(iqt,i,j,km1))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fz   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+            fz   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 #endif /* NDIMS == 3 */
 
 ! calculate the square of the second derivative error
