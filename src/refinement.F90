@@ -23,7 +23,8 @@
 !!
 !! module: REFINEMENT
 !!
-!!  This module handles the refinement criterion calculation.
+!!  This module handles the error estimation and refinement criterion
+!!  determination.
 !!
 !!
 !!******************************************************************************
@@ -36,9 +37,16 @@ module refinement
 
 ! refinement criterion parameters
 !
-  real, save :: crefmin = 4.0d-2
-  real, save :: crefmax = 2.0d-1
-  real, save :: epsref  = 1.0d-2
+  real(kind=8), save :: crefmin = 4.0d-02
+  real(kind=8), save :: crefmax = 2.0d-01
+  real(kind=8), save :: epsref  = 1.0d-02
+
+! flags for variable included in the refinement criterion calculation
+!
+  logical     , save :: dens_ref  = .true.
+  logical     , save :: pres_ref  = .true.
+  logical     , save :: velo_ref  = .false.
+  logical     , save :: magn_ref  = .false.
 
 ! by default everything is private
 !
@@ -70,11 +78,15 @@ module refinement
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_real
+    use parameters, only : get_parameter_real, get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! local variables
+!
+    character(len=255) :: variables = "dens pres"
 !
 !-------------------------------------------------------------------------------
 !
@@ -83,6 +95,17 @@ module refinement
     call get_parameter_real("crefmin", crefmin)
     call get_parameter_real("crefmax", crefmax)
     call get_parameter_real("epsref" , epsref )
+
+! get variables to include in the refinement criterion calculation
+!
+    call get_parameter_string("refinement_variables", variables)
+
+! check if density should be take into account
+!
+    dens_ref = index(variables, 'dens') > 0
+    pres_ref = index(variables, 'pres') > 0
+    velo_ref = index(variables, 'velo') > 0
+    magn_ref = index(variables, 'magn') > 0
 
 !-------------------------------------------------------------------------------
 !
@@ -100,125 +123,71 @@ module refinement
 !
 !   Arguments:
 !
-!     pdata - pointer to the datablock structure of the currently initialized
-!             block;
-!
+!     pdata - pointer to the data block for which the refinement criterion
+!             has to be determined;
 !
 !===============================================================================
 !
   function check_refinement_criterion(pdata) result(criterion)
 
-! include external variables
+! variables and subroutines imported from other modules
 !
     use blocks     , only : block_data
-    use coordinates, only : ib, jb, kb, ie, je, ke
-    use equations  , only : idn, ipr, ibx, iby, ibz
+    use equations  , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_data), pointer, intent(in) :: pdata
 
 ! return variable
 !
-    integer(kind=4)                       :: criterion
+    integer(kind=1)                       :: criterion
 
 ! local variables
 !
-    integer :: i, j, k, im1, jm1, km1, ip1, jp1, kp1
-    real    :: fl, fr, fc, fx, fy, fz
-    real    :: cloc, cref
+    real(kind=4) :: cref
 !
 !-------------------------------------------------------------------------------
 !
 ! reset indicators
 !
-    cref = 0.0d0
+    cref = 0.0e+00
 
-! find the maximum smoothness indicator over all cells
+! find the second derivative error for density
 !
-    do k = kb, ke
+    if (dens_ref) cref = max(cref, second_derivative_error(idn, pdata))
+
+! find the second derivative error for pressure
+!
+    if (pres_ref) cref = max(cref, second_derivative_error(ipr, pdata))
+
+! find the second derivative error for velocity
+!
+    if (velo_ref) then
+
+      cref = max(cref, second_derivative_error(ivx, pdata))
+      cref = max(cref, second_derivative_error(ivy, pdata))
 #if NDIMS == 3
-      km1 = k - 1
-      kp1 = k + 1
-#endif /* NDIMS == 3 */
-      do j = jb, je
-        jm1 = j - 1
-        jp1 = j + 1
-        do i = ib, ie
-          im1 = i - 1
-          ip1 = i + 1
-
-! reset the local criterion value
-!
-          cloc = 0.0d0
-
-! density
-!
-          fr   = pdata%q(idn,ip1,j,k) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,im1,j,k) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,ip1,j,k) + pdata%q(idn,im1,j,k)                   &
-                                                  + 2.0d0 * pdata%q(idn,i,j,k)
-          fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          fr   = pdata%q(idn,i,jp1,k) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,i,jm1,k) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,i,jp1,k) + pdata%q(idn,i,jm1,k)                   &
-                                                  + 2.0d0 * pdata%q(idn,i,j,k)
-          fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-#if NDIMS == 2
-          cloc = max(cloc, fx, fy)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-          fr   = pdata%q(idn,i,j,kp1) - pdata%q(idn,i,j,k)
-          fl   = pdata%q(idn,i,j,km1) - pdata%q(idn,i,j,k)
-          fc   = pdata%q(idn,i,j,kp1) + pdata%q(idn,i,j,km1)                   &
-                                                  + 2.0d0 * pdata%q(idn,i,j,k)
-          fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-          cloc = max(cloc, fx, fy, fz)
+      cref = max(cref, second_derivative_error(ivz, pdata))
 #endif /* NDIMS == 3 */
 
-          if (ipr > 0) then
-! pressure
+    end if
+
+! find the second derivative error for magnetic field
 !
-            fr   = pdata%q(ipr,ip1,j,k) - pdata%q(ipr,i,j,k)
-            fl   = pdata%q(ipr,im1,j,k) - pdata%q(ipr,i,j,k)
-            fc   = pdata%q(ipr,ip1,j,k) + pdata%q(ipr,im1,j,k)                 &
-                                                  + 2.0d0 * pdata%q(ipr,i,j,k)
-            fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-            fr   = pdata%q(ipr,i,jp1,k) - pdata%q(ipr,i,j,k)
-            fl   = pdata%q(ipr,i,jm1,k) - pdata%q(ipr,i,j,k)
-            fc   = pdata%q(ipr,i,jp1,k) + pdata%q(ipr,i,jm1,k)                 &
-                                                  + 2.0d0 * pdata%q(ipr,i,j,k)
-            fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-#if NDIMS == 2
-            cloc = max(cloc, fx, fy)
-#endif /* NDIMS == 2 */
+    if (magn_ref) then
+
+      cref = max(cref, second_derivative_error(ibx, pdata))
+      cref = max(cref, second_derivative_error(iby, pdata))
 #if NDIMS == 3
-            fr   = pdata%q(ipr,i,j,kp1) - pdata%q(ipr,i,j,k)
-            fl   = pdata%q(ipr,i,j,km1) - pdata%q(ipr,i,j,k)
-            fc   = pdata%q(ipr,i,j,kp1) + pdata%q(ipr,i,j,km1)                 &
-                                                  + 2.0d0 * pdata%q(ipr,i,j,k)
-            fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
-            cloc = max(cloc, fx, fy, fz)
+      cref = max(cref, second_derivative_error(ibz, pdata))
 #endif /* NDIMS == 3 */
-          end if
 
-! find the block maximum refinement value
-!
-          cref = max(cref, cloc)
-
-#ifdef DEBUG
-! store the refinement criterion value
-!
-          pdata%c(i,j,k) = cloc
-#endif /* DEBUG */
-
-        end do
-      end do
-    end do
+    end if
 
 ! return the refinement flag depending on the condition value
 !
@@ -238,6 +207,130 @@ module refinement
 !-------------------------------------------------------------------------------
 !
   end function check_refinement_criterion
+!
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
+!
+! function SECOND_DERIVATIVE_ERROR:
+! --------------------------------
+!
+!   Function calculate the second derivative error for a given data block
+!   and selected primitive variables.  The total error is returned then.
+!
+!   Arguments:
+!
+!     iqt   - the index of primitive variable;
+!     pdata - pointer to the data block for which error is calculated;
+!
+!===============================================================================
+!
+  function second_derivative_error(iqt, pdata) result(error)
+
+! variables and subroutines imported from other modules
+!
+    use blocks     , only : block_data
+    use coordinates, only : ib, jb, kb, ie, je, ke
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                  , intent(in) :: iqt
+    type(block_data), pointer, intent(in) :: pdata
+
+! return variable
+!
+    real(kind=4)                          :: error
+
+! local variables
+!
+    integer      :: i, im1, ip1
+    integer      :: j, jm1, jp1
+    integer      :: k, km1, kp1
+    real(kind=4) :: fl, fr, fc, fx, fy, fz
+    real(kind=4) :: eloc
+!
+!-------------------------------------------------------------------------------
+!
+! reset indicators
+!
+    eloc = 0.0e+00
+
+! calculate local refinement criterion for variable which exists
+!
+    if (iqt > 0) then
+
+! find the maximum smoothness indicator over all cells
+!
+      do k = kb, ke
+#if NDIMS == 3
+        km1 = k - 1
+        kp1 = k + 1
+#endif /* NDIMS == 3 */
+        do j = jb, je
+          jm1 = j - 1
+          jp1 = j + 1
+          do i = ib, ie
+            im1 = i - 1
+            ip1 = i + 1
+
+! calculate the second derivative error the X direction
+!
+            fr   = pdata%q(iqt,ip1,j,k) - pdata%q(iqt,i  ,j,k)
+            fl   = pdata%q(iqt,im1,j,k) - pdata%q(iqt,i  ,j,k)
+            fc   = pdata%q(iqt,ip1,j,k) + pdata%q(iqt,im1,j,k)                 &
+                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fx   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+
+! calculate the second derivative error along the Y direction
+!
+            fr   = pdata%q(iqt,i,jp1,k) - pdata%q(iqt,i,j  ,k)
+            fl   = pdata%q(iqt,i,jm1,k) - pdata%q(iqt,i,j  ,k)
+            fc   = pdata%q(iqt,i,jp1,k) + pdata%q(iqt,i,jm1,k)                 &
+                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fy   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+
+#if NDIMS == 3
+! calculate the second derivative error along the Z direction
+!
+            fr   = pdata%q(iqt,i,j,kp1) - pdata%q(iqt,i,j,k  )
+            fl   = pdata%q(iqt,i,j,km1) - pdata%q(iqt,i,j,k  )
+            fc   = pdata%q(iqt,i,j,kp1) + pdata%q(iqt,i,j,km1)                 &
+                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fz   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
+#endif /* NDIMS == 3 */
+
+! calculate the square of the second derivative error
+!
+#if NDIMS == 2
+            eloc = max(eloc, fx * fx + fy * fy)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            eloc = max(eloc, fx * fx + fy * fy + fz * fz)
+#endif /* NDIMS == 3 */
+
+          end do
+        end do
+      end do
+
+    end if ! iqt > 0
+
+! calculate the second derivative error
+!
+    error = sqrt(eloc)
+
+! return the refinement flag
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function second_derivative_error
 
 !===============================================================================
 !
