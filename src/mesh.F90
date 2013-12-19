@@ -1318,21 +1318,21 @@ module mesh
 !
 #if NDIMS == 2
       pparent%u(1:nv,is:it,js:jt, 1   ) =                                      &
-                                2.5d-01 * ((pchild%u(1:nv,il:iu:2,jl:ju:2,1)   &
-                                        +   pchild%u(1:nv,ip:iu:2,jp:ju:2,1))  &
-                                        +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,1)   &
-                                        +   pchild%u(1:nv,il:iu:2,jp:ju:2,1)))
+                        2.50d-01 *  ((pchild%u(1:nv,il:iu:2,jl:ju:2, 1     )   &
+                                 +    pchild%u(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
+                                 +   (pchild%u(1:nv,il:iu:2,jp:ju:2, 1     )   &
+                                 +    pchild%u(1:nv,ip:iu:2,jl:ju:2, 1     )))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
       pparent%u(1:nv,is:it,js:jt,ks:kt) =                                      &
-                         1.25d-01 * ((pchild%u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
-                                  +   pchild%u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
-                                  +  (pchild%u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
-                                  +   pchild%u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))  &
-                                  +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2)   &
-                                  +   pchild%u(1:nv,il:iu:2,jp:ju:2,kp:ku:2))  &
-                                  +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)   &
-                                  +   pchild%u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)))
+                        1.25d-01 * (((pchild%u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                 +    pchild%u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
+                                 +   (pchild%u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
+                                 +    pchild%u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
+                                 +  ((pchild%u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
+                                 +    pchild%u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
+                                 +   (pchild%u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
+                                 +    pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
     end do ! p = 1, nchild
