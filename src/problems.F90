@@ -126,6 +126,11 @@ module problems
     case("blast")
       call setup_problem_blast(pdata)
 
+! specific problems
+!
+    case("reconnection")
+      call setup_problem_reconnection(pdata)
+
     case default
       call print_error("problems::init_problem()"                              &
                      , "Setup subroutime is not implemented for this problem!")
@@ -430,6 +435,157 @@ module problems
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_blast
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_RECONNECTION:
+! -------------------------------------
+!
+!   Subroutine sets the initial conditions for the reconnection problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_reconnection(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
+    use coordinates, only : ay
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real
+    use random     , only : randomn
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: dens = 1.00d+00
+    real(kind=8), save :: pres = 1.00d+00
+    real(kind=8), save :: bamp = 1.00d+00
+    real(kind=8), save :: bgui = 0.00d+00
+    real(kind=8), save :: vper = 1.00d-02
+    real(kind=8), save :: ycut = 1.00d-01
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer            :: i, j, k
+
+! local arrays
+!
+    real(kind=8), dimension(nv,jm) :: q, u
+    real(kind=8), dimension(jm)    :: y
+!
+!-------------------------------------------------------------------------------
+!
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("dens"  , dens)
+      call get_parameter_real("pres"  , pres)
+      call get_parameter_real("brecon", bamp)
+      call get_parameter_real("bguide", bgui)
+      call get_parameter_real("vper"  , vper)
+      call get_parameter_real("ycut"  , ycut)
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+
+! set the density and pressure
+!
+    q(idn,:) = dens
+    if (ipr > 0) q(ipr,:) = pres
+
+! reset velocity components
+!
+    q(ivx,:) = 0.0d+00
+    q(ivy,:) = 0.0d+00
+    q(ivz,:) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+      q(ibx,:) = 0.0d+00
+      q(iby,:) = 0.0d+00
+      q(ibz,:) = bgui
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the XZ plane
+!
+    do k = 1, km
+      do i = 1, im
+
+! sweep along the Y coordinate
+!
+        do j = 1, jm
+
+! set the random velocity field in a layer near current sheet
+!
+          if (abs(y(j)) <= ycut) then
+
+            q(ivx,j) = vper * randomn()
+            q(ivy,j) = vper * randomn()
+#if NDIMS == 3
+            q(ivz,j) = vper * randomn()
+#endif /* NDIMS == 3 */
+
+          end if
+
+! set antiparallel magnetic field component
+!
+          if (ibx > 0) q(ibx,j) = sign(bamp, y(j))
+
+        end do ! j = 1, jm
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(jm, q(1:nv,1:jm), u(1:nv,1:jm))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,i,1:jm,k) = u(1:nv,1:jm)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,i,1:jm,k) = q(1:nv,1:jm)
+
+      end do ! i = 1, im
+    end do ! k = 1, km
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_reconnection
 
 !===============================================================================
 !
