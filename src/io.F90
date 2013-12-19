@@ -51,6 +51,10 @@ module io
   integer           , save :: nres    = -1
   character(len=255), save :: respath = "./"
 
+! flags to determine the way of data writing
+!
+  logical           , save :: with_ghosts = .false.
+
 ! counters for the stored data and restart files
 !
   integer(kind=4)   , save :: nfile = 0, nrest = 0
@@ -95,18 +99,35 @@ module io
 ! local variables are not implicit by default
 !
     implicit none
+
+! local variables
+!
+    character(len=255) :: ghosts = "off"
 !
 !-------------------------------------------------------------------------------
 !
 ! read values of the module parameters
 !
-    call get_parameter_integer("nres"   , nres   )
-    call get_parameter_string ("respath", respath)
+    call get_parameter_integer("nres"          , nres   )
+    call get_parameter_string ("respath"       , respath)
 
 ! get the interval between snapshots
 !
-    call get_parameter_string ("ftype"  , ftype  )
-    call get_parameter_real   ("dtout"  , dtout  )
+    call get_parameter_string ("ftype"         , ftype  )
+    call get_parameter_real   ("dtout"         , dtout  )
+
+! get the flag determining if the ghost cells are stored
+!
+    call get_parameter_string ("include_ghosts", ghosts )
+
+! check ghost cell storing flag
+!
+    select case(trim(ghosts))
+    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+      with_ghosts = .true.
+    case default
+      with_ghosts = .false.
+    end select
 
 !-------------------------------------------------------------------------------
 !
@@ -283,7 +304,7 @@ module io
 ! depending on the selected type of output file write the right groups
 !
         select case(ftype)
-        case('f')
+        case('c')
 
 ! write the coordinates (data block bounds, refinement levels, etc.)
 !
@@ -291,7 +312,7 @@ module io
 
 ! write the variables stored in data blocks (leafs)
 !
-          call write_variables_full_h5(fid)
+          call write_conservative_variables_h5(fid)
 
         case('p')
 
@@ -301,7 +322,7 @@ module io
 
 ! write the variables stored in data blocks (leafs)
 !
-          call write_variables_h5(fid)
+          call write_primitive_variables_h5(fid)
 
         case('r')
 
@@ -2880,48 +2901,50 @@ module io
 !
 !===============================================================================
 !
-! write_variables_full_h5: subroutine writes each variable from datablocks in a
-!                          separate array in the HDF5 format connected to the
-!                          provided identificator
+! subroutine WRITE_PRIMITIVE_VARIABLES_H5:
+! ---------------------------------------
 !
-! info: this subroutine stores variables with ghost cells
+!   Subroutine groups each primitive variable from all data blocks and writes
+!   it as an array in the HDF5 dataset connected to the input HDF file
+!   identificator.
 !
-! arguments:
+!   Arguments:
 !
-!   fid - the HDF5 file identificator
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
-  subroutine write_variables_full_h5(fid)
+  subroutine write_primitive_variables_h5(fid)
 
 ! references to other modules
 !
-    use blocks     , only : block_data, list_data
-    use blocks     , only : get_dblocks
-    use coordinates, only : im, jm, km
-    use equations  , only : nv, cvars, pvars
-    use equations  , only : ivx, ivy, ivz, ipr
-    use error      , only : print_error
-    use hdf5       , only : hid_t, hsize_t
-    use hdf5       , only : h5gcreate_f, h5gclose_f
+    use blocks       , only : block_data, list_data
+    use blocks       , only : get_dblocks
+    use coordinates  , only : im, jm, km, in, jn, kn
+    use coordinates  , only : ib, jb, kb, ie, je, ke
+    use equations    , only : nv, pvars
+    use error        , only : print_error
+    use hdf5         , only : hid_t, hsize_t
+    use hdf5         , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! HDF5 variables
 !
-    integer(hid_t)    :: gid
-    integer(hsize_t)  :: dm(4)
+    integer(hid_t)             :: gid
+    integer(hsize_t)           :: dm(4)
 
 ! local variables
 !
-    integer           :: err
-    integer(kind=4)   :: i, j, k, l, n
+    integer         :: err
+    integer(kind=4) :: i, j, k, l, n
+    integer(kind=4) :: il, jl, kl, iu, ju, ku
 
 ! local allocatable arrays
 !
@@ -2933,221 +2956,171 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! create a group to store global attributes
+! create a group to store variables
 !
     call h5gcreate_f(fid, 'variables', gid, err)
 
-! check if the group has been created successfuly
+! check if the group was created successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
-! store variables only if there are some data blocks on the current processor
+! store variables only if there is at least one data block associated with
+! the current process
 !
-      if (get_dblocks() .gt. 0) then
+      if (get_dblocks() > 0) then
 
-! prepare dimensions
+! prepare dimensions and index limits
 !
         dm(1) = get_dblocks()
-        dm(2) = im
-        dm(3) = jm
-        dm(4) = km
+        if (with_ghosts) then
+          dm(2) = im
+          dm(3) = jm
+          dm(4) = km
 
-! allocate arrays to store variables from all datablocks
+          il    =  1
+          jl    =  1
+          kl    =  1
+          iu    = im
+          ju    = jm
+          ku    = km
+        else
+          dm(2) = in
+          dm(3) = jn
+          dm(4) = kn
+
+          il    = ib
+          jl    = jb
+          kl    = kb
+          iu    = ie
+          ju    = je
+          ku    = ke
+        end if
+
+! allocate array to group a variable from all data blocks
 !
         allocate(qarr(dm(1),dm(2),dm(3),dm(4)))
 
-! iterate over all conserved variables
+! iterate over all variables
 !
         do n = 1, nv
 
-! iterate over all data blocks and fill in the arrays
+! reset the block counter
 !
-          l = 1
+          l = 0
+
+! assosiate the block pointer with the first data block on the list
+!
           pdata => list_data
+
+! iterate over all data blocks and copy the variable from each of them to
+! the allocate array
+!
           do while(associated(pdata))
 
-            qarr(l,1:im,1:jm,1:km) = pdata%u(n,1:im,1:jm,1:km)
-
+! increase the data block counter
+!
             l = l + 1
+
+! copy the variable from the current data block
+!
+            qarr(l,1:dm(2),1:dm(3),1:dm(4)) = pdata%q(n,il:iu,jl:ju,kl:ku)
+
+! assign the pointer with the next data block on the list
+!
             pdata => pdata%next
 
           end do ! pdata=>list_data
 
-! write the variables to the HDF5 file
+! write the variable array to the HDF5 file
 !
-          call write_array4_double_h5(gid, trim(cvars(n)), dm, qarr)
+          call write_array4_double_h5(gid, trim(pvars(n)), dm, qarr)
 
         end do ! n = 1, nv
 
-! store velocity components
-!
-        if (ivx > 0) then
-
-! iterate over all data blocks and fill in the arrays
-!
-          l = 1
-          pdata => list_data
-          do while(associated(pdata))
-
-            qarr(l,1:im,1:jm,1:km) = pdata%u(ivx,1:im,1:jm,1:km)
-
-            l = l + 1
-            pdata => pdata%next
-
-          end do ! pdata=>list_data
-
-! write the variables to the HDF5 file
-!
-          call write_array4_double_h5(gid, trim(pvars(ivx)), dm, qarr)
-
-        end if ! ivx > 0
-
-        if (ivy > 0) then
-
-! iterate over all data blocks and fill in the arrays
-!
-          l = 1
-          pdata => list_data
-          do while(associated(pdata))
-
-            qarr(l,1:im,1:jm,1:km) = pdata%u(ivy,1:im,1:jm,1:km)
-
-            l = l + 1
-            pdata => pdata%next
-
-          end do ! pdata=>list_data
-
-! write the variables to the HDF5 file
-!
-          call write_array4_double_h5(gid, trim(pvars(ivy)), dm, qarr)
-
-        end if ! ivy > 0
-
-        if (ivz > 0) then
-
-! iterate over all data blocks and fill in the arrays
-!
-          l = 1
-          pdata => list_data
-          do while(associated(pdata))
-
-            qarr(l,1:im,1:jm,1:km) = pdata%u(ivz,1:im,1:jm,1:km)
-
-            l = l + 1
-            pdata => pdata%next
-
-          end do ! pdata=>list_data
-
-! write the variables to the HDF5 file
-!
-          call write_array4_double_h5(gid, trim(pvars(ivz)), dm, qarr)
-
-        end if ! ivz > 0
-
-! store pressure
-!
-        if (ipr > 0) then
-
-! iterate over all data blocks and fill in the arrays
-!
-          l = 1
-          pdata => list_data
-          do while(associated(pdata))
-
-            qarr(l,1:im,1:jm,1:km) = pdata%u(ipr,1:im,1:jm,1:km)
-
-            l = l + 1
-            pdata => pdata%next
-
-          end do ! pdata=>list_data
-
-! write the variables to the HDF5 file
-!
-          call write_array4_double_h5(gid, trim(pvars(ipr)), dm, qarr)
-
-        end if ! ipr > 0
-
-! deallocate allocatable arrays
+! deallocate allocatable array
 !
         if (allocated(qarr)) deallocate(qarr)
 
       end if ! dblocks > 0
 
-! close the attribute group
+! close the variable group
 !
       call h5gclose_f(gid, err)
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_variables_full_h5"  &
-                                                    , "Cannot close the group!")
+        call print_error("io::write_primitive_variables_h5"                    &
+                                                  , "Cannot close the group!")
 
       end if
 
-    else
+    else ! error with creating a group
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_variables_full_h5"  &
-                                                   , "Cannot create the group!")
+      call print_error("io::write_primitive_variables_h5"                      &
+                                                 , "Cannot create the group!")
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_variables_full_h5
+  end subroutine write_primitive_variables_h5
 !
 !===============================================================================
 !
-! write_variables_h5: subroutine writes each variable from datablocks in a
-!                     separate array in the HDF5 format connected to the
-!                     provided identificator
+! subroutine WRITE_CONSERVATIVE_VARIABLES_H5:
+! ------------------------------------------
 !
-! info: this subroutine stores variables
+!   Subroutine groups each conservative variable from all data blocks and writes
+!   it as an array in the HDF5 dataset connected to the input HDF file
+!   identificator.
 !
-! arguments:
+!   Arguments:
 !
-!   fid - the HDF5 file identificator
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
-  subroutine write_variables_h5(fid)
+  subroutine write_conservative_variables_h5(fid)
 
 ! references to other modules
 !
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
-    use coordinates  , only : in, jn, kn, ib, ie, jb, je, kb, ke
-    use equations    , only : nv, pvars
+    use coordinates  , only : im, jm, km, in, jn, kn
+    use coordinates  , only : ib, jb, kb, ie, je, ke
+    use equations    , only : nv, cvars
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! HDF5 variables
 !
-    integer(hid_t)    :: gid
-    integer(hsize_t)  :: dm(4)
+    integer(hid_t)             :: gid
+    integer(hsize_t)           :: dm(4)
 
 ! local variables
 !
-    integer           :: err
-    integer(kind=4)   :: i, j, k, l, n
+    integer         :: err
+    integer(kind=4) :: i, j, k, l, n
+    integer(kind=4) :: il, jl, kl, iu, ju, ku
 
 ! local allocatable arrays
 !
-    real(kind=4), dimension(:,:,:,:), allocatable :: qarr
+    real(kind=8), dimension(:,:,:,:), allocatable :: qarr
 
 ! local pointers
 !
@@ -3155,79 +3128,120 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! create a group to store primitive variables
+! create a group to store variables
 !
     call h5gcreate_f(fid, 'variables', gid, err)
 
-! print an error, if the group couldn't be created
+! check if the group was created successfuly
 !
-    if (err == -1) call print_error("io::write_variables_h5"                   &
-                                     , "Cannot create the group 'variables'!")
+    if (err >= 0) then
 
-! store variables only if there are at least one data block on the current
-! processor
+! store variables only if there is at least one data block associated with
+! the current process
 !
-    if (get_dblocks() > 0) then
+      if (get_dblocks() > 0) then
 
-! prepare the variable dimensions
+! prepare dimensions and index limits
 !
-      dm(1) = get_dblocks()
-      dm(2) = in
-      dm(3) = jn
-      dm(4) = kn
+        dm(1) = get_dblocks()
+        if (with_ghosts) then
+          dm(2) = im
+          dm(3) = jm
+          dm(4) = km
 
-! allocate arrays to store the variables from current processor data blocks
+          il    =  1
+          jl    =  1
+          kl    =  1
+          iu    = im
+          ju    = jm
+          ku    = km
+        else
+          dm(2) = in
+          dm(3) = jn
+          dm(4) = kn
+
+          il    = ib
+          jl    = jb
+          kl    = kb
+          iu    = ie
+          ju    = je
+          ku    = ke
+        end if
+
+! allocate array to group a variable from all data blocks
 !
-      allocate(qarr(dm(1),dm(2),dm(3),dm(4)))
+        allocate(qarr(dm(1),dm(2),dm(3),dm(4)))
 
-! iterate over all primitive variables
+! iterate over all variables
 !
-      do n = 1, nv
+        do n = 1, nv
 
-! iterate over the data blocks on current processor
+! reset the block counter
 !
-        l = 1
-        pdata => list_data
-        do while(associated(pdata))
+          l = 0
 
-! copy the primitive variables to the stored arrays
+! assosiate the block pointer with the first data block on the list
 !
-          qarr(l,1:in,1:jn,1:kn) = real(pdata%q(n,ib:ie,jb:je,kb:ke), kind = 4)
+          pdata => list_data
 
-! increase the block number
+! iterate over all data blocks and copy the variable from each of them to
+! the allocate array
 !
-          l = l + 1
+          do while(associated(pdata))
 
-! associate the data block pointer with the next block
+! increase the data block counter
 !
-          pdata => pdata%next
+            l = l + 1
 
-        end do ! pdata=>list_data
-
-! store the primitive variables in the HDF5 file
+! copy the variable from the current data block
 !
-        call write_array4_float_h5(gid, trim(pvars(n)), dm(:), qarr(:,:,:,:))
+            qarr(l,1:dm(2),1:dm(3),1:dm(4)) = pdata%u(n,il:iu,jl:ju,kl:ku)
 
-      end do ! n = 1, nv
-
-! deallocate the temporary arrays
+! assign the pointer with the next data block on the list
 !
-      if (allocated(qarr)) deallocate(qarr)
+            pdata => pdata%next
 
-    end if ! dblocks > 0
+          end do ! pdata=>list_data
 
-! close the variables group
+! write the variable array to the HDF5 file
 !
-    call h5gclose_f(gid, err)
+          call write_array4_double_h5(gid, trim(cvars(n)), dm, qarr)
 
-! print an error, if the group couldn't be closed
+        end do ! n = 1, nv
+
+! deallocate allocatable array
 !
-    if (err == -1) call print_error("io::write_variables_h5"                   &
-                                      , "Cannot close the group 'variables'!")
+        if (allocated(qarr)) deallocate(qarr)
+
+      end if ! dblocks > 0
+
+! close the variable group
+!
+      call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+      if (err > 0) then
+
+! print error about the problem with closing the group
+!
+        call print_error("io::write_conservative_variables_h5"                 &
+                                                  , "Cannot close the group!")
+
+      end if
+
+    else ! error with creating a group
+
+! print error about the problem with creating the group
+!
+      call print_error("io::write_conservative_variables_h5"                   &
+                                                 , "Cannot create the group!")
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_variables_h5
+  end subroutine write_conservative_variables_h5
 !
 !===============================================================================
 !
