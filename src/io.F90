@@ -3109,6 +3109,7 @@ module io
 ! info: this subroutine stores variables
 !
 ! arguments:
+!
 !   fid - the HDF5 file identificator
 !
 !===============================================================================
@@ -3120,13 +3121,10 @@ module io
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
     use coordinates  , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
+    use equations    , only : nv, pvars
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
     use hdf5         , only : h5gcreate_f, h5gclose_f
-#ifdef DEBUG
-    use refinement   , only : check_refinement_criterion
-#endif /* DEBUG */
-    use equations    , only : nv, pvars
 
 ! declare variables
 !
@@ -3162,13 +3160,13 @@ module io
 
 ! print an error, if the group couldn't be created
 !
-    if (err .eq. -1) call print_error("io::write_variables_h5"                 &
+    if (err == -1) call print_error("io::write_variables_h5"                   &
                                      , "Cannot create the group 'variables'!")
 
 ! store variables only if there are at least one data block on the current
 ! processor
 !
-    if (get_dblocks() .gt. 0) then
+    if (get_dblocks() > 0) then
 
 ! prepare the variable dimensions
 !
@@ -3193,7 +3191,7 @@ module io
 
 ! copy the primitive variables to the stored arrays
 !
-          qarr(l,1:in,1:jn,1:kn) = real(pdata%q(n,ib:ie,jb:je,kb:ke), kind=4)
+          qarr(l,1:in,1:jn,1:kn) = real(pdata%q(n,ib:ie,jb:je,kb:ke), kind = 4)
 
 ! increase the block number
 !
@@ -3223,7 +3221,7 @@ module io
 
 ! print an error, if the group couldn't be closed
 !
-    if (err .eq. -1) call print_error("io::write_variables_h5"                 &
+    if (err == -1) call print_error("io::write_variables_h5"                   &
                                       , "Cannot close the group 'variables'!")
 
 !-------------------------------------------------------------------------------
