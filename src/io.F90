@@ -2887,6 +2887,7 @@ module io
 ! info: this subroutine stores variables with ghost cells
 !
 ! arguments:
+!
 !   fid - the HDF5 file identificator
 !
 !===============================================================================
@@ -3120,7 +3121,7 @@ module io
 !
     use blocks       , only : block_data, list_data
     use blocks       , only : get_dblocks
-    use coordinates  , only : im, jm, km, in, jn, kn, ib, ie, jb, je, kb, ke
+    use coordinates  , only : in, jn, kn, ib, ie, jb, je, kb, ke
     use equations    , only : nv, pvars
     use error        , only : print_error
     use hdf5         , only : hid_t, hsize_t
