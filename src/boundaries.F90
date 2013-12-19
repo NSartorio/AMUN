@@ -2416,21 +2416,21 @@ module boundaries
 !
 #if NDIMS == 2
     pdata%u(:,is:it,js:jt, 1   ) =                                             &
-                                2.50d-01 * ((u(1:nv,il:iu:2,jl:ju:2, 1     )   &
-                                         +   u(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
-                                         +  (u(1:nv,il:iu:2,jp:ju:2, 1     )   &
-                                         +   u(1:nv,ip:iu:2,jl:ju:2, 1     )))
+                               2.50d-01 * ((u(1:nv,il:iu:2,jl:ju:2, 1     )    &
+                                        +   u(1:nv,ip:iu:2,jp:ju:2, 1     ))   &
+                                        +  (u(1:nv,il:iu:2,jp:ju:2, 1     )    &
+                                        +   u(1:nv,ip:iu:2,jl:ju:2, 1     )))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
     pdata%u(:,is:it,js:jt,ks:kt) =                                             &
-                                1.25d-01 * ((u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
-                                         +   u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
-                                         +  (u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
-                                         +   u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))  &
-                                         +  (u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
-                                         +   u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
-                                         +  (u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
-                                         +   u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)))
+                               1.25d-01 * (((u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                        +   u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))   &
+                                        +  (u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)    &
+                                        +   u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))  &
+                                        +  ((u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
+                                        +   u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))   &
+                                        +  (u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)    &
+                                        +   u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
