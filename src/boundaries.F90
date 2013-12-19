@@ -2242,26 +2242,41 @@ module boundaries
 !
 !===============================================================================
 !
-! boundary_restrict: subroutine copies the restricted interior of the neighbor
-!                    in order to update a boundary of the current block
+! subroutine BOUNDARY_RESTRICT:
+! ----------------------------
+!
+!   Subroutine restricts variables from the interior of the neighbor data
+!   block copies the resulting array of variables to the fills out
+!   the proper range of ghost zones.  The process of data restriction
+!   conserves stored variables.
+!
+!   Arguments:
+!
+!     pdata              - the input data block;
+!     u                  - the conserved array obtained from the neighbor;
+!     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
   subroutine boundary_restrict(pdata, u, idir, iside, iface)
 
-    use blocks   , only : block_data
-    use coordinates, only : ng, im, ih, ib, ie, ieu           &
-                        , nd, jm, jh, jb, je, jeu           &
-                        , nh, km, kh, kb, ke, keu
-    use equations, only : nv
+! variables and subroutines imported from other modules
+!
+    use blocks       , only : block_data
+    use coordinates  , only : ng, im, ih, ib, ie, ieu           &
+                            , nd, jm, jh, jb, je, jeu           &
+                            , nh, km, kh, kb, ke, keu
+    use equations    , only : nv
 
+! local variables are not implicit by default
+!
     implicit none
 
-! arguments
+! subroutine arguments
 !
-    type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
-    integer                    , intent(in)    :: idir, iside, iface
+    type(block_data)           , pointer, intent(inout) :: pdata
+    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: u
+    integer                             , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
@@ -2279,15 +2294,15 @@ module boundaries
 
 ! X indices
 !
-      if (iside .eq. 1) then
-        is = 1
+      if (iside == 1) then
+        is =  1
         it = ng
       else
         is = ieu
         it = im
       end if
 
-      il = 1
+      il =  1
       iu = nd
       ip = il + 1
 
@@ -2305,7 +2320,7 @@ module boundaries
 #if NDIMS == 3
 ! Z indices
 !
-      kc =    (iface - 1) / 2
+      kc = (iface - 1) / 2
 
       ks = kb - nh + (kh - nh) * kc
       kt = kh      + (kh - nh) * kc
@@ -2330,22 +2345,22 @@ module boundaries
 
 ! Y indices
 !
-      if (iside .eq. 1) then
-        js = 1
+      if (iside == 1) then
+        js =  1
         jt = ng
       else
         js = jeu
         jt = jm
       end if
 
-      jl = 1
+      jl =  1
       ju = nd
       jp = jl + 1
 
 #if NDIMS == 3
 ! Z indices
 !
-      kc =    (iface - 1) / 2
+      kc = (iface - 1) / 2
 
       ks = kb - nh + (kh - nh) * kc
       kt = kh      + (kh - nh) * kc
@@ -2371,7 +2386,7 @@ module boundaries
 
 ! Y indices
 !
-      jc =    (iface - 1) / 2
+      jc = (iface - 1) / 2
 
       js = jb - nh + (jh - nh) * jc
       jt = jh      + (jh - nh) * jc
@@ -2382,38 +2397,40 @@ module boundaries
 
 ! Z indices
 !
-      if (iside .eq. 1) then
-        ks = 1
+      if (iside == 1) then
+        ks =  1
         kt = ng
       else
         ks = keu
         kt = km
       end if
 
-      kl = 1
+      kl =  1
       ku = nd
       kp = kl + 1
 #endif /* NDIMS == 3 */
 
     end select
 
-! update variable boundaries
+! update boundaries of the conserved variables
 !
 #if NDIMS == 2
-    pdata%u(:,is:it,js:jt,:) = 0.25d0 * (u(:,il:iu:2,jl:ju:2,:)                &
-                                       + u(:,ip:iu:2,jl:ju:2,:)                &
-                                       + u(:,il:iu:2,jp:ju:2,:)                &
-                                       + u(:,ip:iu:2,jp:ju:2,:))
+    pdata%u(:,is:it,js:jt, 1   ) =                                             &
+                                2.50d-01 * ((u(1:nv,il:iu:2,jl:ju:2, 1     )   &
+                                         +   u(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
+                                         +  (u(1:nv,il:iu:2,jp:ju:2, 1     )   &
+                                         +   u(1:nv,ip:iu:2,jl:ju:2, 1     )))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    pdata%u(:,is:it,js:jt,ks:kt) = 0.125d0 * (u(:,il:iu:2,jl:ju:2,kl:ku:2)     &
-                                            + u(:,ip:iu:2,jl:ju:2,kl:ku:2)     &
-                                            + u(:,il:iu:2,jp:ju:2,kl:ku:2)     &
-                                            + u(:,ip:iu:2,jp:ju:2,kl:ku:2)     &
-                                            + u(:,il:iu:2,jl:ju:2,kp:ku:2)     &
-                                            + u(:,ip:iu:2,jl:ju:2,kp:ku:2)     &
-                                            + u(:,il:iu:2,jp:ju:2,kp:ku:2)     &
-                                            + u(:,ip:iu:2,jp:ju:2,kp:ku:2))
+    pdata%u(:,is:it,js:jt,ks:kt) =                                             &
+                                1.25d-01 * ((u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                         +   u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
+                                         +  (u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
+                                         +   u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))  &
+                                         +  (u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
+                                         +   u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
+                                         +  (u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
+                                         +   u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)))
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
