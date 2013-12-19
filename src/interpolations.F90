@@ -43,6 +43,7 @@ module interpolations
 ! module parameters
 !
   real(kind=8), save :: eps        = epsilon(1.0d+00)
+  real(kind=8), save :: rad        = 0.5d+00
 
 ! flags for reconstruction corrections
 !
@@ -104,6 +105,7 @@ module interpolations
     call get_parameter_string("limiter"       , slimiter       )
     call get_parameter_string("fix_positivity", positivity_fix )
     call get_parameter_real  ("eps"           , eps            )
+    call get_parameter_real  ("limo3_rad"     , rad            )
 
 ! select the reconstruction method
 !
@@ -114,6 +116,9 @@ module interpolations
     case ("weno3", "WENO3")
       name_rec           =  "3rd order WENO"
       reconstruct_states => reconstruct_weno3
+    case ("limo3", "LIMO3", "LimO3")
+      name_rec           =  "3rd order logarithmic limited"
+      reconstruct_states => reconstruct_limo3
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
@@ -429,6 +434,148 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_weno3
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_LIMO3:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the third order method
+!   with a limiter function LimO3.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Cada, M. & Torrilhon, M.,
+!         "Compact third-order limiter functions for finite volume methods",
+!         Journal of Computational Physics, 2009, 228, 4118-4145
+!     [2] Mignone, A., Tzeferacos, P., & Bodo, G.,
+!         "High-order conservative finite divergence GLM-MHD schemes for
+!          cell-centered MHD",
+!         Journal of Computational Physics, 2010, 229, 5896-5920
+!
+!===============================================================================
+!
+  subroutine reconstruct_limo3(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1
+    real(kind=8) :: dfl, dfr
+    real(kind=8) :: th, et, f1, f2, xl, xi, rdx, rdx2
+!
+!-------------------------------------------------------------------------------
+!
+! prepare parameters
+!
+    rdx   = rad * h
+    rdx2  = rdx * rdx
+
+! iterate over positions and interpolate states
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+! prepare left and right differences
+!
+      dfl = f(i  ) - f(im1)
+      dfr = f(ip1) - f(i  )
+
+! calculate the indicator function (eq. 3.17 in [1])
+!
+      et = (dfl * dfl + dfr * dfr) / rdx2
+
+! the switching function (embedded in eq. 3.22 in [1], eq. 32 in [2])
+!
+      xi = max(0.0d+00, 0.5d+00 * min(2.0d+00, 1.0d+00 + (et - 1.0d+00) / eps))
+      xl = 1.0d+00 - xi
+
+! calculate values at i + ½
+!
+      if (dfr == 0.0d+00) then
+
+        fl(i) = f(i)
+
+      else
+
+! calculate the slope ratio (eq. 2.8 in [1])
+!
+        th = dfl / dfr
+
+! calculate the quadratic reconstruction (eq. 3.8 in [1], divided by 2)
+!
+        f1 = (2.0d+00 + th) / 6.0d+00
+
+! calculate the third order limiter (eq. 3.13 in [1], cofficients divided by 2)
+!
+        if (th >= 0.0d+00) then
+          f2 = max(0.0d+00, min(f1, th, 0.8d+00))
+        else
+          f2 = max(0.0d+00, min(f1, - 0.25d+00 * th))
+        end if
+
+! interpolate the left state (eq. 3.5 in [1], eq. 30 in [2])
+!
+        fl(i) = f(i) + dfr * (xl * f1 + xi * f2)
+
+      end if
+
+! calculate values at i - ½
+!
+      if (dfl == 0.0d+00) then
+
+        fr(im1) = f(i)
+
+      else
+
+! calculate the slope ratio (eq. 2.8 in [1])
+!
+        th = dfr / dfl
+
+! calculate the quadratic reconstruction (eq. 3.8 in [1], divided by 2)
+!
+        f1 = (2.0d+00 + th) / 6.0d+00
+
+! calculate the third order limiter (eq. 3.13 in [1], cofficients divided by 2)
+!
+        if (th >= 0.0d+00) then
+          f2 = max(0.0d+00, min(f1, th, 0.8d+00))
+        else
+          f2 = max(0.0d+00, min(f1, - 0.25d+00 * th))
+        end if
+
+! interpolate the right state (eq. 3.5 in [1], eq. 30 in [2])
+!
+        fr(im1) = f(i) - dfl * (xl * f1 + xi * f2)
+
+      end if
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = f (1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_limo3
 !
 !===============================================================================
 !
