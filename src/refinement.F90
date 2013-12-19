@@ -283,16 +283,16 @@ module refinement
 !
             fr   = pdata%q(iqt,ip1,j,k) - pdata%q(iqt,i  ,j,k)
             fl   = pdata%q(iqt,im1,j,k) - pdata%q(iqt,i  ,j,k)
-            fc   = pdata%q(iqt,ip1,j,k) + pdata%q(iqt,im1,j,k)                 &
-                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fc   = abs(pdata%q(iqt,ip1,j,k)) + abs(pdata%q(iqt,im1,j,k))       &
+                                           + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
             fx   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 
 ! calculate the second derivative error along the Y direction
 !
             fr   = pdata%q(iqt,i,jp1,k) - pdata%q(iqt,i,j  ,k)
             fl   = pdata%q(iqt,i,jm1,k) - pdata%q(iqt,i,j  ,k)
-            fc   = pdata%q(iqt,i,jp1,k) + pdata%q(iqt,i,jm1,k)                 &
-                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fc   = abs(pdata%q(iqt,i,jp1,k)) + abs(pdata%q(iqt,i,jm1,k))       &
+                                           + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
             fy   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 
 #if NDIMS == 3
@@ -300,8 +300,8 @@ module refinement
 !
             fr   = pdata%q(iqt,i,j,kp1) - pdata%q(iqt,i,j,k  )
             fl   = pdata%q(iqt,i,j,km1) - pdata%q(iqt,i,j,k  )
-            fc   = pdata%q(iqt,i,j,kp1) + pdata%q(iqt,i,j,km1)                 &
-                                                + 2.0d+00 * pdata%q(iqt,i,j,k)
+            fc   = abs(pdata%q(iqt,i,j,kp1)) + abs(pdata%q(iqt,i,j,km1))       &
+                                           + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
             fz   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc)
 #endif /* NDIMS == 3 */
 
