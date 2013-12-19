@@ -1208,30 +1208,47 @@ module mesh
 !
 !===============================================================================
 !
-! restrict_block: subroutine shrinks the block data and copy them from children
+! subroutine RESTRICT_BLOCK:
+! -------------------------
+!
+!   Subroutine restricts variables from children data blocks linked to
+!   the input meta block and copy the resulting array of variables to
+!   the associated data block.  The process of data restriction conserves
+!   stored variables.
+!
+!   Arguments:
+!
+!     pblock - the input meta block;
 !
 !===============================================================================
 !
   subroutine restrict_block(pblock)
 
+! variables and subroutines imported from other modules
+!
+    use blocks     , only : ndims
     use blocks     , only : block_meta, block_data, nchild
     use coordinates, only : ng, nh, in, jn, kn, im, jm, km
     use coordinates, only : ih, jh, kh, ib, jb, kb, ie, je, ke
     use equations  , only : nv
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pblock
 
 ! local variables
 !
     integer :: p
-    integer :: if, jf, kf
-    integer :: il, jl, kl, iu, ju, ku
-    integer :: ip, jp, kp
+    integer :: il, jl, kl, iu, ju, ku, ip, jp, kp
     integer :: is, js, ks, it, jt, kt
+
+! local arrays
+!
+    integer, dimension(ndims) :: pos
 
 ! local pointers
 !
@@ -1239,7 +1256,7 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! assign pointers
+! assign the parent data pointer
 !
     pparent => pblock%data
 
@@ -1247,22 +1264,18 @@ module mesh
 !
     do p = 1, nchild
 
-! assign pointer to the current child
+! assign a pointer to the current child
 !
       pchild  => pblock%child(p)%ptr%data
 
-! obtain the position of the current child in the parent block
+! obtain the child position in the parent block
 !
-      if = pchild%meta%pos(1)
-      jf = pchild%meta%pos(2)
-#if NDIMS == 3
-      kf = pchild%meta%pos(3)
-#endif /* NDIMS == 3 */
+      pos(1:ndims) = pchild%meta%pos(1:ndims)
 
 ! calculate the bound indices of the source nad destination arrays
 !
-      if (if .eq. 0) then
-        il = 1
+      if (pos(1) == 0) then
+        il =  1
         iu = ie
         is = ib - nh
         it = ih
@@ -1273,8 +1286,8 @@ module mesh
         it = ie + nh
       end if
       ip = il + 1
-      if (jf .eq. 0) then
-        jl = 1
+      if (pos(2) == 0) then
+        jl =  1
         ju = je
         js = jb - nh
         jt = jh
@@ -1286,8 +1299,8 @@ module mesh
       end if
       jp = jl + 1
 #if NDIMS == 3
-      if (kf .eq. 0) then
-        kl = 1
+      if (pos(3) == 0) then
+        kl =  1
         ku = ke
         ks = kb - nh
         kt = kh
@@ -1300,29 +1313,30 @@ module mesh
       kp = kl + 1
 #endif /* NDIMS == 3 */
 
-! copy the variables from the current child to the proper location of
-! the parent block
+! restrict conserved variables from the current child and copy the resulting
+! array to the proper location of the parent data block
 !
 #if NDIMS == 2
-      pparent%u(1:nv,is:it,js:jt,1) =                                         &
-                                   0.25 * (pchild%u(1:nv,il:iu:2,jl:ju:2,1)   &
-                                         + pchild%u(1:nv,ip:iu:2,jl:ju:2,1)   &
-                                         + pchild%u(1:nv,il:iu:2,jp:ju:2,1)   &
-                                         + pchild%u(1:nv,ip:iu:2,jp:ju:2,1))
+      pparent%u(1:nv,is:it,js:jt, 1   ) =                                      &
+                                2.5d-01 * ((pchild%u(1:nv,il:iu:2,jl:ju:2,1)   &
+                                        +   pchild%u(1:nv,ip:iu:2,jp:ju:2,1))  &
+                                        +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,1)   &
+                                        +   pchild%u(1:nv,il:iu:2,jp:ju:2,1)))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      pparent%u(1:nv,is:it,js:jt,ks:kt) =                                     &
-                             0.125 * (pchild%u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)  &
-                                    + pchild%u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)  &
-                                    + pchild%u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))
+      pparent%u(1:nv,is:it,js:jt,ks:kt) =                                      &
+                         1.25d-01 * ((pchild%u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                  +   pchild%u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
+                                  +  (pchild%u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
+                                  +   pchild%u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))  &
+                                  +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2)   &
+                                  +   pchild%u(1:nv,il:iu:2,jp:ju:2,kp:ku:2))  &
+                                  +  (pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2)   &
+                                  +   pchild%u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)))
 #endif /* NDIMS == 3 */
-    end do
-!
+
+    end do ! p = 1, nchild
+
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
