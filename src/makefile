@@ -56,12 +56,6 @@ FFLAGS  += -D${COMPILER}
 # number of dimensions
 #
 FFLAGS  += -DNDIMS=${NDIMS}
-ifeq ($(SHAPE),Y)
-FFLAGS  += -DSHAPE
-endif
-ifeq ($(REFINE),Y)
-FFLAGS  += -DREFINE
-endif
 
 # output data format
 #

@@ -36,12 +36,8 @@ COMPRESS     = NONE
 # geometry:
 #
 #  NDIMS         - number of dimensions, currently 2 or 3 are supported
-#  REFINE        - if Y the mesh is adaptively refined
-#  SHAPE         - if set Y allows to define a fixed shape in the domain
 #
 NDIMS        = 2
-REFINE       = Y
-SHAPE        = N
 
 #
 #-------------------------------------------------------------------------------
