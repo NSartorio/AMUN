@@ -2630,7 +2630,7 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : append_datablock, associate_blocks
+    use blocks   , only : append_datablock, link_blocks
     use coordinates, only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
@@ -2698,7 +2698,7 @@ module io
 
 ! associate a meta block with the current data block
 !
-          call associate_blocks(block_array(m(l))%ptr, pdata)
+          call link_blocks(block_array(m(l))%ptr, pdata)
 
 ! fill out the array of conservative variables
 !

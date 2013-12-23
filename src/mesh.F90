@@ -429,7 +429,7 @@ module mesh
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
                         , nchild, ndims, nsides, nfaces                        &
                         , refine_block, derefine_block, append_datablock       &
-                        , associate_blocks, remove_datablock
+                        , link_blocks, remove_datablock
     use blocks   , only : get_nleafs
     use coordinates, only : minlev, maxlev, toplev, im, jm, km, res
     use error    , only : print_info, print_error
@@ -769,7 +769,7 @@ module mesh
 !
                 if (pmeta%cpu .eq. nproc) then
                   call append_datablock(pdata)
-                  call associate_blocks(pmeta%child(p)%ptr, pdata)
+                  call link_blocks(pmeta%child(p)%ptr, pdata)
 
 ! receive the data
 !
@@ -829,7 +829,7 @@ module mesh
 #endif /* MPI */
                   if (.not. associated(pparent%data)) then
                     call append_datablock(pdata)
-                    call associate_blocks(pparent, pdata)
+                    call link_blocks(pparent, pdata)
                   end if
                   call restrict_block(pparent)
 #ifdef MPI
@@ -908,7 +908,7 @@ module mesh
 
     use blocks   , only : block_meta, block_data, list_meta, list_data
     use blocks   , only : get_nleafs, append_datablock, remove_datablock   &
-                        , associate_blocks
+                        , link_blocks
     use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
@@ -989,7 +989,7 @@ module mesh
 ! allocate data block for the current block
 !
             call append_datablock(pdata)
-            call associate_blocks(pmeta, pdata)
+            call link_blocks(pmeta, pdata)
 
 ! receive the data
 !

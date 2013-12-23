@@ -135,7 +135,7 @@ module domains
 !
     use blocks     , only : pointer_meta, block_meta, block_data               &
                           , append_metablock, append_datablock                 &
-                          , associate_blocks, metablock_set_leaf               &
+                          , link_blocks, metablock_set_leaf                    &
                           , metablock_set_config, metablock_set_level          &
                           , metablock_set_coord, metablock_set_bounds
     use blocks     , only : nsides, nfaces
@@ -310,7 +310,7 @@ module domains
 
 ! associate meta and data blocks
 !
-          call associate_blocks(pmeta, pdata)
+          call link_blocks(pmeta, pdata)
 
 ! set block coordinates
 !
