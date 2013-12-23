@@ -150,7 +150,7 @@ module mesh
   subroutine generate_mesh()
 
     use blocks  , only : block_meta, block_data, list_meta, list_data
-    use blocks  , only : refine_block, deallocate_datablock
+    use blocks  , only : refine_block, remove_datablock
     use blocks  , only : nchild, nsides, nfaces
     use blocks  , only : get_mblocks, get_nleafs
     use coordinates, only : minlev, maxlev, res
@@ -346,7 +346,7 @@ module mesh
     do while (associated(pmeta))
 
       if (.not. pmeta%leaf) &
-        call deallocate_datablock(pmeta%data)
+        call remove_datablock(pmeta%data)
 
 ! assign pointer to the next block
 !
@@ -398,7 +398,7 @@ module mesh
 ! associated, deallocate its data field
 !
       if (pmeta%cpu .ne. nproc .and. associated(pmeta%data)) &
-        call deallocate_datablock(pmeta%data)
+        call remove_datablock(pmeta%data)
 
 ! assign pointer to the next block
 !
@@ -429,7 +429,7 @@ module mesh
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
                         , nchild, ndims, nsides, nfaces                        &
                         , refine_block, derefine_block, append_datablock       &
-                        , associate_blocks, deallocate_datablock
+                        , associate_blocks, remove_datablock
     use blocks   , only : get_nleafs
     use coordinates, only : minlev, maxlev, toplev, im, jm, km, res
     use error    , only : print_info, print_error
@@ -794,7 +794,7 @@ module mesh
 
 ! deallocate data block
 !
-                  call deallocate_datablock(pmeta%child(p)%ptr%data)
+                  call remove_datablock(pmeta%child(p)%ptr%data)
                 end if
 
 ! set the current processor of the block
@@ -866,7 +866,7 @@ module mesh
 #endif /* MPI */
                 call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
                 call prolong_block(pparent)
-                call deallocate_datablock(pparent%data)
+                call remove_datablock(pparent%data)
 #ifdef MPI
               else
                 call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
@@ -907,7 +907,7 @@ module mesh
   subroutine redistribute_blocks()
 
     use blocks   , only : block_meta, block_data, list_meta, list_data
-    use blocks   , only : get_nleafs, append_datablock, deallocate_datablock   &
+    use blocks   , only : get_nleafs, append_datablock, remove_datablock   &
                         , associate_blocks
     use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
@@ -978,7 +978,7 @@ module mesh
 
 ! deallocate data block
 !
-             call deallocate_datablock(pmeta%data)
+             call remove_datablock(pmeta%data)
 
 ! send data block
 !

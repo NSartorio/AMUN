@@ -480,7 +480,7 @@ module blocks
 ! if corresponding data block is allocated, deallocate it too
 !
       if (associated(pmeta%data)) &
-        call deallocate_datablock(pmeta%data)
+        call remove_datablock(pmeta%data)
 
 ! nullify pointers
 !
