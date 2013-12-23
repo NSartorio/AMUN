@@ -224,8 +224,9 @@ module blocks
   public :: nchild, ndims, nsides, nfaces
   public :: initialize_blocks, finalize_blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
-  public :: append_metablock, associate_blocks, append_datablock               &
-          , deallocate_datablock
+  public :: append_metablock, associate_blocks
+  public :: allocate_datablock, deallocate_datablock
+  public :: append_datablock, remove_datablock
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
@@ -1029,45 +1030,61 @@ module blocks
 !
 !===============================================================================
 !
+!===============================================================================
+!
+! subroutine ALLOCATE_DATABLOCK:
+! -----------------------------
+!
+!   Subroutine allocates space for one data block and returns a pointer
+!   associated with it.
+!
+!   Arguments:
+!
+!     pdata - the pointer associated with the created data block;
+!
+!===============================================================================
+!
   subroutine allocate_datablock(pdata)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! output arguments
+! subroutine arguments
 !
     type(block_data), pointer, intent(out) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
-! allocate block structure
+! allocate the block structure
 !
     allocate(pdata)
 
-! nullify pointers
+! nullify all pointers
 !
     nullify(pdata%prev)
     nullify(pdata%next)
     nullify(pdata%meta)
 
-! allocate space for conserved variables
+! allocate the space for conserved variables
 !
     allocate(pdata%u0(nvars,nx,ny,nz))
     allocate(pdata%u1(nvars,nx,ny,nz))
 
-! allocate space for primitive variables
+! allocate the space for primitive variables
 !
     allocate(pdata%q(nvars,nx,ny,nz))
 
-! initiate the array pointer
+! initiate the conserved variable pointer
 !
     pdata%u => pdata%u0
 
-! allocate space for the numerical fluxes
+! allocate the space for numerical fluxes
 !
-    if (nflux .gt. 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
+    if (nflux > 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
 
 #ifdef DEBUG
-! allocate space for the refinement values
+! allocate the space for the refinement criterion array
 !
     allocate(pdata%c(nx,ny,nz))
 #endif /* DEBUG */
@@ -1082,40 +1099,33 @@ module blocks
 !
 !===============================================================================
 !
-! deallocate_datablock: subroutine deallocates space occupied by a given data
-!                       block
+! subroutine DEALLOCATE_DATABLOCK:
+! -------------------------------
+!
+!   Subroutine deallocates space of the data block associated with the input
+!   pointer.
+!
+!   Arguments:
+!
+!     pdata - the pointer pointing to the data block for deallocating;
 !
 !===============================================================================
 !
   subroutine deallocate_datablock(pdata)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
+! check if the input pointer is associated with a data block
+!
     if (associated(pdata)) then
-
-! if this is the first block in the list, update the list_data pointer
-!
-      if (pdata%meta%id .eq. list_data%meta%id) &
-        list_data => pdata%next
-
-! if this is the last block in the list, update the last_data pointer
-!
-      if (pdata%meta%id .eq. last_data%meta%id) &
-        last_data => pdata%prev
-
-! update the pointer of previous and next blocks
-!
-      if (associated(pdata%prev)) &
-        pdata%prev%next => pdata%next
-
-      if (associated(pdata%next)) &
-        pdata%next%prev => pdata%prev
 
 ! deallocate conservative variables
 !
@@ -1131,7 +1141,7 @@ module blocks
       if (allocated(pdata%f)) deallocate(pdata%f)
 
 #ifdef DEBUG
-! deallocate the refinement array
+! deallocate the refinement critarion array
 !
       if (allocated(pdata%c)) deallocate(pdata%c)
 #endif /* DEBUG */
@@ -1152,7 +1162,7 @@ module blocks
 !
       dblocks = dblocks - 1
 
-    end if
+    end if ! pdata associated with a data block
 
 !-------------------------------------------------------------------------------
 !
@@ -1160,29 +1170,38 @@ module blocks
 !
 !===============================================================================
 !
-! append_datablock: subroutine allocates space for one data block and appends it
-!                   to the data block list
+! subroutine APPEND_DATABLOCK:
+! ---------------------------
+!
+!   Subroutine allocates space for one data block and appends it to the data
+!   block list returning a pointer associated with it.
+!
+!   Arguments:
+!
+!     pdata - the pointer associated with the created data block;
 !
 !===============================================================================
 !
   subroutine append_datablock(pdata)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! output arguments
+! subroutine arguments
 !
     type(block_data), pointer, intent(out) :: pdata
 !
 !-------------------------------------------------------------------------------
 !
-! allocate block
+! allocate the data block
 !
     call allocate_datablock(pdata)
 
-! add to the list
+! add the allocated block to the data block list
 !
     if (associated(last_data)) then
-      pdata%prev => last_data
+      pdata%prev     => last_data
       last_data%next => pdata
     else
       list_data => pdata
@@ -1195,6 +1214,66 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine append_datablock
+!
+!===============================================================================
+!
+! subroutine REMOVE_DATABLOCK:
+! ---------------------------
+!
+!   Subroutine removes a data block associated with the input pointer from
+!   the data block list, and deallocates space used by this block.
+!
+!   Arguments:
+!
+!     pdata - the pointer pointing to the data block for removing;
+!
+!===============================================================================
+!
+  subroutine remove_datablock(pdata)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! check if the input pointer is associated with a data block
+!
+    if (associated(pdata)) then
+
+! remove from the meta block list if the meta pointer is set
+!
+      if (associated(pdata%meta)) then
+
+! if this is the first block in the list, update the list_data pointer
+!
+        if (pdata%meta%id == list_data%meta%id) list_data => pdata%next
+
+! if this is the last block in the list, update the last_data pointer
+!
+        if (pdata%meta%id == last_data%meta%id) last_data => pdata%prev
+
+! update the pointer of previous and next blocks
+!
+        if (associated(pdata%prev)) pdata%prev%next => pdata%next
+
+        if (associated(pdata%next)) pdata%next%prev => pdata%prev
+
+      end if ! %meta associated
+
+! deallocate the associated data block
+!
+      call deallocate_datablock(pdata)
+
+    end if ! pdata associated with a data block
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine remove_datablock
 !
 !===============================================================================
 !
