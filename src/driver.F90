@@ -360,7 +360,7 @@ program amun
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem
 !
-!     call generate_mesh()
+    call generate_mesh()
 
 ! store mesh statistics
 !
