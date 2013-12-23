@@ -141,25 +141,34 @@ module mesh
 !
 !===============================================================================
 !
-! generate_mesh: subroutine generate the initial block structure by creating
-!                blocks according to the geometry, initial problem and
-!                refinement criterium
+! subroutine GENERATE_MESH:
+! ------------------------
+!
+!   Subroutine generates the iinitial block structure by creating blocks
+!   according to the geometry, initial problems and refinement criterion.
+!
 !
 !===============================================================================
 !
   subroutine generate_mesh()
 
-    use blocks  , only : block_meta, block_data, list_meta, list_data
-    use blocks  , only : refine_block, deallocate_datablock
-    use blocks  , only : nchild, nsides, nfaces
-    use blocks  , only : get_mblocks, get_nleafs
-    use coordinates, only : minlev, maxlev, res
-    use domains    , only : setup_domain
-    use error   , only : print_info, print_error
-    use mpitools, only : master, nproc, nprocs
-    use problems   , only : setup_problem
-    use refinement , only : check_refinement_criterion
+! variables and subroutines imported from other modules
+!
+    use blocks       , only : block_meta, block_data, list_meta, list_data
+    use blocks       , only : ndims, nchild, nsides, nfaces
+    use blocks       , only : allocate_datablock, deallocate_datablock
+    use blocks       , only : append_datablock, remove_datablock
+    use blocks       , only : link_blocks, unlink_blocks, refine_block
+    use blocks       , only : get_mblocks, get_nleafs
+    use coordinates  , only : minlev, maxlev, res
+    use domains      , only : setup_domain
+    use error        , only : print_info, print_error
+    use mpitools     , only : master, nproc, nprocs
+    use problems     , only : setup_problem
+    use refinement   , only : check_refinement_criterion
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! local pointers
@@ -169,14 +178,13 @@ module mesh
 
 ! local variables
 !
-    integer(kind=4)                       :: i, j, k, l, n
-#ifdef MPI
+    integer(kind=4)                        :: level, lev, idir, iside, iface
+    integer(kind=4)                        :: np, nl
     integer(kind=4), dimension(0:nprocs-1) :: lb
-#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-! allocate the initial structure of blocks according to the problem
+! allocate the initial lowest level structure of blocks
 !
     call setup_domain()
 
@@ -185,232 +193,259 @@ module mesh
 ! is done yet; we fill out the coarse blocks with the initial condition
 !
     if (master) then
+
+! print the levels while generating them
+!
       write(*,*)
       write(*,"(1x,a)"             ) "Generating the initial mesh:"
       write(*,"(4x,a)",advance="no") "generating level       =    "
+
     end if
 
-    l = 1
-    do while (l .le. maxlev)
-
-! print the level currently processed
+! allocate temporary data block to determine the initial block structure
 !
-      if (master) &
-        write(*,"(1x,i2)",advance="no") l
+    call allocate_datablock(pdata)
 
-! iterate over all data blocks at the current level and initialize the problem
+! reset the currently processed level
 !
-      pdata => list_data
-      do while (associated(pdata))
+    level = 1
+
+! iterate over all level up to the maximum one
+!
+    do while (level < maxlev)
+
+! print the currently processed level
+!
+      if (master) write(*, "(1x,i2)", advance = "no") level
+
+!! DETERMINE THE REFINEMENT OF THE ALL BLOCKS AT CURRENT LEVEL
+!!
+! set the pointer to the first block on the meta block list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks at the current level and initialize the problem
+! for them
+!
+      do while (associated(pmeta))
 
 ! set the initial conditions at the current block
 !
-        if (pdata%meta%level .le. l) &
+        if (pmeta%level == level) then
+
+! associate the temporary data block with the current meta block
+!
+          call link_blocks(pmeta, pdata)
+
+! set up the initial conditions for the block
+!
           call setup_problem(pdata)
 
-! assign pointer to the next block
+! check the refinement criterion for the current block, and do not allow for
+! the derefinement
 !
-        pdata => pdata%next
-      end do
-
-! at the maximum level we only initialize the problem (without checking the
-! refinement criterion)
-!
-      if (l .lt. maxlev) then
-
-! iterate over all data blocks at the current level and check the refinement
-! criterion; do not allow for derefinement
-!
-        pdata => list_data
-        do while (associated(pdata))
-
-          if (pdata%meta%level .eq. l) then
-            pdata%meta%refine = max(0, check_refinement_criterion(pdata))
-
-! if there is only one block, and it is set not to be refined, refine it anyway
-! because the resolution for the problem initiation may be too small
-!
-            if (get_mblocks() .eq. 1 .and. l .eq. 1) &
-              pdata%meta%refine = 1
+          pmeta%refine = max(0, check_refinement_criterion(pdata))
 
 ! if the level is lower then the minimum level set the block to be refined
-! anyway
 !
-            if (l .lt. minlev) pdata%meta%refine = 1
+          if (level < minlev) pmeta%refine = 1
 
-          end if
+! if there is only one block, refine it anyway because the resolution for
+! the problem initiation may be too small
+!
+          if (get_mblocks() == 1 .and. level == 1) pmeta%refine = 1
+
+! unlink the data block from the current meta block
+!
+          call unlink_blocks(pmeta, pdata)
+
+        end if ! pmeta%level == 1
 
 ! assign pointer to the next block
 !
-          pdata => pdata%next
-        end do
+        pmeta => pmeta%next
 
-! walk through all levels down from the current level and check if select all
-! neighbors for the refinement if they are at lower level; there is no need for
+      end do ! pmeta
+
+!! STEP DOWN AND SELECT BLOCKS WHICH NEED TO BE REFINED
+!!
+! walk through all levels down from the current level and check if neighbors
+! of the refined blocks need to be refined as well; there is no need for
 ! checking the blocks at the lowest level;
 !
-        do n = l, 2, -1
+      do lev = level, 2, -1
+
+! set the pointer to the first block on the meta block list
+!
+        pmeta => list_meta
 
 ! iterate over all meta blocks at the level n and if the current block is
 ! selected for the refinement and its neighbors are at lower levels select them
 ! for refinement too;
 !
-          pmeta => list_meta
-          do while (associated(pmeta))
+        do while (associated(pmeta))
 
-! check if the current block is at the level n, is a leaf, and selected for
+! check if the current block is a leaf at the level n and selected for
 ! refinement
 !
-            if (pmeta%level .eq. n) then
-              if (pmeta%leaf) then
-                if (pmeta%refine .eq. 1) then
+          if (pmeta%leaf .and. pmeta%level == lev .and. pmeta%refine == 1) then
 
 ! iterate over all neighbors
 !
-                  do i = 1, NDIMS
-                    do j = 1, nsides
-                      do k = 1, nfaces
+            do idir = 1, ndims
+              do iside = 1, nsides
+                do iface = 1, nfaces
 
 ! assign pointer to the neighbor
 !
-                        pneigh => pmeta%neigh(i,j,k)%ptr
+                  pneigh => pmeta%neigh(idir,iside,iface)%ptr
 
 ! check if the neighbor is associated
 !
-                        if (associated(pneigh)) then
-
-! check if the neighbor is a leaf, if not something wrong is going on
-!
-                          if (pneigh%leaf) then
+                  if (associated(pneigh)) then
 
 ! if the neighbor has lower level, select it to be refined too
 !
-                            if (pneigh%level .lt. pmeta%level) &
-                              pneigh%refine = 1
+                    if (pneigh%level < pmeta%level) pneigh%refine = 1
 
-                          else
-                            call print_error("mesh::init_mesh", "Neighbor is not a leaf!")
-                          end if
-                        end if
+                  end if ! neighbor's pointer is associated
 
-                      end do
-                    end do
-                  end do
+                end do ! iface
+              end do ! iside
+            end do ! idir
 
-                end if
-              end if
-            end if
+          end if ! leaf at level n and marked for refinement
 
 ! assign pointer to the next block
 !
-            pmeta => pmeta%next
+          pmeta => pmeta%next
 
-          end do
-        end do
+        end do ! pmeta
 
-!! refine all selected blocks starting from the lowest level
+      end do ! lev = level, 2, -1
+
+!! REFINE ALL BLOCKS FROM THE LOWEST LEVEL UP
 !!
 ! walk through the levels starting from the lowest to the current level
 !
-        do n = 1, l
+      do lev = 1, level
+
+! set the pointer to the first block on the meta block list
+!
+        pmeta => list_meta
 
 ! iterate over all meta blocks
 !
-          pmeta => list_meta
-          do while (associated(pmeta))
+        do while (associated(pmeta))
 
-! check if the current block is at the level n and, if it is selected for
-! refinement and if so, perform the refinement on this block
+! check if the current block is at the level lev and refine if if
+! it is selected for refinement
 !
-            if (pmeta%level .eq. n .and. pmeta%refine .eq. 1) then
+          if (pmeta%level == lev .and. pmeta%refine == 1) then
 
-! perform the refinement
+! perform the refinement without creating new data blocks
 !
-              call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
+            call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
 
-            end if
+          end if ! selected for refinement and at the current level
 
 ! assign pointer to the next block
 !
-            pmeta => pmeta%next
-          end do
-        end do
-      end if
+          pmeta => pmeta%next
 
-      l = l + 1
-    end do
+        end do ! pmeta
 
-! deallocate data blocks of non leafs
+      end do ! lev = 1, level
+
+! increase the level number
 !
-    pmeta => list_meta
-    do while (associated(pmeta))
+      level = level + 1
 
-      if (.not. pmeta%leaf) &
-        call deallocate_datablock(pmeta%data)
+    end do ! level = 1, maxlev
 
-! assign pointer to the next block
+! deallocate temporary data block
 !
-      pmeta => pmeta%next
-    end do
+    call deallocate_datablock(pdata)
 
-#ifdef MPI
+! print the currently processed level
+!
+    if (master) write(*, "(1x,i2)") level
+
+!! ASSOCIATE THE META BLOCKS WITH PROCESSES AND CREATE INITIAL DATA BLOCKS
+!!
 ! divide blocks between all processes, use the number of data blocks to do this,
 ! but keep blocks from the top level which have the same parent packed together
 !
-    l       = mod(get_nleafs(), nprocs) - 1
-    lb( : ) = get_nleafs() / nprocs
-    lb(0:l) = lb(0:l) + 1
+    nl       = mod(get_nleafs(), nprocs) - 1
+    lb( :  ) = get_nleafs() / nprocs
+    lb(0:nl) = lb(0:nl) + 1
 
 ! reset the processor and block numbers
-    n = 0
-    l = 0
+!
+    np = 0
+    nl = 0
 
+! set the pointer to the first block on the meta block list
+!
     pmeta => list_meta
+
+! iterate over all meta blocks
+!
     do while (associated(pmeta))
 
-! assign the cpu to the current block
+! assign the process number to the current block
 !
-      pmeta%cpu = n
+      pmeta%cpu = np
 
-! increase the number of blocks on the current process; if it exceeds the
-! allowed number reset the counter and increase the processor number
+! check if the current block is the leaf
 !
       if (pmeta%leaf) then
-        l = l + 1
-        if (l .ge. lb(n)) then
-          n = min(nprocs - 1, n + 1)
-          l = 0
-        end if
-      end if
+
+! increase the number of leafs for the current process
+!
+        nl = nl + 1
+
+! if the block belongs to the current process, append a new data block, link it
+! to the current meta block and initialize the problem
+!
+        if (pmeta%cpu == nproc) then
+
+! append new data block
+!
+          call append_datablock(pdata)
+
+! link the data block with the current meta block
+!
+          call link_blocks(pmeta, pdata)
+
+! set up the initial conditions for the block
+!
+          call setup_problem(pdata)
+
+        end if ! leaf and belongs to the current process
+
+! if the number of leafs for the current process exceeds the number of assigned
+! blocks, reset the counter and increase the process number
+!
+        if (nl >= lb(np)) then
+
+! reset the leaf counter for the current process
+!
+          nl = 0
+
+! increase the process number
+!
+          np = min(nprocs - 1, np + 1)
+
+        end if ! nl >= lb(np)
+
+      end if ! leaf
 
 ! assign pointer to the next block
 !
       pmeta => pmeta%next
-    end do
 
-! remove all data blocks which do not belong to the current process
-!
-    pmeta => list_meta
-    do while (associated(pmeta))
-      pnext => pmeta%next
-
-! if the current block belongs to another process and its data field is
-! associated, deallocate its data field
-!
-      if (pmeta%cpu .ne. nproc .and. associated(pmeta%data)) &
-        call deallocate_datablock(pmeta%data)
-
-! assign pointer to the next block
-!
-      pmeta => pnext
-    end do
-#endif /* MPI */
-
-! go to a new line after generating levels
-!
-    if (master) then
-      write(*,*)
-    end if
+    end do ! pmeta
 
 !-------------------------------------------------------------------------------
 !
@@ -429,7 +464,7 @@ module mesh
     use blocks   , only : block_meta, block_data, list_meta, list_data         &
                         , nchild, ndims, nsides, nfaces                        &
                         , refine_block, derefine_block, append_datablock       &
-                        , associate_blocks, deallocate_datablock
+                        , link_blocks, remove_datablock
     use blocks   , only : get_nleafs
     use coordinates, only : minlev, maxlev, toplev, im, jm, km, res
     use error    , only : print_info, print_error
@@ -769,7 +804,7 @@ module mesh
 !
                 if (pmeta%cpu .eq. nproc) then
                   call append_datablock(pdata)
-                  call associate_blocks(pmeta%child(p)%ptr, pdata)
+                  call link_blocks(pmeta%child(p)%ptr, pdata)
 
 ! receive the data
 !
@@ -794,7 +829,7 @@ module mesh
 
 ! deallocate data block
 !
-                  call deallocate_datablock(pmeta%child(p)%ptr%data)
+                  call remove_datablock(pmeta%child(p)%ptr%data)
                 end if
 
 ! set the current processor of the block
@@ -829,7 +864,7 @@ module mesh
 #endif /* MPI */
                   if (.not. associated(pparent%data)) then
                     call append_datablock(pdata)
-                    call associate_blocks(pparent, pdata)
+                    call link_blocks(pparent, pdata)
                   end if
                   call restrict_block(pparent)
 #ifdef MPI
@@ -866,7 +901,7 @@ module mesh
 #endif /* MPI */
                 call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
                 call prolong_block(pparent)
-                call deallocate_datablock(pparent%data)
+                call remove_datablock(pparent%data)
 #ifdef MPI
               else
                 call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
@@ -907,8 +942,8 @@ module mesh
   subroutine redistribute_blocks()
 
     use blocks   , only : block_meta, block_data, list_meta, list_data
-    use blocks   , only : get_nleafs, append_datablock, deallocate_datablock   &
-                        , associate_blocks
+    use blocks   , only : get_nleafs, append_datablock, remove_datablock   &
+                        , link_blocks
     use coordinates, only : im, jm, km
     use mpitools , only : send_real_array, receive_real_array
     use mpitools , only : nprocs, nproc
@@ -978,7 +1013,7 @@ module mesh
 
 ! deallocate data block
 !
-             call deallocate_datablock(pmeta%data)
+             call remove_datablock(pmeta%data)
 
 ! send data block
 !
@@ -989,7 +1024,7 @@ module mesh
 ! allocate data block for the current block
 !
             call append_datablock(pdata)
-            call associate_blocks(pmeta, pdata)
+            call link_blocks(pmeta, pdata)
 
 ! receive the data
 !

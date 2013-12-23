@@ -135,7 +135,7 @@ module domains
 !
     use blocks     , only : pointer_meta, block_meta, block_data               &
                           , append_metablock, append_datablock                 &
-                          , associate_blocks, metablock_set_leaf               &
+                          , link_blocks, metablock_set_leaf                    &
                           , metablock_set_config, metablock_set_level          &
                           , metablock_set_coord, metablock_set_bounds
     use blocks     , only : nsides, nfaces
@@ -159,7 +159,6 @@ module domains
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pnext
-    type(block_data), pointer :: pdata
 
 ! allocatable arrays
 !
@@ -303,14 +302,6 @@ module domains
 ! set the level
 !
           call metablock_set_level(pmeta, 1)
-
-! create a new data block
-!
-          call append_datablock(pdata)
-
-! associate meta and data blocks
-!
-          call associate_blocks(pmeta, pdata)
 
 ! set block coordinates
 !

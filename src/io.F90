@@ -2079,124 +2079,130 @@ module io
       qm(3) = nsides
       qm(4) = nfaces
 
+! only process if there are some metablocks
+!
+      if (am(1) > 0) then
+
 ! allocate arrays to store metablocks data
 !
-      allocate(idx(cm(1)))
-      allocate(par(am(1)))
-      allocate(dat(am(1)))
-      allocate(id (am(1)))
-      allocate(cpu(am(1)))
-      allocate(lev(am(1)))
-      allocate(cfg(am(1)))
-      allocate(ref(am(1)))
-      allocate(lea(am(1)))
-      allocate(xmn(am(1)))
-      allocate(xmx(am(1)))
-      allocate(ymn(am(1)))
-      allocate(ymx(am(1)))
-      allocate(zmn(am(1)))
-      allocate(zmx(am(1)))
-      allocate(chl(dm(1),dm(2)))
-      allocate(pos(pm(1),pm(2)))
-      allocate(cor(pm(1),pm(2)))
-      allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+        allocate(idx(cm(1)))
+        allocate(par(am(1)))
+        allocate(dat(am(1)))
+        allocate(id (am(1)))
+        allocate(cpu(am(1)))
+        allocate(lev(am(1)))
+        allocate(cfg(am(1)))
+        allocate(ref(am(1)))
+        allocate(lea(am(1)))
+        allocate(xmn(am(1)))
+        allocate(xmx(am(1)))
+        allocate(ymn(am(1)))
+        allocate(ymx(am(1)))
+        allocate(zmn(am(1)))
+        allocate(zmx(am(1)))
+        allocate(chl(dm(1),dm(2)))
+        allocate(pos(pm(1),pm(2)))
+        allocate(cor(pm(1),pm(2)))
+        allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 
 ! reset vectors
 !
-      idx(:)       = -1
-      par(:)       = -1
-      dat(:)       = -1
-      lea(:)       = -1
-      chl(:,:)     = -1
-      ngh(:,:,:,:) = -1
+        idx(:)       = -1
+        par(:)       = -1
+        dat(:)       = -1
+        lea(:)       = -1
+        chl(:,:)     = -1
+        ngh(:,:,:,:) = -1
 
 ! iterate over all metablocks and fill in the arrays for storage
 !
-      l = 1
-      pmeta => list_meta
-      do while(associated(pmeta))
+        l = 1
+        pmeta => list_meta
+        do while(associated(pmeta))
 
-        idx(pmeta%id) = l
+          idx(pmeta%id) = l
 
-        if (associated(pmeta%parent)) par(l) = pmeta%parent%id
-        if (associated(pmeta%data)  ) dat(l) = 1
+          if (associated(pmeta%parent)) par(l) = pmeta%parent%id
+          if (associated(pmeta%data)  ) dat(l) = 1
 
-        id (l)   = pmeta%id
-        cpu(l)   = pmeta%cpu
-        lev(l)   = pmeta%level
-        cfg(l)   = pmeta%config
-        ref(l)   = pmeta%refine
-        pos(l,:) = pmeta%pos(:)
-        cor(l,:) = pmeta%coord(:)
+          id (l)   = pmeta%id
+          cpu(l)   = pmeta%cpu
+          lev(l)   = pmeta%level
+          cfg(l)   = pmeta%config
+          ref(l)   = pmeta%refine
+          pos(l,:) = pmeta%pos(:)
+          cor(l,:) = pmeta%coord(:)
 
-        if (pmeta%leaf) lea(l) = 1
+          if (pmeta%leaf) lea(l) = 1
 
-        xmn(l)   = pmeta%xmin
-        xmx(l)   = pmeta%xmax
-        ymn(l)   = pmeta%ymin
-        ymx(l)   = pmeta%ymax
-        zmn(l)   = pmeta%zmin
-        zmx(l)   = pmeta%zmax
+          xmn(l)   = pmeta%xmin
+          xmx(l)   = pmeta%xmax
+          ymn(l)   = pmeta%ymin
+          ymx(l)   = pmeta%ymax
+          zmn(l)   = pmeta%zmin
+          zmx(l)   = pmeta%zmax
 
-        do p = 1, nchild
-          if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
-        end do
+          do p = 1, nchild
+            if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
+          end do
 
-        do i = 1, NDIMS
-          do j = 1, nsides
-            do k = 1, nfaces
-              if (associated(pmeta%neigh(i,j,k)%ptr))  &
-                                        ngh(l,i,j,k) = pmeta%neigh(i,j,k)%ptr%id
+          do i = 1, NDIMS
+            do j = 1, nsides
+              do k = 1, nfaces
+                if (associated(pmeta%neigh(i,j,k)%ptr))  &
+                                          ngh(l,i,j,k) = pmeta%neigh(i,j,k)%ptr%id
+              end do
             end do
           end do
-        end do
 
-        l = l + 1
-        pmeta => pmeta%next
-      end do
+          l = l + 1
+          pmeta => pmeta%next
+        end do
 
 ! store metadata in the HDF5 file
 !
-      call write_vector_integer_h5(gid, 'indices', cm(1), idx)
-      call write_vector_integer_h5(gid, 'parent' , am(1), par)
-      call write_vector_integer_h5(gid, 'data'   , am(1), dat)
-      call write_vector_integer_h5(gid, 'id'     , am(1), id)
-      call write_vector_integer_h5(gid, 'cpu'    , am(1), cpu)
-      call write_vector_integer_h5(gid, 'level'  , am(1), lev)
-      call write_vector_integer_h5(gid, 'config' , am(1), cfg)
-      call write_vector_integer_h5(gid, 'refine' , am(1), ref)
-      call write_vector_integer_h5(gid, 'leaf'   , am(1), lea)
-      call write_vector_double_h5 (gid, 'xmin'   , am(1), xmn)
-      call write_vector_double_h5 (gid, 'xmax'   , am(1), xmx)
-      call write_vector_double_h5 (gid, 'ymin'   , am(1), ymn)
-      call write_vector_double_h5 (gid, 'ymax'   , am(1), ymx)
-      call write_vector_double_h5 (gid, 'zmin'   , am(1), zmn)
-      call write_vector_double_h5 (gid, 'zmax'   , am(1), zmx)
-      call write_array2_integer_h5(gid, 'child'  , dm(:), chl)
-      call write_array2_integer_h5(gid, 'pos'    , pm(:), pos)
-      call write_array2_integer_h5(gid, 'coord'  , pm(:), cor)
-      call write_array4_integer_h5(gid, 'neigh'  , qm(:), ngh)
+        call write_vector_integer_h5(gid, 'indices', cm(1), idx)
+        call write_vector_integer_h5(gid, 'parent' , am(1), par)
+        call write_vector_integer_h5(gid, 'data'   , am(1), dat)
+        call write_vector_integer_h5(gid, 'id'     , am(1), id)
+        call write_vector_integer_h5(gid, 'cpu'    , am(1), cpu)
+        call write_vector_integer_h5(gid, 'level'  , am(1), lev)
+        call write_vector_integer_h5(gid, 'config' , am(1), cfg)
+        call write_vector_integer_h5(gid, 'refine' , am(1), ref)
+        call write_vector_integer_h5(gid, 'leaf'   , am(1), lea)
+        call write_vector_double_h5 (gid, 'xmin'   , am(1), xmn)
+        call write_vector_double_h5 (gid, 'xmax'   , am(1), xmx)
+        call write_vector_double_h5 (gid, 'ymin'   , am(1), ymn)
+        call write_vector_double_h5 (gid, 'ymax'   , am(1), ymx)
+        call write_vector_double_h5 (gid, 'zmin'   , am(1), zmn)
+        call write_vector_double_h5 (gid, 'zmax'   , am(1), zmx)
+        call write_array2_integer_h5(gid, 'child'  , dm(:), chl)
+        call write_array2_integer_h5(gid, 'pos'    , pm(:), pos)
+        call write_array2_integer_h5(gid, 'coord'  , pm(:), cor)
+        call write_array4_integer_h5(gid, 'neigh'  , qm(:), ngh)
 
 ! deallocate allocatable arrays
 !
-      if (allocated(idx)) deallocate(idx)
-      if (allocated(par)) deallocate(par)
-      if (allocated(dat)) deallocate(dat)
-      if (allocated(id) ) deallocate(id)
-      if (allocated(cpu)) deallocate(cpu)
-      if (allocated(lev)) deallocate(lev)
-      if (allocated(cfg)) deallocate(cfg)
-      if (allocated(ref)) deallocate(ref)
-      if (allocated(lea)) deallocate(lea)
-      if (allocated(xmn)) deallocate(xmn)
-      if (allocated(xmx)) deallocate(xmx)
-      if (allocated(ymn)) deallocate(ymn)
-      if (allocated(ymx)) deallocate(ymx)
-      if (allocated(zmn)) deallocate(zmn)
-      if (allocated(zmx)) deallocate(zmx)
-      if (allocated(chl)) deallocate(chl)
-      if (allocated(cor)) deallocate(cor)
-      if (allocated(ngh)) deallocate(ngh)
+        if (allocated(idx)) deallocate(idx)
+        if (allocated(par)) deallocate(par)
+        if (allocated(dat)) deallocate(dat)
+        if (allocated(id) ) deallocate(id)
+        if (allocated(cpu)) deallocate(cpu)
+        if (allocated(lev)) deallocate(lev)
+        if (allocated(cfg)) deallocate(cfg)
+        if (allocated(ref)) deallocate(ref)
+        if (allocated(lea)) deallocate(lea)
+        if (allocated(xmn)) deallocate(xmn)
+        if (allocated(xmx)) deallocate(xmx)
+        if (allocated(ymn)) deallocate(ymn)
+        if (allocated(ymx)) deallocate(ymx)
+        if (allocated(zmn)) deallocate(zmn)
+        if (allocated(zmx)) deallocate(zmx)
+        if (allocated(chl)) deallocate(chl)
+        if (allocated(cor)) deallocate(cor)
+        if (allocated(ngh)) deallocate(ngh)
+
+      end if ! meta blocks > 0
 
 ! close the group
 !
@@ -2624,7 +2630,7 @@ module io
 ! references to other modules
 !
     use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : append_datablock, associate_blocks
+    use blocks   , only : append_datablock, link_blocks
     use coordinates, only : im, jm, km
     use error    , only : print_error
     use hdf5     , only : hid_t, hsize_t
@@ -2692,7 +2698,7 @@ module io
 
 ! associate a meta block with the current data block
 !
-          call associate_blocks(block_array(m(l))%ptr, pdata)
+          call link_blocks(block_array(m(l))%ptr, pdata)
 
 ! fill out the array of conservative variables
 !
