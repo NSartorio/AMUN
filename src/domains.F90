@@ -159,7 +159,6 @@ module domains
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pnext
-    type(block_data), pointer :: pdata
 
 ! allocatable arrays
 !
@@ -303,14 +302,6 @@ module domains
 ! set the level
 !
           call metablock_set_level(pmeta, 1)
-
-! create a new data block
-!
-          call append_datablock(pdata)
-
-! associate meta and data blocks
-!
-          call link_blocks(pmeta, pdata)
 
 ! set block coordinates
 !
