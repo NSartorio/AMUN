@@ -339,12 +339,12 @@ module coordinates
 
 ! print info
 !
-      write(*,"(4x,a,  1x,i6)" ) "refinement to level    =", toplev
-      write(*,"(4x,a,3(1x,i6))") "base configuration     =", ir, jr, kr
-      write(*,"(4x,a,3(1x,i6))") "top level blocks       =", dm(:)
-      write(*,"(4x,a,  1x,i6)" ) "maximum cover blocks   =", product(dm(:))
-      write(*,"(4x,a,3(1x,i6))") "base resolution        =", cm(1:NDIMS)
-      write(*,"(4x,a,3(1x,i6))") "effective resolution   =", rm(1:NDIMS)
+      write(*,"(4x,a,  1x,i6 )" ) "refinement to level    =", toplev
+      write(*,"(4x,a,3(1x,i6 ))") "base configuration     =", ir, jr, kr
+      write(*,"(4x,a,3(1x,i6 ))") "top level blocks       =", dm(:)
+      write(*,"(4x,a,  1x,i12)" ) "maximum cover blocks   =", product(dm(:))
+      write(*,"(4x,a,3(1x,i6 ))") "base resolution        =", cm(1:NDIMS)
+      write(*,"(4x,a,3(1x,i6 ))") "effective resolution   =", rm(1:NDIMS)
 
     end if ! master
 
