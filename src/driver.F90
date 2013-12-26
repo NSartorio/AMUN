@@ -81,7 +81,7 @@ program amun
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
-  real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
+  real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
 
 ! temporary variables
 !
@@ -250,6 +250,10 @@ program amun
   call get_parameter_real   ("tmax" , tmax)
   call get_parameter_real   ("trun" , trun)
   call get_parameter_real   ("tsav" , tsav)
+
+! correct the run time by the save time
+!
+  trun = trun - tsav / 6.0d+01
 
 ! get integral calculation interval
 !
@@ -512,11 +516,11 @@ program amun
 
 ! compute elapsed time
 !
-    thrs = (tm_curr / 60.0 + tsav) / 60.0
+    thrs = tm_curr / 3.6d+03
 
 ! check if the time exceeds execution time limit
 !
-    if (thrs >= trun) iterm = 100
+    if (thrs > trun) iterm = 100
 
 ! print progress info to console
 !
