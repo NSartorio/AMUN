@@ -27,18 +27,33 @@
 !
 module mesh
 
+! module variables are not implicit by default
+!
   implicit none
 
-! maximum number of covering blocks
+! file handler for the mesh statistics
 !
-  integer                 , save :: tblocks = 1
+  integer, save :: funit   = 11
 
-! log file for the mesh statistics
+! by default everything is private
 !
-  character(len=32), save :: fname = "mesh.log"
-  integer          , save :: funit = 11
+  private
 
+! declare public subroutines
+!
+  public :: initialize_mesh, finalize_mesh
+  public :: generate_mesh, update_mesh
+  public :: redistribute_blocks, store_mesh_stats
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
+!
+!===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -47,28 +62,38 @@ module mesh
 !
 !   Subroutine initializes mesh module and its variables.
 !
+!   Arguments:
+!
+!     nrun    - the restarted execution count;
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
+!
 !===============================================================================
 !
-  subroutine initialize_mesh(flag)
+  subroutine initialize_mesh(nrun, verbose, iret)
 
+! import external procedures and variables
+!
     use blocks     , only : datablock_set_dims
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates, only : toplev, im, jm, km
-    use mpitools   , only : master, nprocs
     use equations  , only : nv
+    use mpitools   , only : master, nprocs
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    logical, intent(in) :: flag
+    integer, intent(in)    :: nrun
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
 
 ! local variables
 !
-    integer(kind=4) :: i, j, k, l, n
-    logical         :: info
+    character(len=64) :: fn
+    integer(kind=4)   :: i, j, k, l, n
 
 ! local arrays
 !
@@ -80,64 +105,92 @@ module mesh
 !
     call datablock_set_dims(nv, nv, im, jm, km)
 
-! print general information about resolutions
+! only master prepares the mesh statistics file
 !
     if (master) then
 
-! prepare the file for logging mesh statistics; only the master process handles
-! this part
+! generate the mesh statistics file name
 !
-! check if the mesh statistics file exists
-!
-      inquire(file = fname, exist = info)
-
-! if flag is set to .true. or the original mesh statistics file does not exist,
-! create a new one and write the header in it, otherwise open the original file
-! and move the writing position to the end to allow for appending
-!
-      if (flag .or. .not. info) then
+      write(fn, "('mesh_',i2.2,'.dat')") nrun
 
 ! create a new mesh statistics file
 !
-        open(unit=funit, file=fname, form='formatted', status='replace')
+#ifdef INTEL
+      open(unit = funit, file = fn, form = 'formatted', status = 'replace'     &
+                                                           , buffered = 'yes')
+#else /* INTEL */
+      open(unit = funit, file = fn, form = 'formatted', status = 'replace')
+#endif /* INTEL */
 
-! write the mesh statistics file header
+! write the mesh statistics header
 !
-        write(funit,"('#')")
-        write(funit,"('#',4x,'step',5x,'time',11x,'leaf',4x,'meta'," //        &
-                           "6x,'coverage',8x,'AMR',11x,'block distribution')")
-        write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'," //        &
-                                              "6x,'efficiency')",advance='no')
-        write(funit,"(1x,a12)",advance="no") 'level = 1'
-        do l = 2, toplev
-          write(funit,"(2x,i6)",advance="no") l
-        end do
+      write(funit, "('#',2(4x,a4),10x,a8,6x,a10,5x,a6,6x,a5,4x,a20)")          &
+                                     'step', 'time', 'coverage', 'efficiency'  &
+                                   , 'blocks', 'leafs', 'block distributions:'
+
+! write the mesh distributions header
+!
+      write(funit, "('#',76x,a8)", advance="no") 'level = '
+      do l = 1, toplev
+        write(funit, "(1x,i9)", advance="no") l
+      end do
 #ifdef MPI
-        write(funit,"(1x,a10)",advance="no") 'cpu = 1'
-        do n = 2, nprocs
-          write(funit,"(2x,i6)",advance="no") n
-        end do
+      write(funit, "(4x,a6)", advance="no") 'cpu = '
+      do n = 1, nprocs
+        write(funit, "(1x,i9)", advance="no") n
+      end do
 #endif /* MPI */
-        write(funit,"('' )")
-        write(funit,"('#')")
-
-      else
-
-! open the mesh statistics file and set the position at the end of file
-!
-        open(unit=funit, file=fname, form='formatted', position='append')
-
-! write a marker that the job has been restarted from here
-!
-        write(funit,"('#',1x,a)") "job restarted from this point"
-
-      end if
+      write(funit, "('' )")
+      write(funit, "('#')")
 
     end if ! master
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_mesh
+!
+!===============================================================================
+!
+! subroutine FINALIZE_MESH:
+! ------------------------
+!
+!   Subroutine releases memory used by the module variables.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine finalize_mesh(iret)
+
+! import external procedures and variables
+!
+    use mpitools   , only : master
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+! only master posses a handler to the mesh statistics file
+!
+    if (master) then
+
+! close the statistics file
+!
+      close(funit)
+
+    end if ! master
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_mesh
 !
 !===============================================================================
 !
@@ -1378,122 +1431,179 @@ module mesh
 !
 !===============================================================================
 !
-! clears_mesh: subroutine deallocates mesh, removing blocks
+! subroutine STORE_MESH_STATS:
+! ---------------------------
+!
+!   Subroutine prepares and stores various mesh statistics.
+!
+!   Arguments:
+!
+!     step - the integration step;
+!     time - the physical time;
 !
 !===============================================================================
 !
-  subroutine clear_mesh()
+  subroutine store_mesh_stats(step, time)
 
-    use error   , only : print_info
-    use mpitools, only : master
+! import external procedures and variables
+!
+    use blocks       , only : ndims, block_meta, list_meta
+    use blocks       , only : get_mblocks, get_nleafs
+    use coordinates  , only : ng, im, jm, km, toplev, effres
+    use mpitools     , only : master, nprocs
 
+! local variables are not implicit by default
+!
     implicit none
 
-!-------------------------------------------------------------------------------
+! subroutine arguments
 !
-! close the handler of the mesh statistics file
-!
-    if (master) close(funit)
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine clear_mesh
-!
-!===============================================================================
-!
-! store_mesh_stats: subroutine stores mesh statistics
-!
-!===============================================================================
-!
-  subroutine store_mesh_stats(n, t)
-
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_mblocks, get_nleafs
-    use coordinates, only : ng, im, jm, km, toplev, effres
-    use mpitools, only : master, nprocs
-
-    implicit none
-
-! arguments
-!
-    integer     , intent(in) :: n
-    real(kind=8), intent(in) :: t
+    integer     , intent(in) :: step
+    real(kind=8), intent(in) :: time
 
 ! local variables
 !
     integer(kind=4) :: l
-    real(kind=4)    :: cov, eff
-
-! local arrays
-!
-    integer(kind=4), dimension(toplev) :: ldist
-#ifdef MPI
-    integer(kind=4), dimension(nprocs)  :: cdist
-#endif /* MPI */
+    real(kind=8)    :: cv, ef
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
 
-! local variables
+! local saved variables
 !
-    integer(kind=4), save :: nm = 0, nl = 0
+    logical        , save :: first = .true.
+    integer(kind=4), save :: nm = 0, nl = 0, nt = 0, nc = 0
+
+! local arrays
+!
+    integer(kind=4), dimension(toplev) :: ldist
+#ifdef MPI
+    integer(kind=4), dimension(nprocs) :: cdist
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-! store the statistics about mesh
+! store the mesh statistics only on master
 !
     if (master) then
 
-      if (nm .ne. get_mblocks() .or. nl .ne. get_nleafs()) then
-
-! set new numbers of meta blocks and leafs
+! store the mesh statistics only if they changed
 !
-      nm = get_mblocks()
-      nl = get_nleafs()
+      if (nm /= get_mblocks() .or. nl /= get_nleafs()) then
 
-! calculate the coverage
+! get the mximum block number and maximum level
 !
-      cov = (1.0 * nl) / tblocks
-      eff = 1.0 * nl * (im * jm * km) / product(effres(1:NDIMS) + 2 * ng)
+        if (first) then
 
-! get the block level distribution
+! set the pointer to the first block on the meta block list
+!
+          pmeta => list_meta
+
+! determine the number of base blocks
+!
+          do while(associated(pmeta))
+
+! if the block is at the lowest level, count it
+!
+            if (pmeta%level == 1) nt = nt + 1
+
+! associate the pointer with the next block
+!
+            pmeta => pmeta%next
+
+          end do ! pmeta
+
+! calculate the maximum block number
+!
+          nt = nt * 2**(ndims*(toplev - 1))
+
+! calculate the number of cell in one block (including the ghost cells)
+!
+          nc = im * jm * km
+
+! reset the first execution flag
+!
+          first = .false.
+
+        end if ! first
+
+! get the new numbers of meta blocks and leafs
+!
+        nm = get_mblocks()
+        nl = get_nleafs()
+
+! calculate the coverage (the number of leafs divided by the maximum
+! block number) and the efficiency (the cells count for adaptive mesh
+! divided by the cell count for corresponding uniform mesh)
+!
+        cv = (1.0d+00 * nl) / nt
+        ef = (1.0d+00 * nl) * nc / product(effres(1:ndims) + 2 * ng)
+
+! initialize the level and process block counter
 !
         ldist(:) = 0
 #ifdef MPI
         cdist(:) = 0
 #endif /* MPI */
+
+! set the pointer to the first block on the meta block list
+!
         pmeta => list_meta
+
+! scan all meta blocks and prepare get the block level and process
+! distributions
+!
         do while(associated(pmeta))
+
+! process only leafs
+!
           if (pmeta%leaf) then
+
+! increase the block level and process counts
+!
             ldist(pmeta%level) = ldist(pmeta%level) + 1
 #ifdef MPI
             cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
 #endif /* MPI */
-          end if
-          pmeta => pmeta%next
-        end do
 
-! write down the statistics
+          end if ! the leaf
+
+! associate the pointer with the next block
 !
-        write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8))",advance="no")  &
-                                                        n, t, nl, nm, cov, eff
-        write(funit,"('   ')",advance="no")
+          pmeta => pmeta%next
+
+        end do ! pmeta
+
+! write down the block statistics
+!
+        write(funit, "(i9,3e14.6,2(2x,i9))", advance="no")                     &
+                                                    step, time, cv, ef, nm, nl
+
+! write down the block level distribution
+!
+        write(funit,"(12x)", advance="no")
         do l = 1, toplev
-          write(funit,"(2x,i6)",advance="no") ldist(l)
-        end do
+          write(funit,"(1x,i9)", advance="no") ldist(l)
+        end do ! l = 1, toplev
+
 #ifdef MPI
-        write(funit,"('   ')",advance="no")
+! write down the process level distribution
+!
+        write(funit,"(10x)", advance="no")
         do l = 1, nprocs
-          write(funit,"(2x,i6)",advance="no") cdist(l)
-        end do
+          write(funit,"(1x,i9)", advance="no") cdist(l)
+        end do ! l = 1, nprocs
 #endif /* MPI */
+
+! write the new line symbol
+!
         write(funit,"('')")
 
       end if ! number of blocks or leafs changed
 
-    end if ! is master
-!
+    end if ! master
+
 !-------------------------------------------------------------------------------
 !
   end subroutine store_mesh_stats

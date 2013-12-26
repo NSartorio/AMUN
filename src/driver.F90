@@ -45,7 +45,7 @@ program amun
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
                            , restart_job
-  use mesh          , only : initialize_mesh, clear_mesh
+  use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
   use mesh          , only : redistribute_blocks
@@ -366,7 +366,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call initialize_mesh(.true.)
+    call initialize_mesh(nrun, master, iret)
 
 ! initialize the integrals module
 !
@@ -389,7 +389,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call initialize_mesh(.false.)
+    call initialize_mesh(nrun, master, iret)
 
 ! initialize the integrals module
 !
@@ -585,9 +585,9 @@ program amun
 !
   call clear_integrals()
 
-! deallocate and reset mesh
+! finalize the mesh module
 !
-  call clear_mesh()
+  call finalize_mesh(iret)
 
 ! deallocate block structure
 !
