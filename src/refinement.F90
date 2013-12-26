@@ -31,9 +31,21 @@
 !
 module refinement
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: iri, irc
+#endif /* PROFILE */
 
 ! refinement criterion parameters
 !
@@ -102,6 +114,17 @@ module refinement
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('refinement initialization'      , iri)
+    call set_timer('refinement criterion estimation', irc)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(iri)
+#endif /* PROFILE */
+
 ! get the refinement parameters
 !
     call get_parameter_real("crefmin", crefmin)
@@ -134,6 +157,12 @@ module refinement
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_refinement
@@ -163,7 +192,21 @@ module refinement
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(iri)
+#endif /* PROFILE */
+
+! deallocate refined variable indicators
+!
     if (allocated(qvar_ref)) deallocate(qvar_ref)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -212,6 +255,12 @@ module refinement
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the refinement criterion estimation
+!
+    call start_timer(irc)
+#endif /* PROFILE */
+
 ! reset indicators
 !
     cref = 0.0e+00
@@ -232,6 +281,12 @@ module refinement
     if (cref < crefmin) then
       criterion = -1
     end if
+
+#ifdef PROFILE
+! stop accounting time for the refinement criterion estimation
+!
+    call stop_timer(irc)
+#endif /* PROFILE */
 
 ! return the refinement flag
 !
