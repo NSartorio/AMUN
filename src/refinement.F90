@@ -43,10 +43,7 @@ module refinement
 
 ! flags for variable included in the refinement criterion calculation
 !
-  logical     , save :: dens_ref  = .true.
-  logical     , save :: pres_ref  = .true.
-  logical     , save :: velo_ref  = .false.
-  logical     , save :: magn_ref  = .false.
+  logical, dimension(:), allocatable, save :: qvar_ref
 
 ! by default everything is private
 !
@@ -54,7 +51,8 @@ module refinement
 
 ! declare public subroutines
 !
-  public :: initialize_refinement, check_refinement_criterion
+  public :: initialize_refinement, finalize_refinement
+  public :: check_refinement_criterion
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -66,27 +64,41 @@ module refinement
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_REFINEMENT:
 ! --------------------------------
 !
 !   Subroutine initializes module REFINEMENT.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_refinement()
+  subroutine initialize_refinement(verbose, iret)
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_real, get_parameter_string
+    use equations    , only : nv, pvars
+    use parameters   , only : get_parameter_real, get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
 
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
 ! local variables
 !
-    character(len=255) :: variables = "dens pres"
+    integer                :: p
+    character(len=255)     :: variables = "dens pres"
+    character(len=255)     :: rvars     = ""
 !
 !-------------------------------------------------------------------------------
 !
@@ -100,16 +112,62 @@ module refinement
 !
     call get_parameter_string("refinement_variables", variables)
 
-! check if density should be take into account
+! allocate vector for indicators, which variables are taken into account in
+! calculating the refinement criterion
 !
-    dens_ref = index(variables, 'dens') > 0
-    pres_ref = index(variables, 'pres') > 0
-    velo_ref = index(variables, 'velo') > 0
-    magn_ref = index(variables, 'magn') > 0
+    allocate(qvar_ref(nv))
+
+! check which primitive variable is used to determine the refinement criterion
+!
+    do p = 1, nv
+      qvar_ref(p) = index(variables, trim(pvars(p))) > 0
+      if (qvar_ref(p)) rvars = adjustl(trim(rvars) // ' ' // trim(pvars(p)))
+    end do ! p = 1, nv
+
+! print information about the refinement criterion
+!
+    if (verbose) then
+
+      write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
+      write (*,"(4x,a,1x,1e9.3)") "derefinement threshold =", crefmin
+      write (*,"(4x,a,1x,1e9.3)") "refinement threshold   =", crefmax
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_refinement
+!
+!===============================================================================
+!
+! subroutine FINALIZE_REFINEMENT:
+! ------------------------------
+!
+!   Subroutine releases memory used by the module variables.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine finalize_refinement(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+    if (allocated(qvar_ref)) deallocate(qvar_ref)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_refinement
 !
 !===============================================================================
 !
@@ -132,8 +190,8 @@ module refinement
 
 ! variables and subroutines imported from other modules
 !
-    use blocks     , only : block_data
-    use equations  , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz
+    use blocks       , only : block_data
+    use equations    , only : nv
 
 ! local variables are not implicit by default
 !
@@ -149,6 +207,7 @@ module refinement
 
 ! local variables
 !
+    integer      :: p
     real(kind=4) :: cref
 !
 !-------------------------------------------------------------------------------
@@ -157,37 +216,11 @@ module refinement
 !
     cref = 0.0e+00
 
-! find the second derivative error for density
+! calculate the second derivative error for selected primitive variables only
 !
-    if (dens_ref) cref = max(cref, second_derivative_error(idn, pdata))
-
-! find the second derivative error for pressure
-!
-    if (pres_ref) cref = max(cref, second_derivative_error(ipr, pdata))
-
-! find the second derivative error for velocity
-!
-    if (velo_ref) then
-
-      cref = max(cref, second_derivative_error(ivx, pdata))
-      cref = max(cref, second_derivative_error(ivy, pdata))
-#if NDIMS == 3
-      cref = max(cref, second_derivative_error(ivz, pdata))
-#endif /* NDIMS == 3 */
-
-    end if
-
-! find the second derivative error for magnetic field
-!
-    if (magn_ref) then
-
-      cref = max(cref, second_derivative_error(ibx, pdata))
-      cref = max(cref, second_derivative_error(iby, pdata))
-#if NDIMS == 3
-      cref = max(cref, second_derivative_error(ibz, pdata))
-#endif /* NDIMS == 3 */
-
-    end if
+    do p = 1, nv
+      if (qvar_ref(p)) cref = max(cref, second_derivative_error(p, pdata))
+    end do ! p = 1, nv
 
 ! return the refinement flag depending on the condition value
 !
@@ -214,6 +247,8 @@ module refinement
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! function SECOND_DERIVATIVE_ERROR:
 ! --------------------------------
 !
@@ -231,8 +266,8 @@ module refinement
 
 ! variables and subroutines imported from other modules
 !
-    use blocks     , only : block_data
-    use coordinates, only : ib, jb, kb, ie, je, ke
+    use blocks       , only : block_data
+    use coordinates  , only : ib, jb, kb, ie, je, ke
 
 ! local variables are not implicit by default
 !
