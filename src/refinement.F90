@@ -92,7 +92,7 @@ module refinement
 !
   subroutine initialize_refinement(verbose, iret)
 
-! include external procedures and variables
+! import external procedures and variables
 !
     use equations    , only : nv, pvars
     use parameters   , only : get_parameter_real, get_parameter_string
