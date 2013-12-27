@@ -140,7 +140,7 @@ integrals.o      : integrals.F90 blocks.o coordinates.o equations.o \
                    evolution.o mpitools.o
 interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o
 io.o             : io.F90 blocks.o coordinates.o equations.o error.o           \
-                   evolution.o mpitools.o random.o refinement.o
+                   evolution.o mpitools.o random.o refinement.o timers.o
 mesh.o           : mesh.F90 blocks.o coordinates.o domains.o equations.o       \
                    error.o interpolations.o mpitools.o problems.o refinement.o \
                    timers.o

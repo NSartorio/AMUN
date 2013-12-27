@@ -30,6 +30,12 @@
 !
 module io
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! include external procedures
 !
   use blocks, only : pointer_meta
@@ -37,6 +43,12 @@ module io
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: ioi, iow, ios
+#endif /* PROFILE */
 
 ! data file type
 !
@@ -106,6 +118,18 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('I/O initialization'  , ioi)
+    call set_timer('I/O snapshot writing', iow)
+    call set_timer('I/O snapshot reading', ios)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(ioi)
+#endif /* PROFILE */
+
 ! read values of the module parameters
 !
     call get_parameter_integer("nres"          , nres   )
@@ -128,6 +152,12 @@ module io
     case default
       with_ghosts = .false.
     end select
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(ioi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -155,6 +185,12 @@ module io
 !
     if (dtout <= 0.0d+0 .or. nfile > (int(t / dtout))) return
 
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
+#endif /* PROFILE */
+
 #ifdef HDF5
 ! store data file
 !
@@ -164,6 +200,12 @@ module io
 ! increase the file counter
 !
     nfile = nfile + 1
+
+#ifdef PROFILE
+! stop accounting time for the data writing
+!
+    call stop_timer(iow)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -185,6 +227,12 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
+#endif /* PROFILE */
+
 ! increase the file counter
 !
     nrest = nrest + 1
@@ -194,6 +242,12 @@ module io
 !
     call write_data_h5('r')
 #endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data writing
+!
+    call stop_timer(iow)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -216,6 +270,12 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the data reading
+!
+    call start_timer(ios)
+#endif /* PROFILE */
+
 ! set restart file number
 !
     nrest = nres
@@ -225,6 +285,12 @@ module io
 !
     call read_data_h5()
 #endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data reading
+!
+    call stop_timer(ios)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
