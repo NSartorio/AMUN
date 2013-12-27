@@ -1527,18 +1527,32 @@ module mesh
 !
 !===============================================================================
 !
-! prolong_block: subroutine expands the block data and copy them to children
+! subroutine PROLONG_BLOCK:
+! ------------------------
+!
+!   Subroutine prolongs variables from a data blocks linked to the input
+!   meta block and copy the resulting array of variables to
+!   the newly created children data block.  The process of data restriction
+!   conserves stored variables.
+!
+!   Arguments:
+!
+!     pblock - the input meta block;
 !
 !===============================================================================
 !
   subroutine prolong_block(pblock)
 
+! import external procedures and variables
+!
     use blocks        , only : block_meta, block_data, nchild
     use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates   , only : ib, ie, jb, je, kb, ke
     use equations     , only : nv
     use interpolations, only : limiter
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -1552,6 +1566,11 @@ module mesh
     integer :: ic, jc, kc, ip, jp, kp
     real    :: dul, dur, dux, duy, duz
 
+! local pointers
+!
+    type(block_meta), pointer :: pchild
+    type(block_data), pointer :: pdata
+
 ! local arrays
 !
     integer, dimension(3) :: dm
@@ -1559,11 +1578,6 @@ module mesh
 ! local allocatable arrays
 !
     real, dimension(:,:,:,:), allocatable :: u
-
-! local pointers
-!
-    type(block_meta), pointer :: pchild
-    type(block_data), pointer :: pdata
 
 !-------------------------------------------------------------------------------
 !
@@ -1694,7 +1708,7 @@ module mesh
       pchild%data%u(1:nv,1:im,1:jm,1:km) = u(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
-    end do
+    end do ! nchild
 
 ! deallocate local arrays
 !
@@ -1728,7 +1742,7 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
     use blocks     , only : ndims
     use blocks     , only : block_meta, block_data, nchild
