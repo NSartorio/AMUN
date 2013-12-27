@@ -983,78 +983,96 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine update_mesh
-#ifdef MPI
 !
 !===============================================================================
 !
-! redistribute_blocks: subroutine redistributes blocks equally between
-!                      processors
+! subroutine REDISTRIBUTE_BLOCKS:
+! ------------------------------
+!
+!   Subroutine redistributes data blocks between processes.
+!
 !
 !===============================================================================
 !
   subroutine redistribute_blocks()
 
-    use blocks   , only : block_meta, block_data, list_meta, list_data
-    use blocks   , only : get_nleafs, append_datablock, remove_datablock   &
-                        , link_blocks
-    use coordinates, only : im, jm, km
-    use mpitools , only : send_real_array, receive_real_array
-    use mpitools , only : nprocs, nproc
-    use equations, only : nv
+#ifdef MPI
+! import external procedures and variables
+!
+    use blocks       , only : block_meta, block_data, list_meta, list_data
+    use blocks       , only : get_nleafs
+    use blocks       , only : append_datablock, remove_datablock, link_blocks
+    use coordinates  , only : im, jm, km
+    use equations    , only : nv
+    use mpitools     , only : nprocs, nproc
+    use mpitools     , only : send_real_array, receive_real_array
+#endif /* MPI */
 
+! local variables are not implicit by default
+!
     implicit none
 
+#ifdef MPI
 ! local variables
 !
-    integer         :: iret
-    integer(kind=4) :: l, n
-!
-! tag for the MPI data exchange
-!
-    integer(kind=4)                            :: itag
-
-! array for number of data block for autobalancing
-!
-    integer(kind=4), dimension(0:nprocs-1)      :: lb
-
-! local buffer for data block exchange
-!
-    real(kind=8)   , dimension(nv,im,jm,km)   :: rbuf
+    integer                                 :: iret
+    integer(kind=4)                         :: np, nl
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
+    type(block_meta), pointer               :: pmeta
+    type(block_data), pointer               :: pdata
+
+! tag for the MPI data exchange
+!
+    integer(kind=4)                         :: itag
+
+! array for number of data block for autobalancing
+!
+    integer(kind=4), dimension(0:nprocs-1)  :: lb
+
+! local buffer for data block exchange
+!
+    real(kind=8)   , dimension(nv,im,jm,km) :: rbuf
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-!! AUTO BALANCING
-!!
-! calculate the new division
+#ifdef MPI
+! calculate the new data block division between processes
 !
-    l       = mod(get_nleafs(), nprocs) - 1
-    lb( : ) = get_nleafs() / nprocs
-    lb(0:l) = lb(0:l) + 1
+    nl       = mod(get_nleafs(), nprocs) - 1
+    lb( :  ) = get_nleafs() / nprocs
+    lb(0:nl) = lb(0:nl) + 1
 
-! iterate over all metablocks and reassign the processor numbers
+! reset the processor and leaf numbers
 !
-    n = 0
-    l = 0
+    np = 0
+    nl = 0
 
+! set the pointer to the first block on the meta block list
+!
     pmeta => list_meta
+
+! iterate over all meta blocks and reassign their process numbers
+!
     do while (associated(pmeta))
 
-! assign the cpu to the current block
+! check if the block belongs to another process
 !
-      if (pmeta%cpu .ne. n) then
+      if (pmeta%cpu /= np) then
 
+! check if the block is the leaf
+!
         if (pmeta%leaf) then
 
-! generate the tag for communication
+! generate a tag for communication
 !
-          itag = pmeta%cpu * nprocs + n + nprocs + 1
+          itag = pmeta%cpu * nprocs + np + nprocs + 1
 
-          if (nproc .eq. pmeta%cpu) then
+! sends the block to the right process
+!
+          if (nproc == pmeta%cpu) then
 
 ! copy data to buffer
 !
@@ -1062,19 +1080,21 @@ module mesh
 
 ! send data
 !
-            call send_real_array(size(rbuf), n, itag, rbuf, iret)
+            call send_real_array(size(rbuf), np, itag, rbuf, iret)
 
-! deallocate data block
+! remove data block from the current process
 !
-             call remove_datablock(pmeta%data)
+            call remove_datablock(pmeta%data)
 
 ! send data block
 !
-          end if
+          end if ! nproc == pmeta%cpu
 
-          if (nproc .eq. n) then
+! receive the block from another process
+!
+          if (nproc == np) then
 
-! allocate data block for the current block
+! allocate a new data block and link it with the current meta block
 !
             call append_datablock(pdata)
             call link_blocks(pmeta, pdata)
@@ -1083,43 +1103,56 @@ module mesh
 !
             call receive_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
 
-! coppy buffer to data
+! coppy the buffer to data block
 !
             pmeta%data%u(:,:,:,:) = rbuf(:,:,:,:)
 
-! receive data block
-!
-          end if
+          end if ! nproc == n
 
-        end if
+        end if ! leaf
 
 ! set new processor number
 !
-        pmeta%cpu = n
+        pmeta%cpu = np
 
-      end if
+      end if ! pmeta%cpu /= np
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
       if (pmeta%leaf) then
-        l = l + 1
-        if (l .ge. lb(n)) then
-          n = min(nprocs - 1, n + 1)
-          l = 0
-        end if
-      end if
 
-! assign pointer to the next block
+! increase the number of leafs for the current process
+!
+        nl = nl + 1
+
+! if the number of leafs for the current process exceeds the number of assigned
+! blocks, reset the counter and increase the process number
+!
+        if (nl >= lb(np)) then
+
+! reset the leaf counter for the current process
+!
+          nl = 0
+
+! increase the process number
+!
+          np = min(nprocs - 1, np + 1)
+
+        end if ! l >= lb(n)
+
+      end if ! leaf
+
+! assign the pointer to the next meta block
 !
       pmeta => pmeta%next
 
-    end do
+    end do ! pmeta
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
   end subroutine redistribute_blocks
-#endif /* MPI */
 !
 !===============================================================================
 !
