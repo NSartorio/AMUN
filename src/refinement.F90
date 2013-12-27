@@ -49,8 +49,8 @@ module refinement
 
 ! refinement criterion parameters
 !
-  real(kind=8), save :: crefmin = 4.0d-02
-  real(kind=8), save :: crefmax = 2.0d-01
+  real(kind=8), save :: crefmin = 2.0d-01
+  real(kind=8), save :: crefmax = 8.0d-01
   real(kind=8), save :: epsref  = 1.0d-02
 
 ! flags for variable included in the refinement criterion calculation
