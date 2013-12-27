@@ -40,7 +40,7 @@ module mesh
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, img, imu, ima, imp, imr, ims
+  integer            , save :: imi, ims, img, imu, ima, imp, imr
 #endif /* PROFILE */
 
 ! file handler for the mesh statistics
@@ -117,12 +117,12 @@ module mesh
 ! set timer descriptions
 !
     call set_timer('mesh initialization'    , imi)
+    call set_timer('mesh statistics'        , ims)
     call set_timer('initial mesh generation', img)
     call set_timer('adaptive mesh update'   , imu)
     call set_timer('block autobalancing'    , ima)
     call set_timer('block restriction'      , imr)
     call set_timer('block prolongation'     , imp)
-    call set_timer('mesh statistics'        , ims)
 
 ! start accounting time for module initialization/finalization
 !
@@ -237,6 +237,197 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_mesh
+!
+!===============================================================================
+!
+! subroutine STORE_MESH_STATS:
+! ---------------------------
+!
+!   Subroutine prepares and stores various mesh statistics.
+!
+!   Arguments:
+!
+!     step - the integration step;
+!     time - the physical time;
+!
+!===============================================================================
+!
+  subroutine store_mesh_stats(step, time)
+
+! import external procedures and variables
+!
+    use blocks       , only : ndims, block_meta, list_meta
+    use blocks       , only : get_mblocks, get_nleafs
+    use coordinates  , only : ng, im, jm, km, toplev, effres
+    use mpitools     , only : master, nprocs
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer     , intent(in) :: step
+    real(kind=8), intent(in) :: time
+
+! local variables
+!
+    integer(kind=4) :: l
+    real(kind=8)    :: cv, ef
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+
+! local saved variables
+!
+    logical        , save :: first = .true.
+    integer(kind=4), save :: nm = 0, nl = 0, nt = 0, nc = 0
+
+! local arrays
+!
+    integer(kind=4), dimension(toplev) :: ldist
+#ifdef MPI
+    integer(kind=4), dimension(nprocs) :: cdist
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the mesh statistics
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! store the mesh statistics only on master
+!
+    if (master) then
+
+! store the mesh statistics only if they changed
+!
+      if (nm /= get_mblocks() .or. nl /= get_nleafs()) then
+
+! get the mximum block number and maximum level
+!
+        if (first) then
+
+! set the pointer to the first block on the meta block list
+!
+          pmeta => list_meta
+
+! determine the number of base blocks
+!
+          do while(associated(pmeta))
+
+! if the block is at the lowest level, count it
+!
+            if (pmeta%level == 1) nt = nt + 1
+
+! associate the pointer with the next block
+!
+            pmeta => pmeta%next
+
+          end do ! pmeta
+
+! calculate the maximum block number
+!
+          nt = nt * 2**(ndims*(toplev - 1))
+
+! calculate the number of cell in one block (including the ghost cells)
+!
+          nc = im * jm * km
+
+! reset the first execution flag
+!
+          first = .false.
+
+        end if ! first
+
+! get the new numbers of meta blocks and leafs
+!
+        nm = get_mblocks()
+        nl = get_nleafs()
+
+! calculate the coverage (the number of leafs divided by the maximum
+! block number) and the efficiency (the cells count for adaptive mesh
+! divided by the cell count for corresponding uniform mesh)
+!
+        cv = (1.0d+00 * nl) / nt
+        ef = (1.0d+00 * nl) * nc / product(effres(1:ndims) + 2 * ng)
+
+! initialize the level and process block counter
+!
+        ldist(:) = 0
+#ifdef MPI
+        cdist(:) = 0
+#endif /* MPI */
+
+! set the pointer to the first block on the meta block list
+!
+        pmeta => list_meta
+
+! scan all meta blocks and prepare get the block level and process
+! distributions
+!
+        do while(associated(pmeta))
+
+! process only leafs
+!
+          if (pmeta%leaf) then
+
+! increase the block level and process counts
+!
+            ldist(pmeta%level) = ldist(pmeta%level) + 1
+#ifdef MPI
+            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
+#endif /* MPI */
+
+          end if ! the leaf
+
+! associate the pointer with the next block
+!
+          pmeta => pmeta%next
+
+        end do ! pmeta
+
+! write down the block statistics
+!
+        write(funit, "(i9,3e14.6,2(2x,i9))", advance="no")                     &
+                                                    step, time, cv, ef, nm, nl
+
+! write down the block level distribution
+!
+        write(funit,"(12x)", advance="no")
+        do l = 1, toplev
+          write(funit,"(1x,i9)", advance="no") ldist(l)
+        end do ! l = 1, toplev
+
+#ifdef MPI
+! write down the process level distribution
+!
+        write(funit,"(10x)", advance="no")
+        do l = 1, nprocs
+          write(funit,"(1x,i9)", advance="no") cdist(l)
+        end do ! l = 1, nprocs
+#endif /* MPI */
+
+! write the new line symbol
+!
+        write(funit,"('')")
+
+      end if ! number of blocks or leafs changed
+
+    end if ! master
+
+#ifdef PROFILE
+! stop accounting time for the mesh statistics
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine store_mesh_stats
 !
 !===============================================================================
 !
@@ -1567,197 +1758,6 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
-!
-!===============================================================================
-!
-! subroutine STORE_MESH_STATS:
-! ---------------------------
-!
-!   Subroutine prepares and stores various mesh statistics.
-!
-!   Arguments:
-!
-!     step - the integration step;
-!     time - the physical time;
-!
-!===============================================================================
-!
-  subroutine store_mesh_stats(step, time)
-
-! import external procedures and variables
-!
-    use blocks       , only : ndims, block_meta, list_meta
-    use blocks       , only : get_mblocks, get_nleafs
-    use coordinates  , only : ng, im, jm, km, toplev, effres
-    use mpitools     , only : master, nprocs
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer     , intent(in) :: step
-    real(kind=8), intent(in) :: time
-
-! local variables
-!
-    integer(kind=4) :: l
-    real(kind=8)    :: cv, ef
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta
-
-! local saved variables
-!
-    logical        , save :: first = .true.
-    integer(kind=4), save :: nm = 0, nl = 0, nt = 0, nc = 0
-
-! local arrays
-!
-    integer(kind=4), dimension(toplev) :: ldist
-#ifdef MPI
-    integer(kind=4), dimension(nprocs) :: cdist
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the mesh statistics
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! store the mesh statistics only on master
-!
-    if (master) then
-
-! store the mesh statistics only if they changed
-!
-      if (nm /= get_mblocks() .or. nl /= get_nleafs()) then
-
-! get the mximum block number and maximum level
-!
-        if (first) then
-
-! set the pointer to the first block on the meta block list
-!
-          pmeta => list_meta
-
-! determine the number of base blocks
-!
-          do while(associated(pmeta))
-
-! if the block is at the lowest level, count it
-!
-            if (pmeta%level == 1) nt = nt + 1
-
-! associate the pointer with the next block
-!
-            pmeta => pmeta%next
-
-          end do ! pmeta
-
-! calculate the maximum block number
-!
-          nt = nt * 2**(ndims*(toplev - 1))
-
-! calculate the number of cell in one block (including the ghost cells)
-!
-          nc = im * jm * km
-
-! reset the first execution flag
-!
-          first = .false.
-
-        end if ! first
-
-! get the new numbers of meta blocks and leafs
-!
-        nm = get_mblocks()
-        nl = get_nleafs()
-
-! calculate the coverage (the number of leafs divided by the maximum
-! block number) and the efficiency (the cells count for adaptive mesh
-! divided by the cell count for corresponding uniform mesh)
-!
-        cv = (1.0d+00 * nl) / nt
-        ef = (1.0d+00 * nl) * nc / product(effres(1:ndims) + 2 * ng)
-
-! initialize the level and process block counter
-!
-        ldist(:) = 0
-#ifdef MPI
-        cdist(:) = 0
-#endif /* MPI */
-
-! set the pointer to the first block on the meta block list
-!
-        pmeta => list_meta
-
-! scan all meta blocks and prepare get the block level and process
-! distributions
-!
-        do while(associated(pmeta))
-
-! process only leafs
-!
-          if (pmeta%leaf) then
-
-! increase the block level and process counts
-!
-            ldist(pmeta%level) = ldist(pmeta%level) + 1
-#ifdef MPI
-            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
-#endif /* MPI */
-
-          end if ! the leaf
-
-! associate the pointer with the next block
-!
-          pmeta => pmeta%next
-
-        end do ! pmeta
-
-! write down the block statistics
-!
-        write(funit, "(i9,3e14.6,2(2x,i9))", advance="no")                     &
-                                                    step, time, cv, ef, nm, nl
-
-! write down the block level distribution
-!
-        write(funit,"(12x)", advance="no")
-        do l = 1, toplev
-          write(funit,"(1x,i9)", advance="no") ldist(l)
-        end do ! l = 1, toplev
-
-#ifdef MPI
-! write down the process level distribution
-!
-        write(funit,"(10x)", advance="no")
-        do l = 1, nprocs
-          write(funit,"(1x,i9)", advance="no") cdist(l)
-        end do ! l = 1, nprocs
-#endif /* MPI */
-
-! write the new line symbol
-!
-        write(funit,"('')")
-
-      end if ! number of blocks or leafs changed
-
-    end if ! master
-
-#ifdef PROFILE
-! stop accounting time for the mesh statistics
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine store_mesh_stats
 #ifdef DEBUG
 !
 !===============================================================================
