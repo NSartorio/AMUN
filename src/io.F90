@@ -30,15 +30,12 @@
 !
 module io
 
-#ifdef PROFILE
 ! import external subroutines
 !
+  use blocks, only : pointer_meta
+#ifdef PROFILE
   use timers, only : set_timer, start_timer, stop_timer
 #endif /* PROFILE */
-
-! include external procedures
-!
-  use blocks, only : pointer_meta
 
 ! module variables are not implicit by default
 !
@@ -52,11 +49,11 @@ module io
 
 ! data file type
 !
-  character         , save :: ftype = "p"
+  character         , save :: ftype   = "p"
 
 ! the interval of the snapshots storing
 !
-  real              , save :: dtout = 1.0d+0
+  real              , save :: dtout   = 1.0d+00
 
 ! all module parameters
 !
@@ -93,6 +90,8 @@ module io
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_IO:
 ! ------------------------
 !
@@ -103,10 +102,10 @@ module io
 !
   subroutine initialize_io()
 
-! include external procedures
+! import external procedures
 !
-    use parameters, only : get_parameter_integer, get_parameter_real           &
-                         , get_parameter_string
+    use parameters     , only : get_parameter_integer, get_parameter_real      &
+                              , get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -165,18 +164,24 @@ module io
 !
 !===============================================================================
 !
-! write_data: wrapper subroutine for storing data
+! subroutine WRITE_DATA:
+! ---------------------
 !
-! info: subroutine selects the writing subroutine from the supported output
-!       formats depending on the compilation time options, and stores a data
-!       file; at this moment only the HDF5 format is supported;
+!   Subroutine stores block data in snapshots.  Block variables are grouped
+!   todether and stored in big 4D arrays separately.  This is a wrapper for
+!   specific format storing.
+!
 !
 !===============================================================================
 !
   subroutine write_data()
 
-    use evolution, only : t
+! import external variables
+!
+    use evolution      , only : t
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
