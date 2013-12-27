@@ -27,9 +27,21 @@
 !
 module mesh
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, img, imu, ima, imp, imr, ims
+#endif /* PROFILE */
 
 ! file handler for the mesh statistics
 !
@@ -101,6 +113,22 @@ module mesh
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('mesh initialization'    , imi)
+    call set_timer('initial mesh generation', img)
+    call set_timer('adaptive mesh update'   , imu)
+    call set_timer('block autobalancing'    , ima)
+    call set_timer('block restriction'      , imr)
+    call set_timer('block prolongation'     , imp)
+    call set_timer('mesh statistics'        , ims)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! set data block dimensions
 !
     call datablock_set_dims(nv, nv, im, jm, km)
@@ -145,6 +173,12 @@ module mesh
 
     end if ! master
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_mesh
@@ -178,6 +212,12 @@ module mesh
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! only master posses a handler to the mesh statistics file
 !
     if (master) then
@@ -187,6 +227,12 @@ module mesh
       close(funit)
 
     end if ! master
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -205,7 +251,7 @@ module mesh
 !
   subroutine generate_mesh()
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
     use blocks       , only : block_meta, block_data, list_meta, list_data
     use blocks       , only : ndims, nchild, nsides, nfaces
@@ -237,6 +283,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the initial mesh generation
+!
+    call start_timer(img)
+#endif /* PROFILE */
+
 ! allocate the initial lowest level structure of blocks
 !
     call setup_domain()
@@ -500,6 +552,12 @@ module mesh
 
     end do ! pmeta
 
+#ifdef PROFILE
+! stop accounting time for the initial mesh generation
+!
+    call stop_timer(img)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine generate_mesh
@@ -562,6 +620,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the adaptive mesh refinement update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 #ifdef DEBUG
 ! check mesh
 !
@@ -980,6 +1044,12 @@ module mesh
     call check_mesh('after update_mesh')
 #endif /* DEBUG */
 
+#ifdef PROFILE
+! stop accounting time for the adaptive mesh refinement update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine update_mesh
@@ -1039,6 +1109,12 @@ module mesh
 !-------------------------------------------------------------------------------
 !
 #ifdef MPI
+#ifdef PROFILE
+! start accounting time for the block redistribution
+!
+    call start_timer(ima)
+#endif /* PROFILE */
+
 ! calculate the new data block division between processes
 !
     nl       = mod(get_nleafs(), nprocs) - 1
@@ -1148,6 +1224,12 @@ module mesh
       pmeta => pmeta%next
 
     end do ! pmeta
+
+#ifdef PROFILE
+! stop accounting time for the block redistribution
+!
+    call stop_timer(ima)
+#endif /* PROFILE */
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -1196,6 +1278,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block prolongation
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 ! assign the pdata pointer
 !
     pdata => pblock%data
@@ -1323,6 +1411,12 @@ module mesh
 !
     if (allocated(u)) deallocate(u)
 
+#ifdef PROFILE
+! stop accounting time for the block prolongation
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine prolong_block
@@ -1377,6 +1471,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block restriction
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! assign the parent data pointer
 !
     pparent => pblock%data
@@ -1458,6 +1558,12 @@ module mesh
 
     end do ! p = 1, nchild
 
+#ifdef PROFILE
+! stop accounting time for the block restriction
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
@@ -1517,6 +1623,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the mesh statistics
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
 ! store the mesh statistics only on master
 !
     if (master) then
@@ -1636,6 +1748,12 @@ module mesh
       end if ! number of blocks or leafs changed
 
     end if ! master
+
+#ifdef PROFILE
+! stop accounting time for the mesh statistics
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
