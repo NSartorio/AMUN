@@ -445,7 +445,7 @@ module mesh
 ! import external procedures and variables
 !
     use blocks         , only : block_meta, block_data, list_meta, list_data
-    use blocks         , only : ndims, nchild, nsides, nfaces
+    use blocks         , only : ndims, nchildren, nsides, nfaces
     use blocks         , only : allocate_datablock, deallocate_datablock
     use blocks         , only : append_datablock, remove_datablock
     use blocks         , only : link_blocks, unlink_blocks, refine_block
@@ -771,7 +771,7 @@ module mesh
 ! import external procedures and variables
 !
     use blocks         , only : block_meta, block_data, list_meta, list_data
-    use blocks         , only : nchild, ndims, nsides, nfaces
+    use blocks         , only : nchildren, ndims, nsides, nfaces
     use blocks         , only : get_nleafs
     use blocks         , only : refine_block, derefine_block
     use blocks         , only : append_datablock, remove_datablock, link_blocks
@@ -1091,7 +1091,7 @@ module mesh
 
 ! iterate over all children
 !
-                do p = 1, nchild
+                do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1113,7 +1113,7 @@ module mesh
 
 ! iterate over all children
 !
-                  do p = 1, nchild
+                  do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1170,7 +1170,7 @@ module mesh
 ! find the case when child blocks are spread across at least 2 processors
 !
           flag = .false.
-          do p = 1, nchild
+          do p = 1, nchildren
             flag = flag .or. (pmeta%child(p)%ptr%cpu /= pmeta%cpu)
           end do
 
@@ -1178,7 +1178,7 @@ module mesh
 
 ! iterate over all children
 !
-            do p = 1, nchild
+            do p = 1, nchildren
 
 ! generate the tag for communication
 !
@@ -1233,7 +1233,7 @@ module mesh
 
               end if ! if child is are on different processes
 
-            end do ! nchilds
+            end do ! nchildren
 
           end if ! children spread over different processes
 
@@ -1545,7 +1545,7 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, block_data, nchild
+    use blocks         , only : block_meta, block_data, nchildren
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ib, ie, jb, je, kb, ke
     use equations      , only : nv
@@ -1671,7 +1671,7 @@ module mesh
 
 ! iterate over all children
 !
-    do p = 1, nchild
+    do p = 1, nchildren
 
 ! assign pointer to the current child
 !
@@ -1708,7 +1708,7 @@ module mesh
       pchild%data%u(1:nv,1:im,1:jm,1:km) = u(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
-    end do ! nchild
+    end do ! nchildren
 
 ! deallocate local arrays
 !
@@ -1745,7 +1745,7 @@ module mesh
 ! import external procedures and variables
 !
     use blocks         , only : ndims
-    use blocks         , only : block_meta, block_data, nchild
+    use blocks         , only : block_meta, block_data, nchildren
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ih, jh, kh, ib, jb, kb, ie, je, ke
     use equations      , only : nv
@@ -1786,7 +1786,7 @@ module mesh
 
 ! iterate over all children
 !
-    do p = 1, nchild
+    do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1859,7 +1859,7 @@ module mesh
                                  +    pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
-    end do ! p = 1, nchild
+    end do ! p = 1, nchildren
 
 #ifdef PROFILE
 ! stop accounting time for the block restriction

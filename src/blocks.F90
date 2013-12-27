@@ -36,10 +36,10 @@ module blocks
 
 ! module parameters
 !
-  integer(kind=4), parameter :: ndims  = NDIMS
-  integer(kind=4), parameter :: nsides = 2
-  integer(kind=4), parameter :: nfaces = 2**(ndims - 1)
-  integer(kind=4), parameter :: nchild = 2**ndims
+  integer(kind=4), parameter :: ndims     = NDIMS
+  integer(kind=4), parameter :: nsides    = 2
+  integer(kind=4), parameter :: nfaces    = 2**(ndims - 1)
+  integer(kind=4), parameter :: nchildren = 2**ndims
 
 !! BLOCK STRUCTURE POINTERS (they have to be defined before block structures)
 !!
@@ -72,7 +72,7 @@ module blocks
 
                                  ! pointers to child meta blocks
                                  !
-    type(pointer_meta)          :: child(nchild)
+    type(pointer_meta)          :: child(nchildren)
 
                                  ! pointers to neighbor meta blocks
                                  !
@@ -221,7 +221,7 @@ module blocks
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
   public :: list_meta, list_data
-  public :: nchild, ndims, nsides, nfaces
+  public :: nchildren, ndims, nsides, nfaces
   public :: initialize_blocks, finalize_blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
@@ -372,7 +372,7 @@ module blocks
     nullify(pmeta%next)
     nullify(pmeta%parent)
     nullify(pmeta%data)
-    do i = 1, nchild
+    do i = 1, nchildren
       nullify(pmeta%child(i)%ptr)
     end do
     do k = 1, nfaces
@@ -464,7 +464,7 @@ module blocks
 
 ! nullify children
 !
-      do i = 1, nchild
+      do i = 1, nchildren
         nullify(pmeta%child(i)%ptr)
       end do
 
@@ -1383,7 +1383,7 @@ module blocks
 
 ! local arrays
 !
-    integer, dimension(nchild)              :: config, order
+    integer, dimension(nchildren)           :: config, order
     integer, dimension(ndims,nsides,nfaces) :: set
 
 ! local variables
@@ -1407,7 +1407,7 @@ module blocks
 
 ! iterate over all child blocks
 !
-      do p = 1, nchild
+      do p = 1, nchildren
 
 ! create child meta and data blocks
 !
@@ -1722,13 +1722,13 @@ module blocks
 
 ! set blocks configurations
 !
-      do p = 1, nchild
+      do p = 1, nchildren
         pblock%child(order(p))%ptr%config = config(p)
       end do
 
 ! connect blocks in chain
 !
-      do p = 2, nchild
+      do p = 2, nchildren
         pblock%child(order(p  ))%ptr%prev => pblock%child(order(p-1))%ptr
         pblock%child(order(p-1))%ptr%next => pblock%child(order(p  ))%ptr
       end do
@@ -1736,8 +1736,8 @@ module blocks
 ! insert this chain after the parent block
 !
       pneigh => pblock%next
-      pfirst => pblock%child(order(     1))%ptr
-      plast  => pblock%child(order(nchild))%ptr
+      pfirst => pblock%child(order(        1))%ptr
+      plast  => pblock%child(order(nchildren))%ptr
       if (associated(pneigh)) then
         pneigh%prev => plast
         plast%next  => pneigh
@@ -1760,7 +1760,7 @@ module blocks
 
 ! iterate over all children and allocate data blocks
 !
-      do p = 1, nchild
+      do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1807,7 +1807,7 @@ module blocks
 
 ! iterate over all children and allocate data blocks
 !
-        do p = 1, nchild
+        do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1825,7 +1825,7 @@ module blocks
 
 ! connect blocks in chain
 !
-        do p = 2, nchild
+        do p = 2, nchildren
           pblock%child(order(p  ))%ptr%data%prev =>                            &
                                              pblock%child(order(p-1))%ptr%data
           pblock%child(order(p-1))%ptr%data%next =>                            &
@@ -1836,8 +1836,8 @@ module blocks
 !
         pdata => pblock%data%next
 
-        pfirst => pblock%child(order(     1))%ptr
-        plast  => pblock%child(order(nchild))%ptr
+        pfirst => pblock%child(order(        1))%ptr
+        plast  => pblock%child(order(nchildren))%ptr
 
         if (associated(pdata)) then
           pdata%prev => plast%data
@@ -1945,7 +1945,7 @@ module blocks
 
 ! deallocate child blocks
 !
-    do p = 1, nchild
+    do p = 1, nchildren
       call metablock_unset_leaf(pblock%child(p)%ptr)
       call deallocate_metablock(pblock%child(p)%ptr)
     end do
@@ -2044,7 +2044,7 @@ module blocks
 
 ! check children IDs
 !
-    do p = 1, nchild
+    do p = 1, nchildren
       ptemp => pblock%child(p)%ptr
       if (associated(ptemp)) then
         if (ptemp%id .le. 0 .or. ptemp%id .gt. last_id) then

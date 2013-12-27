@@ -2021,7 +2021,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_last_id, get_mblocks, nchild, nsides, nfaces
+    use blocks  , only : get_last_id, get_mblocks, nchildren, nsides, nfaces
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gcreate_f, h5gclose_f
@@ -2071,7 +2071,7 @@ module io
       am(1) = get_mblocks()
       cm(1) = get_last_id()
       dm(1) = get_mblocks()
-      dm(2) = nchild
+      dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
       qm(1) = get_mblocks()
@@ -2142,7 +2142,7 @@ module io
           zmn(l)   = pmeta%zmin
           zmx(l)   = pmeta%zmax
 
-          do p = 1, nchild
+          do p = 1, nchildren
             if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
           end do
 
@@ -2247,7 +2247,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : nchild, nsides, nfaces
+    use blocks  , only : nchildren, nsides, nfaces
     use blocks  , only : get_mblocks
     use blocks  , only : metablock_set_id, metablock_set_cpu                   &
                        , metablock_set_refine, metablock_set_config            &
@@ -2307,7 +2307,7 @@ module io
 !
       am(1) = get_mblocks()
       dm(1) = get_mblocks()
-      dm(2) = nchild
+      dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
       qm(1) = get_mblocks()
@@ -2405,7 +2405,7 @@ module io
 
         if (par(l) .gt. 0) pmeta%parent => block_array(par(l))%ptr
 
-        do p = 1, nchild
+        do p = 1, nchildren
           if (chl(l,p) .gt. 0) then
             pmeta%child(p)%ptr => block_array(chl(l,p))%ptr
           end if
