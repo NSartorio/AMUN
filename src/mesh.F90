@@ -1875,14 +1875,26 @@ module mesh
 !===============================================================================
 !
 ! check_mesh: subroutine checks if the block structure is correct
+! subroutine CHECK_MESH:
+! ---------------------
+!
+!   Subroutine checks if the meta block structure is correct.
+!
+!   Arguments:
+!
+!     string - the identification string;
 !
 !===============================================================================
 !
   subroutine check_mesh(string)
 
+! import external procedures and variables
+!
     use blocks, only : block_meta, list_meta
     use blocks, only : check_metablock
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -1891,21 +1903,27 @@ module mesh
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta
+    type(block_meta), pointer    :: pmeta
 
 !-------------------------------------------------------------------------------
 !
-! check meta blocks
+! assign the pointer with the first block on the list
 !
     pmeta => list_meta
+
+! iterate over all meta blocks
+!
     do while(associated(pmeta))
 
 ! check the current block
 !
       call check_metablock(pmeta, string)
 
+! assign the pointer with the next block on the meta block list
+!
       pmeta => pmeta%next
-    end do
+
+    end do ! over meta blocks
 
 !-------------------------------------------------------------------------------
 !
