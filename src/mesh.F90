@@ -86,11 +86,11 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks     , only : datablock_set_dims
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coordinates, only : toplev, im, jm, km
-    use equations  , only : nv
-    use mpitools   , only : master, nprocs
+    use blocks         , only : datablock_set_dims
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : toplev, im, jm, km
+    use equations      , only : nv
+    use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
 !
@@ -200,7 +200,7 @@ module mesh
 
 ! import external procedures and variables
 !
-    use mpitools   , only : master
+    use mpitools       , only : master
 
 ! local variables are not implicit by default
 !
@@ -256,10 +256,10 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks       , only : ndims, block_meta, list_meta
-    use blocks       , only : get_mblocks, get_nleafs
-    use coordinates  , only : ng, im, jm, km, toplev, effres
-    use mpitools     , only : master, nprocs
+    use blocks         , only : ndims, block_meta, list_meta
+    use blocks         , only : get_mblocks, get_nleafs
+    use coordinates    , only : ng, im, jm, km, toplev, effres
+    use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
 !
@@ -444,18 +444,18 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks       , only : block_meta, block_data, list_meta, list_data
-    use blocks       , only : ndims, nchild, nsides, nfaces
-    use blocks       , only : allocate_datablock, deallocate_datablock
-    use blocks       , only : append_datablock, remove_datablock
-    use blocks       , only : link_blocks, unlink_blocks, refine_block
-    use blocks       , only : get_mblocks, get_nleafs
-    use coordinates  , only : minlev, maxlev, res
-    use domains      , only : setup_domain
-    use error        , only : print_info, print_error
-    use mpitools     , only : master, nproc, nprocs
-    use problems     , only : setup_problem
-    use refinement   , only : check_refinement_criterion
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : ndims, nchild, nsides, nfaces
+    use blocks         , only : allocate_datablock, deallocate_datablock
+    use blocks         , only : append_datablock, remove_datablock
+    use blocks         , only : link_blocks, unlink_blocks, refine_block
+    use blocks         , only : get_mblocks, get_nleafs
+    use coordinates    , only : minlev, maxlev, res
+    use domains        , only : setup_domain
+    use error          , only : print_info, print_error
+    use mpitools       , only : master, nproc, nprocs
+    use problems       , only : setup_problem
+    use refinement     , only : check_refinement_criterion
 
 ! local variables are not implicit by default
 !
@@ -770,20 +770,20 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks       , only : block_meta, block_data, list_meta, list_data
-    use blocks       , only : nchild, ndims, nsides, nfaces
-    use blocks       , only : get_nleafs
-    use blocks       , only : refine_block, derefine_block
-    use blocks       , only : append_datablock, remove_datablock, link_blocks
-    use coordinates  , only : minlev, maxlev, toplev, im, jm, km, res
-    use equations    , only : nv
-    use error        , only : print_info, print_error
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : nchild, ndims, nsides, nfaces
+    use blocks         , only : get_nleafs
+    use blocks         , only : refine_block, derefine_block
+    use blocks         , only : append_datablock, remove_datablock, link_blocks
+    use coordinates    , only : minlev, maxlev, toplev, im, jm, km, res
+    use equations      , only : nv
+    use error          , only : print_info, print_error
 #ifdef MPI
-    use mpitools     , only : master, nprocs, nproc
-    use mpitools     , only : reduce_sum_integer_array
-    use mpitools     , only : send_real_array, receive_real_array
+    use mpitools       , only : master, nprocs, nproc
+    use mpitools       , only : reduce_sum_integer_array
+    use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
-    use refinement   , only : check_refinement_criterion
+    use refinement     , only : check_refinement_criterion
 
 ! local variables are not implicit by default
 !
@@ -1358,13 +1358,13 @@ module mesh
 #ifdef MPI
 ! import external procedures and variables
 !
-    use blocks       , only : block_meta, block_data, list_meta, list_data
-    use blocks       , only : get_nleafs
-    use blocks       , only : append_datablock, remove_datablock, link_blocks
-    use coordinates  , only : im, jm, km
-    use equations    , only : nv
-    use mpitools     , only : nprocs, nproc
-    use mpitools     , only : send_real_array, receive_real_array
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : get_nleafs
+    use blocks         , only : append_datablock, remove_datablock, link_blocks
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1545,11 +1545,11 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks        , only : block_meta, block_data, nchild
-    use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
-    use coordinates   , only : ib, ie, jb, je, kb, ke
-    use equations     , only : nv
-    use interpolations, only : limiter
+    use blocks         , only : block_meta, block_data, nchild
+    use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates    , only : ib, ie, jb, je, kb, ke
+    use equations      , only : nv
+    use interpolations , only : limiter
 
 ! local variables are not implicit by default
 !
@@ -1744,11 +1744,11 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks     , only : ndims
-    use blocks     , only : block_meta, block_data, nchild
-    use coordinates, only : ng, nh, in, jn, kn, im, jm, km
-    use coordinates, only : ih, jh, kh, ib, jb, kb, ie, je, ke
-    use equations  , only : nv
+    use blocks         , only : ndims
+    use blocks         , only : block_meta, block_data, nchild
+    use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates    , only : ih, jh, kh, ib, jb, kb, ie, je, ke
+    use equations      , only : nv
 
 ! local variables are not implicit by default
 !
@@ -1890,8 +1890,8 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks, only : block_meta, list_meta
-    use blocks, only : check_metablock
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : check_metablock
 
 ! local variables are not implicit by default
 !

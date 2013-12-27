@@ -94,8 +94,8 @@ module refinement
 
 ! import external procedures and variables
 !
-    use equations    , only : nv, pvars
-    use parameters   , only : get_parameter_real, get_parameter_string
+    use equations      , only : nv, pvars
+    use parameters     , only : get_parameter_real, get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -231,10 +231,10 @@ module refinement
 !
   function check_refinement_criterion(pdata) result(criterion)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks       , only : block_data
-    use equations    , only : nv
+    use blocks         , only : block_data
+    use equations      , only : nv
 
 ! local variables are not implicit by default
 !
@@ -319,10 +319,10 @@ module refinement
 !
   function second_derivative_error(iqt, pdata) result(error)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks       , only : block_data
-    use coordinates  , only : ib, jb, kb, ie, je, ke
+    use blocks         , only : block_data
+    use coordinates    , only : ib, jb, kb, ie, je, ke
 
 ! local variables are not implicit by default
 !
