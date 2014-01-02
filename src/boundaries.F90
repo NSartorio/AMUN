@@ -254,10 +254,11 @@ module boundaries
 !
   subroutine boundary_variables()
 
-! include external variables
+! import external procedures and variables
 !
-    use coordinates   , only : toplev
-    use mpitools      , only : periodic
+    use blocks         , only : ndims
+    use coordinates    , only : toplev
+    use mpitools       , only : periodic
 
 ! local variables are not implicit by default
 !
@@ -285,7 +286,7 @@ module boundaries
 
 ! iterate over all directions
 !
-      do idir = 1, NDIMS
+      do idir = 1, ndims
 
 ! update boundaries which don't have neighbors and which are not periodic
 !
@@ -299,7 +300,7 @@ module boundaries
 
 ! restrict blocks from higher level neighbours
 !
-      do idir = 1, NDIMS
+      do idir = 1, ndims
 
         call restrict_boundaries(ilev - 1, idir)
 
@@ -313,13 +314,13 @@ module boundaries
 
 ! prolong boundaries from lower level neighbours
 !
-      do idir = 1, NDIMS
+      do idir = 1, ndims
 
         call prolong_boundaries(ilev, idir)
 
       end do
 
-      do idir = 1, NDIMS
+      do idir = 1, ndims
 
 ! update boundaries which don't have neighbors and which are not periodic
 !
