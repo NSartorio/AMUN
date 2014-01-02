@@ -54,6 +54,16 @@ module boundaries
   character(len = 32), save     :: zlbndry = "periodic"
   character(len = 32), save     :: zubndry = "periodic"
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_boundaries, finalize_boundaries
+  public :: boundary_variables, boundary_fluxes
+  public :: xlbndry, ylbndry, zlbndry, xubndry, yubndry, zubndry
+
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
   contains
