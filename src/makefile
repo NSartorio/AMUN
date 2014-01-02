@@ -124,7 +124,7 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 blocks.o         : blocks.F90 error.o
 boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
-                   interpolations.o mpitools.o
+                   interpolations.o mpitools.o timers.o
 constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \

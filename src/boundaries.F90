@@ -29,9 +29,21 @@
 !
 module boundaries
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, imv, imf
+#endif /* PROFILE */
 
 ! module parameters for the boundary update order and boundary type
 !
@@ -74,6 +86,18 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('boundaries:: initialization', imi)
+    call set_timer('boundaries:: variables'     , imv)
+    call set_timer('boundaries:: fluxes'        , imf)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get runtime values for the boundary types
 !
     call get_parameter_string ("xlbndry" , xlbndry)
@@ -129,9 +153,56 @@ module boundaries
     end if
 #endif /* MPI */
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_boundaries
+!
+!===============================================================================
+!
+! subroutine FINALIZE_BOUNDARIES:
+! ------------------------------
+!
+!   Subroutine releases memory used by the module.
+!
+!   Arguments:
+!
+!     iret    - an integer flag for error return value;
+!
+!===============================================================================
+!
+  subroutine finalize_boundaries(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_boundaries
 !
 !===============================================================================
 !
@@ -161,6 +232,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable boundary update
+!
+    call start_timer(imv)
+#endif /* PROFILE */
+
 ! 1. FIRST FILL OUT THE CORNERS WITH THE EXTRAPOLATED VARIABLES
 !
     call update_corners()
@@ -218,6 +295,12 @@ module boundaries
       end do
 
     end do ! levels
+
+#ifdef PROFILE
+! stop accounting time for variable boundary update
+!
+    call stop_timer(imv)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1636,6 +1719,12 @@ module boundaries
 !
     if (toplev .eq. 1) return
 
+#ifdef PROFILE
+! start accounting time for flux boundary update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 #ifdef MPI
 ! reset the block counter
 !
@@ -2002,6 +2091,12 @@ module boundaries
       end do ! isend
     end do ! irecv
 #endif /* MPI */
+
+#ifdef PROFILE
+! stop accounting time for flux boundary update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
