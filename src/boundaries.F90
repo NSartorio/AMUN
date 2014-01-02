@@ -81,24 +81,30 @@ module boundaries
 !
 !   Subroutine initializes the module BOUNDARIES by setting its parameters.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_boundaries()
+  subroutine initialize_boundaries(verbose, iret)
 
-! include external procedures
-!
-    use parameters    , only : get_parameter_string
-
-! include external variables
+! import external procedures and variables
 !
 #ifdef MPI
-    use mpitools      , only : pdims, pcoords, periodic
+    use mpitools       , only : pdims, pcoords, periodic
 #endif /* MPI */
+    use parameters     , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -123,46 +129,61 @@ module boundaries
     call get_parameter_string ("zlbndry" , zlbndry)
     call get_parameter_string ("zubndry" , zubndry)
 
+! print information about the boundary conditions
+!
+    if (verbose) then
+
+      write (*,"(4x,a10,13x,'=',2(1x,a))") "x-boundary"                        &
+                                                , trim(xlbndry), trim(xubndry)
+      write (*,"(4x,a10,13x,'=',2(1x,a))") "y-boundary"                        &
+                                                , trim(ylbndry), trim(yubndry)
+#if NDIMS == 3
+      write (*,"(4x,a10,13x,'=',2(1x,a))") "z-boundary"                        &
+                                                , trim(zlbndry), trim(zubndry)
+#endif /* NDIMS == 3 */
+
+    end if
+
 #ifdef MPI
 ! change the internal boundaries to "exchange" type for the MPI update
 !
-    if (pdims(1) .gt. 1) then
+    if (pdims(1) > 1) then
       if (periodic(1)) then
         xlbndry       = "exchange"
         xubndry       = "exchange"
       else
-        if (pcoords(1) .gt. 0         ) then
+        if (pcoords(1) > 0         ) then
           xlbndry       = "exchange"
         end if
-        if (pcoords(1) .lt. pdims(1)-1) then
+        if (pcoords(1) < pdims(1)-1) then
           xubndry       = "exchange"
         end if
       end if
     end if
 
-    if (pdims(2) .gt. 1) then
+    if (pdims(2) > 1) then
       if (periodic(2)) then
         ylbndry       = "exchange"
         yubndry       = "exchange"
       else
-        if (pcoords(2) .gt. 0         ) then
+        if (pcoords(2) > 0         ) then
           ylbndry       = "exchange"
         end if
-        if (pcoords(2) .lt. pdims(2)-1) then
+        if (pcoords(2) < pdims(2)-1) then
           yubndry       = "exchange"
         end if
       end if
     end if
 
-    if (pdims(3) .gt. 1) then
+    if (pdims(3) > 1) then
       if (periodic(3)) then
         zlbndry       = "exchange"
         zubndry       = "exchange"
       else
-        if (pcoords(3) .gt. 0         ) then
+        if (pcoords(3) > 0         ) then
           zlbndry       = "exchange"
         end if
-        if (pcoords(3) .lt. pdims(3)-1) then
+        if (pcoords(3) < pdims(3)-1) then
           zubndry       = "exchange"
         end if
       end if

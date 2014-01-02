@@ -35,7 +35,7 @@ program amun
 ! include external subroutines used in this module
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
-  use boundaries    , only : initialize_boundaries
+  use boundaries    , only : initialize_boundaries, finalize_boundaries
   use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
@@ -348,9 +348,16 @@ program amun
 !
   call initialize_blocks()
 
+! initialize boundaries module and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Boundaries:"
+  end if
+
 ! initialize boundaries
 !
-  call initialize_boundaries()
+  call initialize_boundaries(master, iret)
 
 ! initialize module PROBLEMS
 !
@@ -588,6 +595,10 @@ program amun
 ! finalize the mesh module
 !
   call finalize_mesh(iret)
+
+! finalize boundary module
+!
+  call finalize_boundaries(iret)
 
 ! deallocate block structure
 !
