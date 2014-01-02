@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -30,21 +30,30 @@
 !
 module io
 
-! include external procedures
+! import external subroutines
 !
   use blocks, only : pointer_meta
+#ifdef PROFILE
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
 
 ! module variables are not implicit by default
 !
   implicit none
 
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: ioi, iow, ios
+#endif /* PROFILE */
+
 ! data file type
 !
-  character         , save :: ftype = "p"
+  character         , save :: ftype   = "p"
 
 ! the interval of the snapshots storing
 !
-  real              , save :: dtout = 1.0d+0
+  real              , save :: dtout   = 1.0d+00
 
 ! all module parameters
 !
@@ -81,6 +90,8 @@ module io
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_IO:
 ! ------------------------
 !
@@ -91,10 +102,10 @@ module io
 !
   subroutine initialize_io()
 
-! include external procedures
+! import external procedures
 !
-    use parameters, only : get_parameter_integer, get_parameter_real           &
-                         , get_parameter_string
+    use parameters     , only : get_parameter_integer, get_parameter_real      &
+                              , get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -106,6 +117,18 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('I/O initialization'  , ioi)
+    call set_timer('I/O snapshot writing', iow)
+    call set_timer('I/O snapshot reading', ios)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(ioi)
+#endif /* PROFILE */
+
 ! read values of the module parameters
 !
     call get_parameter_integer("nres"          , nres   )
@@ -129,24 +152,36 @@ module io
       with_ghosts = .false.
     end select
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(ioi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_io
 !
 !===============================================================================
 !
-! write_data: wrapper subroutine for storing data
+! subroutine WRITE_DATA:
+! ---------------------
 !
-! info: subroutine selects the writing subroutine from the supported output
-!       formats depending on the compilation time options, and stores a data
-!       file; at this moment only the HDF5 format is supported;
+!   Subroutine stores block data in snapshots.  Block variables are grouped
+!   todether and stored in big 4D arrays separately.  This is a wrapper for
+!   specific format storing.
+!
 !
 !===============================================================================
 !
   subroutine write_data()
 
-    use evolution, only : t
+! import external variables
+!
+    use evolution      , only : t
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
@@ -154,6 +189,12 @@ module io
 ! exit the subroutine, if the time of the next snapshot is not reached
 !
     if (dtout <= 0.0d+0 .or. nfile > (int(t / dtout))) return
+
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
+#endif /* PROFILE */
 
 #ifdef HDF5
 ! store data file
@@ -164,6 +205,12 @@ module io
 ! increase the file counter
 !
     nfile = nfile + 1
+
+#ifdef PROFILE
+! stop accounting time for the data writing
+!
+    call stop_timer(iow)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -185,6 +232,12 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
+#endif /* PROFILE */
+
 ! increase the file counter
 !
     nrest = nrest + 1
@@ -194,6 +247,12 @@ module io
 !
     call write_data_h5('r')
 #endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data writing
+!
+    call stop_timer(iow)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -216,6 +275,12 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the data reading
+!
+    call start_timer(ios)
+#endif /* PROFILE */
+
 ! set restart file number
 !
     nrest = nres
@@ -225,6 +290,12 @@ module io
 !
     call read_data_h5()
 #endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data reading
+!
+    call stop_timer(ios)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -2021,7 +2092,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_last_id, get_mblocks, nchild, nsides, nfaces
+    use blocks  , only : get_last_id, get_mblocks, nchildren, nsides, nfaces
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
     use hdf5    , only : h5gcreate_f, h5gclose_f
@@ -2071,7 +2142,7 @@ module io
       am(1) = get_mblocks()
       cm(1) = get_last_id()
       dm(1) = get_mblocks()
-      dm(2) = nchild
+      dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
       qm(1) = get_mblocks()
@@ -2142,7 +2213,7 @@ module io
           zmn(l)   = pmeta%zmin
           zmx(l)   = pmeta%zmax
 
-          do p = 1, nchild
+          do p = 1, nchildren
             if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
           end do
 
@@ -2247,7 +2318,7 @@ module io
 ! references to other modules
 !
     use blocks  , only : block_meta, list_meta
-    use blocks  , only : nchild, nsides, nfaces
+    use blocks  , only : nchildren, nsides, nfaces
     use blocks  , only : get_mblocks
     use blocks  , only : metablock_set_id, metablock_set_cpu                   &
                        , metablock_set_refine, metablock_set_config            &
@@ -2307,7 +2378,7 @@ module io
 !
       am(1) = get_mblocks()
       dm(1) = get_mblocks()
-      dm(2) = nchild
+      dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
       qm(1) = get_mblocks()
@@ -2405,7 +2476,7 @@ module io
 
         if (par(l) .gt. 0) pmeta%parent => block_array(par(l))%ptr
 
-        do p = 1, nchild
+        do p = 1, nchildren
           if (chl(l,p) .gt. 0) then
             pmeta%child(p)%ptr => block_array(chl(l,p))%ptr
           end if

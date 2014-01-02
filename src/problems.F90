@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -184,7 +184,7 @@ module problems
 ! default parameter values
 !
     real(kind=8), save :: dens   = 1.00d+00
-    real(kind=8), save :: ratio  = 1.00d+00
+    real(kind=8), save :: ratio  = 1.00d+02
     real(kind=8), save :: radius = 1.00d-01
     real(kind=8), save :: csnd   = 4.0824829046386301635d-01
     real(kind=8), save :: buni   = 1.00d+00

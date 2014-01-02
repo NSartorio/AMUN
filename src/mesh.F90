@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -27,18 +27,45 @@
 !
 module mesh
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
+! module variables are not implicit by default
+!
   implicit none
 
-! maximum number of covering blocks
+#ifdef PROFILE
+! timer indices
 !
-  integer                 , save :: tblocks = 1
+  integer            , save :: imi, ims, img, imu, ima, imp, imr
+#endif /* PROFILE */
 
-! log file for the mesh statistics
+! file handler for the mesh statistics
 !
-  character(len=32), save :: fname = "mesh.log"
-  integer          , save :: funit = 11
+  integer, save :: funit   = 11
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_mesh, finalize_mesh
+  public :: generate_mesh, update_mesh
+  public :: redistribute_blocks, store_mesh_stats
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
+!
+!===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -47,28 +74,38 @@ module mesh
 !
 !   Subroutine initializes mesh module and its variables.
 !
+!   Arguments:
+!
+!     nrun    - the restarted execution count;
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
+!
 !===============================================================================
 !
-  subroutine initialize_mesh(flag)
+  subroutine initialize_mesh(nrun, verbose, iret)
 
-    use blocks     , only : datablock_set_dims
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coordinates, only : toplev, im, jm, km
-    use mpitools   , only : master, nprocs
-    use equations  , only : nv
+! import external procedures and variables
+!
+    use blocks         , only : datablock_set_dims
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : toplev, im, jm, km
+    use equations      , only : nv
+    use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    logical, intent(in) :: flag
+    integer, intent(in)    :: nrun
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
 
 ! local variables
 !
-    integer(kind=4) :: i, j, k, l, n
-    logical         :: info
+    character(len=64) :: fn
+    integer(kind=4)   :: i, j, k, l, n
 
 ! local arrays
 !
@@ -76,68 +113,321 @@ module mesh
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('mesh initialization'    , imi)
+    call set_timer('mesh statistics'        , ims)
+    call set_timer('initial mesh generation', img)
+    call set_timer('adaptive mesh update'   , imu)
+    call set_timer('block autobalancing'    , ima)
+    call set_timer('block restriction'      , imr)
+    call set_timer('block prolongation'     , imp)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! set data block dimensions
 !
     call datablock_set_dims(nv, nv, im, jm, km)
 
-! print general information about resolutions
+! only master prepares the mesh statistics file
 !
     if (master) then
 
-! prepare the file for logging mesh statistics; only the master process handles
-! this part
+! generate the mesh statistics file name
 !
-! check if the mesh statistics file exists
-!
-      inquire(file = fname, exist = info)
-
-! if flag is set to .true. or the original mesh statistics file does not exist,
-! create a new one and write the header in it, otherwise open the original file
-! and move the writing position to the end to allow for appending
-!
-      if (flag .or. .not. info) then
+      write(fn, "('mesh_',i2.2,'.dat')") nrun
 
 ! create a new mesh statistics file
 !
-        open(unit=funit, file=fname, form='formatted', status='replace')
+#ifdef INTEL
+      open(unit = funit, file = fn, form = 'formatted', status = 'replace'     &
+                                                           , buffered = 'yes')
+#else /* INTEL */
+      open(unit = funit, file = fn, form = 'formatted', status = 'replace')
+#endif /* INTEL */
 
-! write the mesh statistics file header
+! write the mesh statistics header
 !
-        write(funit,"('#')")
-        write(funit,"('#',4x,'step',5x,'time',11x,'leaf',4x,'meta'," //        &
-                           "6x,'coverage',8x,'AMR',11x,'block distribution')")
-        write(funit,"('#',27x,'blocks',2x,'blocks',4x,'efficiency'," //        &
-                                              "6x,'efficiency')",advance='no')
-        write(funit,"(1x,a12)",advance="no") 'level = 1'
-        do l = 2, toplev
-          write(funit,"(2x,i6)",advance="no") l
-        end do
+      write(funit, "('#',2(4x,a4),10x,a8,6x,a10,5x,a6,6x,a5,4x,a20)")          &
+                                     'step', 'time', 'coverage', 'efficiency'  &
+                                   , 'blocks', 'leafs', 'block distributions:'
+
+! write the mesh distributions header
+!
+      write(funit, "('#',76x,a8)", advance="no") 'level = '
+      do l = 1, toplev
+        write(funit, "(1x,i9)", advance="no") l
+      end do
 #ifdef MPI
-        write(funit,"(1x,a10)",advance="no") 'cpu = 1'
-        do n = 2, nprocs
-          write(funit,"(2x,i6)",advance="no") n
-        end do
+      write(funit, "(4x,a6)", advance="no") 'cpu = '
+      do n = 1, nprocs
+        write(funit, "(1x,i9)", advance="no") n
+      end do
 #endif /* MPI */
-        write(funit,"('' )")
-        write(funit,"('#')")
-
-      else
-
-! open the mesh statistics file and set the position at the end of file
-!
-        open(unit=funit, file=fname, form='formatted', position='append')
-
-! write a marker that the job has been restarted from here
-!
-        write(funit,"('#',1x,a)") "job restarted from this point"
-
-      end if
+      write(funit, "('' )")
+      write(funit, "('#')")
 
     end if ! master
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_mesh
+!
+!===============================================================================
+!
+! subroutine FINALIZE_MESH:
+! ------------------------
+!
+!   Subroutine releases memory used by the module variables.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine finalize_mesh(iret)
+
+! import external procedures and variables
+!
+    use mpitools       , only : master
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! only master posses a handler to the mesh statistics file
+!
+    if (master) then
+
+! close the statistics file
+!
+      close(funit)
+
+    end if ! master
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_mesh
+!
+!===============================================================================
+!
+! subroutine STORE_MESH_STATS:
+! ---------------------------
+!
+!   Subroutine prepares and stores various mesh statistics.
+!
+!   Arguments:
+!
+!     step - the integration step;
+!     time - the physical time;
+!
+!===============================================================================
+!
+  subroutine store_mesh_stats(step, time)
+
+! import external procedures and variables
+!
+    use blocks         , only : ndims, block_meta, list_meta
+    use blocks         , only : get_mblocks, get_nleafs
+    use coordinates    , only : ng, im, jm, km, toplev, effres
+    use mpitools       , only : master, nprocs
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer     , intent(in) :: step
+    real(kind=8), intent(in) :: time
+
+! local variables
+!
+    integer(kind=4) :: l
+    real(kind=8)    :: cv, ef
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+
+! local saved variables
+!
+    logical        , save :: first = .true.
+    integer(kind=4), save :: nm = 0, nl = 0, nt = 0, nc = 0
+
+! local arrays
+!
+    integer(kind=4), dimension(toplev) :: ldist
+#ifdef MPI
+    integer(kind=4), dimension(nprocs) :: cdist
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the mesh statistics
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! store the mesh statistics only on master
+!
+    if (master) then
+
+! store the mesh statistics only if they changed
+!
+      if (nm /= get_mblocks() .or. nl /= get_nleafs()) then
+
+! get the mximum block number and maximum level
+!
+        if (first) then
+
+! set the pointer to the first block on the meta block list
+!
+          pmeta => list_meta
+
+! determine the number of base blocks
+!
+          do while(associated(pmeta))
+
+! if the block is at the lowest level, count it
+!
+            if (pmeta%level == 1) nt = nt + 1
+
+! associate the pointer with the next block
+!
+            pmeta => pmeta%next
+
+          end do ! pmeta
+
+! calculate the maximum block number
+!
+          nt = nt * 2**(ndims*(toplev - 1))
+
+! calculate the number of cell in one block (including the ghost cells)
+!
+          nc = im * jm * km
+
+! reset the first execution flag
+!
+          first = .false.
+
+        end if ! first
+
+! get the new numbers of meta blocks and leafs
+!
+        nm = get_mblocks()
+        nl = get_nleafs()
+
+! calculate the coverage (the number of leafs divided by the maximum
+! block number) and the efficiency (the cells count for adaptive mesh
+! divided by the cell count for corresponding uniform mesh)
+!
+        cv = (1.0d+00 * nl) / nt
+        ef = (1.0d+00 * nl) * nc / product(effres(1:ndims) + 2 * ng)
+
+! initialize the level and process block counter
+!
+        ldist(:) = 0
+#ifdef MPI
+        cdist(:) = 0
+#endif /* MPI */
+
+! set the pointer to the first block on the meta block list
+!
+        pmeta => list_meta
+
+! scan all meta blocks and prepare get the block level and process
+! distributions
+!
+        do while(associated(pmeta))
+
+! process only leafs
+!
+          if (pmeta%leaf) then
+
+! increase the block level and process counts
+!
+            ldist(pmeta%level) = ldist(pmeta%level) + 1
+#ifdef MPI
+            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
+#endif /* MPI */
+
+          end if ! the leaf
+
+! associate the pointer with the next block
+!
+          pmeta => pmeta%next
+
+        end do ! pmeta
+
+! write down the block statistics
+!
+        write(funit, "(i9,3e14.6,2(2x,i9))", advance="no")                     &
+                                                    step, time, cv, ef, nm, nl
+
+! write down the block level distribution
+!
+        write(funit,"(12x)", advance="no")
+        do l = 1, toplev
+          write(funit,"(1x,i9)", advance="no") ldist(l)
+        end do ! l = 1, toplev
+
+#ifdef MPI
+! write down the process level distribution
+!
+        write(funit,"(10x)", advance="no")
+        do l = 1, nprocs
+          write(funit,"(1x,i9)", advance="no") cdist(l)
+        end do ! l = 1, nprocs
+#endif /* MPI */
+
+! write the new line symbol
+!
+        write(funit,"('')")
+
+      end if ! number of blocks or leafs changed
+
+    end if ! master
+
+#ifdef PROFILE
+! stop accounting time for the mesh statistics
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine store_mesh_stats
 !
 !===============================================================================
 !
@@ -152,20 +442,20 @@ module mesh
 !
   subroutine generate_mesh()
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks       , only : block_meta, block_data, list_meta, list_data
-    use blocks       , only : ndims, nchild, nsides, nfaces
-    use blocks       , only : allocate_datablock, deallocate_datablock
-    use blocks       , only : append_datablock, remove_datablock
-    use blocks       , only : link_blocks, unlink_blocks, refine_block
-    use blocks       , only : get_mblocks, get_nleafs
-    use coordinates  , only : minlev, maxlev, res
-    use domains      , only : setup_domain
-    use error        , only : print_info, print_error
-    use mpitools     , only : master, nproc, nprocs
-    use problems     , only : setup_problem
-    use refinement   , only : check_refinement_criterion
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : allocate_datablock, deallocate_datablock
+    use blocks         , only : append_datablock, remove_datablock
+    use blocks         , only : link_blocks, unlink_blocks, refine_block
+    use blocks         , only : get_mblocks, get_nleafs
+    use coordinates    , only : minlev, maxlev, res
+    use domains        , only : setup_domain
+    use error          , only : print_info, print_error
+    use mpitools       , only : master, nproc, nprocs
+    use problems       , only : setup_problem
+    use refinement     , only : check_refinement_criterion
 
 ! local variables are not implicit by default
 !
@@ -184,6 +474,12 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the initial mesh generation
+!
+    call start_timer(img)
+#endif /* PROFILE */
+
 ! allocate the initial lowest level structure of blocks
 !
     call setup_domain()
@@ -218,7 +514,7 @@ module mesh
 !
       if (master) write(*, "(1x,i2)", advance = "no") level
 
-!! DETERMINE THE REFINEMENT OF THE ALL BLOCKS AT CURRENT LEVEL
+!! DETERMINE THE REFINEMENT OF ALL BLOCKS AT CURRENT LEVEL
 !!
 ! set the pointer to the first block on the meta block list
 !
@@ -447,42 +743,62 @@ module mesh
 
     end do ! pmeta
 
+#ifdef PROFILE
+! stop accounting time for the initial mesh generation
+!
+    call stop_timer(img)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine generate_mesh
 !
 !===============================================================================
 !
-! update_mesh: subroutine check the refinement criterion for each block,
-!              refines or derefines it if necessary, and restricts or
-!              prolongates all data to the newly created blocks
+! subroutine UPDATE_MESH:
+! ----------------------
+!
+!   Subroutine checks the refinement criterion for each data block, and
+!   refines or derefines it if necessary by restricting or prolongating
+!   the block data.  In the MPI version the data blocks are redistributed
+!   among all processes after the mesh update.
+!
 !
 !===============================================================================
 !
   subroutine update_mesh()
 
-    use blocks   , only : block_meta, block_data, list_meta, list_data         &
-                        , nchild, ndims, nsides, nfaces                        &
-                        , refine_block, derefine_block, append_datablock       &
-                        , link_blocks, remove_datablock
-    use blocks   , only : get_nleafs
-    use coordinates, only : minlev, maxlev, toplev, im, jm, km, res
-    use error    , only : print_info, print_error
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : nchildren, ndims, nsides, nfaces
+    use blocks         , only : get_nleafs
+    use blocks         , only : refine_block, derefine_block
+    use blocks         , only : append_datablock, remove_datablock, link_blocks
+    use coordinates    , only : minlev, maxlev, toplev, im, jm, km, res
+    use equations      , only : nv
+    use error          , only : print_info, print_error
 #ifdef MPI
-    use mpitools , only : reduce_sum_integer_array
-    use mpitools , only : send_real_array, receive_real_array
-    use mpitools , only : master, nprocs, nproc
+    use mpitools       , only : master, nprocs, nproc
+    use mpitools       , only : reduce_sum_integer_array
+    use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
-    use refinement , only : check_refinement_criterion
-    use equations  , only : nv
+    use refinement     , only : check_refinement_criterion
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! local variables
 !
     logical         :: flag
-    integer(kind=4) :: i, j, k, l, n, p
+    integer(kind=4) :: nl, i, j, k, l, n, p
     integer         :: iret
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh, pchild, pparent
+    type(block_data), pointer :: pdata
 
 #ifdef MPI
 ! tag for the MPI data exchange
@@ -495,36 +811,42 @@ module mesh
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:nprocs-1)      :: lb
+    integer(kind=4), dimension(0:nprocs-1)     :: lb
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nv,im,jm,km)     :: rbuf
+    real(kind=8)   , dimension(nv,im,jm,km)    :: rbuf
 #endif /* MPI */
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh, pchild, pparent
-    type(block_data), pointer :: pdata
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the adaptive mesh refinement update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 #ifdef DEBUG
-! check mesh
+! check the mesh when debugging
 !
     call check_mesh('before update_mesh')
-
 #endif /* DEBUG */
-! iterate over elements of the data block list
+
+!! DETERMINE THE REFINEMENT OF ALL DATA BLOCKS
+!!
+! set the pointer to the first block on the data block list
 !
     pdata => list_data
+
+! iterate over all blocks in the data block list
+!
     do while (associated(pdata))
 
 ! assign a pointer to the meta block associated with the current data block
 !
       pmeta => pdata%meta
 
-! if the current data block has a meta block associated
+! continue if the current data block has a meta block associated
 !
       if (associated(pmeta)) then
 
@@ -538,76 +860,128 @@ module mesh
 
 ! correct the refinement of the block for the base and top levels
 !
-          if (pmeta%level .lt. minlev) pmeta%refine =  1
-          if (pmeta%level .eq. minlev) pmeta%refine = max(0, pmeta%refine)
-          if (pmeta%level .eq. maxlev) pmeta%refine = min(0, pmeta%refine)
-          if (pmeta%level .gt. maxlev) pmeta%refine = -1
+          if (pmeta%level <  minlev) pmeta%refine =  1
+          if (pmeta%level == minlev) pmeta%refine = max(0, pmeta%refine)
+          if (pmeta%level == maxlev) pmeta%refine = min(0, pmeta%refine)
+          if (pmeta%level >  maxlev) pmeta%refine = -1
 
         end if ! pmeta is a leaf
+
       end if ! pmeta associated
 
 ! assign a pointer to the next data block
 !
       pdata => pdata%next
 
-   end do
+   end do ! pdata
 
 #ifdef MPI
-! allocate buffer for the refinement field values
+!! EXCHANGE REFINEMENT FLAGS BETWEEN ALL PROCESSES
+!!
+! get the number of leafs
 !
-    allocate(ibuf(get_nleafs()))
+    nl = get_nleafs()
+
+! allocate a buffer for the refinement field values
+!
+    allocate(ibuf(nl))
 
 ! reset the buffer
 !
     ibuf(:) = 0
 
-! store refinement flags for all blocks for exchange between processors
+! reset the leaf block counter
 !
-    l = 1
+    l = 0
+
+! set the pointer to the first block on the meta block list
+!
     pmeta => list_meta
+
+! iterate over all meta blocks
+!
     do while (associated(pmeta))
+
+! process only leafs
+!
       if (pmeta%leaf) then
+
+! increase the leaf block counter
+!
+        l = l + 1
+
+! store the refinement flag for all blocks at the current process for
+! exchange with other processors
+!
         ibuf(l) = pmeta%refine
 
-        l = l + 1
-      end if
+      end if ! pmeta is the leaf
+
+! assign a pointer to the next meta block
+!
       pmeta => pmeta%next
-    end do
+
+    end do ! pmeta
 
 ! update refinement flags across all processors
 !
-    call reduce_sum_integer_array(get_nleafs(), ibuf(1:get_nleafs()), iret)
+    call reduce_sum_integer_array(nl, ibuf(1:nl), iret)
+
+! reset the leaf block counter
+!
+    l = 0
+
+! set the pointer to the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all meta blocks
+!
+    do while (associated(pmeta))
+
+! process only leafs
+!
+      if (pmeta%leaf) then
+
+! increase the leaf block counter
+!
+        l = l + 1
 
 ! update non-local block refinement flags
 !
-    l = 1
-    pmeta => list_meta
-    do while (associated(pmeta))
-      if (pmeta%leaf) then
         pmeta%refine = ibuf(l)
 
-        l = l + 1
-      end if
+      end if ! pmeta is the leaf
+
+! assign a pointer to the next meta block
+!
       pmeta => pmeta%next
-    end do
+
+    end do ! pmeta
 
 ! deallocate the buffer
 !
     if (allocated(ibuf)) deallocate(ibuf)
-
 #endif /* MPI */
-! iterate over all levels starting from top and correct the refinement of blocks
+
+!! SELECT NEIGHBORS OF REFINED BLOCKS TO BE REFINED IF NECESSARY
+!!
+! iterate over all levels starting from top and correct the refinement
+! of neighbor blocks
 !
     do l = toplev, 1, -1
 
-! iterate over all meta blocks
+! set the pointer to the first block on the meta block list
 !
       pmeta => list_meta
+
+! iterate over all meta blocks
+!
       do while (associated(pmeta))
 
 ! check only leafs at the current level
 !
-        if (pmeta%leaf .and. pmeta%level .eq. l) then
+        if (pmeta%leaf .and. pmeta%level == l) then
 
 ! iterte over all neighbors of the current leaf
 !
@@ -623,56 +997,56 @@ module mesh
 !
                 if (associated(pneigh)) then
 
-!= conditions for blocks which are selected to be refined
+!=== conditions for blocks selected to be refined
 !
-                  if (pmeta%refine .eq. 1) then
+                  if (pmeta%refine == 1) then
 
-! if the neighbor is set to be derefined, reset its flags (this applies to
-! blocks at the current and lower levels)
+! if the neighbor is set to be derefined, reset its flag (this applies to
+! blocks at the current or lower level)
 !
                     pneigh%refine = max(0, pneigh%refine)
 
 ! if the neighbor is at lower level, always set it to be refined
 !
-                    if (pneigh%level .lt. pmeta%level) pneigh%refine = 1
+                    if (pneigh%level < pmeta%level) pneigh%refine = 1
 
                   end if ! refine = 1
 
-!= conditions for blocks which stay at the same level
+!=== conditions for blocks which stay at the same level
 !
-                  if (pmeta%refine .eq. 0) then
+                  if (pmeta%refine == 0) then
 
 ! if the neighbor lays at lower level and is set to be derefined, cancel its
 ! derefinement
 !
-                    if (pneigh%level .lt. pmeta%level)                         &
+                    if (pneigh%level < pmeta%level)                            &
                                          pneigh%refine = max(0, pneigh%refine)
 
                   end if ! refine = 0
 
-!= conditions for blocks which are selected to be derefined
+!=== conditions for blocks which are selected to be derefined
 !
-                  if (pmeta%refine .eq. -1) then
+                  if (pmeta%refine == -1) then
 
 ! if the neighbor is at lower level and is set to be derefined, cancel its
 ! derefinement
 !
-                    if (pneigh%level .lt. pmeta%level)                         &
+                    if (pneigh%level < pmeta%level)                            &
                                          pneigh%refine = max(0, pneigh%refine)
 
-! if the neighbor is set to be refined, cancel derefinement of the current block
+! if a neighbor is set to be refined, cancel the derefinement of current block
 !
-                    if (pneigh%refine .eq. 1) pmeta%refine = 0
+                    if (pneigh%refine == 1) pmeta%refine = 0
 
                   end if ! refine = -1
 
                 end if ! associated(pneigh)
 
-               end do
-             end do
-          end do
+              end do ! nfaces
+            end do ! nsides
+          end do ! ndims
 
-        end if ! leafs at level l
+        end if ! the leaf at level l
 
 ! assign a pointer to the next block
 !
@@ -680,23 +1054,28 @@ module mesh
 
       end do ! meta blocks
 
-!= now check all derefined block if their siblings are set for derefinement too
-!  and are at the same level; check ony levels >= 2
+!! CHECK IF BLOCK CHILDREN CAN BE DEREFINED
+!!
+! now check all derefined block if their siblings are set for derefinement too
+! and are at the same level; check only levels > 1
 !
-      if (l .ge. 2) then
+      if (l > 1) then
+
+! set the pointer to the first block on the meta block list
+!
+        pmeta => list_meta
 
 ! iterate over all blocks
 !
-        pmeta => list_meta
         do while (associated(pmeta))
 
 ! check only leafs at the current level
 !
-          if (pmeta%leaf .and. pmeta%level .eq. l) then
+          if (pmeta%leaf .and. pmeta%level == l) then
 
 ! check blocks which are selected to be derefined
 !
-            if (pmeta%refine .eq. -1) then
+            if (pmeta%refine == -1) then
 
 ! assign a pointer to the parent of the current block
 !
@@ -712,30 +1091,29 @@ module mesh
 
 ! iterate over all children
 !
-                do p = 1, nchild
+                do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
                   pchild => pparent%child(p)%ptr
 
-! check if the current child is a leaf
+! check if the current child is the leaf
 !
                   flag = flag .and. (pchild%leaf)
 
 ! check if the current child is set to be derefined
 !
-                  flag = flag .and. (pchild%refine .eq. -1)
+                  flag = flag .and. (pchild%refine == -1)
 
                 end do ! over all children
 
-! if not all children are proper for derefinement, cancel derefinement of all
-! children
+! if not all children can be derefined, cancel the derefinement
 !
                 if (.not. flag) then
 
 ! iterate over all children
 !
-                  do p = 1, nchild
+                  do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -761,63 +1139,79 @@ module mesh
 
         end do ! meta blocks
 
-      end if ! l >= 2
+      end if ! l > 1
 
     end do ! levels
 
 #ifdef MPI
-! find all sibling blocks which are spread over different processors
+!! BRING BACK ALL CHILDREN SELECTED FOR DEREFINEMENT TO THE SAME PROCESS
+!!
+! set the pointer to the first block on the meta block list
 !
     pmeta => list_meta
+
+! iterate over all meta blocks
+!
     do while (associated(pmeta))
+
+! process only parent blocks (not leafs)
+!
       if (.not. pmeta%leaf) then
-        if (pmeta%child(1)%ptr%refine .eq. -1) then
+
+! check if the first child is selected for derefinement
+!
+        if (pmeta%child(1)%ptr%refine == -1) then
 
 ! check if the parent blocks is on the same processor as the next block, if not
 ! move it to the same processor
 !
-          if (pmeta%cpu .ne. pmeta%next%cpu) &
-            pmeta%cpu = pmeta%next%cpu
+          if (pmeta%cpu /= pmeta%next%cpu) pmeta%cpu = pmeta%next%cpu
 
 ! find the case when child blocks are spread across at least 2 processors
 !
           flag = .false.
-          do p = 1, nchild
-            flag = flag .or. (pmeta%child(p)%ptr%cpu .ne. pmeta%cpu)
+          do p = 1, nchildren
+            flag = flag .or. (pmeta%child(p)%ptr%cpu /= pmeta%cpu)
           end do
 
           if (flag) then
 
 ! iterate over all children
 !
-            do p = 1, nchild
+            do p = 1, nchildren
 
 ! generate the tag for communication
 !
-              itag = pmeta%child(p)%ptr%cpu * nprocs + pmeta%cpu + nprocs + p + 1
+              itag = pmeta%child(p)%ptr%cpu * nprocs + pmeta%cpu               &
+                                                              + nprocs + p + 1
 
 ! if the current children is not on the same processor, then ...
 !
-              if (pmeta%child(p)%ptr%cpu .ne. pmeta%cpu) then
+              if (pmeta%child(p)%ptr%cpu /= pmeta%cpu) then
+
+! if the meta block is on the same process
+!
+                if (pmeta%cpu == nproc) then
 
 ! allocate data blocks for children on the processor which will receive data
 !
-                if (pmeta%cpu .eq. nproc) then
                   call append_datablock(pdata)
                   call link_blocks(pmeta%child(p)%ptr, pdata)
 
 ! receive the data
 !
-                  call receive_real_array(size(rbuf), pmeta%child(p)%ptr%cpu, itag, rbuf, iret)
+                  call receive_real_array(size(rbuf), pmeta%child(p)%ptr%cpu   &
+                                                           , itag, rbuf, iret)
 
 ! coppy buffer to data
 !
                   pmeta%child(p)%ptr%data%u(:,:,:,:) = rbuf(:,:,:,:)
+
                 end if
 
 ! send data to the right processor and deallocate data block
 !
-                if (pmeta%child(p)%ptr%cpu .eq. nproc) then
+                if (pmeta%child(p)%ptr%cpu == nproc) then
 
 ! copy data to buffer
 !
@@ -830,22 +1224,32 @@ module mesh
 ! deallocate data block
 !
                   call remove_datablock(pmeta%child(p)%ptr%data)
+
                 end if
 
 ! set the current processor of the block
 !
                 pmeta%child(p)%ptr%cpu = pmeta%cpu
-              end if
-            end do
 
-          end if
-        end if
-      end if
+              end if ! if child is are on different processes
 
+            end do ! nchildren
+
+          end if ! children spread over different processes
+
+        end if ! children selected for derefinement
+
+      end if ! the block is parent
+
+! assign a pointer to the next block
+!
       pmeta => pmeta%next
-    end do
+
+    end do ! over meta blocks
 #endif /* MPI */
 
+!! DEREFINE SELECTED BLOCKS
+!!
 ! perform the actual derefinement
 !
     do l = toplev, 2, -1
@@ -886,7 +1290,9 @@ module mesh
 
     end do
 
-! perform the actual refinement
+!! REFINE SELECTED BLOCKS
+!!
+! perform the actual refinement starting from the lowest level
 !
     do l = 1, toplev - 1
 
@@ -913,7 +1319,7 @@ module mesh
         pmeta => pmeta%next
       end do
 
-    end do
+    end do ! l = 1, toplev - 1
 
 #ifdef MPI
 ! redistribute blocks equally among all processors
@@ -927,81 +1333,111 @@ module mesh
     call check_mesh('after update_mesh')
 #endif /* DEBUG */
 
+#ifdef PROFILE
+! stop accounting time for the adaptive mesh refinement update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine update_mesh
-#ifdef MPI
 !
 !===============================================================================
 !
-! redistribute_blocks: subroutine redistributes blocks equally between
-!                      processors
+! subroutine REDISTRIBUTE_BLOCKS:
+! ------------------------------
+!
+!   Subroutine redistributes data blocks between processes.
+!
 !
 !===============================================================================
 !
   subroutine redistribute_blocks()
 
-    use blocks   , only : block_meta, block_data, list_meta, list_data
-    use blocks   , only : get_nleafs, append_datablock, remove_datablock   &
-                        , link_blocks
-    use coordinates, only : im, jm, km
-    use mpitools , only : send_real_array, receive_real_array
-    use mpitools , only : nprocs, nproc
-    use equations, only : nv
+#ifdef MPI
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+    use blocks         , only : get_nleafs
+    use blocks         , only : append_datablock, remove_datablock, link_blocks
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : send_real_array, receive_real_array
+#endif /* MPI */
 
+! local variables are not implicit by default
+!
     implicit none
 
+#ifdef MPI
 ! local variables
 !
-    integer         :: iret
-    integer(kind=4) :: l, n
-!
-! tag for the MPI data exchange
-!
-    integer(kind=4)                            :: itag
-
-! array for number of data block for autobalancing
-!
-    integer(kind=4), dimension(0:nprocs-1)      :: lb
-
-! local buffer for data block exchange
-!
-    real(kind=8)   , dimension(nv,im,jm,km)   :: rbuf
+    integer                                 :: iret
+    integer(kind=4)                         :: np, nl
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
+    type(block_meta), pointer               :: pmeta
+    type(block_data), pointer               :: pdata
+
+! tag for the MPI data exchange
+!
+    integer(kind=4)                         :: itag
+
+! array for number of data block for autobalancing
+!
+    integer(kind=4), dimension(0:nprocs-1)  :: lb
+
+! local buffer for data block exchange
+!
+    real(kind=8)   , dimension(nv,im,jm,km) :: rbuf
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
-!! AUTO BALANCING
-!!
-! calculate the new division
+#ifdef MPI
+#ifdef PROFILE
+! start accounting time for the block redistribution
 !
-    l       = mod(get_nleafs(), nprocs) - 1
-    lb( : ) = get_nleafs() / nprocs
-    lb(0:l) = lb(0:l) + 1
+    call start_timer(ima)
+#endif /* PROFILE */
 
-! iterate over all metablocks and reassign the processor numbers
+! calculate the new data block division between processes
 !
-    n = 0
-    l = 0
+    nl       = mod(get_nleafs(), nprocs) - 1
+    lb( :  ) = get_nleafs() / nprocs
+    lb(0:nl) = lb(0:nl) + 1
 
+! reset the processor and leaf numbers
+!
+    np = 0
+    nl = 0
+
+! set the pointer to the first block on the meta block list
+!
     pmeta => list_meta
+
+! iterate over all meta blocks and reassign their process numbers
+!
     do while (associated(pmeta))
 
-! assign the cpu to the current block
+! check if the block belongs to another process
 !
-      if (pmeta%cpu .ne. n) then
+      if (pmeta%cpu /= np) then
 
+! check if the block is the leaf
+!
         if (pmeta%leaf) then
 
-! generate the tag for communication
+! generate a tag for communication
 !
-          itag = pmeta%cpu * nprocs + n + nprocs + 1
+          itag = pmeta%cpu * nprocs + np + nprocs + 1
 
-          if (nproc .eq. pmeta%cpu) then
+! sends the block to the right process
+!
+          if (nproc == pmeta%cpu) then
 
 ! copy data to buffer
 !
@@ -1009,19 +1445,21 @@ module mesh
 
 ! send data
 !
-            call send_real_array(size(rbuf), n, itag, rbuf, iret)
+            call send_real_array(size(rbuf), np, itag, rbuf, iret)
 
-! deallocate data block
+! remove data block from the current process
 !
-             call remove_datablock(pmeta%data)
+            call remove_datablock(pmeta%data)
 
 ! send data block
 !
-          end if
+          end if ! nproc == pmeta%cpu
 
-          if (nproc .eq. n) then
+! receive the block from another process
+!
+          if (nproc == np) then
 
-! allocate data block for the current block
+! allocate a new data block and link it with the current meta block
 !
             call append_datablock(pdata)
             call link_blocks(pmeta, pdata)
@@ -1030,58 +1468,91 @@ module mesh
 !
             call receive_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
 
-! coppy buffer to data
+! coppy the buffer to data block
 !
             pmeta%data%u(:,:,:,:) = rbuf(:,:,:,:)
 
-! receive data block
-!
-          end if
+          end if ! nproc == n
 
-        end if
+        end if ! leaf
 
 ! set new processor number
 !
-        pmeta%cpu = n
+        pmeta%cpu = np
 
-      end if
+      end if ! pmeta%cpu /= np
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
       if (pmeta%leaf) then
-        l = l + 1
-        if (l .ge. lb(n)) then
-          n = min(nprocs - 1, n + 1)
-          l = 0
-        end if
-      end if
 
-! assign pointer to the next block
+! increase the number of leafs for the current process
+!
+        nl = nl + 1
+
+! if the number of leafs for the current process exceeds the number of assigned
+! blocks, reset the counter and increase the process number
+!
+        if (nl >= lb(np)) then
+
+! reset the leaf counter for the current process
+!
+          nl = 0
+
+! increase the process number
+!
+          np = min(nprocs - 1, np + 1)
+
+        end if ! l >= lb(n)
+
+      end if ! leaf
+
+! assign the pointer to the next meta block
 !
       pmeta => pmeta%next
 
-    end do
+    end do ! pmeta
+
+#ifdef PROFILE
+! stop accounting time for the block redistribution
+!
+    call stop_timer(ima)
+#endif /* PROFILE */
+#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
   end subroutine redistribute_blocks
-#endif /* MPI */
 !
 !===============================================================================
 !
-! prolong_block: subroutine expands the block data and copy them to children
+! subroutine PROLONG_BLOCK:
+! ------------------------
+!
+!   Subroutine prolongs variables from a data blocks linked to the input
+!   meta block and copy the resulting array of variables to
+!   the newly created children data block.  The process of data restriction
+!   conserves stored variables.
+!
+!   Arguments:
+!
+!     pblock - the input meta block;
 !
 !===============================================================================
 !
   subroutine prolong_block(pblock)
 
-    use blocks        , only : block_meta, block_data, nchild
-    use coordinates   , only : ng, nh, in, jn, kn, im, jm, km
-    use coordinates   , only : ib, ie, jb, je, kb, ke
-    use equations     , only : nv
-    use interpolations, only : limiter
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, block_data, nchildren
+    use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates    , only : ib, ie, jb, je, kb, ke
+    use equations      , only : nv
+    use interpolations , only : limiter
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -1095,6 +1566,11 @@ module mesh
     integer :: ic, jc, kc, ip, jp, kp
     real    :: dul, dur, dux, duy, duz
 
+! local pointers
+!
+    type(block_meta), pointer :: pchild
+    type(block_data), pointer :: pdata
+
 ! local arrays
 !
     integer, dimension(3) :: dm
@@ -1103,13 +1579,14 @@ module mesh
 !
     real, dimension(:,:,:,:), allocatable :: u
 
-! local pointers
-!
-    type(block_meta), pointer :: pchild
-    type(block_data), pointer :: pdata
-
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block prolongation
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 ! assign the pdata pointer
 !
     pdata => pblock%data
@@ -1194,7 +1671,7 @@ module mesh
 
 ! iterate over all children
 !
-    do p = 1, nchild
+    do p = 1, nchildren
 
 ! assign pointer to the current child
 !
@@ -1231,11 +1708,17 @@ module mesh
       pchild%data%u(1:nv,1:im,1:jm,1:km) = u(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
-    end do
+    end do ! nchildren
 
 ! deallocate local arrays
 !
     if (allocated(u)) deallocate(u)
+
+#ifdef PROFILE
+! stop accounting time for the block prolongation
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1259,13 +1742,13 @@ module mesh
 !
   subroutine restrict_block(pblock)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks     , only : ndims
-    use blocks     , only : block_meta, block_data, nchild
-    use coordinates, only : ng, nh, in, jn, kn, im, jm, km
-    use coordinates, only : ih, jh, kh, ib, jb, kb, ie, je, ke
-    use equations  , only : nv
+    use blocks         , only : ndims
+    use blocks         , only : block_meta, block_data, nchildren
+    use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
+    use coordinates    , only : ih, jh, kh, ib, jb, kb, ie, je, ke
+    use equations      , only : nv
 
 ! local variables are not implicit by default
 !
@@ -1291,13 +1774,19 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block restriction
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! assign the parent data pointer
 !
     pparent => pblock%data
 
 ! iterate over all children
 !
-    do p = 1, nchild
+    do p = 1, nchildren
 
 ! assign a pointer to the current child
 !
@@ -1370,146 +1859,42 @@ module mesh
                                  +    pchild%u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
-    end do ! p = 1, nchild
+    end do ! p = 1, nchildren
+
+#ifdef PROFILE
+! stop accounting time for the block restriction
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
-!
-!===============================================================================
-!
-! clears_mesh: subroutine deallocates mesh, removing blocks
-!
-!===============================================================================
-!
-  subroutine clear_mesh()
-
-    use error   , only : print_info
-    use mpitools, only : master
-
-    implicit none
-
-!-------------------------------------------------------------------------------
-!
-! close the handler of the mesh statistics file
-!
-    if (master) close(funit)
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine clear_mesh
-!
-!===============================================================================
-!
-! store_mesh_stats: subroutine stores mesh statistics
-!
-!===============================================================================
-!
-  subroutine store_mesh_stats(n, t)
-
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_mblocks, get_nleafs
-    use coordinates, only : ng, im, jm, km, toplev, effres
-    use mpitools, only : master, nprocs
-
-    implicit none
-
-! arguments
-!
-    integer     , intent(in) :: n
-    real(kind=8), intent(in) :: t
-
-! local variables
-!
-    integer(kind=4) :: l
-    real(kind=4)    :: cov, eff
-
-! local arrays
-!
-    integer(kind=4), dimension(toplev) :: ldist
-#ifdef MPI
-    integer(kind=4), dimension(nprocs)  :: cdist
-#endif /* MPI */
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta
-
-! local variables
-!
-    integer(kind=4), save :: nm = 0, nl = 0
-
-!-------------------------------------------------------------------------------
-!
-! store the statistics about mesh
-!
-    if (master) then
-
-      if (nm .ne. get_mblocks() .or. nl .ne. get_nleafs()) then
-
-! set new numbers of meta blocks and leafs
-!
-      nm = get_mblocks()
-      nl = get_nleafs()
-
-! calculate the coverage
-!
-      cov = (1.0 * nl) / tblocks
-      eff = 1.0 * nl * (im * jm * km) / product(effres(1:NDIMS) + 2 * ng)
-
-! get the block level distribution
-!
-        ldist(:) = 0
-#ifdef MPI
-        cdist(:) = 0
-#endif /* MPI */
-        pmeta => list_meta
-        do while(associated(pmeta))
-          if (pmeta%leaf) then
-            ldist(pmeta%level) = ldist(pmeta%level) + 1
-#ifdef MPI
-            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
-#endif /* MPI */
-          end if
-          pmeta => pmeta%next
-        end do
-
-! write down the statistics
-!
-        write(funit,"(2x,i8,2x,1pe14.8,2(2x,i6),2(2x,1pe14.8))",advance="no")  &
-                                                        n, t, nl, nm, cov, eff
-        write(funit,"('   ')",advance="no")
-        do l = 1, toplev
-          write(funit,"(2x,i6)",advance="no") ldist(l)
-        end do
-#ifdef MPI
-        write(funit,"('   ')",advance="no")
-        do l = 1, nprocs
-          write(funit,"(2x,i6)",advance="no") cdist(l)
-        end do
-#endif /* MPI */
-        write(funit,"('')")
-
-      end if ! number of blocks or leafs changed
-
-    end if ! is master
-!
-!-------------------------------------------------------------------------------
-!
-  end subroutine store_mesh_stats
 #ifdef DEBUG
 !
 !===============================================================================
 !
 ! check_mesh: subroutine checks if the block structure is correct
+! subroutine CHECK_MESH:
+! ---------------------
+!
+!   Subroutine checks if the meta block structure is correct.
+!
+!   Arguments:
+!
+!     string - the identification string;
 !
 !===============================================================================
 !
   subroutine check_mesh(string)
 
-    use blocks, only : block_meta, list_meta
-    use blocks, only : check_metablock
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : check_metablock
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! input arguments
@@ -1518,21 +1903,27 @@ module mesh
 
 ! local pointers
 !
-    type(block_meta), pointer :: pmeta
+    type(block_meta), pointer    :: pmeta
 
 !-------------------------------------------------------------------------------
 !
-! check meta blocks
+! assign the pointer with the first block on the list
 !
     pmeta => list_meta
+
+! iterate over all meta blocks
+!
     do while(associated(pmeta))
 
 ! check the current block
 !
       call check_metablock(pmeta, string)
 
+! assign the pointer with the next block on the meta block list
+!
       pmeta => pmeta%next
-    end do
+
+    end do ! over meta blocks
 
 !-------------------------------------------------------------------------------
 !

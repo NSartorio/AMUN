@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -31,22 +31,31 @@
 !
 module refinement
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
 
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: iri, irc
+#endif /* PROFILE */
+
 ! refinement criterion parameters
 !
-  real(kind=8), save :: crefmin = 4.0d-02
-  real(kind=8), save :: crefmax = 2.0d-01
+  real(kind=8), save :: crefmin = 2.0d-01
+  real(kind=8), save :: crefmax = 8.0d-01
   real(kind=8), save :: epsref  = 1.0d-02
 
 ! flags for variable included in the refinement criterion calculation
 !
-  logical     , save :: dens_ref  = .true.
-  logical     , save :: pres_ref  = .true.
-  logical     , save :: velo_ref  = .false.
-  logical     , save :: magn_ref  = .false.
+  logical, dimension(:), allocatable, save :: qvar_ref
 
 ! by default everything is private
 !
@@ -54,7 +63,8 @@ module refinement
 
 ! declare public subroutines
 !
-  public :: initialize_refinement, check_refinement_criterion
+  public :: initialize_refinement, finalize_refinement
+  public :: check_refinement_criterion
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -66,30 +76,55 @@ module refinement
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_REFINEMENT:
 ! --------------------------------
 !
 !   Subroutine initializes module REFINEMENT.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_refinement()
+  subroutine initialize_refinement(verbose, iret)
 
-! include external procedures and variables
+! import external procedures and variables
 !
-    use parameters, only : get_parameter_real, get_parameter_string
+    use equations      , only : nv, pvars
+    use parameters     , only : get_parameter_real, get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
 
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
 ! local variables
 !
-    character(len=255) :: variables = "dens pres"
+    integer                :: p
+    character(len=255)     :: variables = "dens pres"
+    character(len=255)     :: rvars     = ""
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('refinement initialization'      , iri)
+    call set_timer('refinement criterion estimation', irc)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(iri)
+#endif /* PROFILE */
+
 ! get the refinement parameters
 !
     call get_parameter_real("crefmin", crefmin)
@@ -100,16 +135,82 @@ module refinement
 !
     call get_parameter_string("refinement_variables", variables)
 
-! check if density should be take into account
+! allocate vector for indicators, which variables are taken into account in
+! calculating the refinement criterion
 !
-    dens_ref = index(variables, 'dens') > 0
-    pres_ref = index(variables, 'pres') > 0
-    velo_ref = index(variables, 'velo') > 0
-    magn_ref = index(variables, 'magn') > 0
+    allocate(qvar_ref(nv))
+
+! check which primitive variable is used to determine the refinement criterion
+!
+    do p = 1, nv
+      qvar_ref(p) = index(variables, trim(pvars(p))) > 0
+      if (qvar_ref(p)) rvars = adjustl(trim(rvars) // ' ' // trim(pvars(p)))
+    end do ! p = 1, nv
+
+! print information about the refinement criterion
+!
+    if (verbose) then
+
+      write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
+      write (*,"(4x,a,1x,1e9.2)") "derefinement threshold =", crefmin
+      write (*,"(4x,a,1x,1e9.2)") "refinement threshold   =", crefmax
+
+    end if
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_refinement
+!
+!===============================================================================
+!
+! subroutine FINALIZE_REFINEMENT:
+! ------------------------------
+!
+!   Subroutine releases memory used by the module variables.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine finalize_refinement(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(iri)
+#endif /* PROFILE */
+
+! deallocate refined variable indicators
+!
+    if (allocated(qvar_ref)) deallocate(qvar_ref)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(iri)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_refinement
 !
 !===============================================================================
 !
@@ -130,10 +231,10 @@ module refinement
 !
   function check_refinement_criterion(pdata) result(criterion)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks     , only : block_data
-    use equations  , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz
+    use blocks         , only : block_data
+    use equations      , only : nv
 
 ! local variables are not implicit by default
 !
@@ -149,45 +250,26 @@ module refinement
 
 ! local variables
 !
+    integer      :: p
     real(kind=4) :: cref
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the refinement criterion estimation
+!
+    call start_timer(irc)
+#endif /* PROFILE */
+
 ! reset indicators
 !
     cref = 0.0e+00
 
-! find the second derivative error for density
+! calculate the second derivative error for selected primitive variables only
 !
-    if (dens_ref) cref = max(cref, second_derivative_error(idn, pdata))
-
-! find the second derivative error for pressure
-!
-    if (pres_ref) cref = max(cref, second_derivative_error(ipr, pdata))
-
-! find the second derivative error for velocity
-!
-    if (velo_ref) then
-
-      cref = max(cref, second_derivative_error(ivx, pdata))
-      cref = max(cref, second_derivative_error(ivy, pdata))
-#if NDIMS == 3
-      cref = max(cref, second_derivative_error(ivz, pdata))
-#endif /* NDIMS == 3 */
-
-    end if
-
-! find the second derivative error for magnetic field
-!
-    if (magn_ref) then
-
-      cref = max(cref, second_derivative_error(ibx, pdata))
-      cref = max(cref, second_derivative_error(iby, pdata))
-#if NDIMS == 3
-      cref = max(cref, second_derivative_error(ibz, pdata))
-#endif /* NDIMS == 3 */
-
-    end if
+    do p = 1, nv
+      if (qvar_ref(p)) cref = max(cref, second_derivative_error(p, pdata))
+    end do ! p = 1, nv
 
 ! return the refinement flag depending on the condition value
 !
@@ -199,6 +281,12 @@ module refinement
     if (cref < crefmin) then
       criterion = -1
     end if
+
+#ifdef PROFILE
+! stop accounting time for the refinement criterion estimation
+!
+    call stop_timer(irc)
+#endif /* PROFILE */
 
 ! return the refinement flag
 !
@@ -212,6 +300,8 @@ module refinement
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
+!===============================================================================
+!
 !===============================================================================
 !
 ! function SECOND_DERIVATIVE_ERROR:
@@ -229,10 +319,10 @@ module refinement
 !
   function second_derivative_error(iqt, pdata) result(error)
 
-! variables and subroutines imported from other modules
+! import external procedures and variables
 !
-    use blocks     , only : block_data
-    use coordinates, only : ib, jb, kb, ie, je, ke
+    use blocks         , only : block_data
+    use coordinates    , only : ib, jb, kb, ie, je, ke
 
 ! local variables are not implicit by default
 !

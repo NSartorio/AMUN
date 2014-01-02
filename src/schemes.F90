@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -33,9 +33,21 @@
 !
 module schemes
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, imu, imf, imr
+#endif /* PROFILE */
 
 ! pointer to the flux update procedure
 !
@@ -100,6 +112,19 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('schemes initialization', imi)
+    call set_timer('increment update'      , imu)
+    call set_timer('flux update'           , imf)
+    call set_timer('Riemann solver'        , imr)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the Riemann solver
 !
     call get_parameter_string("riemann_solver", solver)
@@ -285,6 +310,12 @@ module schemes
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_schemes
@@ -314,6 +345,22 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! nullify procedure pointers
+!
+    nullify(update_flux)
+    nullify(riemann)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -358,6 +405,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for increment update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! reset the increment array du
 !
     du(:,:,:,:) = 0.0d+00
@@ -384,6 +437,12 @@ module schemes
     end do
     du(:,:,:,1) = du(:,:,:,1) - dh(3) * f(3,:,:,:,1)
 #endif /* NDIMS == 3 */
+
+#ifdef PROFILE
+! stop accounting time for increment update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -447,6 +506,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! reset the flux array
 !
     f(:,:,:,:) = 0.0d+00
@@ -542,6 +607,12 @@ module schemes
 
     end select
 
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_iso
@@ -598,6 +669,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! reset the flux array
 !
     f(:,:,:,:) = 0.0d+00
@@ -698,6 +775,12 @@ module schemes
 #endif /* NDIMS == 3 */
 
     end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -756,6 +839,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! reset the flux array
 !
     f(:,:,:,:) = 0.0d+00
@@ -875,6 +964,12 @@ module schemes
 
     end select
 
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_mhd_iso
@@ -932,6 +1027,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! reset the flux array
 !
     f(:,:,:,:) = 0.0d+00
@@ -1056,6 +1157,12 @@ module schemes
 #endif /* NDIMS == 3 */
 
     end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1118,6 +1225,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -1176,6 +1289,12 @@ module schemes
       end if ! sl < 0 < sr
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1238,6 +1357,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -1297,6 +1422,12 @@ module schemes
       end if ! sl < 0 < sr
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1361,6 +1492,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -1477,6 +1614,12 @@ module schemes
 
     end do ! i = 1, n
 
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_hd_adi_hllc
@@ -1539,6 +1682,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -1607,6 +1756,12 @@ module schemes
 
     end do ! i = 1, n
 
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_iso_hll
@@ -1670,6 +1825,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -1988,6 +2149,12 @@ module schemes
 
     end do ! i = 1, n
 
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_iso_hlld
@@ -2050,6 +2217,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -2366,6 +2539,12 @@ module schemes
 
     end do ! i = 1, n
 
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_iso_hlldm
@@ -2428,6 +2607,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -2496,6 +2681,12 @@ module schemes
       end if ! sl < 0 < sr
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -2567,6 +2758,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -2817,6 +3014,12 @@ module schemes
 
     end do ! i = 1, n
 
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_adi_hllc
@@ -2882,6 +3085,12 @@ module schemes
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the left and right states of primitive variables
 !
     do p = 1, nv
@@ -3430,6 +3639,12 @@ module schemes
       end if ! sl < 0 < sr
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

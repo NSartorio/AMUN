@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ program amun
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
                            , restart_job
-  use mesh          , only : initialize_mesh, clear_mesh
+  use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
   use mesh          , only : redistribute_blocks
@@ -65,12 +65,12 @@ program amun
                            , get_parameter_string
   use problems      , only : initialize_problems
   use random        , only : initialize_random, finalize_random
-  use refinement    , only : initialize_refinement
+  use refinement    , only : initialize_refinement, finalize_refinement
   use schemes       , only : initialize_schemes, finalize_schemes
   use timers        , only : initialize_timers, finalize_timers
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
-  use timers        , only : ntimers
+  use timers        , only : get_count, ntimers
 
 ! module variables are not implicit by default
 !
@@ -81,7 +81,7 @@ program amun
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
-  real                  :: tmax  = 0.0d0, trun = 9999.0d0, tsav = 20.0d0
+  real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
 
 ! temporary variables
 !
@@ -183,7 +183,7 @@ program amun
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2013 Grzegorz Kowal'
+                                        'Copyright (C) 2008-2014 Grzegorz Kowal'
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
@@ -201,7 +201,7 @@ program amun
 
 ! check if the termination flag was broadcaster successfully
 !
-  if (iterm > 0) go to 20
+  if (iterm > 0) go to 100
 
 ! reset the termination flag
 !
@@ -218,7 +218,7 @@ program amun
 
 ! check if the termination flag was broadcaster successfully
 !
-  if (iterm > 0) go to 20
+  if (iterm > 0) go to 100
 
 ! reset the termination flag
 !
@@ -251,6 +251,10 @@ program amun
   call get_parameter_real   ("trun" , trun)
   call get_parameter_real   ("tsav" , tsav)
 
+! correct the run time by the save time
+!
+  trun = trun - tsav / 6.0d+01
+
 ! get integral calculation interval
 !
   call get_parameter_integer("ndat" , ndat)
@@ -281,7 +285,7 @@ program amun
 
 ! jump to the end if the equations could not be initialized
 !
-  if (iret > 0) go to 60
+  if (iret > 0) go to 100
 
 ! initialize physics modules and print info
 !
@@ -296,7 +300,22 @@ program amun
 
 ! jump to the end if the equations could not be initialized
 !
+  if (iret > 0) go to 60
+
+! initialize refinement module and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Refinement:"
+  end if
+
+! jump to the end if the refinement could not be initialized
+!
   if (iret > 0) go to 50
+
+! initialize module REFINEMENT
+!
+  call initialize_refinement(master, iret)
 
 ! initialize methods modules and print info
 !
@@ -337,10 +356,6 @@ program amun
 !
   call initialize_problems()
 
-! initialize module REFINEMENT
-!
-  call initialize_refinement()
-
 ! initialize module IO
 !
   call initialize_io()
@@ -351,7 +366,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call initialize_mesh(.true.)
+    call initialize_mesh(nrun, master, iret)
 
 ! initialize the integrals module
 !
@@ -374,7 +389,7 @@ program amun
 
 ! initialize the mesh module
 !
-    call initialize_mesh(.false.)
+    call initialize_mesh(nrun, master, iret)
 
 ! initialize the integrals module
 !
@@ -501,11 +516,11 @@ program amun
 
 ! compute elapsed time
 !
-    thrs = (tm_curr / 60.0 + tsav) / 60.0
+    thrs = tm_curr / 3.6d+03
 
 ! check if the time exceeds execution time limit
 !
-    if (thrs >= trun) iterm = 100
+    if (thrs > trun) iterm = 100
 
 ! print progress info to console
 !
@@ -570,9 +585,9 @@ program amun
 !
   call clear_integrals()
 
-! deallocate and reset mesh
+! finalize the mesh module
 !
-  call clear_mesh()
+  call finalize_mesh(iret)
 
 ! deallocate block structure
 !
@@ -619,13 +634,23 @@ program amun
 
 ! print the execution times
 !
+#ifdef PROFILE
+    write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
+                      ".3,' secs = ',f6.2,' % [', i10,']')"
+#else /* PROFILE */
     write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
                       ".3,' secs = ',f6.2,' %')"
+#endif /* PROFILE */
 
     write (*,'(1x,a)') 'EXECUTION TIMINGS'
     do i = 2, ntimers
+#ifdef PROFILE
      if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
-                                                             , tm_conv * tm(i)
+                                               , tm_conv * tm(i), get_count(i)
+#else /* PROFILE */
+     if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
+                                               , tm_conv * tm(i)
+#endif /* PROFILE */
     end do
 
 ! print the CPU times
@@ -648,9 +673,49 @@ program amun
 
   end if
 
+! finalize module INTERPOLATIONS
+!
+  call finalize_interpolations(iret)
+
+! finalize module SCHEMES
+!
+  call finalize_schemes(iret)
+
+! jump point
+!
+  30 continue
+
+! finalize module EVOLUTION
+!
+  call finalize_evolution(iret)
+
+! jump point
+!
+  40 continue
+
+! finalize module REFINEMENT
+!
+  call finalize_refinement(iret)
+
+! jump point
+!
+  50 continue
+
+! finalize module EQUATIONS
+!
+  call finalize_equations(iret)
+
+! jump point
+!
+  60 continue
+
+! finalize module COORDINATES
+!
+  call finalize_coordinates(iret)
+
 ! a label to go to if there are any problems
 !
-20 continue
+  100 continue
 
   if (master) then
 
@@ -690,42 +755,6 @@ program amun
     write (*,'(a)') ''
 
   end if
-
-! finalize module INTERPOLATIONS
-!
-  call finalize_interpolations(iret)
-
-! finalize module SCHEMES
-!
-  call finalize_schemes(iret)
-
-! jump point
-!
-  30 continue
-
-! finalize module EVOLUTION
-!
-  call finalize_evolution(iret)
-
-! jump point
-!
-  40 continue
-
-! finalize module EQUATIONS
-!
-  call finalize_equations(iret)
-
-! jump point
-!
-  50 continue
-
-! finalize module COORDINATES
-!
-  call finalize_coordinates(iret)
-
-! jump point
-!
-  60 continue
 
 ! finalize modules PARAMETERS
 !

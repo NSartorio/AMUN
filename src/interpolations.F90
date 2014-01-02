@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -31,9 +31,21 @@
 !
 module interpolations
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, imr, imf
+#endif /* PROFILE */
 
 ! pointers to the reconstruction and limiter procedures
 !
@@ -99,6 +111,18 @@ module interpolations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('interpolation initialization', imi)
+    call set_timer('reconstruction'              , imr)
+    call set_timer('fix positivity'              , imf)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! obtain the user defined interpolation methods and coefficients
 !
     call get_parameter_string("reconstruction", sreconstruction)
@@ -169,6 +193,12 @@ module interpolations
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_interpolations
@@ -196,10 +226,22 @@ module interpolations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! release the procedure pointers
 !
     nullify(reconstruct_states)
     nullify(limiter)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -240,9 +282,21 @@ module interpolations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for reconstruction
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! reconstruct the states using the selected subroutine
 !
     call reconstruct_states(n, h, f(:), fl(:), fr(:))
+
+#ifdef PROFILE
+! stop accounting time for reconstruction
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -816,6 +870,12 @@ module interpolations
 !
 !------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for positivity fix
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! check positivity only if desired
 !
     if (positivity) then
@@ -857,6 +917,12 @@ module interpolations
       end do ! i = 1, n
 
     end if ! positivity == .true.
+
+#ifdef PROFILE
+! stop accounting time for positivity fix
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

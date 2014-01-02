@@ -131,25 +131,28 @@ driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    integrals.o interpolations.o io.o mesh.o mpitools.o         \
                    parameters.o problems.o random.o refinement.o    \
                    schemes.o
-equations.o      : equations.F90 coordinates.o parameters.o
+equations.o      : equations.F90 coordinates.o parameters.o timers.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
                    equations.o mesh.o mpitools.o parameters.o schemes.o
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
 integrals.o      : integrals.F90 blocks.o coordinates.o equations.o \
                    evolution.o mpitools.o
-interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o
+interpolations.o : interpolations.F90 blocks.o coordinates.o parameters.o      \
+                   timers.o
 io.o             : io.F90 blocks.o coordinates.o equations.o error.o           \
-                   evolution.o mpitools.o random.o refinement.o
+                   evolution.o mpitools.o random.o refinement.o timers.o
 mesh.o           : mesh.F90 blocks.o coordinates.o domains.o equations.o       \
-                   error.o interpolations.o mpitools.o problems.o refinement.o
+                   error.o interpolations.o mpitools.o problems.o refinement.o \
+                   timers.o
 mpitools.o       : mpitools.F90 timers.o
 parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
                    error.o parameters.o
 refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
-                   parameters.o
-schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o
+                   parameters.o timers.o
+schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o      \
+                   timers.o
 random.o         : random.F90 mpitools.o parameters.o
 timers.o         : timers.F90
 
