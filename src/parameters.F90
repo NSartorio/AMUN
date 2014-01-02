@@ -24,7 +24,7 @@
 !! module: PARAMETERS
 !!
 !!  This module handles runtime parameters by reading them from a parameter
-!!  file and distributing them among all processors.
+!!  file and distributing among all processes.
 !!
 !!******************************************************************************
 !
@@ -35,7 +35,7 @@ module parameters
   implicit none
 
 ! module parameters determining the name and value field lengths, and the
-! maximum length
+! maximum string length
 !
   integer, parameter         :: nlen = 32, vlen = 128, mlen = 256
 
@@ -116,20 +116,20 @@ module parameters
 !
 !-------------------------------------------------------------------------------
 !
-! parse the command line to check if another configuration file name has been
-! specified
+! parse the command line to check if a different parameter file has been
+! provided
 !
     do l = 1, iargc()
       call getarg(l, line)
-      if (trim(line) .eq. '-i' .or. trim(line) .eq. '--input') then
+      if (trim(line) == '-i' .or. trim(line) == '--input') then
         call getarg(l + 1, line)
-        if (trim(line) .ne. '') then
+        if (trim(line) /= '') then
           fname = trim(line)
         end if
       end if
     end do
 
-! print information about the file from which the parameters will be read
+! print information about the file from which parameters are read
 !
     write(*,*)
     write(*,*) 'Reading parameters from ' // trim(fname)
@@ -146,13 +146,13 @@ module parameters
 !
       call get_parameters_number(iret)
 
-! check if obtaining the number of parameters was successful
+! check if the number of parameters was obtained successfully
 !
-      if (iret .gt. 0) return
+      if (iret > 0) return
 
-! if the parameter file is empty, print an error and return from the subroutine
+! if the parameter file is empty, print an error and quit the subroutine
 !
-      if (nparams .le. 0) then
+      if (nparams <= 0) then
         write(*,*) 'The parameter file ' // trim(fname)                        &
                                                     // ' is empty! Exiting...'
         write(*,*)
@@ -191,6 +191,7 @@ module parameters
 ! ------------------------------
 !
 !   Subroutine releases memory used by arrays in this module.
+!
 !
 !===============================================================================
 !
@@ -254,8 +255,8 @@ module parameters
 
 ! if the line is empty or it's a comment, skip the counting
 !
-    if ((len_trim(line) .eq. 0)                                                &
-                         .or. index(trim(adjustl(line)), '#') .eq. 1) go to 10
+    if ((len_trim(line) == 0)                                                  &
+                           .or. index(trim(adjustl(line)), '#') == 1) go to 10
 
 ! increase the number of parameters
 !
@@ -341,8 +342,8 @@ module parameters
 
 ! if the line is empty or it's a comment, skip the counting
 !
-    if ((len_trim(line) .eq. 0)                                                &
-                         .or. index(trim(adjustl(line)), '#') .eq. 1) go to 10
+    if ((len_trim(line) == 0)                                                  &
+                           .or. index(trim(adjustl(line)), '#') == 1) go to 10
 
 ! parse the line to get parameter name and value
 !
@@ -443,8 +444,8 @@ module parameters
 
 ! remove the length of the in-line comment from the length of line
 !
-    if (c .gt. 0) l = c - 1
-    if (i .gt. 0 .and.  j .gt. 0) then
+    if (c > 0) l = c - 1
+    if (i > 0 .and. j > 0) then
      i = i + 1
      j = j - 1
     else
@@ -507,8 +508,8 @@ module parameters
 ! find the selected parameter
 !
     np = 1
-    do while (np .le. nparams)
-      if (name .eq. pnames(np)) then
+    do while (np <= nparams)
+      if (name == pnames(np)) then
         read(pvalues(np), err = 100, fmt = *) value
       end if
       np = np + 1
@@ -560,8 +561,8 @@ module parameters
 ! find the selected parameter
 !
     np = 1
-    do while (np .le. nparams)
-      if (name .eq. pnames(np)) then
+    do while (np <= nparams)
+      if (name == pnames(np)) then
         read(pvalues(np), err = 100, fmt = *) value
       end if
       np = np + 1
@@ -617,8 +618,8 @@ module parameters
 ! find the selected parameter
 !
     np = 1
-    do while (np .le. nparams)
-      if (name .eq. pnames(np)) then
+    do while (np <= nparams)
+      if (name == pnames(np)) then
         value = pvalues(np)(1:nl)
       end if
       np = np + 1
@@ -645,9 +646,10 @@ module parameters
 !
   subroutine redistribute_parameters(iret)
 
-! include external procedures and variables
+! import external procedures and variables
 !
-    use mpitools, only : master, bcast_integer_variable, bcast_string_variable
+    use mpitools       , only : master
+    use mpitools       , only : bcast_integer_variable, bcast_string_variable
 
 ! local variables are not implicit by default
 !

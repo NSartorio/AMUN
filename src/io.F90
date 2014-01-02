@@ -218,16 +218,19 @@ module io
 !
 !===============================================================================
 !
-! write_restart_data: wrapper subroutine for storing the restart data
+! subroutine WRITE_RESTART_DATA:
+! -----------------------------
 !
-! info: subroutine selects the writing subroutine from the supported output
-!       formats depending on the compilation time options, and writes a restart
-!       file;
+!   Subroutine stores block data in restart files.  This is a wrapper for
+!   specific format storing.
+!
 !
 !===============================================================================
 !
   subroutine write_restart_data()
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
@@ -305,6 +308,8 @@ module io
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
+!===============================================================================
+!
 #ifdef HDF5
 !===============================================================================
 !
@@ -5431,6 +5436,7 @@ module io
 !
   end subroutine write_array6_double_h5
 #endif /* HDF5 */
+
 !===============================================================================
 !
 end module
