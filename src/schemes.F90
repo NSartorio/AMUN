@@ -118,7 +118,7 @@ module schemes
     call set_timer('schemes initialization', imi)
     call set_timer('increment update'      , imu)
     call set_timer('flux update'           , imf)
-    call set_timer('riemann solver'        , imr)
+    call set_timer('Riemann solver'        , imr)
 
 ! start accounting time for module initialization/finalization
 !
