@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2013 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -183,7 +183,7 @@ program amun
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2013 Grzegorz Kowal'
+                                        'Copyright (C) 2008-2014 Grzegorz Kowal'
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
