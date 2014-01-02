@@ -152,8 +152,8 @@ module refinement
     if (verbose) then
 
       write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
-      write (*,"(4x,a,1x,1e9.3)") "derefinement threshold =", crefmin
-      write (*,"(4x,a,1x,1e9.3)") "refinement threshold   =", crefmax
+      write (*,"(4x,a,1x,1e9.2)") "derefinement threshold =", crefmin
+      write (*,"(4x,a,1x,1e9.2)") "refinement threshold   =", crefmax
 
     end if
 
