@@ -42,7 +42,7 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imv, imf
+  integer            , save :: imi, imv, imf, imc, imp, imr, ims
 #endif /* PROFILE */
 
 ! module parameters for the boundary update order and boundary type
@@ -114,6 +114,10 @@ module boundaries
     call set_timer('boundaries:: initialization', imi)
     call set_timer('boundaries:: variables'     , imv)
     call set_timer('boundaries:: fluxes'        , imf)
+    call set_timer('boundaries:: copy'          , imc)
+    call set_timer('boundaries:: prolong'       , imp)
+    call set_timer('boundaries:: restrict'      , imr)
+    call set_timer('boundaries:: specific'      , ims)
 
 ! start accounting time for module initialization/finalization
 !
@@ -935,6 +939,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for specific boundary update
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
 ! assign the pointer to the first block on the list
 !
     pmeta => list_meta
@@ -978,6 +988,12 @@ module boundaries
       pmeta => pmeta%next
 
     end do ! meta blocks
+
+#ifdef PROFILE
+! stop accounting time for specific boundary update
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1051,6 +1067,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for restrict boundary update
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 #ifdef MPI
 ! reset the exchange block counters
 !
@@ -1368,6 +1390,12 @@ module boundaries
         end do ! irecv
 #endif /* MPI */
 
+#ifdef PROFILE
+! stop accounting time for restrict boundary update
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_boundaries
@@ -1440,6 +1468,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for prolong boundary update
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 #ifdef MPI
 ! reset the exchange block counters
 !
@@ -1769,6 +1803,12 @@ module boundaries
     end do ! irecv
 #endif /* MPI */
 
+#ifdef PROFILE
+! stop accounting time for prolong boundary update
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine prolong_boundaries
@@ -1840,6 +1880,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for copy boundary update
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
 #ifdef MPI
 ! reset the exchange block counters
 !
@@ -2141,6 +2187,12 @@ module boundaries
       end do ! isend
     end do ! irecv
 #endif /* MPI */
+
+#ifdef PROFILE
+! stop accounting time for copy boundary update
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
