@@ -151,7 +151,8 @@ problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
                    error.o parameters.o
 refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    parameters.o timers.o
-schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o
+schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o      \
+                   timers.o
 random.o         : random.F90 mpitools.o parameters.o
 timers.o         : timers.F90
 
