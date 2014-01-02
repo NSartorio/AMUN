@@ -70,7 +70,7 @@ program amun
   use timers        , only : initialize_timers, finalize_timers
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
-  use timers        , only : ntimers
+  use timers        , only : get_count, ntimers
 
 ! module variables are not implicit by default
 !
@@ -634,13 +634,23 @@ program amun
 
 ! print the execution times
 !
+#ifdef PROFILE
+    write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
+                      ".3,' secs = ',f6.2,' % [', i10,']')"
+#else /* PROFILE */
     write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
                       ".3,' secs = ',f6.2,' %')"
+#endif /* PROFILE */
 
     write (*,'(1x,a)') 'EXECUTION TIMINGS'
     do i = 2, ntimers
+#ifdef PROFILE
      if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
-                                                             , tm_conv * tm(i)
+                                               , tm_conv * tm(i), get_count(i)
+#else /* PROFILE */
+     if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
+                                               , tm_conv * tm(i)
+#endif /* PROFILE */
     end do
 
 ! print the CPU times

@@ -43,6 +43,7 @@ module timers
   logical          , dimension(ntimers), save :: flag
   character(len=32), dimension(ntimers), save :: description
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
+  integer(kind=4)  , dimension(ntimers), save :: tcount
   integer(kind=8)                      , save :: ticks, tbegin
   real   (kind=8)                      , save :: conv
 
@@ -53,7 +54,8 @@ module timers
 ! declare public subroutines and variables
 !
   public :: initialize_timers, finalize_timers
-  public :: set_timer, start_timer, stop_timer, get_timer, get_timer_total
+  public :: set_timer, start_timer, stop_timer
+  public :: get_timer, get_count, get_timer_total
   public :: ntimers, timer_enabled, timer_description
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -100,6 +102,7 @@ module timers
     times(:)       = 0
     tstart(:)      = 0
     tstop(:)       = 0
+    tcount(:)      = 0
 
 ! prepare the conversion factor
 !
@@ -241,8 +244,16 @@ module timers
 !
 !-------------------------------------------------------------------------------
 !
+! get the system clock
+!
     call system_clock(tstop(timer))
 
+! increase the timer count
+!
+    tcount(timer) = tcount(timer) + 1
+
+! add the time increment
+!
     times(timer) = times(timer) + (tstop(timer) - tstart(timer))
 
 !-------------------------------------------------------------------------------
@@ -289,6 +300,47 @@ module timers
 !-------------------------------------------------------------------------------
 !
   end function get_timer
+!
+!===============================================================================
+!
+! function GET_COUNT:
+! ------------------
+!
+!   Function returns the call count for the specified timer.
+!
+!   Arguments:
+!
+!     timer - the timer index;
+!
+!===============================================================================
+!
+  function get_count(timer)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer, intent(in) :: timer
+
+! return variable
+!
+    integer(kind=4)     :: get_count
+!
+!-------------------------------------------------------------------------------
+!
+! estimate the accounted time for the specified timer
+!
+    get_count = tcount(timer)
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_count
 !
 !===============================================================================
 !
