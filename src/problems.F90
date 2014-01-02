@@ -179,7 +179,7 @@ module problems
 ! default parameter values
 !
     real(kind=8), save :: dens   = 1.00d+00
-    real(kind=8), save :: ratio  = 1.00d+00
+    real(kind=8), save :: ratio  = 1.00d+02
     real(kind=8), save :: radius = 1.00d-01
     real(kind=8), save :: csnd   = 4.0824829046386301635d-01
     real(kind=8), save :: buni   = 1.00d+00
