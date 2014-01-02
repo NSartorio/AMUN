@@ -45,9 +45,21 @@
 !
 module equations
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, imc, imf, imm
+#endif /* PROFILE */
 
 ! pointers to the conversion procedures
 !
@@ -166,6 +178,19 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('equations initialization', imi)
+    call set_timer('variable conversion'     , imc)
+    call set_timer('flux calculation'        , imf)
+    call set_timer('maximum speed estimation', imm)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the system of equations
 !
     call get_parameter_string("equation_system"   , eqsys)
@@ -419,6 +444,12 @@ module equations
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_equations
@@ -448,6 +479,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! deallocate variable name arrays
 !
     if (allocated(pvars)) deallocate(pvars)
@@ -459,6 +496,12 @@ module equations
     nullify(cons2prim)
     nullify(fluxspeed)
     nullify(maxspeed )
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -627,6 +670,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       u(idn,i) = q(idn,i)
@@ -635,6 +686,12 @@ module equations
       u(imz,i) = q(idn,i) * q(ivz,i)
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -674,6 +731,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       q(idn,i) = u(idn,i)
@@ -682,6 +747,12 @@ module equations
       q(ivz,i) = u(imz,i) / u(idn,i)
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -724,6 +795,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux calculation
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
 ! calculate the hydrodynamic fluxes
@@ -739,6 +818,12 @@ module equations
       c(i) = csnd
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for flux calculation
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -783,6 +868,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the maximum speed estimation
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
 ! reset the maximum speed
 !
     maxspeed = 0.0d+00
@@ -805,6 +896,12 @@ module equations
         end do ! i = ib, ie
       end do ! j = jb, je
     end do ! k = kb, ke
+
+#ifdef PROFILE
+! stop accounting time for the maximum speed estimation
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! return the value
 !
@@ -855,6 +952,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       u(idn,i) = q(idn,i)
@@ -866,6 +971,12 @@ module equations
       u(ien,i) = ei + ek
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -906,6 +1017,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       q(idn,i) = u(idn,i)
@@ -917,6 +1036,12 @@ module equations
       q(ipr,i) = gammam1 * ei
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -959,6 +1084,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux calculation
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
 ! calculate the hydrodynamic fluxes
@@ -975,6 +1108,12 @@ module equations
       c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for flux calculation
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1019,6 +1158,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the maximum speed estimation
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
 ! reset the maximum speed
 !
     maxspeed = 0.0d+00
@@ -1045,6 +1190,12 @@ module equations
         end do ! i = ib, ie
       end do ! j = jb, je
     end do ! k = kb, ke
+
+#ifdef PROFILE
+! stop accounting time for the maximum speed estimation
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! return the value
 !
@@ -1094,6 +1245,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       u(idn,i) = q(idn,i)
@@ -1106,6 +1265,12 @@ module equations
       u(ibp,i) = q(ibp,i)
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1145,6 +1310,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       q(idn,i) = u(idn,i)
@@ -1157,6 +1330,12 @@ module equations
       q(ibp,i) = u(ibp,i)
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1201,6 +1380,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux calculation
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
 ! prepare pressures and scalar product
@@ -1236,6 +1423,12 @@ module equations
       end if
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for flux calculation
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1279,6 +1472,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the maximum speed estimation
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
 ! reset the maximum speed
 !
     maxspeed = 0.0d+00
@@ -1306,6 +1505,12 @@ module equations
         end do ! i = ib, ie
       end do ! j = jb, je
     end do ! k = kb, ke
+
+#ifdef PROFILE
+! stop accounting time for the maximum speed estimation
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! return the value
 !
@@ -1356,6 +1561,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       u(idn,i) = q(idn,i)
@@ -1372,6 +1585,12 @@ module equations
       u(ien,i) = ei + ek + em
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1412,6 +1631,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
       q(idn,i) = u(idn,i)
@@ -1428,6 +1655,12 @@ module equations
       q(ipr,i) = gammam1 * ei
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1473,6 +1706,14 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for flux calculation
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
     do i = 1, n
 
 ! prepare pressures and scalar product
@@ -1510,6 +1751,12 @@ module equations
       end if
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for flux calculation
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1553,6 +1800,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the maximum speed estimation
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
 ! reset the maximum speed
 !
     maxspeed = 0.0d+00
@@ -1580,6 +1833,12 @@ module equations
         end do ! i = ib, ie
       end do ! j = jb, je
     end do ! k = kb, ke
+
+#ifdef PROFILE
+! stop accounting time for the maximum speed estimation
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! return the value
 !
