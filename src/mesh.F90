@@ -116,13 +116,13 @@ module mesh
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('mesh initialization'    , imi)
-    call set_timer('mesh statistics'        , ims)
-    call set_timer('initial mesh generation', img)
-    call set_timer('adaptive mesh update'   , imu)
-    call set_timer('block autobalancing'    , ima)
-    call set_timer('block restriction'      , imr)
-    call set_timer('block prolongation'     , imp)
+    call set_timer('mesh:: initialization'    , imi)
+    call set_timer('mesh:: statistics'        , ims)
+    call set_timer('mesh:: initial generation', img)
+    call set_timer('mesh:: adaptive update'   , imu)
+    call set_timer('mesh:: autobalancing'     , ima)
+    call set_timer('mesh:: block restriction' , imr)
+    call set_timer('mesh:: block prolongation', imp)
 
 ! start accounting time for module initialization/finalization
 !
