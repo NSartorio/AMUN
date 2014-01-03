@@ -117,8 +117,8 @@ module refinement
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('refinement initialization'      , iri)
-    call set_timer('refinement criterion estimation', irc)
+    call set_timer('refinement:: initialization', iri)
+    call set_timer('refinement:: criterion'     , irc)
 
 ! start accounting time for module initialization/finalization
 !
