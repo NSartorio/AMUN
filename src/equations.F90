@@ -181,10 +181,10 @@ module equations
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('equations initialization', imi)
-    call set_timer('variable conversion'     , imc)
-    call set_timer('flux calculation'        , imf)
-    call set_timer('maximum speed estimation', imm)
+    call set_timer('equations:: initialization'     , imi)
+    call set_timer('equations:: variable conversion', imc)
+    call set_timer('equations:: flux calculation'   , imf)
+    call set_timer('equations:: speed estimation'   , imm)
 
 ! start accounting time for module initialization/finalization
 !
