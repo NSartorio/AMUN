@@ -104,8 +104,8 @@ module random
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('random generator initialization', iri)
-    call set_timer('random number generation'       , irc)
+    call set_timer('random:: initialization'   , iri)
+    call set_timer('random:: number generation', irc)
 
 ! start accounting time for the random number generator
 !
