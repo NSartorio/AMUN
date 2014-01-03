@@ -114,9 +114,9 @@ module interpolations
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('interpolation initialization', imi)
-    call set_timer('reconstruction'              , imr)
-    call set_timer('fix positivity'              , imf)
+    call set_timer('interpolations:: initialization', imi)
+    call set_timer('interpolations:: reconstruction', imr)
+    call set_timer('interpolations:: fix positivity', imf)
 
 ! start accounting time for module initialization/finalization
 !
