@@ -120,9 +120,9 @@ module io
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('I/O initialization'  , ioi)
-    call set_timer('I/O snapshot writing', iow)
-    call set_timer('I/O snapshot reading', ios)
+    call set_timer('io:: initialization'  , ioi)
+    call set_timer('io:: snapshot writing', iow)
+    call set_timer('io:: snapshot reading', ios)
 
 ! start accounting time for module initialization/finalization
 !
