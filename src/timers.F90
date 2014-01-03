@@ -55,7 +55,7 @@ module timers
 !
   public :: initialize_timers, finalize_timers
   public :: set_timer, start_timer, stop_timer
-  public :: get_timer, get_next_timer, get_count, get_timer_total
+  public :: get_timer, get_count, get_timer_total
   public :: ntimers, timer_enabled, timer_description
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
