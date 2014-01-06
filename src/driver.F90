@@ -54,7 +54,7 @@ program amun
   use mpitools      , only : setup_mpi
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
-  use mpitools      , only : reduce_maximum_integer
+  use mpitools      , only : reduce_maximum_integer, reduce_sum_real_array
 #endif /* MPI */
   use mpitools      , only : master, nprocs, nproc
   use parameters    , only : read_parameters, finalize_parameters
@@ -622,65 +622,57 @@ program amun
     tm(i) = get_timer(i)
   end do
 
+#ifdef MPI
+! sum up timers from all processes
+!
+  call reduce_sum_real_array(ntimers, tm(:), iret)
+#endif /* MPI */
+
 ! print timings only on master processor
 !
   if (master) then
 
-! print one empty line
-!
-    write (*,'(a)') ''
-
 ! calculate the conversion factor
 !
-    tm_conv = 100.0 / tm(1)
+    tm_conv = 1.0d+02 / tm(1)
 
 ! get the execution time
 !
     tm_exec = get_timer_total()
 
-! prepare the string formatting
+! print one empty line
 !
-    write (tmp,"(i64)") int(tm(1))
-    write (tmp,"(i64)") len_trim(adjustl(tmp)) + 6
+    write (*,'(a)') ''
 
 ! print the execution times
 !
-#ifdef PROFILE
-    write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
-                      ".3,' secs = ',f6.2,' % [', i10,']')"
-#else /* PROFILE */
-    write (fmt,"(a)") "(2x,a32,1x,':',1x,1f" // trim(adjustl(tmp)) //          &
-                      ".3,' secs = ',f6.2,' %')"
-#endif /* PROFILE */
+    write (tmp,"(a)") "(2x,a32,1x,':',3x,1f16.3,' secs = ',f6.2,' %')"
 
     write (*,'(1x,a)') 'EXECUTION TIMINGS'
     do i = 2, ntimers
-#ifdef PROFILE
-     if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
-                                               , tm_conv * tm(i), get_count(i)
-#else /* PROFILE */
-     if (timer_enabled(i)) write (*,fmt) timer_description(i), tm(i)           &
-                                               , tm_conv * tm(i)
-#endif /* PROFILE */
+     if (timer_enabled(i)) write (*,tmp) timer_description(i), tm(i)           &
+                                                             , tm_conv * tm(i)
     end do
 
-! print the CPU times
+! print the execution times
 !
-    write (tmp,"(a)") "(1x,a14,20x,':',1x,1f" // trim(adjustl(tmp)) //         &
-                      ".3,' secs = ',f6.2,' %')"
-    write (*,tmp) 'TOTAL CPU TIME', tm(1)         , 100.0
-    write (*,tmp) 'TIME PER STEP ', tm(1) / nsteps, 100.0 / nsteps
+    write (tmp,"(a)") "(1x,a14,20x,':',3x,1f16.3,' secs = ',f6.2,' %')"
+    write (*,tmp) 'TOTAL CPU TIME', tm(1)         , 1.0d+02
+    write (*,tmp) 'TIME PER STEP ', tm(1) / nsteps, 1.0d+02 / nsteps
 #ifdef MPI
-    write (*,tmp) 'TIME PER CPU  ', tm(1) / nprocs, 100.0 / nprocs
+    write (*,tmp) 'TIME PER CPU  ', tm(1) / nprocs, 1.0d+02 / nprocs
 #endif /* MPI */
 
-! print the execution time
-
-    write (tmp,"(i64)") int(tm(1))
-    write (tmp,"(i64)") len_trim(adjustl(tmp)) + 6
-    write (tmp,"(a)") "(1x,a14,20x,':',1x,1f" // trim(adjustl(tmp)) //         &
-                      ".3,' secs')"
-    write (*,tmp) 'EXECUTION TIME', tm_exec
+! convert the execution time to days, hours, minutes, and seconds and print it
+!
+    tm(1) = tm_exec / 8.64d+04
+    tm(2) = mod(tm_exec / 3.6d+02, 2.4d+01)
+    tm(3) = mod(tm_exec / 6.0d+01, 6.0d+01)
+    tm(4) = mod(tm_exec, 6.0d+01)
+    tm(5) = nint((tm_exec - floor(tm_exec)) * 1.0d+03)
+    write (tmp,"(a)") "(1x,a14,20x,':',3x,i14,'d'" //                          &
+                                       ",i3.2,'h',i3.2,'m',i3.2,'.',i3.3,'s')"
+    write (*,tmp) 'EXECUTION TIME', int(tm(1:5))
 
   end if
 
