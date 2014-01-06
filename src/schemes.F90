@@ -386,7 +386,7 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
     use equations  , only : nv
 
 ! local variables are not implicit by default
@@ -417,25 +417,22 @@ module schemes
 
 ! perform update along the X direction
 !
-    do i = 2, im
+    do i = ibl, ieu
       du(:,i,:,:) = du(:,i,:,:) - dh(1) * (f(1,:,i,:,:) - f(1,:,i-1,:,:))
     end do
-    du(:,1,:,:) = du(:,1,:,:) - dh(1) * f(1,:,1,:,:)
 
 ! perform update along the Y direction
 !
-    do j = 2, jm
+    do j = jbl, jeu
       du(:,:,j,:) = du(:,:,j,:) - dh(2) * (f(2,:,:,j,:) - f(2,:,:,j-1,:))
     end do
-    du(:,:,1,:) = du(:,:,1,:) - dh(2) * f(2,:,:,1,:)
 
 #if NDIMS == 3
 ! perform update along the Z direction
 !
-    do k = 2, km
+    do k = kbl, keu
       du(:,:,:,k) = du(:,:,:,k) - dh(3) * (f(3,:,:,:,k) - f(3,:,:,:,k-1))
     end do
-    du(:,:,:,1) = du(:,:,:,1) - dh(3) * f(3,:,:,:,1)
 #endif /* NDIMS == 3 */
 
 #ifdef PROFILE
@@ -477,7 +474,7 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
 
@@ -523,8 +520,8 @@ module schemes
 
 !  calculate the flux along the X-direction
 !
-      do k = 1, km
-        do j = 1, jm
+      do k = kbl, keu
+        do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -544,15 +541,15 @@ module schemes
           f(imy,1:im,j,k) = fx(imy,1:im)
           f(imz,1:im,j,k) = fx(imz,1:im)
 
-        end do ! j = 1, jm
-      end do ! k = 1, km
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
 
     case(2)
 
 !  calculate the flux along the Y direction
 !
-      do k = 1, km
-        do i = 1, im
+      do k = kbl, keu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -572,16 +569,16 @@ module schemes
           f(imy,i,1:jm,k) = fy(imx,1:jm)
           f(imz,i,1:jm,k) = fy(imy,1:jm)
 
-        end do ! i = 1, im
-      end do ! k = 1, km
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
 
 #if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
 !
-      do j = 1, jm
-        do i = 1, im
+      do j = jbl, jeu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -601,8 +598,8 @@ module schemes
           f(imy,i,j,1:km) = fz(imz,1:km)
           f(imz,i,j,1:km) = fz(imx,1:km)
 
-        end do ! i = 1, im
-      end do ! j = 1, jm
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
 #endif /* NDIMS == 3 */
 
     end select
@@ -640,7 +637,7 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
 
@@ -686,8 +683,8 @@ module schemes
 
 !  calculate the flux along the X-direction
 !
-      do k = 1, km
-        do j = 1, jm
+      do k = kbl, keu
+        do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -709,15 +706,15 @@ module schemes
           f(imz,1:im,j,k) = fx(imz,1:im)
           f(ien,1:im,j,k) = fx(ien,1:im)
 
-        end do ! j = 1, jm
-      end do ! k = 1, km
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
 
     case(2)
 
 !  calculate the flux along the Y direction
 !
-      do k = 1, km
-        do i = 1, im
+      do k = kbl, keu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -739,16 +736,16 @@ module schemes
           f(imz,i,1:jm,k) = fy(imy,1:jm)
           f(ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do ! i = 1, im
-      end do ! k = 1, km
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
 
 #if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
 !
-      do j = 1, jm
-        do i = 1, im
+      do j = jbl, jeu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -770,8 +767,8 @@ module schemes
           f(imz,i,j,1:km) = fz(imx,1:km)
           f(ien,i,j,1:km) = fz(ien,1:km)
 
-        end do ! i = 1, im
-      end do ! j = 1, jm
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
 #endif /* NDIMS == 3 */
 
     end select
@@ -809,7 +806,7 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
     use equations  , only : ibx, iby, ibz, ibp
@@ -856,8 +853,8 @@ module schemes
 
 !  calculate the flux along the X-direction
 !
-      do k = 1, km
-        do j = 1, jm
+      do k = kbl, keu
+        do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -885,15 +882,15 @@ module schemes
           f(ibz,1:im,j,k) = fx(ibz,1:im)
           f(ibp,1:im,j,k) = fx(ibp,1:im)
 
-        end do ! j = 1, jm
-      end do ! k = 1, km
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
 
     case(2)
 
 !  calculate the flux along the Y direction
 !
-      do k = 1, km
-        do i = 1, im
+      do k = kbl, keu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -921,16 +918,16 @@ module schemes
           f(ibz,i,1:jm,k) = fy(iby,1:jm)
           f(ibp,i,1:jm,k) = fy(ibp,1:jm)
 
-        end do ! i = 1, im
-      end do ! k = 1, km
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
 
 #if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
 !
-      do j = 1, jm
-        do i = 1, im
+      do j = jbl, jeu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -958,8 +955,8 @@ module schemes
           f(ibz,i,j,1:km) = fz(ibx,1:km)
           f(ibp,i,j,1:km) = fz(ibp,1:km)
 
-        end do ! i = 1, im
-      end do ! j = 1, jm
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
 #endif /* NDIMS == 3 */
 
     end select
@@ -997,7 +994,7 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
     use equations  , only : ibx, iby, ibz, ibp
@@ -1044,8 +1041,8 @@ module schemes
 
 !  calculate the flux along the X-direction
 !
-      do k = 1, km
-        do j = 1, jm
+      do k = kbl, keu
+        do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -1075,15 +1072,15 @@ module schemes
           f(ibp,1:im,j,k) = fx(ibp,1:im)
           f(ien,1:im,j,k) = fx(ien,1:im)
 
-        end do
-      end do
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
 
     case(2)
 
 !  calculate the flux along the Y direction
 !
-      do k = 1, km
-        do i = 1, im
+      do k = kbl, keu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -1113,16 +1110,16 @@ module schemes
           f(ibp,i,1:jm,k) = fy(ibp,1:jm)
           f(ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do
-      end do
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
 
 #if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
 !
-      do j = 1, jm
-        do i = 1, im
+      do j = jbl, ieu
+        do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
@@ -1152,8 +1149,8 @@ module schemes
           f(ibp,i,j,1:km) = fz(ibp,1:km)
           f(ien,i,j,1:km) = fz(ien,1:km)
 
-        end do
-      end do
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
 #endif /* NDIMS == 3 */
 
     end select
