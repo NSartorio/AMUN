@@ -662,7 +662,6 @@ program amun
 ! get the execution time
 !
     tm_exec = get_timer_total()
-print *, tm_exec
 
 ! convert the execution time to days, hours, minutes, and seconds and print it
 !
