@@ -1030,12 +1030,12 @@ module boundaries
 !
   subroutine specific_boundaries(ilev, idir)
 
-! include external variables
+! import external procedures and variables
 !
-    use blocks        , only : block_meta, list_meta
-    use blocks        , only : nsides
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : nsides
 #ifdef MPI
-    use mpitools      , only : nproc
+    use mpitools       , only : nproc
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1062,7 +1062,7 @@ module boundaries
     call start_timer(ims)
 #endif /* PROFILE */
 
-! assign the pointer to the first block on the list
+! assign the pointer with the first block on the meta list
 !
     pmeta => list_meta
 
@@ -1096,7 +1096,7 @@ module boundaries
           end do ! sides
 
 #ifdef MPI
-        end if ! local process
+        end if ! block belong to the local process
 #endif /* MPI */
       end if ! leaf
 
