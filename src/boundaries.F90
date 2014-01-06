@@ -280,63 +280,41 @@ module boundaries
     call start_timer(imv)
 #endif /* PROFILE */
 
-! 1. FIRST FILL OUT THE CORNERS WITH THE EXTRAPOLATED VARIABLES
+! first, restrict the boundaries from higher to lower levels along each
+! direction
 !
-    call update_corners()
+    do idir = 1, ndims
+      do ilev = toplev, 1, -1
+        call restrict_boundaries(ilev, idir)
+      end do ! levels
+    end do ! directions
 
-! step down from the top level
+! then, copy the boundaries between blocks at the same level
 !
-    do ilev = toplev, 1, -1
-
-! iterate over all directions
-!
-      do idir = 1, ndims
-
-! update boundaries which don't have neighbors and which are not periodic
-!
-        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
-
-! copy boundaries between blocks at the same levels
-!
+    do idir = 1, ndims
+      do ilev = 1, toplev
         call copy_boundaries(ilev, idir)
+      end do ! levels
+    end do ! directions
 
-      end do ! directions
-
-! restrict blocks from higher level neighbours
+! finally, prolong boundaries from blocks at lower level to their higher level
+! neighbors
 !
-      do idir = 1, ndims
-
-        call restrict_boundaries(ilev - 1, idir)
-
-      end do
-
-    end do ! levels
-
-! step up from the first level
-!
-    do ilev = 1, toplev
-
-! prolong boundaries from lower level neighbours
-!
-      do idir = 1, ndims
-
+    do idir = 1, ndims
+      do ilev = 1, toplev
         call prolong_boundaries(ilev, idir)
+      end do ! levels
+    end do ! directions
 
-      end do
-
-      do idir = 1, ndims
-
-! update boundaries which don't have neighbors and which are not periodic
+! additionally, if specific boundary conditions are used, apply them too
 !
-        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
-
-! copy boundaries between blocks at the same levels
-!
-        call copy_boundaries(ilev, idir)
-
-      end do
-
-    end do ! levels
+    do idir = 1, ndims
+      if (.not. periodic(idir)) then
+        do ilev = 1, toplev
+          call specific_boundaries(ilev, idir)
+        end do ! levels
+      end if
+    end do ! directions
 
 #ifdef PROFILE
 ! stop accounting time for variable boundary update
