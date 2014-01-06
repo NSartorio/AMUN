@@ -636,10 +636,6 @@ program amun
 !
     tm_conv = 1.0d+02 / tm(1)
 
-! get the execution time
-!
-    tm_exec = get_timer_total()
-
 ! print one empty line
 !
     write (*,'(a)') ''
@@ -663,10 +659,15 @@ program amun
     write (*,tmp) 'TIME PER CPU  ', tm(1) / nprocs, 1.0d+02 / nprocs
 #endif /* MPI */
 
+! get the execution time
+!
+    tm_exec = get_timer_total()
+print *, tm_exec
+
 ! convert the execution time to days, hours, minutes, and seconds and print it
 !
     tm(1) = tm_exec / 8.64d+04
-    tm(2) = mod(tm_exec / 3.6d+02, 2.4d+01)
+    tm(2) = mod(tm_exec / 3.6d+03, 2.4d+01)
     tm(3) = mod(tm_exec / 6.0d+01, 6.0d+01)
     tm(4) = mod(tm_exec, 6.0d+01)
     tm(5) = nint((tm_exec - floor(tm_exec)) * 1.0d+03)
