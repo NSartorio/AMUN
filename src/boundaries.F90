@@ -280,10 +280,6 @@ module boundaries
     call start_timer(imv)
 #endif /* PROFILE */
 
-! 1. FIRST FILL OUT THE CORNERS WITH THE EXTRAPOLATED VARIABLES
-!
-    call update_corners()
-
 ! step down from the top level
 !
     do ilev = toplev, 1, -1
@@ -308,7 +304,7 @@ module boundaries
 
         call restrict_boundaries(ilev - 1, idir)
 
-      end do
+      end do ! directions
 
     end do ! levels
 
@@ -322,19 +318,7 @@ module boundaries
 
         call prolong_boundaries(ilev, idir)
 
-      end do
-
-      do idir = 1, ndims
-
-! update boundaries which don't have neighbors and which are not periodic
-!
-        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
-
-! copy boundaries between blocks at the same levels
-!
-        call copy_boundaries(ilev, idir)
-
-      end do
+      end do ! boundaries
 
     end do ! levels
 
