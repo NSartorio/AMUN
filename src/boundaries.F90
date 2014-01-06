@@ -1025,6 +1025,10 @@ module boundaries
 !   Subroutine scans over all leaf blocks in order to find blocks without
 !   neighbours, then updates the boundaries for selected type.
 !
+!   Arguments:
+!
+!     ilev - the level to be processed;
+!     idir - the direction to be processed;
 !
 !===============================================================================
 !
