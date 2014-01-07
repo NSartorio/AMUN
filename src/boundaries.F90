@@ -3103,6 +3103,210 @@ module boundaries
 !
 !===============================================================================
 !
+! subroutine BOUNDARY_PROLONG:
+! ---------------------------
+!
+!   Subroutine updates the data block boundaries by prolonging the data from
+!   the provided variable array.  The process of data restriction conserves
+!   stored variables.
+!
+!   Arguments:
+!
+!     pdata              - the input data block;
+!     u                  - the conserved array;
+!     idir, iside, iface - the positions of the neighbor block;
+!
+!===============================================================================
+!
+  subroutine boundary_prolong(pdata, u, idir, iside, iface)
+
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : ng, im, ih, ib, ie, ieu                        &
+                              , nd, jm, jh, jb, je, jeu                        &
+                              , nh, km, kh, kb, ke, keu
+    use equations      , only : nv
+    use interpolations , only : limiter
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer  , intent(inout) :: pdata
+    real   , dimension(:,:,:,:), intent(in)    :: u
+    integer                    , intent(in)    :: idir, iside, iface
+
+! local variables
+!
+    integer :: i, j, k, q
+    integer :: ic, jc, kc, ip, jp, kp
+    integer :: il, jl, kl, iu, ju, ku
+    integer :: is, js, ks, it, jt, kt
+    real    :: dul, dur, dux, duy, duz
+!
+!-------------------------------------------------------------------------------
+!
+! prepare indices depending on the direction
+!
+    select case(idir)
+
+    case(1)
+
+! X indices
+!
+      if (iside == 1) then
+        is = 1
+      else
+        is = ieu
+      end if
+
+      il = 2
+      iu = 1 + nh
+
+! Y indices
+!
+      jc = mod(iface - 1, 2)
+      js = jb
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = kb
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = ib
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
+
+! Y indices
+!
+      if (iside == 1) then
+        js = 1
+      else
+        js = jeu
+      end if
+
+      jl = 2
+      ju = 1 + nh
+
+#if NDIMS == 3
+! Z indices
+!
+      kc =    (iface - 1) / 2
+      ks = kb
+      kl = kb + (kh - ng) * kc
+      ku = kh + (kh - ng) * kc
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! X indices
+!
+      ic = mod(iface - 1, 2)
+      is = ib
+      il = ib + (ih - ng) * ic
+      iu = ih + (ih - ng) * ic
+
+! Y indices
+!
+      jc =    (iface - 1) / 2
+      js = jb
+      jl = jb + (jh - ng) * jc
+      ju = jh + (jh - ng) * jc
+
+! Z indices
+!
+      if (iside == 1) then
+        ks = 1
+      else
+        ks = keu
+      end if
+
+      kl = 2
+      ku = 1 + nh
+#endif /* NDIMS == 3 */
+
+    end select
+
+! update variable boundaries with the linear interpolation
+!
+#if NDIMS == 2
+    do k = 1, km
+      kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = kl, ku
+      kt = 2 * (k - kl) + ks
+      kp = kt + 1
+#endif /* NDIMS == 3 */
+      do j = jl, ju
+        jt = 2 * (j - jl) + js
+        jp = jt + 1
+        do i = il, iu
+          it = 2 * (i - il) + is
+          ip = it + 1
+
+! iterate over all variables
+!
+          do q = 1, nv
+
+            dul = u(q,i  ,j,k) - u(q,i-1,j,k)
+            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
+            dux = limiter(0.25d+00, dul, dur)
+
+            dul = u(q,i,j  ,k) - u(q,i,j-1,k)
+            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
+            duy = limiter(0.25d+00, dul, dur)
+
+#if NDIMS == 3
+            dul = u(q,i,j,k  ) - u(q,i,j,k-1)
+            dur = u(q,i,j,k+1) - u(q,i,j,k  )
+            duz = limiter(0.25d+00, dul, dur)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 2
+            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy)
+            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy)
+            pdata%u(q,it,jp,kt) = u(q,i,j,k) + (duy - dux)
+            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy + duz)
+            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy - duz)
+            pdata%u(q,it,jp,kt) = u(q,i,j,k) - (dux - duy + duz)
+            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy - duz)
+            pdata%u(q,it,jt,kp) = u(q,i,j,k) - (dux + duy - duz)
+            pdata%u(q,ip,jt,kp) = u(q,i,j,k) + (dux - duy + duz)
+            pdata%u(q,it,jp,kp) = u(q,i,j,k) - (dux - duy - duz)
+            pdata%u(q,ip,jp,kp) = u(q,i,j,k) + (dux + duy + duz)
+#endif /* NDIMS == 3 */
+
+          end do ! q - 1, nv
+
+        end do ! i = il, iu
+      end do ! j = jl, ju
+    end do ! k = kl, ku
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_prolong
+!
+!===============================================================================
+!
 ! correct_flux: subroutine copies the boundary flux from the neighbor at higher
 !               level and updates its own
 !
@@ -3276,334 +3480,6 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine correct_flux
-!
-!===============================================================================
-!
-! boundary_prolong: subroutine copies the prolongated interior of a neighbor in
-!                   order to update a boundary of the current block
-!
-!===============================================================================
-!
-  subroutine boundary_prolong(pdata, u, idir, iside, iface)
-
-    use blocks        , only : block_data
-    use coordinates   , only : ng, im, ih, ib, ie, ieu                         &
-                             , nd, jm, jh, jb, je, jeu                         &
-                             , nh, km, kh, kb, ke, keu
-    use equations     , only : nv
-    use interpolations, only : limiter
-
-    implicit none
-
-! arguments
-!
-    type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
-    integer                    , intent(in)    :: idir, iside, iface
-
-! local variables
-!
-    integer :: i, j, k, q
-    integer :: ic, jc, kc, ip, jp, kp
-    integer :: il, jl, kl, iu, ju, ku
-    integer :: is, js, ks, it, jt, kt
-    real    :: dul, dur, dux, duy, duz
-!
-!-------------------------------------------------------------------------------
-!
-! prepare indices
-!
-    select case(idir)
-
-    case(1)
-
-! X indices
-!
-      if (iside .eq. 1) then
-        is = 1
-      else
-        is = ieu
-      end if
-
-      il = 2
-      iu = 1 + nh
-
-! Y indices
-!
-      jc = mod(iface - 1, 2)
-      js = 1
-      jl = jb - nh + (jh - ng) * jc
-      ju = jh + nh + (jh - ng) * jc
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = 1
-      kl = kb - nh + (kh - ng) * kc
-      ku = kh + nh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-! update variable boundaries
-!
-#if NDIMS == 2
-      do k = 1, km
-        kt = 1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      do k = kl, ku
-        kt = 2 * (k - kl) + ks
-        kp = kt + 1
-#endif /* NDIMS == 3 */
-        do j = jl, ju
-          jt = 2 * (j - jl) + js
-          jp = jt + 1
-          do i = il, iu
-            it = 2 * (i - il) + is
-            ip = it + 1
-
-            pdata%u(:,it,jt,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
-            pdata%u(:,it,jp,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
-#if NDIMS == 3
-            pdata%u(:,it,jt,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
-            pdata%u(:,it,jp,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
-#endif /* NDIMS == 3 */
-          end do
-        end do
-      end do
-
-! Y indices
-!
-      jc = mod(iface - 1, 2)
-      js = jb
-      jl = jb + (jh - ng) * jc
-      ju = jh + (jh - ng) * jc
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = kb
-      kl = kb + (kh - ng) * kc
-      ku = kh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-    case(2)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = 1
-      il = ib - nh + (ih - ng) * ic
-      iu = ih + nh + (ih - ng) * ic
-
-! Y indices
-!
-      if (iside .eq. 1) then
-        js = 1
-      else
-        js = jeu
-      end if
-
-      jl = 2
-      ju = 1 + nh
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = 1
-      kl = kb - nh + (kh - ng) * kc
-      ku = kh + nh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-! update variable boundaries
-!
-#if NDIMS == 2
-      do k = 1, km
-        kt = 1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      do k = kl, ku
-        kt = 2 * (k - kl) + ks
-        kp = kt + 1
-#endif /* NDIMS == 3 */
-        do j = jl, ju
-          jt = 2 * (j - jl) + js
-          jp = jt + 1
-          do i = il, iu
-            it = 2 * (i - il) + is
-            ip = it + 1
-
-            pdata%u(:,it,jt,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
-            pdata%u(:,it,jp,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
-#if NDIMS == 3
-            pdata%u(:,it,jt,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
-            pdata%u(:,it,jp,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
-#endif /* NDIMS == 3 */
-          end do
-        end do
-      end do
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = ib
-      il = ib + (ih - ng) * ic
-      iu = ih + (ih - ng) * ic
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = kb
-      kl = kb + (kh - ng) * kc
-      ku = kh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = 1
-      il = ib - nh + (ih - ng) * ic
-      iu = ih + nh + (ih - ng) * ic
-
-! Y indices
-!
-      jc =    (iface - 1) / 2
-      js = 1
-      jl = jb - nh + (jh - ng) * jc
-      ju = jh + nh + (jh - ng) * jc
-
-! Z indices
-!
-      if (iside .eq. 1) then
-        ks = 1
-      else
-        ks = keu
-      end if
-
-      kl = 2
-      ku = 1 + nh
-
-! update variable boundaries
-!
-#if NDIMS == 2
-      do k = 1, km
-        kt = 1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      do k = kl, ku
-        kt = 2 * (k - kl) + ks
-        kp = kt + 1
-#endif /* NDIMS == 3 */
-        do j = jl, ju
-          jt = 2 * (j - jl) + js
-          jp = jt + 1
-          do i = il, iu
-            it = 2 * (i - il) + is
-            ip = it + 1
-
-            pdata%u(:,it,jt,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kt) = u(:,i,j,k)
-            pdata%u(:,it,jp,kt) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kt) = u(:,i,j,k)
-#if NDIMS == 3
-            pdata%u(:,it,jt,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jt,kp) = u(:,i,j,k)
-            pdata%u(:,it,jp,kp) = u(:,i,j,k)
-            pdata%u(:,ip,jp,kp) = u(:,i,j,k)
-#endif /* NDIMS == 3 */
-          end do
-        end do
-      end do
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = ib
-      il = ib + (ih - ng) * ic
-      iu = ih + (ih - ng) * ic
-
-! Y indices
-!
-      jc =    (iface - 1) / 2
-      js = jb
-      jl = jb + (jh - ng) * jc
-      ju = jh + (jh - ng) * jc
-#endif /* NDIMS == 3 */
-
-    end select
-
-! update variable boundaries with the linear interpolation
-!
-#if NDIMS == 2
-    do k = 1, km
-      kt = 1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    do k = kl, ku
-      kt = 2 * (k - kl) + ks
-      kp = kt + 1
-#endif /* NDIMS == 3 */
-      do j = jl, ju
-        jt = 2 * (j - jl) + js
-        jp = jt + 1
-        do i = il, iu
-          it = 2 * (i - il) + is
-          ip = it + 1
-
-          do q = 1, nv
-
-            dul = u(q,i  ,j,k) - u(q,i-1,j,k)
-            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
-            dux = limiter(0.25d+00, dul, dur)
-
-            dul = u(q,i,j  ,k) - u(q,i,j-1,k)
-            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
-            duy = limiter(0.25d+00, dul, dur)
-
-#if NDIMS == 3
-            dul = u(q,i,j,k  ) - u(q,i,j,k-1)
-            dur = u(q,i,j,k+1) - u(q,i,j,k  )
-            duz = limiter(0.25d+00, dul, dur)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 2
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy)
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy)
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) + (duy - dux)
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - dux - duy - duz
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + dux - duy - duz
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) - dux + duy - duz
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + dux + duy - duz
-            pdata%u(q,it,jt,kp) = u(q,i,j,k) - dux - duy + duz
-            pdata%u(q,ip,jt,kp) = u(q,i,j,k) + dux - duy + duz
-            pdata%u(q,it,jp,kp) = u(q,i,j,k) - dux + duy + duz
-            pdata%u(q,ip,jp,kp) = u(q,i,j,k) + dux + duy + duz
-#endif /* NDIMS == 3 */
-          end do
-        end do
-      end do
-    end do
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_prolong
 
 !===============================================================================
 !
