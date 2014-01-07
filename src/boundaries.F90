@@ -2613,6 +2613,228 @@ module boundaries
 !
 !===============================================================================
 !
+! subroutine BOUNDARY_SPECIFIC:
+! ----------------------------
+!
+!   Subroutine applies specific boundary conditions to the pointed data block.
+!
+!   Arguments:
+!
+!     pdata - the pointer to modified data block;
+!     idir  - the direction to be processed;
+!     iside - the side to be processed;
+!
+!===============================================================================
+!
+  subroutine boundary_specific(pdata, idir, iside)
+
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
+                            , jbl, je, jeu, kb, kbl, ke, keu
+    use equations      , only : nv
+    use equations      , only : idn, imx, imy, imz, ibx, iby, ibz, ibp
+    use error          , only : print_warning
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+    integer                  , intent(in)    :: idir, iside
+
+! local variables
+!
+    integer :: ii, i, j, k, it, jt, kt, is, js, ks
+!
+!-------------------------------------------------------------------------------
+!
+! prepare a direction/side index
+!
+    ii = 10 * idir + iside
+
+! perform update depending on the direction/side flag
+!
+    select case(ii)
+
+! left side along the X direction
+!
+    case(11)
+
+! apply selected boundary condition
+!
+      select case(xlbndry)
+
+      case("reflecting", "reflect")
+
+        do i = 1, ng
+
+          it = ib  - i
+          is = ibl + i
+
+          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
+          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do i = 1, ng
+          pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
+        end do
+
+      end select
+
+! right side along the X direction
+!
+    case(12)
+
+! apply selected boundary condition
+!
+      select case(xubndry)
+
+      case("reflecting", "reflect")
+
+        do i = 1, ng
+          it = ie  + i
+          is = ieu - i
+
+          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
+          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do i = ieu, im
+          pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
+        end do
+
+      end select
+
+! left side along the Y direction
+!
+    case(21)
+
+! apply selected boundary condition
+!
+      select case(ylbndry)
+
+      case("reflecting", "reflect")
+
+        do j = 1, ng
+          jt = jb  - j
+          js = jbl + j
+
+          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
+          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do j = 1, ng
+          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
+        end do
+
+      end select
+
+! right side along the Y direction
+!
+    case(22)
+
+! apply selected boundary condition
+!
+      select case(yubndry)
+
+      case("reflecting", "reflect")
+
+        do j = 1, ng
+          jt = je  + j
+          js = jeu - j
+
+          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
+          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do j = jeu, jm
+          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
+        end do
+
+      end select
+
+#if NDIMS == 3
+! left side along the Z direction
+!
+    case(31)
+
+! apply selected boundary condition
+!
+      select case(zlbndry)
+
+      case("reflecting", "reflect")
+
+        do k = 1, ng
+          kt = kb  - k
+          ks = kbl + k
+
+          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
+          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do k = 1, ng
+          pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
+        end do
+
+      end select
+
+! right side along the Z direction
+!
+    case(32)
+
+! apply selected boundary condition
+!
+      select case(zubndry)
+
+      case("reflecting", "reflect")
+
+        do k = 1, ng
+          kt = ke  + k
+          ks = keu - k
+
+          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
+          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+        end do
+
+      case default ! "open" as default boundary conditions
+
+        do k = keu, km
+          pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
+        end do
+
+      end select
+#endif /* NDIMS == 3 */
+
+    case default
+
+! print error if the direction/side flag is wrong
+!
+      call print_warning("boundaries::boundary_specific"                       &
+                       , "Wrong direction or side of the boundary condition!")
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_specific
+!
+!===============================================================================
+!
 ! correct_flux: subroutine copies the boundary flux from the neighbor at higher
 !               level and updates its own
 !
@@ -3368,199 +3590,6 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine boundary_prolong
-!
-!===============================================================================
-!
-! boundary_specific: subroutine applies specific boundary conditions to the
-!                    current block
-!
-!===============================================================================
-!
-  subroutine boundary_specific(pdata, idir, iside)
-
-    use blocks       , only : block_data
-    use coordinates  , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
-                            , jbl, je, jeu, kb, kbl, ke, keu
-    use equations    , only : idn, imx, imy, imz, ibx, iby, ibz, ibp
-    use error        , only : print_warning
-    use equations    , only : nv
-
-    implicit none
-
-! arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-    integer                  , intent(in)    :: idir, iside
-
-! local variables
-!
-    integer :: ii, i, j, k, it, jt, kt, is, js, ks
-!
-!-------------------------------------------------------------------------------
-!
-! calcuate the flag determinig the side of boundary to update
-!
-    ii = 10 * idir + iside
-
-! perform update according to the flag
-!
-    select case(ii)
-
-! left side along the X direction
-!
-    case(11)
-
-      select case(xlbndry)
-
-      case("reflecting", "reflect")
-
-        do i = 1, ng
-          it = ib  - i
-          is = ibl + i
-
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do i = 1, ng
-          pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
-        end do
-
-      end select
-
-! right side along the X direction
-!
-    case(12)
-
-      select case(xubndry)
-
-      case("reflecting", "reflect")
-
-        do i = 1, ng
-          it = ie  + i
-          is = ieu - i
-
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do i = ieu, im
-          pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
-        end do
-
-      end select
-
-! left side along the Y direction
-!
-    case(21)
-
-      select case(ylbndry)
-
-      case("reflecting", "reflect")
-
-        do j = 1, ng
-          jt = jb  - j
-          js = jbl + j
-
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do j = 1, ng
-          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
-        end do
-
-      end select
-
-! right side along the Y direction
-!
-    case(22)
-
-      select case(yubndry)
-
-      case("reflecting", "reflect")
-
-        do j = 1, ng
-          jt = je  + j
-          js = jeu - j
-
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do j = jeu, jm
-          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
-        end do
-
-      end select
-
-#if NDIMS == 3
-! left side along the Z direction
-!
-    case(31)
-
-      select case(zlbndry)
-
-      case("reflecting", "reflect")
-
-        do k = 1, ng
-          kt = kb  - k
-          ks = kbl + k
-
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do k = 1, ng
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
-        end do
-
-      end select
-
-! right side along the Z direction
-!
-    case(32)
-
-      select case(zubndry)
-
-      case("reflecting", "reflect")
-
-        do k = 1, ng
-          kt = ke  + k
-          ks = keu - k
-
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
-        end do
-
-      case default ! "open" as default boundary conditions
-
-        do k = keu, km
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
-        end do
-
-      end select
-#endif /* NDIMS == 3 */
-
-    case default
-      call print_warning("boundaries::boundary_specific"                       &
-                       , "Wrong direction or side of the boundary condition!")
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_specific
 
 !===============================================================================
 !
