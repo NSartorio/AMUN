@@ -258,7 +258,7 @@ module mesh
 !
     use blocks         , only : ndims, block_meta, list_meta
     use blocks         , only : get_mblocks, get_nleafs
-    use coordinates    , only : ng, im, jm, km, toplev, effres
+    use coordinates    , only : ng, nd, im, jm, km, toplev, effres
     use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
@@ -272,7 +272,7 @@ module mesh
 
 ! local variables
 !
-    integer(kind=4) :: l
+    integer(kind=4) :: l, n
     real(kind=8)    :: cv, ef
 
 ! local pointers
@@ -282,7 +282,8 @@ module mesh
 ! local saved variables
 !
     logical        , save :: first = .true.
-    integer(kind=4), save :: nm = 0, nl = 0, nt = 0, nc = 0
+    integer(kind=4), save :: nm = 0, nl = 0
+    real(kind=8)   , save :: fcv = 1.0d+00, fef = 1.0d+00
 
 ! local arrays
 !
@@ -311,6 +312,10 @@ module mesh
 !
         if (first) then
 
+! reset the maximum number of base blocks
+!
+          n = 0
+
 ! set the pointer to the first block on the meta block list
 !
           pmeta => list_meta
@@ -321,7 +326,7 @@ module mesh
 
 ! if the block is at the lowest level, count it
 !
-            if (pmeta%level == 1) nt = nt + 1
+            if (pmeta%level == 1) n = n + 1
 
 ! associate the pointer with the next block
 !
@@ -331,11 +336,16 @@ module mesh
 
 ! calculate the maximum block number
 !
-          nt = nt * 2**(ndims*(toplev - 1))
+          n = n * 2**(ndims*(toplev - 1))
 
-! calculate the number of cell in one block (including the ghost cells)
+! prepare coverage and efficiency factors
 !
-          nc = im * jm * km
+          fcv = 1.0d+00 / n
+          fef = 1.0d+00 * im / (effres(1) + nd)
+          fef =     fef * jm / (effres(2) + nd)
+#if NDIMS == 3
+          fef =     fef * km / (effres(3) + nd)
+#endif /* NDIMS == 3 */
 
 ! reset the first execution flag
 !
@@ -352,8 +362,8 @@ module mesh
 ! block number) and the efficiency (the cells count for adaptive mesh
 ! divided by the cell count for corresponding uniform mesh)
 !
-        cv = (1.0d+00 * nl) / nt
-        ef = (1.0d+00 * nl) * nc / product(effres(1:ndims) + 2 * ng)
+        cv = fcv * nl
+        ef = fef * nl
 
 ! initialize the level and process block counter
 !
