@@ -250,7 +250,7 @@ module boundaries
 ! subroutine BOUNDARY_VARIABLES:
 ! -----------------------------
 !
-!   Subroutine updates the ghost zones of the data blocks from their neighbours
+!   Subroutine updates the ghost zones of the data blocks from their neighbors
 !   or applies the specific boundary conditions.
 !
 !
@@ -298,7 +298,7 @@ module boundaries
 
       end do ! directions
 
-! restrict blocks from higher level neighbours
+! restrict blocks from higher level neighbors
 !
       do idir = 1, ndims
 
@@ -312,7 +312,7 @@ module boundaries
 !
     do ilev = 1, toplev
 
-! prolong boundaries from lower level neighbours
+! prolong boundaries from lower level neighbors
 !
       do idir = 1, ndims
 
@@ -1023,7 +1023,7 @@ module boundaries
 ! ------------------------------
 !
 !   Subroutine scans over all leaf blocks in order to find blocks without
-!   neighbours, then updates the boundaries for selected type.
+!   neighbors, then updates the boundaries for selected type.
 !
 !   Arguments:
 !
@@ -1088,11 +1088,11 @@ module boundaries
 !
           do iside = 1, nsides
 
-! assign a neighbour pointer to the current neighbour
+! assign a neighbor pointer to the current neighbor
 !
             pneigh => pmeta%neigh(idir,iside,1)%ptr
 
-! make sure that the neighbour is not associated, then apply specific boundaries
+! make sure that the neighbor is not associated, then apply specific boundaries
 !
             if (.not. associated(pneigh))                                      &
                                call boundary_specific(pmeta%data, idir, iside)
@@ -1591,7 +1591,7 @@ module boundaries
 ! subroutine RESTRICT_BOUNDARIES:
 ! ------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find neighbours at
+!   Subroutine scans over all leaf blocks in order to find neighbors at
 !   different levels, then updates the boundaries of blocks at lower levels by
 !   restricting variables from higher level blocks.
 !
@@ -1791,7 +1791,7 @@ module boundaries
 #ifdef MPI
                   end if ! block on the current processor
 
-                else ! block and neighbour on different processors
+                else ! block and neighbor on different processors
 
 ! increase the counter for number of blocks to exchange
 !
@@ -1825,12 +1825,12 @@ module boundaries
 !
                   block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
 
-                end if ! block and neighbour on different processors
+                end if ! block and neighbor on different processors
 #endif /* MPI */
 
-              end if ! block at lower level than neighbour
+              end if ! block at lower level than neighbor
 
-            end if ! neighbour associated
+            end if ! neighbor associated
 
           end do ! faces
         end do ! sides
