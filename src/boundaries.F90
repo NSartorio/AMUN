@@ -3484,7 +3484,7 @@ module boundaries
           j2 = j1 + 1
 
           pdata%f(idir,:,i,j,kt) = 2.5d-01 * (f(:,i1,j1) + f(:,i2,j1)          &
-                                           + f(:,i1,j2) + f(:,i2,j2))
+                                            + f(:,i1,j2) + f(:,i2,j2))
         end do
       end do
 #endif /* NDIMS == 3 */
