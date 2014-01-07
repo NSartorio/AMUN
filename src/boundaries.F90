@@ -2835,6 +2835,78 @@ module boundaries
 !
 !===============================================================================
 !
+! subroutine BOUNDARY_COPY:
+! ------------------------
+!
+!   Subroutine updates boundaries by copying them from the provided array.
+!
+!   Arguments:
+!
+!     pdata - the pointer to modified data block;
+!     u     - the variable array from which boundaries are updated;
+!     idir  - the direction to be processed;
+!     iside - the side to be processed;
+!
+!===============================================================================
+!
+  subroutine boundary_copy(pdata, u, idir, iside)
+
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer  , intent(inout) :: pdata
+    real   , dimension(:,:,:,:), intent(in)    :: u
+    integer                    , intent(in)    :: idir, iside
+!
+!-------------------------------------------------------------------------------
+!
+! update boundaries depending on the direction
+!
+    select case(idir)
+
+    case(1)
+
+      if (iside == 1) then
+        pdata%u(1:nv,  1:ibl,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+      else
+        pdata%u(1:nv,ieu:im ,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+      end if
+
+    case(2)
+
+      if (iside == 1) then
+        pdata%u(1:nv,1:im,  1:jbl,1:km) = u(1:nv,1:im,1:ng,1:km)
+      else
+        pdata%u(1:nv,1:im,jeu:jm ,1:km) = u(1:nv,1:im,1:ng,1:km)
+      end if
+
+#if NDIMS == 3
+    case(3)
+
+      if (iside == 1) then
+        pdata%u(1:nv,1:im,1:jm,  1:kbl) = u(1:nv,1:im,1:jm,1:ng)
+      else
+        pdata%u(1:nv,1:im,1:jm,keu:km ) = u(1:nv,1:im,1:jm,1:ng)
+      end if
+#endif /* NDIMS == 3 */
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_copy
+!
+!===============================================================================
+!
 ! correct_flux: subroutine copies the boundary flux from the neighbor at higher
 !               level and updates its own
 !
@@ -3008,63 +3080,6 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine correct_flux
-!
-!===============================================================================
-!
-! boundary_copy: subroutine copies the interior of neighbor to update
-!                a boundary of the current block
-!
-!===============================================================================
-!
-  subroutine boundary_copy(pdata, u, idir, iside)
-
-    use blocks   , only : block_data
-    use coordinates, only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
-    use equations, only : nv
-
-    implicit none
-
-! input arguments
-!
-    type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
-    integer                    , intent(in)    :: idir, iside
-!
-!-------------------------------------------------------------------------------
-!
-    select case(idir)
-
-    case(1)
-
-      if (iside .eq. 1) then
-        pdata%u(1:nv,  1:ibl,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
-      else
-        pdata%u(1:nv,ieu:im ,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
-      end if
-
-    case(2)
-
-      if (iside .eq. 1) then
-        pdata%u(1:nv,1:im,  1:jbl,1:km) = u(1:nv,1:im,1:ng,1:km)
-      else
-        pdata%u(1:nv,1:im,jeu:jm ,1:km) = u(1:nv,1:im,1:ng,1:km)
-      end if
-
-#if NDIMS == 3
-    case(3)
-
-      if (iside .eq. 1) then
-        pdata%u(1:nv,1:im,1:jm,  1:kbl) = u(1:nv,1:im,1:jm,1:ng)
-      else
-        pdata%u(1:nv,1:im,1:jm,keu:km ) = u(1:nv,1:im,1:jm,1:ng)
-      end if
-#endif /* NDIMS == 3 */
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_copy
 !
 !===============================================================================
 !
