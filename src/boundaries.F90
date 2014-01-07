@@ -1595,30 +1595,31 @@ module boundaries
 !   different levels, then updates the boundaries of blocks at lower levels by
 !   restricting variables from higher level blocks.
 !
+!   Arguments:
+!
+!     ilev - the level to be processed;
+!     idir - the direction to be processed;
 !
 !===============================================================================
 !
   subroutine restrict_boundaries(ilev, idir)
 
-! include external procedures
+! import external procedures and variables
 !
+    use blocks         , only : ndims, nsides, nfaces
+    use blocks         , only : block_meta, block_data, list_meta
+    use blocks         , only : block_info, pointer_info
+    use coordinates    , only : toplev
+    use coordinates    , only : ng, nd, nh, im, jm, km
+    use coordinates    , only : ib, jb, kb, ie, je, ke
+    use coordinates    , only : ibu, jbu, kbu, iel, jel, kel
 #ifdef MPI
-    use mpitools      , only : send_real_array, receive_real_array
+    use equations      , only : nv
 #endif /* MPI */
-
-! include external variables
-!
-    use blocks        , only : ndims, nsides, nfaces
-    use blocks        , only : block_meta, block_data, list_meta
-    use blocks        , only : block_info, pointer_info
-    use coordinates   , only : toplev
-    use coordinates   , only : ng, nd, nh, im, jm, km
-    use coordinates   , only : ib, jb, kb, ie, je, ke
-    use coordinates   , only : ibu, jbu, kbu, iel, jel, kel
-    use mpitools      , only : periodic
+    use mpitools       , only : periodic
 #ifdef MPI
-    use mpitools      , only : nproc, nprocs, npmax
-    use equations     , only : nv
+    use mpitools       , only : nproc, nprocs, npmax
+    use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1629,6 +1630,14 @@ module boundaries
 !
     integer, intent(in) :: ilev, idir
 
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh
+    type(block_data), pointer :: pdata
+#ifdef MPI
+    type(block_info), pointer :: pinfo
+#endif /* MPI */
+
 ! local variables
 !
     integer :: iside, iface, nside, nface, level
@@ -1637,19 +1646,14 @@ module boundaries
 #ifdef MPI
     integer :: isend, irecv, nblocks, itag, l
 
+! local pointer arrays
+!
+    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
+
 ! local arrays
 !
     integer     , dimension(0:npmax,0:npmax)        :: block_counter
     real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-    type(block_data), pointer :: pdata
-#ifdef MPI
-    type(block_info), pointer :: pinfo
-    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -1661,24 +1665,30 @@ module boundaries
 #endif /* PROFILE */
 
 #ifdef MPI
+!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
+!!
 ! reset the exchange block counters
 !
     block_counter(:,:) = 0
 
 ! nullify the info pointers
 !
-    do irecv = 0, nprocs - 1
-      do isend = 0, nprocs - 1
+    do irecv = 0, npmax
+      do isend = 0, npmax
         nullify(block_array(irecv,isend)%ptr)
       end do
     end do
 #endif /* MPI */
 
-! assign the pointer to the first meta block on in the list
+!! 2. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME PROCESS
+!!    AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
+!!    DIFFERENT PROCESSES
+!!
+! assign the pointer to the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks until the last is reached
+! iterate over all meta blocks
 !
     do while(associated(pmeta))
 
@@ -1686,138 +1696,144 @@ module boundaries
 !
       if (pmeta%leaf .and. pmeta%level == ilev) then
 
-! scan over all directions, sides and faces
+! process all sides and faces
 !
-!         do idir = 1, ndims
-          do iside = 1, nsides
-            do iface = 1, nfaces
+        do iside = 1, nsides
+          do iface = 1, nfaces
 
-! assign a neighbour pointer to the neighbour
+! assign the pointer to the current neighbor
 !
-              pneigh => pmeta%neigh(idir,iside,iface)%ptr
+            pneigh => pmeta%neigh(idir,iside,iface)%ptr
 
-! check if the neighbour is associated
+! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
-! if the neighbour is at the higher level
+! continue, if the neighbor is at the higher level
 !
-                if (pmeta%level < pneigh%level) then
+              if (pmeta%level < pneigh%level) then
 
 #ifdef MPI
-! check if the current meta block and its neighbour belong to the same processor
+! check if the current meta block and its neighbor belong to the same process
 !
-                  if (pmeta%cpu == pneigh%cpu) then
+                if (pmeta%cpu == pneigh%cpu) then
 
-! check if the current meta block lays on the current processors
+! check if the current meta block belongs to the current process
 !
-                    if (pmeta%cpu == nproc) then
+                  if (pmeta%cpu == nproc) then
 #endif /* MPI */
 
-! prepare indices of the neighbour array
+! process each direction separatelly
 !
-                      select case(idir)
-                        case(1)
-                          if (iside .eq. 1) then
-                            il = ie - nd + 1
-                            iu = ie
-                          else
-                            il = ib
-                            iu = ib + nd - 1
-                          end if
-                          jl = 1
-                          ju = jm
-                          kl = 1
-                          ku = km
+                    select case(idir)
 
-                        case(2)
-                          if (iside .eq. 1) then
-                            jl = je - nd + 1
-                            ju = je
-                          else
-                            jl = jb
-                            ju = jb + nd - 1
-                          end if
-                          il = 1
-                          iu = im
-                          kl = 1
-                          ku = km
+                      case(1)
+
+! prepare indices of the neighbor slices used for the boundary update
+!
+                        if (iside == 1) then
+                          il = ie - nd + 1
+                          iu = ie
+                        else
+                          il = ib
+                          iu = ib + nd - 1
+                        end if
+                        jl = 1
+                        ju = jm
+                        kl = 1
+                        ku = km
+
+                      case(2)
+
+! prepare indices of the neighbor slices used for the boundary update
+!
+                        if (iside == 1) then
+                          jl = je - nd + 1
+                          ju = je
+                        else
+                          jl = jb
+                          ju = jb + nd - 1
+                        end if
+                        il = 1
+                        iu = im
+                        kl = 1
+                        ku = km
 
 #if NDIMS == 3
-                        case(3)
-                          if (iside .eq. 1) then
-                            kl = ke - nd + 1
-                            ku = ke
-                          else
-                            kl = kb
-                            ku = kb + nd - 1
-                          end if
-                          il = 1
-                          iu = im
-                          jl = 1
-                          ju = jm
+                      case(3)
+
+! prepare indices of the neighbor slices used for the boundary update
+!
+                        if (iside == 1) then
+                          kl = ke - nd + 1
+                          ku = ke
+                        else
+                          kl = kb
+                          ku = kb + nd - 1
+                        end if
+                        il = 1
+                        iu = im
+                        jl = 1
+                        ju = jm
 #endif /* NDIMS == 3 */
-                      end select
+                    end select
 
-! assign a pointer to the data structure of the current block
+! assign a pointer to the associate data block
 !
-                      pdata  => pmeta%data
+                    pdata  => pmeta%data
 
-! update the boundaries of the current block
+! update boundaries of the current block
 !
-                      call boundary_restrict(pdata                             &
+                    call boundary_restrict(pdata                               &
                                          , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
                                                         , idir, iside, iface)
 
 #ifdef MPI
-                    end if ! block on the current processor
+                  end if ! block on the current processor
 
-                  else ! block and neighbour on different processors
+                else ! block and neighbour on different processors
 
 ! increase the counter for number of blocks to exchange
 !
-                      block_counter(pmeta%cpu,pneigh%cpu) =                    &
+                  block_counter(pmeta%cpu,pneigh%cpu) =                        &
                                        block_counter(pmeta%cpu,pneigh%cpu) + 1
 
 ! allocate a new info object
 !
-                      allocate(pinfo)
+                  allocate(pinfo)
 
 ! fill out its fields
 !
-                      pinfo%block            => pmeta
-                      pinfo%neigh            => pneigh
-                      pinfo%direction        =  idir
-                      pinfo%side             =  iside
-                      pinfo%face             =  iface
-                      pinfo%level_difference =  pmeta%level - pneigh%level
+                  pinfo%block            => pmeta
+                  pinfo%neigh            => pneigh
+                  pinfo%direction        =  idir
+                  pinfo%side             =  iside
+                  pinfo%face             =  iface
+                  pinfo%level_difference =  pmeta%level - pneigh%level
 
 ! nullify pointers
 !
-                      nullify(pinfo%prev)
-                      nullify(pinfo%next)
+                  nullify(pinfo%prev)
+                  nullify(pinfo%next)
 
 ! if the list is not empty append the created block
 !
-                      if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr)) then
-                        pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
-                        nullify(pinfo%next)
-                      end if
+                  if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr))       &
+                           pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
 
 ! point the list to the last created block
 !
-                      block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                  block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
 
-                  end if ! block and neighbour on different processors
+                end if ! block and neighbour on different processors
 #endif /* MPI */
 
-                end if ! block at lower level than neighbour
+              end if ! block at lower level than neighbour
 
-              end if ! neighbour associated
+            end if ! neighbour associated
 
-            end do ! faces
-          end do ! sides
-!         end do ! directions
+          end do ! faces
+        end do ! sides
 
       end if ! leaf
 
@@ -1828,153 +1844,247 @@ module boundaries
     end do ! meta blocks
 
 #ifdef MPI
+!! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
+!!
 ! iterate over sending and receiving processors
 !
-        do irecv = 0, npmax
-          do isend = 0, npmax
+    do irecv = 0, npmax
+      do isend = 0, npmax
 
-!! process blocks with the neighbors at higher levels
-!!
 ! process only pairs which have boundaries to exchange
 !
-            if (block_counter(irecv,isend) .gt. 0) then
+        if (block_counter(irecv,isend) > 0) then
 
 ! obtain the number of blocks to exchange
 !
-              nblocks = block_counter(irecv,isend)
+          nblocks = block_counter(irecv,isend)
 
 ! prepare the tag for communication
 !
-              itag = 10 * (irecv * nprocs + isend + 1) + 2
+          itag = 10 * (irecv * nprocs + isend + 1) + 2
 
-! allocate space for variables
+! allocate data buffer for block variable exchange
 !
-              select case(idir)
-              case(1)
-                allocate(rbuf(nblocks,nv,nd,jm,km))
-              case(2)
-                allocate(rbuf(nblocks,nv,im,nd,km))
-              case(3)
-                allocate(rbuf(nblocks,nv,im,jm,nd))
-              end select
+          select case(idir)
+          case(1)
+            allocate(rbuf(nblocks,nv,nd,jm,km))
+          case(2)
+            allocate(rbuf(nblocks,nv,im,nd,km))
+          case(3)
+            allocate(rbuf(nblocks,nv,im,jm,nd))
+          end select
 
 ! if isend == nproc we are sending data
 !
-              if (isend .eq. nproc) then
+          if (isend == nproc) then
 
-! fill out the buffer with block data
+! reset the block counter
 !
-                l = 1
+            l = 0
 
-                pinfo => block_array(irecv,isend)%ptr
-                do while(associated(pinfo))
-
-! prepare indices of the neighbor array
+! process each direction separately
 !
-                  select case(idir)
-                  case(1)
-                    if (pinfo%side .eq. 1) then
-                      il = ie - nd + 1
-                      iu = ie
-                    else
-                      il = ib
-                      iu = ib + nd - 1
-                    end if
+            select case(idir)
 
-                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+            case(1)
 
-                  case(2)
-                    if (pinfo%side .eq. 1) then
-                      jl = je - nd + 1
-                      ju = je
-                    else
-                      jl = jb
-                      ju = jb + nd - 1
-                    end if
-
-                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
-
-                  case(3)
-                    if (pinfo%side .eq. 1) then
-                      kl = ke - nd + 1
-                      ku = ke
-                    else
-                      kl = kb
-                      ku = kb + nd - 1
-                    end if
-
-                    rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
-                  end select
-
-                  pinfo => pinfo%prev
-                  l = l + 1
-                end do
-
-! send data buffer
+! associate the pointer with the first block in the exchange list
 !
-                call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
+              pinfo => block_array(irecv,isend)%ptr
 
-              end if
+! iterate over exchange blocks and fill out the data buffer with the block
+! variables
+!
+              do while(associated(pinfo))
+
+! increase the block counter
+!
+                l = l + 1
+
+! prepare slice indices depending on the side
+!
+                if (pinfo%side == 1) then
+                  il = ie - nd + 1
+                  iu = ie
+                else
+                  il = ib
+                  iu = ib + nd - 1
+                end if
+
+! fill the data buffer with the current block variable slices
+!
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+
+! associate the pointer with the next block
+!
+                pinfo => pinfo%prev
+
+              end do ! %ptr block list
+
+            case(2)
+
+! associate the pointer with the first block in the exchange list
+!
+              pinfo => block_array(irecv,isend)%ptr
+
+! iterate over exchange blocks and fill out the data buffer with the block
+! variables
+!
+              do while(associated(pinfo))
+
+! increase the block counter
+!
+                l = l + 1
+
+! prepare slice indices depending on the side
+!
+                if (pinfo%side == 1) then
+                  jl = je - nd + 1
+                  ju = je
+                else
+                  jl = jb
+                  ju = jb + nd - 1
+                end if
+
+! fill the data buffer with the current block variable slices
+!
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+
+! associate the pointer with the next block
+!
+                pinfo => pinfo%prev
+
+              end do ! %ptr block list
+
+#if NDIMS == 3
+            case(3)
+
+! associate the pointer with the first block in the exchange list
+!
+              pinfo => block_array(irecv,isend)%ptr
+
+! iterate over exchange blocks and fill out the data buffer with the block
+! variables
+!
+              do while(associated(pinfo))
+
+! increase the block counter
+!
+                l = l + 1
+
+! prepare slice indices depending on the side
+!
+                if (pinfo%side == 1) then
+                  kl = ke - nd + 1
+                  ku = ke
+                else
+                  kl = kb
+                  ku = kb + nd - 1
+                end if
+
+! fill the data buffer with the current block variable slices
+!
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+
+! associate the pointer with the next block
+!
+                pinfo => pinfo%prev
+
+              end do ! %ptr block list
+#endif /* NDIMS == 3 */
+
+            end select
+
+! send the data buffer to another process
+!
+            call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
+
+          end if ! irecv = nproc
 
 ! if irecv == nproc we are receiving data
 !
-              if (irecv .eq. nproc) then
+          if (irecv == nproc) then
 
-! receive data
+! receive the data buffer
 !
-                call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag, rbuf(:,:,:,:,:), iret)
+            call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag         &
+                                                      , rbuf(:,:,:,:,:), iret)
 
-! iterate over all received blocks and update boundaries
+! reset the block counter
 !
-                l = 1
+            l = 0
 
-                pinfo => block_array(irecv,isend)%ptr
-                do while(associated(pinfo))
-
-! set indices
+! associate the pointer with the first block in the exchange list
 !
-                  iside = pinfo%side
-                  iface = pinfo%face
+            pinfo => block_array(irecv,isend)%ptr
 
-! assign a pointer to the data structure of the current block
+! iterate over all received blocks and update boundaries of the corresponding
+! data blocks
 !
-                  pdata => pinfo%block%data
+            do while(associated(pinfo))
+
+! increase the block counter
+!
+              l = l + 1
+
+! set side and face indices
+!
+              iside = pinfo%side
+              iface = pinfo%face
+
+! assign a pointer to the associated data block
+!
+              pdata => pinfo%block%data
 
 ! update the boundaries of the current block
 !
-                  call boundary_restrict(pdata, rbuf(l,:,:,:,:)                &
-                                                         , idir, iside, iface)
+              call boundary_restrict(pdata, rbuf(l,:,:,:,:), idir, iside, iface)
 
-                  pinfo => pinfo%prev
-                  l = l + 1
-                end do
-
-              end if
-
-! deallocate buffers
+! associate the pointer with the next block
 !
-              if (allocated(rbuf)) deallocate(rbuf)
+              pinfo => pinfo%prev
 
-! deallocate info blocks
+            end do ! %ptr block list
+
+          end if ! irecv = nproc
+
+! deallocate data buffer
 !
-              pinfo => block_array(irecv,isend)%ptr
-              do while(associated(pinfo))
-                block_array(irecv,isend)%ptr => pinfo%prev
+          if (allocated(rbuf)) deallocate(rbuf)
 
-                nullify(pinfo%prev)
-                nullify(pinfo%next)
-                nullify(pinfo%block)
-                nullify(pinfo%neigh)
+! associate the pointer with the first block in the exchange list
+!
+          pinfo => block_array(irecv,isend)%ptr
 
-                deallocate(pinfo)
+! scan over all blocks on the exchange block list
+!
+          do while(associated(pinfo))
 
-                pinfo => block_array(irecv,isend)%ptr
-              end do
+! associate the exchange list pointer
+!
+            block_array(irecv,isend)%ptr => pinfo%prev
 
-            end if ! if block_count > 0
+! nullify the pointer fields
+!
+            nullify(pinfo%prev)
+            nullify(pinfo%next)
+            nullify(pinfo%block)
+            nullify(pinfo%neigh)
 
-          end do ! isend
-        end do ! irecv
+! deallocate the object
+!
+            deallocate(pinfo)
+
+! associate the pointer with the next block
+!
+            pinfo => block_array(irecv,isend)%ptr
+
+          end do ! %ptr block list
+
+        end if ! if block_count > 0
+
+      end do ! isend
+    end do ! irecv
 #endif /* MPI */
 
 #ifdef PROFILE
