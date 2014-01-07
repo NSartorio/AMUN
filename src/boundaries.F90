@@ -358,7 +358,7 @@ module boundaries
     use coordinates    , only : ibl, ie, jbl, je, kbl, ke
 #ifdef MPI
     use equations      , only : nv
-    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : nprocs, nproc, npmax
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -415,8 +415,8 @@ module boundaries
 
 ! nullify pointers to blocks which need to be exchanged between processes
 !
-    do irecv = 0, nprocs - 1
-      do isend = 0, nprocs - 1
+    do irecv = 0, npmax
+      do isend = 0, npmax
         do idir = 1, ndims
           nullify(block_array(idir,irecv,isend)%ptr)
         end do ! idir
@@ -580,8 +580,8 @@ module boundaries
 #ifdef MPI
 ! iterate over sending and receiving processes
 !
-    do irecv = 0, nprocs - 1
-      do isend = 0, nprocs - 1
+    do irecv = 0, npmax
+      do isend = 0, npmax
         do idir = 1, ndims
 
 ! process only pairs which have anything to exchange
