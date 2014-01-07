@@ -3307,18 +3307,36 @@ module boundaries
 !
 !===============================================================================
 !
-! correct_flux: subroutine copies the boundary flux from the neighbor at higher
-!               level and updates its own
+! subroutine CORRECT_FLUX:
+! -----------------------
+!
+!   Subroutine updates the boundary flux from the provided flux array.
+!
+!   Arguments:
+!
+!     pdata              - the input data block;
+!     f                  - the flux array;
+!     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
   subroutine correct_flux(pdata, f, idir, iside, iface)
 
-    use blocks   , only : block_data
-    use coordinates, only : ng, in, jn, kn, ih, jh, kh                         &
-                          , ib, ie, ibl, jb, je, jbl, kb, ke, kbl
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : ng, in, jn, kn, ih, jh, kh                     &
+                              , ib, jb, kb, ie, je, ke, ibl, jbl, kbl
 
+! local variables are not implicit by default
+!
     implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer         , intent(inout) :: pdata
+    real            , dimension(:,:,:), intent(in)    :: f
+    integer                           , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
@@ -3327,14 +3345,10 @@ module boundaries
 #if NDIMS == 3
     integer :: k, kc, kt, kl, ku, k1, k2
 #endif /* NDIMS == 3 */
-
-! arguments
-!
-    type(block_data), pointer         , intent(inout) :: pdata
-    real            , dimension(:,:,:), intent(in)    :: f
-    integer                           , intent(in)    :: idir, iside, iface
 !
 !-------------------------------------------------------------------------------
+!
+! update fluxes for each direction separately
 !
     select case(idir)
 
@@ -3344,9 +3358,9 @@ module boundaries
 
 ! index of the slice which will be updated
 !
-      if (iside .eq. 1) then ! left side
+      if (iside == 1) then ! left side
         it = ibl
-      else                   ! right side
+      else                 ! right side
         it = ie
       end if
 
@@ -3373,15 +3387,15 @@ module boundaries
         j2 = j1 + 1
 
 #if NDIMS == 2
-        pdata%f(idir,:,it,j,:) = 0.5d0 * (f(:,j1,:) + f(:,j2,:))
+        pdata%f(idir,:,it,j,:) = 5.0d-01 * (f(:,j1,:) + f(:,j2,:))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
         do k = kl, ku
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,it,j,k) = 0.25d0 * (f(:,j1,k1) + f(:,j2,k1)           &
-                                           + f(:,j1,k2) + f(:,j2,k2))
+          pdata%f(idir,:,it,j,k) = 2.5d-01 * (f(:,j1,k1) + f(:,j2,k1)          &
+                                            + f(:,j1,k2) + f(:,j2,k2))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3392,9 +3406,9 @@ module boundaries
 
 ! index of the slice which will be updated
 !
-      if (iside .eq. 1) then ! left side
+      if (iside == 1) then ! left side
         jt = jbl
-      else                   ! right side
+      else                 ! right side
         jt = je
       end if
 
@@ -3421,15 +3435,15 @@ module boundaries
         i2 = i1 + 1
 
 #if NDIMS == 2
-        pdata%f(idir,:,i,jt,:) = 0.5d0 * (f(:,i1,:) + f(:,i2,:))
+        pdata%f(idir,:,i,jt,:) = 5.0d-01 * (f(:,i1,:) + f(:,i2,:))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
         do k = kl, ku
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,i,jt,k) = 0.25d0 * (f(:,i1,k1) + f(:,i2,k1)           &
-                                           + f(:,i1,k2) + f(:,i2,k2))
+          pdata%f(idir,:,i,jt,k) = 2.5d-01 * (f(:,i1,k1) + f(:,i2,k1)          &
+                                            + f(:,i1,k2) + f(:,i2,k2))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3441,9 +3455,9 @@ module boundaries
 
 ! index of the slice which will be updated
 !
-      if (iside .eq. 1) then ! left side
+      if (iside == 1) then ! left side
         kt = kbl
-      else                   ! right side
+      else                 ! right side
         kt = ke
       end if
 
@@ -3469,7 +3483,7 @@ module boundaries
           j1 = 2 * (j - jl) + jb
           j2 = j1 + 1
 
-          pdata%f(idir,:,i,j,kt) = 0.25d0 * (f(:,i1,j1) + f(:,i2,j1)           &
+          pdata%f(idir,:,i,j,kt) = 2.5d-01 * (f(:,i1,j1) + f(:,i2,j1)          &
                                            + f(:,i1,j2) + f(:,i2,j2))
         end do
       end do
