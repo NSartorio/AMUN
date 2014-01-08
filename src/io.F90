@@ -2592,7 +2592,7 @@ module io
 !
     implicit none
 
-! input variables
+! subroutine variables
 !
     integer(hid_t), intent(in) :: fid
 
@@ -2749,49 +2749,55 @@ module io
 !
 !===============================================================================
 !
-! read_datablocks_h5: subroutine restored datablocks from the HDF5 restart file
+! subroutine READ_DATABLOCKS_H5:
+! -----------------------------
 !
-! info: this subroutine restores only the datablocks
+!   Subroutine reads all data blocks stored in the group 'datablocks' of
+!   the provided handler to the HDF5 restart file.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
   subroutine read_datablocks_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : append_datablock, link_blocks
-    use coordinates, only : im, jm, km
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f
+    use blocks         , only : block_meta, block_data, list_data
+    use blocks         , only : append_datablock, link_blocks
+    use coordinates    , only : im, jm, km
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine variables
 !
-    integer(hid_t), intent(in) :: fid
+    integer(hid_t), intent(in)     :: fid
+
+! local pointers
+!
+    type(block_data), pointer      :: pdata
 
 ! local variables
 !
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
     integer                        :: err
+
+! local arrays
+!
     integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)        , allocatable :: m
-    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: u
-
-! local pointers
-!
-    type(block_data), pointer :: pdata
+    integer(kind=4), dimension(:)        , allocatable :: id
+    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: uv, qv
 !
 !-------------------------------------------------------------------------------
 !
@@ -2799,29 +2805,31 @@ module io
 !
     call read_datablock_dims_h5(fid, dm(:))
 
-! open the datablock group
+! open the group 'datablocks'
 !
     call h5gopen_f(fid, 'datablocks', gid, err)
 
 ! check if the datablock group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
-! restore all data blocks
+! restore data blocks only if there are any
 !
-      if (dm(1) .gt. 0) then
+      if (dm(1) > 0) then
 
-! allocate array to restore datablocks data
+! allocate arrays to read data
 !
-        allocate(m(dm(1)))
-        allocate(u(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(id(dm(1)))
+        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
-! read datablocks from the HDF5 file
+! read array data from the HDF5 file
 !
-        call read_vector_integer_h5(gid, 'meta', dm(1:1), m(:))
-        call read_array5_double_h5 (gid, 'u'   , dm(1:5), u(:,:,:,:,:))
+        call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
+        call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+        call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
 
-! iterate over all data blocks, allocate them and fill their U arrays
+! iterate over data blocks, allocate them and fill out their fields
 !
         do l = 1, dm(1)
 
@@ -2829,20 +2837,22 @@ module io
 !
           call append_datablock(pdata)
 
-! associate a meta block with the current data block
+! associate the corresponding meta block with the current data block
 !
-          call link_blocks(block_array(m(l))%ptr, pdata)
+          call link_blocks(block_array(id(l))%ptr, pdata)
 
-! fill out the array of conservative variables
+! fill out the array of conservative and primitive variables
 !
-          pdata%u(:,:,:,:) = u(l,:,:,:,:)
+          pdata%u(:,:,:,:) = uv(l,:,:,:,:)
+          pdata%q(:,:,:,:) = qv(l,:,:,:,:)
 
-        end do
+        end do ! l = 1, dm(1)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(m)) deallocate(m)
-        if (allocated(u)) deallocate(u)
+        if (allocated(id)) deallocate(id)
+        if (allocated(uv)) deallocate(uv)
+        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
@@ -2852,12 +2862,12 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
         call print_error("io::read_datablocks_h5"                              &
-                                              , "Cannot close datablock group!")
+                                           , "Cannot close data block group!")
 
       end if
 
@@ -2865,7 +2875,8 @@ module io
 
 ! print error about the problem with opening the group
 !
-      call print_error("io::read_datablocks_h5", "Cannot open datablock group!")
+      call print_error("io::read_datablocks_h5"                                &
+                                            , "Cannot open data block group!")
 
     end if
 
