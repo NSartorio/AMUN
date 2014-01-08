@@ -175,6 +175,96 @@ module io
 !
 !===============================================================================
 !
+! subroutine READ_RESTART_DATA:
+! ----------------------------
+!
+!   Subroutine reads restart files in order to resume the job. This is
+!   a wrapper for specific format storing.
+!
+!
+!===============================================================================
+!
+  subroutine read_restart_data()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the data reading
+!
+    call start_timer(ios)
+#endif /* PROFILE */
+
+! set restart file number
+!
+    nrest = nres
+
+#ifdef HDF5
+! read HDF5 restart file and rebuild the meta and data block structures
+!
+    call read_data_h5()
+#endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data reading
+!
+    call stop_timer(ios)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_restart_data
+!
+!===============================================================================
+!
+! subroutine WRITE_RESTART_DATA:
+! -----------------------------
+!
+!   Subroutine stores block data in restart files.  This is a wrapper for
+!   specific format storing.
+!
+!
+!===============================================================================
+!
+  subroutine write_restart_data()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
+#endif /* PROFILE */
+
+! increase the file counter
+!
+    nrest = nrest + 1
+
+#ifdef HDF5
+! store restart file
+!
+    call write_data_h5('r')
+#endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for the data writing
+!
+    call stop_timer(iow)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_restart_data
+!
+!===============================================================================
+!
 ! subroutine WRITE_DATA:
 ! ---------------------
 !
@@ -226,96 +316,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_data
-!
-!===============================================================================
-!
-! subroutine WRITE_RESTART_DATA:
-! -----------------------------
-!
-!   Subroutine stores block data in restart files.  This is a wrapper for
-!   specific format storing.
-!
-!
-!===============================================================================
-!
-  subroutine write_restart_data()
-
-! local variables are not implicit by default
-!
-    implicit none
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the data writing
-!
-    call start_timer(iow)
-#endif /* PROFILE */
-
-! increase the file counter
-!
-    nrest = nrest + 1
-
-#ifdef HDF5
-! store restart file
-!
-    call write_data_h5('r')
-#endif /* HDF5 */
-
-#ifdef PROFILE
-! stop accounting time for the data writing
-!
-    call stop_timer(iow)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_restart_data
-!
-!===============================================================================
-!
-! subroutine READ_RESTART_DATA:
-! ----------------------------
-!
-!   Subroutine reads restart files in order to resume the job. This is
-!   a wrapper for specific format storing.
-!
-!
-!===============================================================================
-!
-  subroutine read_restart_data()
-
-! local variables are not implicit by default
-!
-    implicit none
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the data reading
-!
-    call start_timer(ios)
-#endif /* PROFILE */
-
-! set restart file number
-!
-    nrest = nres
-
-#ifdef HDF5
-! read HDF5 restart file and rebuild the meta and data block structures
-!
-    call read_data_h5()
-#endif /* HDF5 */
-
-#ifdef PROFILE
-! stop accounting time for the data reading
-!
-    call stop_timer(ios)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_restart_data
 !
 !===============================================================================
 !!
