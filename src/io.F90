@@ -71,7 +71,7 @@ module io
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
-  integer(kind=4)   , save :: rtoplev = 1, rncpus = 1
+  integer(kind=4)   , save :: rtoplev = 1, rnprocs = 1
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
@@ -528,8 +528,8 @@ module io
 ! file for the remaining processors
 !
       lcpu = nproc
-      if (rncpus .lt. nprocs) then
-        lcpu = min(rncpus - 1, nproc)
+      if (rnprocs .lt. nprocs) then
+        lcpu = min(rnprocs - 1, nproc)
       end if
 
 ! prepare the filename
@@ -621,7 +621,7 @@ module io
 ! if the number of files is larger than the number of processors read the
 ! remaining files and allocate data blocks in the last processor
 !
-      if (rncpus .gt. nprocs) then
+      if (rnprocs .gt. nprocs) then
 
 ! perform the rest only on the last processor
 !
@@ -629,7 +629,7 @@ module io
 
 ! iterate over the remaining files
 !
-          do lcpu = nprocs, rncpus - 1
+          do lcpu = nprocs, rnprocs - 1
 
 ! prepare the filename
 !
@@ -816,7 +816,7 @@ module io
 
 ! read attribute 'nprocs'
 !
-            call h5aopen_by_name_f(fid, "/attributes", "ncpus", aid, err)
+            call h5aopen_by_name_f(fid, "/attributes", "nprocs", aid, err)
 
 ! check if the attribute has been opened successfully
 !
@@ -824,7 +824,7 @@ module io
 
 ! read the attribute nprocs
 !
-              call read_attribute_integer_h5(aid, "ncpus", rncpus)
+              call read_attribute_integer_h5(aid, "nprocs", rnprocs)
 
 ! close the attribute
 !
@@ -837,7 +837,7 @@ module io
 ! print error about the problem with closing the current file
 !
                 call print_error("io::read_restart_params_h5"                  &
-                                        , "Cannot close the attribute ncpus!")
+                                       , "Cannot close the attribute nprocs!")
 
               end if
 
@@ -846,7 +846,7 @@ module io
 ! print error about the problem with opening the attribute
 !
               call print_error("io::read_restart_params_h5"                    &
-                                         , "Cannot open the attribute ncpus!")
+                                        , "Cannot open the attribute nprocs!")
 
             end if
 
@@ -1006,8 +1006,8 @@ module io
       call write_attribute_integer_h5(gid, 'minlev' , minlev)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'toplev' , toplev)
-      call write_attribute_integer_h5(gid, 'ncpus'  , nprocs)
-      call write_attribute_integer_h5(gid, 'ncpu'   , nproc)
+      call write_attribute_integer_h5(gid, 'nprocs' , nprocs)
+      call write_attribute_integer_h5(gid, 'nproc'  , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'iter'   , n)
       call write_attribute_integer_h5(gid, 'nfile'  , nfile)
@@ -1125,7 +1125,7 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, lnleafs           &
-                       , lncells, lnghost, lnseeds, lmaxlev, lncpu
+                       , lncells, lnghost, lnseeds, lmaxlev, lnproc
 
 ! local pointers
 !
@@ -1206,8 +1206,8 @@ module io
 !
                 ucor = 2**(maxlev - lmaxlev)
               end if
-            case('ncpu')
-              call read_attribute_integer_h5(aid, aname, lncpu)
+            case('nproc')
+              call read_attribute_integer_h5(aid, aname, lnproc)
             case('last_id')
               call read_attribute_integer_h5(aid, aname, llast_id)
             case('mblocks')
