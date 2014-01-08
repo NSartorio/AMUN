@@ -326,161 +326,6 @@ module io
 #ifdef HDF5
 !===============================================================================
 !
-! write_data_h5: wrapper subroutine for the HDF5 format
-!
-! info: subroutine performs the initialization and finalization of the HDF5
-!       interface, creates and closes the file, and also stores the parameters
-!        andvariables in the chosen format (i.e. for the restart, visualization,
-!       etc.)
-!
-! arguments: same as in write_data()
-!
-!===============================================================================
-!
-  subroutine write_data_h5(ftype)
-
-! references to other modules
-!
-    use error   , only : print_error
-    use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
-    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
-    use mpitools, only : nproc
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    character, intent(in) :: ftype
-
-! local variables
-!
-    character(len=64) :: fl
-    integer(hid_t)    :: fid
-    integer           :: err
-!
-!-------------------------------------------------------------------------------
-!
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! check if the interface has been initialized successfuly
-!
-    if (err .ge. 0) then
-
-! prepare the filename
-!
-      if (ftype .eq. 'r') then
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
-      else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
-      end if
-
-! create the new HDF5 file
-!
-      call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
-
-! check if the file has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the global attributes
-!
-        call write_attributes_h5(fid)
-
-! depending on the selected type of output file write the right groups
-!
-        select case(ftype)
-        case('c')
-
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-          call write_coordinates_h5(fid)
-
-! write the variables stored in data blocks (leafs)
-!
-          call write_conservative_variables_h5(fid)
-
-        case('p')
-
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-          call write_coordinates_h5(fid)
-
-! write the variables stored in data blocks (leafs)
-!
-          call write_primitive_variables_h5(fid)
-
-        case('r')
-
-! write all metablocks which represent the internal structure of domain
-!
-          call write_metablocks_h5(fid)
-
-! write all datablocks which represent the all variables
-!
-          call write_datablocks_h5(fid)
-
-        case default
-        end select
-
-! terminate access to the current file
-!
-        call h5fclose_f(fid, err)
-
-! check if the file has been closed successfully
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-          call print_error("io::write_data_h5"  &
-                                            , "Cannot close file: " // trim(fl))
-
-        end if
-
-      else
-
-! print error about the problem with creating the HDF5 file
-!
-        call print_error("io::write_data_h5"  &
-                                           , "Cannot create file: " // trim(fl))
-
-      end if
-
-! close the FORTRAN interface
-!
-      call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the HDF5 Fortran interface
-!
-        call print_error("io::write_data_h5"  &
-                                   , "Cannot close the HDF5 Fortran interface!")
-
-      end if
-
-    else
-
-! print the error about the problem with initialization of the HDF5 Fortran
-! interface
-!
-      call print_error("io::write_data_h5"  &
-                              , "Cannot initialize the HDF5 Fortran interface!")
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_data_h5
-!
-!===============================================================================
-!
 ! read_data_h5: wrapper subroutine for job restart from a HDF5 format
 !
 ! info: subroutine reads and restores the meta and data block structures from
@@ -752,6 +597,161 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_data_h5
+!
+!===============================================================================
+!
+! write_data_h5: wrapper subroutine for the HDF5 format
+!
+! info: subroutine performs the initialization and finalization of the HDF5
+!       interface, creates and closes the file, and also stores the parameters
+!        andvariables in the chosen format (i.e. for the restart, visualization,
+!       etc.)
+!
+! arguments: same as in write_data()
+!
+!===============================================================================
+!
+  subroutine write_data_h5(ftype)
+
+! references to other modules
+!
+    use error   , only : print_error
+    use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
+    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools, only : nproc
+
+! declare variables
+!
+    implicit none
+
+! input variables
+!
+    character, intent(in) :: ftype
+
+! local variables
+!
+    character(len=64) :: fl
+    integer(hid_t)    :: fid
+    integer           :: err
+!
+!-------------------------------------------------------------------------------
+!
+! initialize the FORTRAN interface
+!
+    call h5open_f(err)
+
+! check if the interface has been initialized successfuly
+!
+    if (err .ge. 0) then
+
+! prepare the filename
+!
+      if (ftype .eq. 'r') then
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
+      else
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
+      end if
+
+! create the new HDF5 file
+!
+      call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
+
+! check if the file has been created successfuly
+!
+      if (err .ge. 0) then
+
+! write the global attributes
+!
+        call write_attributes_h5(fid)
+
+! depending on the selected type of output file write the right groups
+!
+        select case(ftype)
+        case('c')
+
+! write the coordinates (data block bounds, refinement levels, etc.)
+!
+          call write_coordinates_h5(fid)
+
+! write the variables stored in data blocks (leafs)
+!
+          call write_conservative_variables_h5(fid)
+
+        case('p')
+
+! write the coordinates (data block bounds, refinement levels, etc.)
+!
+          call write_coordinates_h5(fid)
+
+! write the variables stored in data blocks (leafs)
+!
+          call write_primitive_variables_h5(fid)
+
+        case('r')
+
+! write all metablocks which represent the internal structure of domain
+!
+          call write_metablocks_h5(fid)
+
+! write all datablocks which represent the all variables
+!
+          call write_datablocks_h5(fid)
+
+        case default
+        end select
+
+! terminate access to the current file
+!
+        call h5fclose_f(fid, err)
+
+! check if the file has been closed successfully
+!
+        if (err .gt. 0) then
+
+! print error about the problem with closing the current file
+!
+          call print_error("io::write_data_h5"  &
+                                            , "Cannot close file: " // trim(fl))
+
+        end if
+
+      else
+
+! print error about the problem with creating the HDF5 file
+!
+        call print_error("io::write_data_h5"  &
+                                           , "Cannot create file: " // trim(fl))
+
+      end if
+
+! close the FORTRAN interface
+!
+      call h5close_f(err)
+
+! check if the interface has been closed successfuly
+!
+      if (err .gt. 0) then
+
+! print error about the problem with closing the HDF5 Fortran interface
+!
+        call print_error("io::write_data_h5"  &
+                                   , "Cannot close the HDF5 Fortran interface!")
+
+      end if
+
+    else
+
+! print the error about the problem with initialization of the HDF5 Fortran
+! interface
+!
+      call print_error("io::write_data_h5"  &
+                              , "Cannot initialize the HDF5 Fortran interface!")
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_data_h5
 !
 !===============================================================================
 !
