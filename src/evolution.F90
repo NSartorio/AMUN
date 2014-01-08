@@ -50,8 +50,8 @@ module evolution
 
 ! time variables
 !
-  integer, save :: n       = 0
-  real   , save :: t       = 0.0d+00
+  integer, save :: step    = 0
+  real   , save :: time    = 0.0d+00
   real   , save :: dt      = 1.0d+00
   real   , save :: dtn     = 1.0d+00
 
@@ -66,7 +66,7 @@ module evolution
 
 ! declare public variables
 !
-  public :: cfl, n, t, dt, dtn
+  public :: cfl, step, time, dt, dtn
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !

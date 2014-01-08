@@ -40,7 +40,7 @@ program amun
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, new_time_step
-  use evolution     , only : n, t, dt
+  use evolution     , only : step, time, dt
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
@@ -379,7 +379,7 @@ program amun
 
 ! store mesh statistics
 !
-    call store_mesh_stats(n, t)
+    call store_mesh_stats(step, time)
 
 ! calculate new timestep
 !
@@ -454,7 +454,7 @@ program amun
 ! get current time in seconds
 !
   if (master) &
-    tbeg = t
+    tbeg = time
 
 ! print progress info on master processor
 !
@@ -476,18 +476,18 @@ program amun
 #if defined INTEL || defined PATHSCALE
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL | PATHSCALE */
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
 
   end if
 
 ! main loop
 !
-  do while((nsteps <= nmax) .and. (t < tmax) .and. (iterm == 0))
+  do while((nsteps <= nmax) .and. (time < tmax) .and. (iterm == 0))
 
 ! performe one step evolution
 !
@@ -495,13 +495,13 @@ program amun
 
 ! advance the iteration number and time
 !
-    t      = t + dt
-    n      = n + 1
-    nsteps = nsteps + 1
+    time   = time   + dt
+    step   = step   +  1
+    nsteps = nsteps +  1
 
 ! store mesh statistics
 !
-    call store_mesh_stats(n, t)
+    call store_mesh_stats(step, time)
 
 ! store integrals
 !
@@ -529,7 +529,7 @@ program amun
 
 ! calculate days, hours, seconds
 !
-      ec   = int(tm_curr * (tmax - t) / max(1.0e-8, t - tbeg), kind = 4)
+      ec   = int(tm_curr * (tmax - time) / max(1.0e-8, time - tbeg), kind = 4)
       es   = max(0, int(mod(ec, 60)))
       em   = int(mod(ec / 60, 60))
       eh   = int(ec / 3600)
@@ -540,11 +540,11 @@ program amun
 #if defined INTEL || defined PATHSCALE
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL | PATHSCALE */
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1)',advance="no")                               &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
 
     end if

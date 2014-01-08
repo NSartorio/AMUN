@@ -279,7 +279,7 @@ module io
 
 ! import external variables
 !
-    use evolution      , only : t
+    use evolution      , only : time
 
 ! local variables are not implicit by default
 !
@@ -289,7 +289,7 @@ module io
 !
 ! exit the subroutine, if the time of the next snapshot is not reached
 !
-    if (dtout <= 0.0d+0 .or. nfile > (int(t / dtout))) return
+    if (dtout <= 0.0d+0 .or. nfile > (int(time / dtout))) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -1009,7 +1009,7 @@ module io
     use coordinates, only : nn, ng, in, jn, kn, minlev, maxlev, toplev, ir, jr, kr
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error
-    use evolution, only : n, t, dt, dtn
+    use evolution, only : step, time, dt, dtn
     use hdf5     , only : hid_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
     use mpitools , only : nprocs, nproc
@@ -1058,7 +1058,7 @@ module io
       call write_attribute_integer_h5(gid, 'nprocs' , nprocs)
       call write_attribute_integer_h5(gid, 'nproc'  , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
-      call write_attribute_integer_h5(gid, 'iter'   , n)
+      call write_attribute_integer_h5(gid, 'step'   , step  )
       call write_attribute_integer_h5(gid, 'nfile'  , nfile)
 
 ! store the real attributes
@@ -1069,7 +1069,7 @@ module io
       call write_attribute_double_h5(gid, 'ymax', ymax)
       call write_attribute_double_h5(gid, 'zmin', zmin)
       call write_attribute_double_h5(gid, 'zmax', zmax)
-      call write_attribute_double_h5(gid, 'time', t   )
+      call write_attribute_double_h5(gid, 'time', time)
       call write_attribute_double_h5(gid, 'dt'  , dt  )
       call write_attribute_double_h5(gid, 'dtn' , dtn )
 
@@ -1151,7 +1151,7 @@ module io
     use coordinates, only : initialize_coordinates, finalize_coordinates
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error, print_warning
-    use evolution, only : n, t, dt, dtn
+    use evolution, only : step, time, dt, dtn
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
@@ -1283,12 +1283,12 @@ module io
                 call print_error("io::read_attributes_h5"                      &
                       , "File and program block ghost layers are incompatible!")
               end if
-            case('iter')
-              call read_attribute_integer_h5(aid, aname, n)
+            case('step')
+              call read_attribute_integer_h5(aid, aname, step)
             case('nfile')
               call read_attribute_integer_h5(aid, aname, nfile)
             case('time')
-              call read_attribute_double_h5(aid, aname, t)
+              call read_attribute_double_h5(aid, aname, time)
             case('dt')
               call read_attribute_double_h5(aid, aname, dt)
             case('dtn')
