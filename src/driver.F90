@@ -44,7 +44,7 @@ program amun
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
-                           , read_restart_data
+                           , read_restart_data, next_tout
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
   use mpitools      , only : initialize_mpitools, finalize_mpitools
@@ -79,6 +79,12 @@ program amun
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
   real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
+  real(kind=8)          :: dtnext = 0.0d+00
+
+! flag to adjust time precisely to the snapshots
+!
+  logical        , save :: precise_snapshots = .false.
+  character(len=255)    :: prec_snap         = "off"
 
 ! temporary variables
 !
@@ -250,7 +256,24 @@ program amun
 
 ! correct the run time by the save time
 !
-  trun = trun - tsav / 6.0d+01
+  trun   = trun - tsav / 6.0d+01
+
+! initialize dtnext
+!
+  dtnext = 2.0d+00 * tmax
+
+! get the precise snapshot flag
+!
+  call get_parameter_string ("precise_snapshots", prec_snap)
+
+! set the precise snapshot flag
+!
+  if (prec_snap == "on"  ) precise_snapshots = .true.
+  if (prec_snap == "ON"  ) precise_snapshots = .true.
+  if (prec_snap == "true") precise_snapshots = .true.
+  if (prec_snap == "TRUE") precise_snapshots = .true.
+  if (prec_snap == "yes" ) precise_snapshots = .true.
+  if (prec_snap == "YES" ) precise_snapshots = .true.
 
 ! get integral calculation interval
 !
@@ -360,6 +383,14 @@ program amun
 !
   call initialize_problems()
 
+! initialize boundaries module and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Snapshots:"
+    write (*,"(4x,a22,1x,'='1x,a)") "precise snapshot times", trim(prec_snap)
+  end if
+
 ! initialize module IO
 !
   call initialize_io()
@@ -383,7 +414,7 @@ program amun
 
 ! calculate new timestep
 !
-    call new_time_step()
+    call new_time_step(dtnext)
 
 ! initialize the integrals module
 !
@@ -489,9 +520,13 @@ program amun
 !
   do while((nsteps <= nmax) .and. (time < tmax) .and. (iterm == 0))
 
+! get the next snapshot time
+!
+    if (precise_snapshots) dtnext = next_tout() - time
+
 ! performe one step evolution
 !
-    call advance()
+    call advance(dtnext)
 
 ! advance the iteration number and time
 !

@@ -66,7 +66,8 @@ module io
 
 ! counters for the stored data and restart files
 !
-  integer(kind=4)   , save :: nfile = 0, nrest = 0
+  integer(kind=4)   , save :: isnap = -1
+  integer(kind=4)   , save :: nrest =  0
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
@@ -90,6 +91,7 @@ module io
 !
   public :: initialize_io
   public :: read_restart_data, write_restart_data, write_data
+  public :: next_tout
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -186,6 +188,10 @@ module io
 !
   subroutine read_restart_data()
 
+! import external variables
+!
+    use evolution      , only : time
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -207,6 +213,10 @@ module io
 !
     call read_data_h5()
 #endif /* HDF5 */
+
+! calculate the next snapshot number
+!
+    isnap = int(time / dtout)
 
 #ifdef PROFILE
 ! stop accounting time for the data reading
@@ -289,7 +299,7 @@ module io
 !
 ! exit the subroutine, if the time of the next snapshot is not reached
 !
-    if (dtout <= 0.0d+0 .or. nfile > (int(time / dtout))) return
+    if (dtout <= 0.0d+00 .or. isnap >= (int(time / dtout))) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -297,15 +307,15 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
+! increase the file counter
+!
+    isnap = isnap + 1
+
 #ifdef HDF5
 ! store data file
 !
     call write_data_h5(ftype)
 #endif /* HDF5 */
-
-! increase the file counter
-!
-    nfile = nfile + 1
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
@@ -316,6 +326,34 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_data
+!
+!===============================================================================
+!
+! function NEXT_TOUT:
+! ------------------
+!
+!   Function returns time of the next data snapshot.
+!
+!
+!===============================================================================
+!
+  real function next_tout()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+    if (dtout > 0.0d+00) then
+      next_tout = (isnap + 1) * dtout
+    else
+      next_tout = huge(dtout)
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end function next_tout
 !
 !===============================================================================
 !!
@@ -698,7 +736,7 @@ module io
       if (ftype .eq. 'r') then
         write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
       else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
       end if
 
 ! create the new HDF5 file
@@ -1059,7 +1097,6 @@ module io
       call write_attribute_integer_h5(gid, 'nproc'  , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'step'   , step  )
-      call write_attribute_integer_h5(gid, 'nfile'  , nfile)
 
 ! store the real attributes
 !
@@ -1285,8 +1322,6 @@ module io
               end if
             case('step')
               call read_attribute_integer_h5(aid, aname, step)
-            case('nfile')
-              call read_attribute_integer_h5(aid, aname, nfile)
             case('time')
               call read_attribute_double_h5(aid, aname, time)
             case('dt')
