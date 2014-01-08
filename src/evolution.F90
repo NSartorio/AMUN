@@ -50,8 +50,8 @@ module evolution
 
 ! time variables
 !
-  integer, save :: n       = 0
-  real   , save :: t       = 0.0d+00
+  integer, save :: step    = 0
+  real   , save :: time    = 0.0d+00
   real   , save :: dt      = 1.0d+00
   real   , save :: dtn     = 1.0d+00
 
@@ -66,7 +66,7 @@ module evolution
 
 ! declare public variables
 !
-  public :: cfl, n, t, dt, dtn
+  public :: cfl, step, time, dt, dtn
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -201,10 +201,13 @@ module evolution
 !   Subroutine advances the solution by one time step using the selected time
 !   integration method.
 !
+!   Arguments:
+!
+!     dtnext - next time step;
 !
 !===============================================================================
 !
-  subroutine advance()
+  subroutine advance(dtnext)
 
 ! include external procedures
 !
@@ -218,12 +221,16 @@ module evolution
 ! local variables are not implicit by default
 !
     implicit none
+
+! input variables
+!
+    real, intent(in) :: dtnext
 !
 !-------------------------------------------------------------------------------
 !
 ! find new time step
 !
-    call new_time_step()
+    call new_time_step(dtnext)
 
 ! advance the solution using the selected method
 !
@@ -250,6 +257,124 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine advance
+!
+!===============================================================================
+!
+! subroutine NEW_TIME_STEP:
+! ------------------------
+!
+!   Subroutine estimates the new time step from the maximum speed in the system
+!   and source term constraints.
+!
+!   Arguments:
+!
+!     dtnext - next time step;
+!
+!===============================================================================
+!
+  subroutine new_time_step(dtnext)
+
+! include external procedures
+!
+    use equations     , only : maxspeed, cmax, cmax2
+#ifdef MPI
+    use mpitools      , only : reduce_maximum_real, reduce_maximum_integer
+#endif /* MPI */
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : adx, ady, adz
+    use coordinates   , only : toplev
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input variables
+!
+    real, intent(in) :: dtnext
+
+! local pointers
+!
+    type(block_data), pointer :: pblock
+
+! local variables
+!
+    integer                   :: iret
+    integer(kind=4)           :: lev
+    real                      :: cm, dx_min
+
+! local parameters
+!
+    real, parameter           :: eps = tiny(cmax)
+!
+!-------------------------------------------------------------------------------
+!
+! reset the maximum speed, and the highest level
+!
+    cmax   = eps
+    lev    = 1
+
+! iterate over all data blocks in order to find the maximum speed among them
+! and the highest level which is required to obtain the spatial step
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! find the maximum level occupied by blocks (can be smaller than toplev)
+!
+      lev = max(lev, pblock%meta%level)
+
+! obtain the maximum speed for the current block
+!
+      cm = maxspeed(pblock%q(:,:,:,:))
+
+! compare global and local maximum speeds
+!
+      cmax = max(cmax, cm)
+
+! assiociate the pointer with the next block
+!
+      pblock => pblock%next
+
+    end do
+
+#ifdef MPI
+! find maximum speed in the system from all processors
+!
+    call reduce_maximum_real   (cmax, iret)
+    call reduce_maximum_integer(lev , iret)
+#endif /* MPI */
+
+! calculate squared cmax
+!
+    cmax2 = cmax * cmax
+
+! find the smallest spatial step
+!
+#if NDIMS == 2
+    dx_min = min(adx(lev), ady(lev))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    dx_min = min(adx(lev), ady(lev), adz(lev))
+#endif /* NDIMS == 3 */
+
+! calcilate the new time step
+!
+    dtn = dx_min / max(cmax, eps)
+
+! calculate the new time step
+!
+    dt  = cfl * dtn
+
+! round the time
+!
+    if (dtnext > 0.0d+00) dt = min(dt, dtnext)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine new_time_step
 !
 !===============================================================================
 !!
@@ -599,113 +724,6 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_variables
-!
-!===============================================================================
-!
-! subroutine NEW_TIME_STEP:
-! ------------------------
-!
-!   Subroutine estimates the new time step from the maximum speed in the system
-!   and source term constraints.
-!
-!
-!===============================================================================
-!
-  subroutine new_time_step()
-
-! include external procedures
-!
-    use equations     , only : maxspeed, cmax, cmax2
-#ifdef MPI
-    use mpitools      , only : reduce_maximum_real, reduce_maximum_integer
-#endif /* MPI */
-
-! include external variables
-!
-    use blocks        , only : block_data, list_data
-    use coordinates   , only : adx, ady, adz
-    use coordinates   , only : toplev
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! local pointers
-!
-    type(block_data), pointer :: pblock
-
-! local variables
-!
-    integer                   :: iret
-    integer(kind=4)           :: lev
-    real                      :: cm, dx_min
-
-! local parameters
-!
-    real, parameter           :: eps = tiny(cmax)
-!
-!-------------------------------------------------------------------------------
-!
-! reset the maximum speed, and the highest level
-!
-    cmax   = eps
-    lev    = 1
-
-! iterate over all data blocks in order to find the maximum speed among them
-! and the highest level which is required to obtain the spatial step
-!
-    pblock => list_data
-    do while (associated(pblock))
-
-! find the maximum level occupied by blocks (can be smaller than toplev)
-!
-      lev = max(lev, pblock%meta%level)
-
-! obtain the maximum speed for the current block
-!
-      cm = maxspeed(pblock%q(:,:,:,:))
-
-! compare global and local maximum speeds
-!
-      cmax = max(cmax, cm)
-
-! assiociate the pointer with the next block
-!
-      pblock => pblock%next
-
-    end do
-
-#ifdef MPI
-! find maximum speed in the system from all processors
-!
-    call reduce_maximum_real   (cmax, iret)
-    call reduce_maximum_integer(lev , iret)
-#endif /* MPI */
-
-! calculate squared cmax
-!
-    cmax2 = cmax * cmax
-
-! find the smallest spatial step
-!
-#if NDIMS == 2
-    dx_min = min(adx(lev), ady(lev))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    dx_min = min(adx(lev), ady(lev), adz(lev))
-#endif /* NDIMS == 3 */
-
-! calcilate the new time step
-!
-    dtn = dx_min / max(cmax, eps)
-
-! calculate the new time step
-!
-    dt  = cfl * dtn
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine new_time_step
 
 !===============================================================================
 !

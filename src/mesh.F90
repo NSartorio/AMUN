@@ -1384,25 +1384,25 @@ module mesh
 #ifdef MPI
 ! local variables
 !
-    integer                                 :: iret
-    integer(kind=4)                         :: np, nl
+    integer                                   :: iret
+    integer(kind=4)                           :: np, nl
 
 ! local pointers
 !
-    type(block_meta), pointer               :: pmeta
-    type(block_data), pointer               :: pdata
+    type(block_meta), pointer                 :: pmeta
+    type(block_data), pointer                 :: pdata
 
 ! tag for the MPI data exchange
 !
-    integer(kind=4)                         :: itag
+    integer(kind=4)                           :: itag
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:nprocs-1)  :: lb
+    integer(kind=4), dimension(0:nprocs-1)    :: lb
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(nv,im,jm,km) :: rbuf
+    real(kind=8)   , dimension(2,nv,im,jm,km) :: rbuf
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -1451,7 +1451,8 @@ module mesh
 
 ! copy data to buffer
 !
-            rbuf(:,:,:,:) = pmeta%data%u(:,:,:,:)
+            rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
+            rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
 
 ! send data
 !
@@ -1480,7 +1481,8 @@ module mesh
 
 ! coppy the buffer to data block
 !
-            pmeta%data%u(:,:,:,:) = rbuf(:,:,:,:)
+            pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
+            pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
 
           end if ! nproc == n
 

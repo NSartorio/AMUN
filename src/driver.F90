@@ -40,16 +40,13 @@ program amun
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, new_time_step
-  use evolution     , only : n, t, dt
+  use evolution     , only : step, time, dt
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
-                           , restart_job
+                           , read_restart_data, next_tout
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
-#ifdef MPI
-  use mesh          , only : redistribute_blocks
-#endif /* MPI */
   use mpitools      , only : initialize_mpitools, finalize_mpitools
   use mpitools      , only : setup_mpi
 #ifdef MPI
@@ -82,6 +79,12 @@ program amun
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
   real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
+  real(kind=8)          :: dtnext = 0.0d+00
+
+! flag to adjust time precisely to the snapshots
+!
+  logical        , save :: precise_snapshots = .false.
+  character(len=255)    :: prec_snap         = "off"
 
 ! temporary variables
 !
@@ -253,7 +256,24 @@ program amun
 
 ! correct the run time by the save time
 !
-  trun = trun - tsav / 6.0d+01
+  trun   = trun - tsav / 6.0d+01
+
+! initialize dtnext
+!
+  dtnext = 2.0d+00 * tmax
+
+! get the precise snapshot flag
+!
+  call get_parameter_string ("precise_snapshots", prec_snap)
+
+! set the precise snapshot flag
+!
+  if (prec_snap == "on"  ) precise_snapshots = .true.
+  if (prec_snap == "ON"  ) precise_snapshots = .true.
+  if (prec_snap == "true") precise_snapshots = .true.
+  if (prec_snap == "TRUE") precise_snapshots = .true.
+  if (prec_snap == "yes" ) precise_snapshots = .true.
+  if (prec_snap == "YES" ) precise_snapshots = .true.
 
 ! get integral calculation interval
 !
@@ -363,6 +383,14 @@ program amun
 !
   call initialize_problems()
 
+! initialize boundaries module and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Snapshots:"
+    write (*,"(4x,a22,1x,'='1x,a)") "precise snapshot times", trim(prec_snap)
+  end if
+
 ! initialize module IO
 !
   call initialize_io()
@@ -375,10 +403,6 @@ program amun
 !
     call initialize_mesh(nrun, master, iret)
 
-! initialize the integrals module
-!
-    call init_integrals(.true.)
-
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem
 !
@@ -386,32 +410,33 @@ program amun
 
 ! store mesh statistics
 !
-    call store_mesh_stats(n, t)
+    call store_mesh_stats(step, time)
 
 ! calculate new timestep
 !
-    call new_time_step()
+    call new_time_step(dtnext)
+
+! initialize the integrals module
+!
+    call init_integrals(.true.)
 
   else
+
+! increase the run number
+!
+    nrun  = nres + 1
 
 ! initialize the mesh module
 !
     call initialize_mesh(nrun, master, iret)
 
+! reconstruct the meta and data block structures from a given restart file
+!
+    call read_restart_data()
+
 ! initialize the integrals module
 !
     call init_integrals(.false.)
-
-! reconstruct the meta and data block structures from a given restart file
-!
-    call restart_job()
-
-#ifdef MPI
-! redistribute blocks between processors in case the number of processors has
-! changed
-!
-    call redistribute_blocks()
-#endif /* MPI */
 
   end if
 
@@ -460,7 +485,7 @@ program amun
 ! get current time in seconds
 !
   if (master) &
-    tbeg = t
+    tbeg = time
 
 ! print progress info on master processor
 !
@@ -482,32 +507,36 @@ program amun
 #if defined INTEL || defined PATHSCALE
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL | PATHSCALE */
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
 
   end if
 
 ! main loop
 !
-  do while((nsteps < nmax) .and. (t <= tmax) .and. (iterm == 0))
+  do while((nsteps <= nmax) .and. (time < tmax) .and. (iterm == 0))
+
+! get the next snapshot time
+!
+    if (precise_snapshots) dtnext = next_tout() - time
 
 ! performe one step evolution
 !
-    call advance()
+    call advance(dtnext)
 
 ! advance the iteration number and time
 !
-    t      = t + dt
-    n      = n + 1
-    nsteps = nsteps + 1
+    time   = time   + dt
+    step   = step   +  1
+    nsteps = nsteps +  1
 
 ! store mesh statistics
 !
-    call store_mesh_stats(n, t)
+    call store_mesh_stats(step, time)
 
 ! store integrals
 !
@@ -535,7 +564,7 @@ program amun
 
 ! calculate days, hours, seconds
 !
-      ec   = int(tm_curr * (tmax - t) / max(1.0e-8, t - tbeg), kind = 4)
+      ec   = int(tm_curr * (tmax - time) / max(1.0e-8, time - tbeg), kind = 4)
       es   = max(0, int(mod(ec, 60)))
       em   = int(mod(ec / 60, 60))
       eh   = int(ec / 3600)
@@ -546,11 +575,11 @@ program amun
 #if defined INTEL || defined PATHSCALE
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL | PATHSCALE */
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1)',advance="no")                               &
-                              n, t, dt, get_nleafs(), ed, eh, em, es, char(13)
+                        step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL | PATHSCALE */
 
     end if

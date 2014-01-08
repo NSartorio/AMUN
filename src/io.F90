@@ -66,12 +66,13 @@ module io
 
 ! counters for the stored data and restart files
 !
-  integer(kind=4)   , save :: nfile = 0, nrest = 0
+  integer(kind=4)   , save :: isnap = -1
+  integer(kind=4)   , save :: nrest =  0
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
-  integer(kind=4)   , save :: rtoplev = 1, rncpus = 1
+  integer(kind=4)   , save :: rtoplev = 1, nfiles = 1
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
@@ -82,6 +83,18 @@ module io
 !
   type(pointer_meta), dimension(:), allocatable, save :: block_array
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_io
+  public :: read_restart_data, write_restart_data, write_data
+  public :: next_tout
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
@@ -164,21 +177,20 @@ module io
 !
 !===============================================================================
 !
-! subroutine WRITE_DATA:
-! ---------------------
+! subroutine READ_RESTART_DATA:
+! ----------------------------
 !
-!   Subroutine stores block data in snapshots.  Block variables are grouped
-!   todether and stored in big 4D arrays separately.  This is a wrapper for
-!   specific format storing.
+!   Subroutine reads restart files in order to resume the job. This is
+!   a wrapper for specific format storing.
 !
 !
 !===============================================================================
 !
-  subroutine write_data()
+  subroutine read_restart_data()
 
 ! import external variables
 !
-    use evolution      , only : t
+    use evolution      , only : time
 
 ! local variables are not implicit by default
 !
@@ -186,35 +198,35 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! exit the subroutine, if the time of the next snapshot is not reached
-!
-    if (dtout <= 0.0d+0 .or. nfile > (int(t / dtout))) return
-
 #ifdef PROFILE
-! start accounting time for the data writing
+! start accounting time for the data reading
 !
-    call start_timer(iow)
+    call start_timer(ios)
 #endif /* PROFILE */
 
-#ifdef HDF5
-! store data file
+! set restart file number
 !
-    call write_data_h5(ftype)
+    nrest = nres
+
+#ifdef HDF5
+! read HDF5 restart file and rebuild the meta and data block structures
+!
+    call read_data_h5()
 #endif /* HDF5 */
 
-! increase the file counter
+! calculate the next snapshot number
 !
-    nfile = nfile + 1
+    isnap = int(time / dtout)
 
 #ifdef PROFILE
-! stop accounting time for the data writing
+! stop accounting time for the data reading
 !
-    call stop_timer(iow)
+    call stop_timer(ios)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data
+  end subroutine read_restart_data
 !
 !===============================================================================
 !
@@ -263,46 +275,85 @@ module io
 !
 !===============================================================================
 !
-! restart_job: wrapper subroutine for the job restart from a data file
+! subroutine WRITE_DATA:
+! ---------------------
 !
-! info: subroutine selects the restoring subroutine from supported output
-!       formats depending on the compilation time options, and restored the
-!       meta and data block structures; at this moment only the HDF5 format is
-!       supported;
+!   Subroutine stores block data in snapshots.  Block variables are grouped
+!   todether and stored in big 4D arrays separately.  This is a wrapper for
+!   specific format storing.
+!
 !
 !===============================================================================
 !
-  subroutine restart_job()
+  subroutine write_data()
 
+! import external variables
+!
+    use evolution      , only : time
+
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef PROFILE
-! start accounting time for the data reading
+! exit the subroutine, if the time of the next snapshot is not reached
 !
-    call start_timer(ios)
+    if (dtout <= 0.0d+00 .or. isnap >= (int(time / dtout))) return
+
+#ifdef PROFILE
+! start accounting time for the data writing
+!
+    call start_timer(iow)
 #endif /* PROFILE */
 
-! set restart file number
+! increase the file counter
 !
-    nrest = nres
+    isnap = isnap + 1
 
 #ifdef HDF5
-! read HDF5 restart file and rebuild blocks structure
+! store data file
 !
-    call read_data_h5()
+    call write_data_h5(ftype)
 #endif /* HDF5 */
 
 #ifdef PROFILE
-! stop accounting time for the data reading
+! stop accounting time for the data writing
 !
-    call stop_timer(ios)
+    call stop_timer(iow)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine restart_job
+  end subroutine write_data
+!
+!===============================================================================
+!
+! function NEXT_TOUT:
+! ------------------
+!
+!   Function returns time of the next data snapshot.
+!
+!
+!===============================================================================
+!
+  real function next_tout()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+    if (dtout > 0.0d+00) then
+      next_tout = (isnap + 1) * dtout
+    else
+      next_tout = huge(dtout)
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end function next_tout
 !
 !===============================================================================
 !!
@@ -311,6 +362,329 @@ module io
 !===============================================================================
 !
 #ifdef HDF5
+!===============================================================================
+!
+! subroutine READ_DATA_H5:
+! -----------------------
+!
+!   Subroutine reads parameters, meta and data blocks stored in
+!   the HDF5 format restart files and reconstructs the data structure
+!   in order to resume a terminated job.
+!
+!
+!===============================================================================
+!
+  subroutine read_data_h5()
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_RDONLY_F
+    use hdf5           , only : h5open_f, h5close_f
+    use hdf5           , only : h5fis_hdf5_f, h5fopen_f, h5fclose_f
+#ifdef MPI
+    use mesh           , only : redistribute_blocks
+#endif /* MPI */
+    use mpitools       , only : nprocs, nproc
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    character(len=64) :: fl
+    integer(hid_t)    :: fid
+    integer           :: err, lfile
+    logical           :: info
+!
+!-------------------------------------------------------------------------------
+!
+!! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
+!!
+! prepare the filename
+!
+    write (fl, '("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+
+! check if the HDF5 file exists
+!
+    inquire(file = fl, exist = info)
+
+! if file does not exist, print error and quit the subroutine
+!
+    if (.not. info) then
+      call print_error("io::read_data_h5", "File " // trim(fl)                 &
+                                                        // " does not exist!")
+      return
+    end if ! file does not exist
+
+! initialize the FORTRAN interface
+!
+    call h5open_f(err)
+
+! in the case of error, print a message and quit the subroutine
+!
+    if (err < 0) then
+      call print_error("io::read_data_h5"                                      &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
+
+! check if this file is in the HDF5 format
+!
+    call h5fis_hdf5_f(fl, info, err)
+
+! if the format verification failed, close the interface, print error and exit
+!
+    if (err < 0) then
+      call print_error("io::read_data_h5", "Cannot check the file format!")
+      call h5close_f(err)
+      return
+    end if
+
+! the file is not in the HDF5 format, print message and quit
+!
+    if (.not. info) then
+      call print_error("io::read_data_h5", "File " // trim(fl)                 &
+                                                   // " is not an HDF5 file!")
+      call h5close_f(err)
+      return
+    end if
+
+! opent the HDF5 file
+!
+    call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+    if (err < 0) then
+      call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+! read global attributes
+!
+    call read_attributes_h5(fid)
+
+! read meta blocks and recreate the meta block hierarchy
+!
+    call read_metablocks_h5(fid)
+
+! close the file
+!
+    call h5fclose_f(fid, err)
+
+! if the file could not be closed print message and quit
+!
+    if (err > 0) then
+      call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+!! 1. RESTORE DATA BLOCKS
+!!
+! separate data blocks reading into two cases, when the number of processors is
+! larger or equal to the number of files, and when we have less processors than
+! files
+!
+! first, read data blocks to processes which have corresponding restart file
+!
+    if (nproc < nfiles) then
+
+! prepare the filename
+!
+      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, nproc, '.h5'
+
+! check if the HDF5 file exists
+!
+      inquire(file = fl, exist = info)
+
+! if file does not exist, print error and quit the subroutine
+!
+      if (.not. info) then
+        call print_error("io::read_data_h5", "File " // trim(fl)               &
+                                                        // " does not exist!")
+        call h5close_f(err)
+        return
+      end if ! file does not exist
+
+! check if this file is in the HDF5 format
+!
+      call h5fis_hdf5_f(fl, info, err)
+
+! if the format verification failed, close the interface, print error and exit
+!
+      if (err < 0) then
+        call print_error("io::read_data_h5", "Cannot check the file format!")
+        call h5close_f(err)
+        return
+      end if
+
+! the file is not in the HDF5 format, print message and quit
+!
+      if (.not. info) then
+        call print_error("io::read_data_h5", "File " // trim(fl)               &
+                                                   // " is not an HDF5 file!")
+        call h5close_f(err)
+        return
+      end if
+
+! open the HDF5 file
+!
+      call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+      if (err < 0) then
+        call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+        call h5close_f(err)
+        return
+      end if
+
+! read data blocks
+!
+      call read_datablocks_h5(fid)
+
+! close the file
+!
+      call h5fclose_f(fid, err)
+
+! if the file could not be closed print message and quit
+!
+      if (err > 0) then
+        call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+        call h5close_f(err)
+        return
+      end if
+
+    end if ! nproc < nfiles
+
+! if there are more files than processes, read the remaining files by
+! the last process and redistribute blocks after each processed file,
+! otherwise only redistribute blocks
+!
+    if (nprocs < nfiles) then
+
+! iterate over remaining files and read one by one to the last block
+!
+      do lfile = nprocs, nfiles - 1
+
+! read the remaining files by the last process only
+!
+        if (nproc == nprocs - 1) then
+
+! prepare the filename
+!
+          write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lfile, '.h5'
+
+! check if the HDF5 file exists
+!
+          inquire(file = fl, exist = info)
+
+! if file does not exist, print error and quit the subroutine
+!
+          if (.not. info) then
+            call print_error("io::read_data_h5", "File " // trim(fl)           &
+                                                        // " does not exist!")
+            call h5close_f(err)
+            return
+          end if ! file does not exist
+
+! check if this file is in the HDF5 format
+!
+          call h5fis_hdf5_f(fl, info, err)
+
+! if the format verification failed, close the interface, print error and exit
+!
+          if (err < 0) then
+            call print_error("io::read_data_h5"                                &
+                                            , "Cannot check the file format!")
+            call h5close_f(err)
+            return
+          end if
+
+! the file is not in the HDF5 format, print message and quit
+!
+          if (.not. info) then
+            call print_error("io::read_data_h5", "File " // trim(fl)           &
+                                                   // " is not an HDF5 file!")
+            call h5close_f(err)
+            return
+          end if
+
+! open the HDF5 file
+!
+          call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+          if (err < 0) then
+            call print_error("io::read_data_h5"                                &
+                                           , "Cannot open file: " // trim(fl))
+            call h5close_f(err)
+            return
+          end if
+
+! read data blocks
+!
+          call read_datablocks_h5(fid)
+
+! close the file
+!
+          call h5fclose_f(fid, err)
+
+! if the file could not be closed print message and quit
+!
+          if (err > 0) then
+            call print_error("io::read_data_h5"                                &
+                                          , "Cannot close file: " // trim(fl))
+            call h5close_f(err)
+            return
+          end if
+
+        end if ! nproc == nprocs - 1
+
+#ifdef MPI
+! redistribute blocks between processors
+!
+        call redistribute_blocks()
+#endif /* MPI */
+
+      end do ! lfile = nprocs, nfiles - 1
+
+    else ! nprocs < nfiles
+
+#ifdef MPI
+! redistribute blocks between processors
+!
+      call redistribute_blocks()
+#endif /* MPI */
+
+    end if ! nprocs < nfiles
+
+! deallocate the array of block pointers
+!
+    if (allocated(block_array)) deallocate(block_array)
+
+! close the FORTRAN interface
+!
+    call h5close_f(err)
+
+! check if the interface has been closed successfuly
+!
+    if (err > 0) then
+      call print_error("io::read_data_h5"                                      &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_data_h5
+!
 !===============================================================================
 !
 ! write_data_h5: wrapper subroutine for the HDF5 format
@@ -362,7 +736,7 @@ module io
       if (ftype .eq. 'r') then
         write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
       else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nfile, nproc, '.h5'
+        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
       end if
 
 ! create the new HDF5 file
@@ -468,280 +842,6 @@ module io
 !
 !===============================================================================
 !
-! read_data_h5: wrapper subroutine for job restart from a HDF5 format
-!
-! info: subroutine reads and restores the meta and data block structures from
-!       an HDF5 file
-!
-!===============================================================================
-!
-  subroutine read_data_h5()
-
-! references to other modules
-!
-    use error   , only : print_error
-    use hdf5    , only : hid_t
-    use hdf5    , only : H5F_ACC_RDONLY_F
-    use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
-                       , h5fclose_f
-    use mpitools, only : nprocs, nproc
-
-! declare variables
-!
-    implicit none
-
-! local variables
-!
-    character(len=64) :: fl
-    integer(hid_t)    :: fid
-    integer           :: err, lcpu
-    logical           :: info
-!
-!-------------------------------------------------------------------------------
-!
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! check if the interface has been initialized successfuly
-!
-    if (err .ge. 0) then
-
-! read restart parameters, such as, the number of processors and maximum level
-!
-      call read_restart_params_h5()
-
-! if the number of processors is larger then the number of files, use the last
-! file for the remaining processors
-!
-      lcpu = nproc
-      if (rncpus .lt. nprocs) then
-        lcpu = min(rncpus - 1, nproc)
-      end if
-
-! prepare the filename
-!
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
-
-! check if the HDF5 file exists
-!
-      inquire(file = fl, exist = info)
-
-      if (info) then
-
-! check if this is an HDF5 file
-!
-        call h5fis_hdf5_f(fl, info, err)
-
-        if (err .ge. 0) then
-
-          if (info) then
-
-! opent the current HDF5 file
-!
-            call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
-
-! check if the file has been opened successfuly
-!
-            if (err .ge. 0) then
-
-! read global attributes
-!
-              call read_attributes_h5(fid)
-
-! read meta blocks
-!
-              call read_metablocks_h5(fid)
-
-! read data blocks
-!
-              if (lcpu .eq. nproc) call read_datablocks_h5(fid)
-
-! terminate access to the current file
-!
-              call h5fclose_f(fid, err)
-
-! check if the file has been closed successfully
-!
-              if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-                call print_error("io::read_data_h5"                            &
-                                            , "Cannot close file: " // trim(fl))
-
-              end if
-
-            else
-
-! print error about the problem with opening the HDF5 file
-!
-              call print_error("io::read_data_h5"  &
-                                             , "Cannot open file: " // trim(fl))
-
-            end if
-
-          else
-
-! print error about the wrong file format
-!
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                     // " is not an HDF5 file!")
-          end if
-
-        else
-
-! print error about the problem with checking the file format
-!
-          call print_error("io::read_data_h5", "Cannot check the file format!")
-
-        end if
-
-      else
-
-! print error since files does not exist
-!
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                     // " does not exist!")
-      end if
-
-! if the number of files is larger than the number of processors read the
-! remaining files and allocate data blocks in the last processor
-!
-      if (rncpus .gt. nprocs) then
-
-! perform the rest only on the last processor
-!
-        if (nproc .eq. (nprocs - 1)) then
-
-! iterate over the remaining files
-!
-          do lcpu = nprocs, rncpus - 1
-
-! prepare the filename
-!
-            write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
-
-! check if the HDF5 file exists
-!
-            inquire(file = fl, exist = info)
-
-! check if the file exists
-!
-            if (info) then
-
-! check if this is an HDF5 file
-!
-              call h5fis_hdf5_f(fl, info, err)
-
-              if (err .ge. 0) then
-
-                if (info) then
-
-! opent the current HDF5 file
-!
-                  call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
-
-! check if the file has been opened successfuly
-!
-                  if (err .ge. 0) then
-
-! read data blocks
-!
-                    call read_datablocks_h5(fid)
-
-! terminate access to the current file
-!
-                    call h5fclose_f(fid, err)
-
-! check if the file has been closed successfully
-!
-                    if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-                      call print_error("io::read_data_h5"                      &
-                                          , "Cannot close file: " // trim(fl))
-
-                    end if
-
-                  else
-
-! print error about the problem with opening the HDF5 file
-!
-                    call print_error("io::read_data_h5"                        &
-                                           , "Cannot open file: " // trim(fl))
-
-                  end if
-
-                else
-
-! print error about the wrong file format
-!
-                  call print_error("io::read_data_h5"                          &
-                             , "File " // trim(fl) // " is not an HDF5 file!")
-                end if
-
-              else
-
-! print error about the problem with checking the file format
-!
-                call print_error("io::read_data_h5"                            &
-                                            , "Cannot check the file format!")
-
-              end if
-
-
-            else
-
-! print error since the file does not exist
-!
-              call print_error("io::read_data_h5"                              &
-                                  , "File " // trim(fl) // " does not exist!")
-
-            end if
-
-          end do
-
-        end if
-
-      end if
-
-! deallocate the array of block pointers
-!
-      if (allocated(block_array)) deallocate(block_array)
-
-! close the FORTRAN interface
-!
-      call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the HDF5 Fortran interface
-!
-        call print_error("io::read_data_h5"  &
-                                   , "Cannot close the HDF5 Fortran interface!")
-
-      end if
-
-    else
-
-! print the error about the problem with initialization of the HDF5 Fortran
-! interface
-!
-      call print_error("io::read_data_h5"  &
-                              , "Cannot initialize the HDF5 Fortran interface!")
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_data_h5
-!
-!===============================================================================
-!
 ! read_restart_params_h5: subroutine reads parameters required to decide how to
 !                         restart the job
 !
@@ -803,7 +903,7 @@ module io
 
 ! read attribute 'nprocs'
 !
-            call h5aopen_by_name_f(fid, "/attributes", "ncpus", aid, err)
+            call h5aopen_by_name_f(fid, "/attributes", "nprocs", aid, err)
 
 ! check if the attribute has been opened successfully
 !
@@ -811,7 +911,7 @@ module io
 
 ! read the attribute nprocs
 !
-              call read_attribute_integer_h5(aid, "ncpus", rncpus)
+              call read_attribute_integer_h5(aid, "nprocs", nfiles)
 
 ! close the attribute
 !
@@ -824,7 +924,7 @@ module io
 ! print error about the problem with closing the current file
 !
                 call print_error("io::read_restart_params_h5"                  &
-                                        , "Cannot close the attribute ncpus!")
+                                       , "Cannot close the attribute nprocs!")
 
               end if
 
@@ -833,7 +933,7 @@ module io
 ! print error about the problem with opening the attribute
 !
               call print_error("io::read_restart_params_h5"                    &
-                                         , "Cannot open the attribute ncpus!")
+                                        , "Cannot open the attribute nprocs!")
 
             end if
 
@@ -947,7 +1047,7 @@ module io
     use coordinates, only : nn, ng, in, jn, kn, minlev, maxlev, toplev, ir, jr, kr
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error
-    use evolution, only : n, t, dt, dtn
+    use evolution, only : step, time, dt, dtn
     use hdf5     , only : hid_t
     use hdf5     , only : h5gcreate_f, h5gclose_f
     use mpitools , only : nprocs, nproc
@@ -993,11 +1093,10 @@ module io
       call write_attribute_integer_h5(gid, 'minlev' , minlev)
       call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
       call write_attribute_integer_h5(gid, 'toplev' , toplev)
-      call write_attribute_integer_h5(gid, 'ncpus'  , nprocs)
-      call write_attribute_integer_h5(gid, 'ncpu'   , nproc)
+      call write_attribute_integer_h5(gid, 'nprocs' , nprocs)
+      call write_attribute_integer_h5(gid, 'nproc'  , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
-      call write_attribute_integer_h5(gid, 'iter'   , n)
-      call write_attribute_integer_h5(gid, 'nfile'  , nfile)
+      call write_attribute_integer_h5(gid, 'step'   , step  )
 
 ! store the real attributes
 !
@@ -1007,7 +1106,7 @@ module io
       call write_attribute_double_h5(gid, 'ymax', ymax)
       call write_attribute_double_h5(gid, 'zmin', zmin)
       call write_attribute_double_h5(gid, 'zmax', zmax)
-      call write_attribute_double_h5(gid, 'time', t   )
+      call write_attribute_double_h5(gid, 'time', time)
       call write_attribute_double_h5(gid, 'dt'  , dt  )
       call write_attribute_double_h5(gid, 'dtn' , dtn )
 
@@ -1089,7 +1188,7 @@ module io
     use coordinates, only : initialize_coordinates, finalize_coordinates
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
     use error    , only : print_error, print_warning
-    use evolution, only : n, t, dt, dtn
+    use evolution, only : step, time, dt, dtn
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
                         , h5aopen_idx_f, h5aclose_f, h5aget_name_f
@@ -1112,7 +1211,7 @@ module io
     integer(kind=4)   :: dm(3)
     integer           :: err, i, l
     integer           :: nattrs, lndims, llast_id, lmblocks, lnleafs           &
-                       , lncells, lnghost, lnseeds, lmaxlev, lncpu
+                       , lncells, lnghost, lnseeds, lmaxlev, lnproc
 
 ! local pointers
 !
@@ -1193,8 +1292,10 @@ module io
 !
                 ucor = 2**(maxlev - lmaxlev)
               end if
-            case('ncpu')
-              call read_attribute_integer_h5(aid, aname, lncpu)
+            case('nprocs')
+              call read_attribute_integer_h5(aid, aname, nfiles)
+            case('nproc')
+              call read_attribute_integer_h5(aid, aname, lnproc)
             case('last_id')
               call read_attribute_integer_h5(aid, aname, llast_id)
             case('mblocks')
@@ -1219,12 +1320,10 @@ module io
                 call print_error("io::read_attributes_h5"                      &
                       , "File and program block ghost layers are incompatible!")
               end if
-            case('iter')
-              call read_attribute_integer_h5(aid, aname, n)
-            case('nfile')
-              call read_attribute_integer_h5(aid, aname, nfile)
+            case('step')
+              call read_attribute_integer_h5(aid, aname, step)
             case('time')
-              call read_attribute_double_h5(aid, aname, t)
+              call read_attribute_double_h5(aid, aname, time)
             case('dt')
               call read_attribute_double_h5(aid, aname, dt)
             case('dtn')
@@ -1244,12 +1343,12 @@ module io
             case('nseeds')
               call read_attribute_integer_h5(aid, aname, lnseeds)
 
-! check if the numbers of seeds are compatible
-!
-              if (lnseeds .ne. nseeds) then
-                call print_error("io::read_attributes_h5"                      &
-                , "The number of seeds from file and program are incompatible!")
-              end if
+! ! check if the numbers of seeds are compatible
+! !
+!               if (lnseeds .ne. nseeds) then
+!                 call print_error("io::read_attributes_h5"                      &
+!                 , "The number of seeds from file and program are incompatible!")
+!               end if
             case('seeds')
 
 ! check if the numbers of seeds are compatible
@@ -2550,117 +2649,161 @@ module io
 !
 !===============================================================================
 !
-! write_datablocks_h5: subroutine writes datablocks in the HDF5 format connected
-!                      to the provided identificator
+! subroutine WRITE_DATABLOCKS_H5:
+! ------------------------------
 !
-! info: this subroutine stores only the datablocks
+!   Subroutine writes all data block fields in the new group 'datablocks'
+!   in the provided handler to the HDF5 file.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
   subroutine write_datablocks_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : get_dblocks
-    use coordinates, only : im, jm, km
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gcreate_f, h5gclose_f
-    use equations, only : nv
+    use blocks         , only : ndims
+    use blocks         , only : block_meta, block_data, list_data
+    use blocks         , only : get_dblocks
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine variables
 !
     integer(hid_t), intent(in) :: fid
 
+! local pointers
+!
+    type(block_meta), pointer  :: pmeta
+    type(block_data), pointer  :: pdata
+
 ! local variables
 !
-    integer(hid_t)                 :: gid
-    integer(kind=4)                :: l
-    integer                        :: err
+    integer(hid_t)             :: gid
+    integer(kind=4)            :: l
+    integer                    :: err
+
+! local arrays
+!
     integer(hsize_t), dimension(1) :: am
-    integer(hsize_t), dimension(5) :: cm, dm
-    integer(hsize_t), dimension(6) :: qm
+    integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)          , allocatable :: met
-    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: u
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
+    integer(kind=4), dimension(:)          , allocatable :: id
+    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: uv, qv
 !
 !-------------------------------------------------------------------------------
 !
-! create the group for datablocks
+! create a new group for storing data blocks
 !
     call h5gcreate_f(fid, 'datablocks', gid, err)
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
-! store data blocks only if there are some on the current processor
+! store data blocks only if there is at least one belonging to
+! the current process
 !
-      if (get_dblocks() .gt. 0) then
+      if (get_dblocks() > 0) then
 
 ! prepate dimensions
 !
         am(1) = get_dblocks()
-        cm(1) = get_dblocks()
         dm(1) = get_dblocks()
         dm(2) = nv
         dm(3) = im
         dm(4) = jm
         dm(5) = km
-        qm(1) = get_dblocks()
-        qm(2) = NDIMS
-        qm(3) = nv
-        qm(4) = im
-        qm(5) = jm
-        qm(6) = km
-        cm(2) = 3
-        cm(3) = im
-        cm(4) = jm
-        cm(5) = km
 
-! allocate arrays to store datablocks data
+! allocate arrays to store associated meta block identificators, conserved and
+! primitive variables
 !
-        allocate(met(am(1)))
-        allocate(u  (dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(id(am(1)))
+        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
-! iterate over all metablocks and fill in the arrays for storage
+! reset the block counter
 !
-        l = 1
+        l = 0
+
+! associate the pointer with the first block in the data block list
+!
         pdata => list_data
+
+! iterate over all data blocks and fill in the arrays id, u, and q
+!
         do while(associated(pdata))
 
-          if (associated(pdata%meta)) met(l) = pdata%meta%id
-
-          u(l,:,:,:,:)   = pdata%u(:,:,:,:)
-
-          l = l + 1
-          pdata => pdata%next
-        end do
-
-! store datablocks in the HDF5 file
+#ifdef DEBUG
+! store only data from data blocks associated with meta blocks
 !
-        call write_vector_integer_h5(gid, 'meta', am(1), met)
-        call write_array5_double_h5 (gid, 'u'   , dm(:), u)
+          if (associated(pdata%meta)) then
+
+! increase the block counter
+!
+            l             = l + 1
+
+! fill in the meta block ID array
+!
+            id(l)         = pdata%meta%id
+
+! fill in the conservative and primitive variable arrays
+!
+            uv(l,:,:,:,:) = pdata%u(:,:,:,:)
+            qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+
+          else ! meta block not associated
+
+! print error about the lack of associated meta block
+!
+            call print_error("io::write_datablocks_h5"                         &
+                                                , "Meta block no associated!")
+
+          end if ! meta block not associated
+#else /* DEBUG */
+! increase the block counter
+!
+          l             = l + 1
+
+! fill in the meta block ID array
+!
+          id(l)         = pdata%meta%id
+
+! fill in the conservative and primitive variable arrays
+!
+          uv(l,:,:,:,:) = pdata%u(:,:,:,:)
+          qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+#endif /* DEBUG */
+
+! associate the pointer with the next data block on the list
+!
+          pdata => pdata%next
+
+        end do ! data blocks
+
+! store data arrays in the current group
+!
+        call write_vector_integer_h5(gid, 'meta', am(1), id)
+        call write_array5_double_h5 (gid, 'uvar', dm(:), uv)
+        call write_array5_double_h5 (gid, 'qvar', dm(:), qv)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(met)) deallocate(met)
-        if (allocated(u)  ) deallocate(u)
+        if (allocated(id)) deallocate(id)
+        if (allocated(uv)) deallocate(uv)
+        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
@@ -2670,7 +2813,7 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
@@ -2692,49 +2835,55 @@ module io
 !
 !===============================================================================
 !
-! read_datablocks_h5: subroutine restored datablocks from the HDF5 restart file
+! subroutine READ_DATABLOCKS_H5:
+! -----------------------------
 !
-! info: this subroutine restores only the datablocks
+!   Subroutine reads all data blocks stored in the group 'datablocks' of
+!   the provided handler to the HDF5 restart file.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
   subroutine read_datablocks_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : append_datablock, link_blocks
-    use coordinates, only : im, jm, km
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f
+    use blocks         , only : block_meta, block_data, list_data
+    use blocks         , only : append_datablock, link_blocks
+    use coordinates    , only : im, jm, km
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine variables
 !
-    integer(hid_t), intent(in) :: fid
+    integer(hid_t), intent(in)     :: fid
+
+! local pointers
+!
+    type(block_data), pointer      :: pdata
 
 ! local variables
 !
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
     integer                        :: err
+
+! local arrays
+!
     integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)        , allocatable :: m
-    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: u
-
-! local pointers
-!
-    type(block_data), pointer :: pdata
+    integer(kind=4), dimension(:)        , allocatable :: id
+    real(kind=8)   , dimension(:,:,:,:,:), allocatable :: uv, qv
 !
 !-------------------------------------------------------------------------------
 !
@@ -2742,29 +2891,31 @@ module io
 !
     call read_datablock_dims_h5(fid, dm(:))
 
-! open the datablock group
+! open the group 'datablocks'
 !
     call h5gopen_f(fid, 'datablocks', gid, err)
 
 ! check if the datablock group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
-! restore all data blocks
+! restore data blocks only if there are any
 !
-      if (dm(1) .gt. 0) then
+      if (dm(1) > 0) then
 
-! allocate array to restore datablocks data
+! allocate arrays to read data
 !
-        allocate(m(dm(1)))
-        allocate(u(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(id(dm(1)))
+        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
-! read datablocks from the HDF5 file
+! read array data from the HDF5 file
 !
-        call read_vector_integer_h5(gid, 'meta', dm(1:1), m(:))
-        call read_array5_double_h5 (gid, 'u'   , dm(1:5), u(:,:,:,:,:))
+        call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
+        call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+        call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
 
-! iterate over all data blocks, allocate them and fill their U arrays
+! iterate over data blocks, allocate them and fill out their fields
 !
         do l = 1, dm(1)
 
@@ -2772,20 +2923,22 @@ module io
 !
           call append_datablock(pdata)
 
-! associate a meta block with the current data block
+! associate the corresponding meta block with the current data block
 !
-          call link_blocks(block_array(m(l))%ptr, pdata)
+          call link_blocks(block_array(id(l))%ptr, pdata)
 
-! fill out the array of conservative variables
+! fill out the array of conservative and primitive variables
 !
-          pdata%u(:,:,:,:) = u(l,:,:,:,:)
+          pdata%u(:,:,:,:) = uv(l,:,:,:,:)
+          pdata%q(:,:,:,:) = qv(l,:,:,:,:)
 
-        end do
+        end do ! l = 1, dm(1)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(m)) deallocate(m)
-        if (allocated(u)) deallocate(u)
+        if (allocated(id)) deallocate(id)
+        if (allocated(uv)) deallocate(uv)
+        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
@@ -2795,12 +2948,12 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
         call print_error("io::read_datablocks_h5"                              &
-                                              , "Cannot close datablock group!")
+                                           , "Cannot close data block group!")
 
       end if
 
@@ -2808,7 +2961,8 @@ module io
 
 ! print error about the problem with opening the group
 !
-      call print_error("io::read_datablocks_h5", "Cannot open datablock group!")
+      call print_error("io::read_datablocks_h5"                                &
+                                            , "Cannot open data block group!")
 
     end if
 

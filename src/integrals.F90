@@ -138,7 +138,7 @@ module integrals
     use blocks   , only : block_meta, block_data, list_data
     use coordinates, only : ib, ie, jb, je, kb, ke
     use coordinates, only : advol
-    use evolution, only : n, t, dt
+    use evolution, only : step, time, dt
     use mpitools , only : master
 #ifdef MPI
     use mpitools , only : reduce_sum_real_array
@@ -211,7 +211,7 @@ module integrals
 ! close integrals.dat
 !
     if (master) then
-      write(funit,"(i8,12(1x,1pe15.8))") n, t, dt, arr(1:10)
+      write(funit,"(i8,12(1x,1pe15.8))") step, time, dt, arr(1:10)
     end if
 !
 !-------------------------------------------------------------------------------
