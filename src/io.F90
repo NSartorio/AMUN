@@ -71,7 +71,7 @@ module io
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
-  integer(kind=4)   , save :: rtoplev = 1, rnprocs = 1
+  integer(kind=4)   , save :: rtoplev = 1, nfiles = 1
 
 ! the coefficient related to the difference between the maximum level stored in
 ! the restart file and set through the configuration file
@@ -326,25 +326,31 @@ module io
 #ifdef HDF5
 !===============================================================================
 !
-! read_data_h5: wrapper subroutine for job restart from a HDF5 format
+! subroutine READ_DATA_H5:
+! -----------------------
 !
-! info: subroutine reads and restores the meta and data block structures from
-!       an HDF5 file
+!   Subroutine reads parameters, meta and data blocks stored in
+!   the HDF5 format restart files and reconstructs the data structure
+!   in order to resume a terminated job.
+!
 !
 !===============================================================================
 !
   subroutine read_data_h5()
 
-! references to other modules
+! import external procedures and variables
 !
-    use error   , only : print_error
-    use hdf5    , only : hid_t
-    use hdf5    , only : H5F_ACC_RDONLY_F
-    use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
-                       , h5fclose_f
-    use mpitools, only : nprocs, nproc
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_RDONLY_F
+    use hdf5           , only : h5open_f, h5close_f
+    use hdf5           , only : h5fis_hdf5_f, h5fopen_f, h5fclose_f
+#ifdef MPI
+    use mesh           , only : redistribute_blocks
+#endif /* MPI */
+    use mpitools       , only : nprocs, nproc
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
@@ -352,246 +358,289 @@ module io
 !
     character(len=64) :: fl
     integer(hid_t)    :: fid
-    integer           :: err, lcpu
+    integer           :: err, lfile
     logical           :: info
 !
 !-------------------------------------------------------------------------------
 !
+!! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
+!!
+! prepare the filename
+!
+    write (fl, '("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+
+! check if the HDF5 file exists
+!
+    inquire(file = fl, exist = info)
+
+! if file does not exist, print error and quit the subroutine
+!
+    if (.not. info) then
+      call print_error("io::read_data_h5", "File " // trim(fl)                 &
+                                                        // " does not exist!")
+      return
+    end if ! file does not exist
+
 ! initialize the FORTRAN interface
 !
     call h5open_f(err)
 
-! check if the interface has been initialized successfuly
+! in the case of error, print a message and quit the subroutine
 !
-    if (err .ge. 0) then
+    if (err < 0) then
+      call print_error("io::read_data_h5"                                      &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
 
-! read restart parameters, such as, the number of processors and maximum level
+! check if this file is in the HDF5 format
 !
-      call read_restart_params_h5()
+    call h5fis_hdf5_f(fl, info, err)
 
-! if the number of processors is larger then the number of files, use the last
-! file for the remaining processors
+! if the format verification failed, close the interface, print error and exit
 !
-      lcpu = nproc
-      if (rnprocs .lt. nprocs) then
-        lcpu = min(rnprocs - 1, nproc)
-      end if
+    if (err < 0) then
+      call print_error("io::read_data_h5", "Cannot check the file format!")
+      call h5close_f(err)
+      return
+    end if
+
+! the file is not in the HDF5 format, print message and quit
+!
+    if (.not. info) then
+      call print_error("io::read_data_h5", "File " // trim(fl)                 &
+                                                   // " is not an HDF5 file!")
+      call h5close_f(err)
+      return
+    end if
+
+! opent the HDF5 file
+!
+    call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+    if (err < 0) then
+      call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+! read global attributes
+!
+    call read_attributes_h5(fid)
+
+! read meta blocks and recreate the meta block hierarchy
+!
+    call read_metablocks_h5(fid)
+
+! close the file
+!
+    call h5fclose_f(fid, err)
+
+! if the file could not be closed print message and quit
+!
+    if (err > 0) then
+      call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+!! 1. RESTORE DATA BLOCKS
+!!
+! separate data blocks reading into two cases, when the number of processors is
+! larger or equal to the number of files, and when we have less processors than
+! files
+!
+! first, read data blocks to processes which have corresponding restart file
+!
+    if (nproc < nfiles) then
 
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
+      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, nproc, '.h5'
 
 ! check if the HDF5 file exists
 !
       inquire(file = fl, exist = info)
 
-      if (info) then
-
-! check if this is an HDF5 file
+! if file does not exist, print error and quit the subroutine
 !
-        call h5fis_hdf5_f(fl, info, err)
+      if (.not. info) then
+        call print_error("io::read_data_h5", "File " // trim(fl)               &
+                                                        // " does not exist!")
+        call h5close_f(err)
+        return
+      end if ! file does not exist
 
-        if (err .ge. 0) then
-
-          if (info) then
-
-! opent the current HDF5 file
+! check if this file is in the HDF5 format
 !
-            call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+      call h5fis_hdf5_f(fl, info, err)
 
-! check if the file has been opened successfuly
+! if the format verification failed, close the interface, print error and exit
 !
-            if (err .ge. 0) then
+      if (err < 0) then
+        call print_error("io::read_data_h5", "Cannot check the file format!")
+        call h5close_f(err)
+        return
+      end if
 
-! read global attributes
+! the file is not in the HDF5 format, print message and quit
 !
-              call read_attributes_h5(fid)
+      if (.not. info) then
+        call print_error("io::read_data_h5", "File " // trim(fl)               &
+                                                   // " is not an HDF5 file!")
+        call h5close_f(err)
+        return
+      end if
 
-! read meta blocks
+! open the HDF5 file
 !
-              call read_metablocks_h5(fid)
+      call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+      if (err < 0) then
+        call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+        call h5close_f(err)
+        return
+      end if
 
 ! read data blocks
 !
-              if (lcpu .eq. nproc) call read_datablocks_h5(fid)
+      call read_datablocks_h5(fid)
 
-! terminate access to the current file
+! close the file
 !
-              call h5fclose_f(fid, err)
+      call h5fclose_f(fid, err)
 
-! check if the file has been closed successfully
+! if the file could not be closed print message and quit
 !
-              if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-                call print_error("io::read_data_h5"                            &
-                                            , "Cannot close file: " // trim(fl))
-
-              end if
-
-            else
-
-! print error about the problem with opening the HDF5 file
-!
-              call print_error("io::read_data_h5"  &
-                                             , "Cannot open file: " // trim(fl))
-
-            end if
-
-          else
-
-! print error about the wrong file format
-!
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                     // " is not an HDF5 file!")
-          end if
-
-        else
-
-! print error about the problem with checking the file format
-!
-          call print_error("io::read_data_h5", "Cannot check the file format!")
-
-        end if
-
-      else
-
-! print error since files does not exist
-!
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                     // " does not exist!")
+      if (err > 0) then
+        call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+        call h5close_f(err)
+        return
       end if
 
-! if the number of files is larger than the number of processors read the
-! remaining files and allocate data blocks in the last processor
-!
-      if (rnprocs .gt. nprocs) then
+    end if ! nproc < nfiles
 
-! perform the rest only on the last processor
+! if there are more files than processes, read the remaining files by
+! the last process and redistribute blocks after each processed file,
+! otherwise only redistribute blocks
 !
-        if (nproc .eq. (nprocs - 1)) then
+    if (nprocs < nfiles) then
 
-! iterate over the remaining files
+! iterate over remaining files and read one by one to the last block
 !
-          do lcpu = nprocs, rnprocs - 1
+      do lfile = nprocs, nfiles - 1
+
+! read the remaining files by the last process only
+!
+        if (nproc == nprocs - 1) then
 
 ! prepare the filename
 !
-            write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lcpu, '.h5'
+          write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lfile, '.h5'
 
 ! check if the HDF5 file exists
 !
-            inquire(file = fl, exist = info)
+          inquire(file = fl, exist = info)
 
-! check if the file exists
+! if file does not exist, print error and quit the subroutine
 !
-            if (info) then
+          if (.not. info) then
+            call print_error("io::read_data_h5", "File " // trim(fl)           &
+                                                        // " does not exist!")
+            call h5close_f(err)
+            return
+          end if ! file does not exist
 
-! check if this is an HDF5 file
+! check if this file is in the HDF5 format
 !
-              call h5fis_hdf5_f(fl, info, err)
+          call h5fis_hdf5_f(fl, info, err)
 
-              if (err .ge. 0) then
-
-                if (info) then
-
-! opent the current HDF5 file
+! if the format verification failed, close the interface, print error and exit
 !
-                  call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+          if (err < 0) then
+            call print_error("io::read_data_h5"                                &
+                                            , "Cannot check the file format!")
+            call h5close_f(err)
+            return
+          end if
 
-! check if the file has been opened successfuly
+! the file is not in the HDF5 format, print message and quit
 !
-                  if (err .ge. 0) then
+          if (.not. info) then
+            call print_error("io::read_data_h5", "File " // trim(fl)           &
+                                                   // " is not an HDF5 file!")
+            call h5close_f(err)
+            return
+          end if
+
+! open the HDF5 file
+!
+          call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! if the file could not be opened, print message and quit
+!
+          if (err < 0) then
+            call print_error("io::read_data_h5"                                &
+                                           , "Cannot open file: " // trim(fl))
+            call h5close_f(err)
+            return
+          end if
 
 ! read data blocks
 !
-                    call read_datablocks_h5(fid)
+          call read_datablocks_h5(fid)
 
-! terminate access to the current file
+! close the file
 !
-                    call h5fclose_f(fid, err)
+          call h5fclose_f(fid, err)
 
-! check if the file has been closed successfully
+! if the file could not be closed print message and quit
 !
-                    if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-                      call print_error("io::read_data_h5"                      &
+          if (err > 0) then
+            call print_error("io::read_data_h5"                                &
                                           , "Cannot close file: " // trim(fl))
+            call h5close_f(err)
+            return
+          end if
 
-                    end if
+        end if ! nproc == nprocs - 1
 
-                  else
-
-! print error about the problem with opening the HDF5 file
+#ifdef MPI
+! redistribute blocks between processors
 !
-                    call print_error("io::read_data_h5"                        &
-                                           , "Cannot open file: " // trim(fl))
+        call redistribute_blocks()
+#endif /* MPI */
 
-                  end if
+      end do ! lfile = nprocs, nfiles - 1
 
-                else
+    else ! nprocs < nfiles
 
-! print error about the wrong file format
+#ifdef MPI
+! redistribute blocks between processors
 !
-                  call print_error("io::read_data_h5"                          &
-                             , "File " // trim(fl) // " is not an HDF5 file!")
-                end if
+      call redistribute_blocks()
+#endif /* MPI */
 
-              else
-
-! print error about the problem with checking the file format
-!
-                call print_error("io::read_data_h5"                            &
-                                            , "Cannot check the file format!")
-
-              end if
-
-
-            else
-
-! print error since the file does not exist
-!
-              call print_error("io::read_data_h5"                              &
-                                  , "File " // trim(fl) // " does not exist!")
-
-            end if
-
-          end do
-
-        end if
-
-      end if
+    end if ! nprocs < nfiles
 
 ! deallocate the array of block pointers
 !
-      if (allocated(block_array)) deallocate(block_array)
+    if (allocated(block_array)) deallocate(block_array)
 
 ! close the FORTRAN interface
 !
-      call h5close_f(err)
+    call h5close_f(err)
 
 ! check if the interface has been closed successfuly
 !
-      if (err .gt. 0) then
-
-! print error about the problem with closing the HDF5 Fortran interface
-!
-        call print_error("io::read_data_h5"  &
-                                   , "Cannot close the HDF5 Fortran interface!")
-
-      end if
-
-    else
-
-! print the error about the problem with initialization of the HDF5 Fortran
-! interface
-!
-      call print_error("io::read_data_h5"  &
-                              , "Cannot initialize the HDF5 Fortran interface!")
-
+    if (err > 0) then
+      call print_error("io::read_data_h5"                                      &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
     end if
 
 !-------------------------------------------------------------------------------
@@ -824,7 +873,7 @@ module io
 
 ! read the attribute nprocs
 !
-              call read_attribute_integer_h5(aid, "nprocs", rnprocs)
+              call read_attribute_integer_h5(aid, "nprocs", nfiles)
 
 ! close the attribute
 !
@@ -1206,6 +1255,8 @@ module io
 !
                 ucor = 2**(maxlev - lmaxlev)
               end if
+            case('nprocs')
+              call read_attribute_integer_h5(aid, aname, nfiles)
             case('nproc')
               call read_attribute_integer_h5(aid, aname, lnproc)
             case('last_id')
@@ -1257,12 +1308,12 @@ module io
             case('nseeds')
               call read_attribute_integer_h5(aid, aname, lnseeds)
 
-! check if the numbers of seeds are compatible
-!
-              if (lnseeds .ne. nseeds) then
-                call print_error("io::read_attributes_h5"                      &
-                , "The number of seeds from file and program are incompatible!")
-              end if
+! ! check if the numbers of seeds are compatible
+! !
+!               if (lnseeds .ne. nseeds) then
+!                 call print_error("io::read_attributes_h5"                      &
+!                 , "The number of seeds from file and program are incompatible!")
+!               end if
             case('seeds')
 
 ! check if the numbers of seeds are compatible

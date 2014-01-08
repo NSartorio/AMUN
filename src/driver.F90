@@ -47,9 +47,6 @@ program amun
                            , read_restart_data
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
-#ifdef MPI
-  use mesh          , only : redistribute_blocks
-#endif /* MPI */
   use mpitools      , only : initialize_mpitools, finalize_mpitools
   use mpitools      , only : setup_mpi
 #ifdef MPI
@@ -405,13 +402,6 @@ program amun
 ! reconstruct the meta and data block structures from a given restart file
 !
     call read_restart_data()
-
-#ifdef MPI
-! redistribute blocks between processors in case the number of processors has
-! changed
-!
-    call redistribute_blocks()
-#endif /* MPI */
 
   end if
 
