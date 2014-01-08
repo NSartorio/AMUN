@@ -82,6 +82,17 @@ module io
 !
   type(pointer_meta), dimension(:), allocatable, save :: block_array
 
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_io
+  public :: read_restart_data, write_restart_data, write_data
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
