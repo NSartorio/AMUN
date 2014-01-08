@@ -493,7 +493,7 @@ program amun
 
 ! main loop
 !
-  do while((nsteps < nmax) .and. (t <= tmax) .and. (iterm == 0))
+  do while((nsteps <= nmax) .and. (t < tmax) .and. (iterm == 0))
 
 ! performe one step evolution
 !
