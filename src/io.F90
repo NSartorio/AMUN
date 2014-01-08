@@ -263,17 +263,19 @@ module io
 !
 !===============================================================================
 !
-! restart_job: wrapper subroutine for the job restart from a data file
+! subroutine READ_RESTART_DATA:
+! ----------------------------
 !
-! info: subroutine selects the restoring subroutine from supported output
-!       formats depending on the compilation time options, and restored the
-!       meta and data block structures; at this moment only the HDF5 format is
-!       supported;
+!   Subroutine reads restart files in order to resume the job. This is
+!   a wrapper for specific format storing.
+!
 !
 !===============================================================================
 !
-  subroutine restart_job()
+  subroutine read_restart_data()
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
@@ -289,7 +291,7 @@ module io
     nrest = nres
 
 #ifdef HDF5
-! read HDF5 restart file and rebuild blocks structure
+! read HDF5 restart file and rebuild the meta and data block structures
 !
     call read_data_h5()
 #endif /* HDF5 */
@@ -302,7 +304,7 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine restart_job
+  end subroutine read_restart_data
 !
 !===============================================================================
 !!

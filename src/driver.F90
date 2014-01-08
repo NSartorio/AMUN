@@ -44,7 +44,7 @@ program amun
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io, write_data, write_restart_data     &
-                           , restart_job
+                           , read_restart_data
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
 #ifdef MPI
@@ -404,7 +404,7 @@ program amun
 
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call restart_job()
+    call read_restart_data()
 
 #ifdef MPI
 ! redistribute blocks between processors in case the number of processors has
