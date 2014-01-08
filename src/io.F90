@@ -2563,29 +2563,32 @@ module io
 !
 !===============================================================================
 !
-! write_datablocks_h5: subroutine writes datablocks in the HDF5 format connected
-!                      to the provided identificator
+! subroutine WRITE_DATABLOCKS_H5:
+! ------------------------------
 !
-! info: this subroutine stores only the datablocks
+!   Subroutine writes all data block fields in the new group 'datablocks'
+!   in the provided handler to the HDF5 file.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
   subroutine write_datablocks_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data, list_data
-    use blocks   , only : get_dblocks
-    use coordinates, only : im, jm, km
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gcreate_f, h5gclose_f
-    use equations, only : nv
+    use blocks         , only : ndims
+    use blocks         , only : block_meta, block_data, list_data
+    use blocks         , only : get_dblocks
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
@@ -2593,87 +2596,128 @@ module io
 !
     integer(hid_t), intent(in) :: fid
 
+! local pointers
+!
+    type(block_meta), pointer  :: pmeta
+    type(block_data), pointer  :: pdata
+
 ! local variables
 !
-    integer(hid_t)                 :: gid
-    integer(kind=4)                :: l
-    integer                        :: err
+    integer(hid_t)             :: gid
+    integer(kind=4)            :: l
+    integer                    :: err
+
+! local arrays
+!
     integer(hsize_t), dimension(1) :: am
-    integer(hsize_t), dimension(5) :: cm, dm
-    integer(hsize_t), dimension(6) :: qm
+    integer(hsize_t), dimension(5) :: dm
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)          , allocatable :: met
-    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: u
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
+    integer(kind=4), dimension(:)          , allocatable :: id
+    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: uv, qv
 !
 !-------------------------------------------------------------------------------
 !
-! create the group for datablocks
+! create a new group for storing data blocks
 !
     call h5gcreate_f(fid, 'datablocks', gid, err)
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
-! store data blocks only if there are some on the current processor
+! store data blocks only if there is at least one belonging to
+! the current process
 !
-      if (get_dblocks() .gt. 0) then
+      if (get_dblocks() > 0) then
 
 ! prepate dimensions
 !
         am(1) = get_dblocks()
-        cm(1) = get_dblocks()
         dm(1) = get_dblocks()
         dm(2) = nv
         dm(3) = im
         dm(4) = jm
         dm(5) = km
-        qm(1) = get_dblocks()
-        qm(2) = NDIMS
-        qm(3) = nv
-        qm(4) = im
-        qm(5) = jm
-        qm(6) = km
-        cm(2) = 3
-        cm(3) = im
-        cm(4) = jm
-        cm(5) = km
 
-! allocate arrays to store datablocks data
+! allocate arrays to store associated meta block identificators, conserved and
+! primitive variables
 !
-        allocate(met(am(1)))
-        allocate(u  (dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(id(am(1)))
+        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
 
-! iterate over all metablocks and fill in the arrays for storage
+! reset the block counter
 !
-        l = 1
+        l = 0
+
+! associate the pointer with the first block in the data block list
+!
         pdata => list_data
+
+! iterate over all data blocks and fill in the arrays id, u, and q
+!
         do while(associated(pdata))
 
-          if (associated(pdata%meta)) met(l) = pdata%meta%id
-
-          u(l,:,:,:,:)   = pdata%u(:,:,:,:)
-
-          l = l + 1
-          pdata => pdata%next
-        end do
-
-! store datablocks in the HDF5 file
+#ifdef DEBUG
+! store only data from data blocks associated with meta blocks
 !
-        call write_vector_integer_h5(gid, 'meta', am(1), met)
-        call write_array5_double_h5 (gid, 'u'   , dm(:), u)
+          if (associated(pdata%meta)) then
+
+! increase the block counter
+!
+            l             = l + 1
+
+! fill in the meta block ID array
+!
+            id(l)         = pdata%meta%id
+
+! fill in the conservative and primitive variable arrays
+!
+            uv(l,:,:,:,:) = pdata%u(:,:,:,:)
+            qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+
+          else ! meta block not associated
+
+! print error about the lack of associated meta block
+!
+            call print_error("io::write_datablocks_h5"                         &
+                                                , "Meta block no associated!")
+
+          end if ! meta block not associated
+#else /* DEBUG */
+! increase the block counter
+!
+          l             = l + 1
+
+! fill in the meta block ID array
+!
+          id(l)         = pdata%meta%id
+
+! fill in the conservative and primitive variable arrays
+!
+          uv(l,:,:,:,:) = pdata%u(:,:,:,:)
+          qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+#endif /* DEBUG */
+
+! associate the pointer with the next data block on the list
+!
+          pdata => pdata%next
+
+        end do ! data blocks
+
+! store data arrays in the current group
+!
+        call write_vector_integer_h5(gid, 'meta', am(1), id)
+        call write_array5_double_h5 (gid, 'uvar', dm(:), uv)
+        call write_array5_double_h5 (gid, 'qvar', dm(:), qv)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(met)) deallocate(met)
-        if (allocated(u)  ) deallocate(u)
+        if (allocated(id)) deallocate(id)
+        if (allocated(uv)) deallocate(uv)
+        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
@@ -2683,7 +2727,7 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
