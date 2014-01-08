@@ -372,10 +372,6 @@ program amun
 !
     call initialize_mesh(nrun, master, iret)
 
-! initialize the integrals module
-!
-    call init_integrals(.true.)
-
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem
 !
@@ -389,19 +385,27 @@ program amun
 !
     call new_time_step()
 
+! initialize the integrals module
+!
+    call init_integrals(.true.)
+
   else
+
+! increase the run number
+!
+    nrun  = nres + 1
 
 ! initialize the mesh module
 !
     call initialize_mesh(nrun, master, iret)
 
-! initialize the integrals module
-!
-    call init_integrals(.false.)
-
 ! reconstruct the meta and data block structures from a given restart file
 !
     call read_restart_data()
+
+! initialize the integrals module
+!
+    call init_integrals(.false.)
 
   end if
 
