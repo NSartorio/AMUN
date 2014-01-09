@@ -260,7 +260,7 @@ module io
 #ifdef HDF5
 ! store restart file
 !
-    call write_data_h5('r')
+    call write_restart_snapshot_h5()
 #endif /* HDF5 */
 
 #ifdef PROFILE
@@ -690,6 +690,109 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_restart_snapshot_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_RESTART_SNAPSHOT_H5:
+! ------------------------------------
+!
+!   Subroutine writes restart snapshot, i.e. parameters, meta and data blocks
+!   to the HDF5 format restart files in order to resume a terminated job later.
+!
+!
+!===============================================================================
+!
+  subroutine write_restart_snapshot_h5()
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_TRUNC_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools       , only : nproc
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    character(len=64) :: fl
+    integer(hid_t)    :: fid
+    integer           :: err
+!
+!-------------------------------------------------------------------------------
+!
+! initialize the FORTRAN interface
+!
+    call h5open_f(err)
+
+! in the case of error, print a message and quit the subroutine
+!
+    if (err < 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
+
+! prepare the restart snapshot filename
+!
+    write (fl,'(a1,i6.6,"_",i5.5,a3)') 'r', nrest, nproc, '.h5'
+
+! create the new HDF5 file to store the snapshot
+!
+    call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
+
+! if the file could not be created, print message and quit
+!
+    if (err < 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                         , "Cannot create file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+! write the global attributes
+!
+    call write_attributes_h5(fid)
+
+! write all metablocks which represent the internal structure of domain
+!
+    call write_metablocks_h5(fid)
+
+! write all datablocks which represent the all variables
+!
+    call write_datablocks_h5(fid)
+
+! close the file
+!
+    call h5fclose_f(fid, err)
+
+! if the file could not be closed print message and quit
+!
+    if (err > 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                          , "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
+
+! close the FORTRAN interface
+!
+    call h5close_f(err)
+
+! check if the interface has been closed successfuly
+!
+    if (err > 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_restart_snapshot_h5
 !
 !===============================================================================
 !
