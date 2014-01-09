@@ -47,27 +47,31 @@ module io
   integer            , save :: ioi, iow, ios
 #endif /* PROFILE */
 
-! data file type
+! MODULE PARAMETERS:
+! =================
 !
-  character         , save :: ftype   = "p"
-
-! the interval of the snapshots storing
+!   respath - the directory from which the restart snapshots should be read;
+!   ftype   - the type of snapshots to write:
+!        'p' -> all primitive variables (default);
+!        'c' -> all conserved variables;
+!   nres    - for run restarting, this is the number of restart snapshot;
+!   irest   - the local counter for the restart snapshots;
+!   isnap   - the local counter for the regular snapshots;
+!   dtres   - the execution time interval for restart snapshot storing
+!             (in hours);
+!   dtout   - the problem time interval for regular snapshot storing;
 !
-  real              , save :: dtout   = 1.0d+00
-
-! all module parameters
-!
-  integer           , save :: nres    = -1
   character(len=255), save :: respath = "./"
+  character         , save :: ftype   = "p"
+  integer           , save :: nres    = -1
+  integer(kind=4)   , save :: irest   =  0
+  integer(kind=4)   , save :: isnap   = -1
+  real              , save :: dtres   =  6.0d+00
+  real              , save :: dtout   =  1.0d+00
 
 ! flags to determine the way of data writing
 !
   logical           , save :: with_ghosts = .false.
-
-! counters for the stored data and restart files
-!
-  integer(kind=4)   , save :: isnap = -1
-  integer(kind=4)   , save :: nrest =  0
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
@@ -206,7 +210,7 @@ module io
 
 ! set restart file number
 !
-    nrest = nres
+    irest = nres
 
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
@@ -255,7 +259,7 @@ module io
 
 ! increase the file counter
 !
-    nrest = nrest + 1
+    irest = irest + 1
 
 #ifdef HDF5
 ! store restart file
@@ -405,7 +409,7 @@ module io
 !!
 ! prepare the filename
 !
-    write (fl, '("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+    write (fl, '("r",i6.6,"_",i5.5,a3)') irest, 0, '.h5'
 
 ! check if the HDF5 file exists
 !
@@ -499,7 +503,7 @@ module io
 
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, nproc, '.h5'
+      write (fl,'("r",i6.6,"_",i5.5,a3)') irest, nproc, '.h5'
 
 ! check if the HDF5 file exists
 !
@@ -584,7 +588,7 @@ module io
 
 ! prepare the filename
 !
-          write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lfile, '.h5'
+          write (fl,'("r",i6.6,"_",i5.5,a3)') irest, lfile, '.h5'
 
 ! check if the HDF5 file exists
 !
@@ -738,7 +742,7 @@ module io
 
 ! prepare the restart snapshot filename
 !
-    write (fl,'(a1,i6.6,"_",i5.5,a3)') 'r', nrest, nproc, '.h5'
+    write (fl,'(a1,i6.6,"_",i5.5,a3)') 'r', irest, nproc, '.h5'
 
 ! create the new HDF5 file to store the snapshot
 !
@@ -957,7 +961,7 @@ module io
 !
 ! prepare the filename
 !
-    write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+    write (fl,'("r",i6.6,"_",i5.5,a3)') irest, 0, '.h5'
 
 ! check if the HDF5 file exists
 !
