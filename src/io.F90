@@ -59,7 +59,7 @@ module io
 !   isnap   - the local counter for the regular snapshots;
 !   hrest   - the execution time interval for restart snapshot storing
 !             (in hours);
-!   dtout   - the problem time interval for regular snapshot storing;
+!   hsnap   - the problem time interval for regular snapshot storing;
 !
   character(len=255), save :: respath = "./"
   character         , save :: ftype   = "p"
@@ -67,7 +67,7 @@ module io
   integer(kind=4)   , save :: irest   =  1
   integer(kind=4)   , save :: isnap   = -1
   real              , save :: hrest   =  6.0d+00
-  real              , save :: dtout   =  1.0d+00
+  real              , save :: hsnap   =  1.0d+00
 
 ! flags to determine the way of data writing
 !
@@ -160,14 +160,14 @@ module io
 
 ! get restart parameters
 !
-    call get_parameter_string ("restart_path"    , respath)
-    call get_parameter_integer("restart_number"  , nrest  )
-    call get_parameter_real   ("restart_interval", hrest  )
+    call get_parameter_string ("restart_path"     , respath)
+    call get_parameter_integer("restart_number"   , nrest  )
+    call get_parameter_real   ("restart_interval" , hrest  )
 
 ! get the interval between snapshots
 !
-    call get_parameter_string ("ftype"         , ftype  )
-    call get_parameter_real   ("dtout"         , dtout  )
+    call get_parameter_string ("snapshot_type"    , ftype  )
+    call get_parameter_real   ("snapshot_interval", hsnap  )
 
 ! get the flag determining if the ghost cells are stored
 !
@@ -186,9 +186,14 @@ module io
 !
     irun = max(1, nrest)
 
-! print info about restarted job
+! print info about snapshot parameters
 !
     if (verbose) then
+      if (ftype == 'p') write (*,"(4x,a13,10x,'=',1x,a)")                      &
+                                     "snapshot type", "primitive variables"
+      if (ftype == 'c') write (*,"(4x,a13,10x,'=',1x,a)")                      &
+                                     "snapshot type", "conservative variables"
+      write (*,"(4x,a21,2x,'=',1x,e8.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
         dd = int(hrest / 2.4d+01)
         hh = int(mod(hrest, 2.4d+01))
@@ -275,7 +280,7 @@ module io
 
 ! calculate the next snapshot number
 !
-    isnap = int(time / dtout)
+    isnap = int(time / hsnap)
 
 #ifdef PROFILE
 ! stop accounting time for the data reading
@@ -376,7 +381,7 @@ module io
 !
 ! exit the subroutine, if the time of the next snapshot is not reached
 !
-    if (dtout <= 0.0d+00 .or. isnap >= (int(time / dtout))) return
+    if (hsnap <= 0.0d+00 .or. isnap >= (int(time / hsnap))) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -422,10 +427,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-    if (dtout > 0.0d+00) then
-      next_tout = (isnap + 1) * dtout
+    if (hsnap > 0.0d+00) then
+      next_tout = (isnap + 1) * hsnap
     else
-      next_tout = huge(dtout)
+      next_tout = huge(hsnap)
     end if
 
 !-------------------------------------------------------------------------------
