@@ -43,8 +43,9 @@ program amun
   use evolution     , only : step, time, dt
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
-  use io            , only : initialize_io, write_data, write_restart_data     &
-                           , read_restart_data, next_tout
+  use io            , only : initialize_io
+  use io            , only : read_restart_snapshot, write_restart_snapshot
+  use io            , only : write_snapshot, next_tout
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
   use mpitools      , only : initialize_mpitools, finalize_mpitools
@@ -432,7 +433,7 @@ program amun
 
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call read_restart_data()
+    call read_restart_snapshot()
 
 ! initialize the integrals module
 !
@@ -455,7 +456,7 @@ program amun
   if (nres < 0) then
 
     call store_integrals()
-    call write_data()
+    call write_snapshot()
 
 #ifdef MPI
 ! reduce termination flag over all processors
@@ -544,7 +545,7 @@ program amun
 
 ! store data
 !
-    call write_data()
+    call write_snapshot()
 
 ! get current time in seconds
 !
@@ -610,7 +611,7 @@ program amun
 
 ! write down the restart dump
 !
-  call write_restart_data()
+  call write_restart_snapshot()
 
 ! a label to go to if there are any problems, but since all modules have been
 ! initialized, we have to finalize them first

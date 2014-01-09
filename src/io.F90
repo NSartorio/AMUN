@@ -90,7 +90,7 @@ module io
 ! declare public subroutines
 !
   public :: initialize_io
-  public :: read_restart_data, write_restart_data, write_data
+  public :: read_restart_snapshot, write_restart_snapshot, write_snapshot
   public :: next_tout
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -177,16 +177,16 @@ module io
 !
 !===============================================================================
 !
-! subroutine READ_RESTART_DATA:
-! ----------------------------
+! subroutine READ_RESTART_SNAPSHOT:
+! --------------------------------
 !
-!   Subroutine reads restart files in order to resume the job. This is
-!   a wrapper for specific format storing.
+!   Subroutine reads restart snapshot files in order to resume the job.
+!   This is a wrapper calling specific format subroutine.
 !
 !
 !===============================================================================
 !
-  subroutine read_restart_data()
+  subroutine read_restart_snapshot()
 
 ! import external variables
 !
@@ -226,20 +226,20 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_restart_data
+  end subroutine read_restart_snapshot
 !
 !===============================================================================
 !
-! subroutine WRITE_RESTART_DATA:
-! -----------------------------
+! subroutine WRITE_RESTART_SNAPSHOTS:
+! ----------------------------------
 !
-!   Subroutine stores block data in restart files.  This is a wrapper for
-!   specific format storing.
+!   Subroutine stores current snapshot in restart files.
+!   This is a wrapper calling specific format subroutine.
 !
 !
 !===============================================================================
 !
-  subroutine write_restart_data()
+  subroutine write_restart_snapshot()
 
 ! local variables are not implicit by default
 !
@@ -271,12 +271,12 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_restart_data
+  end subroutine write_restart_snapshot
 !
 !===============================================================================
 !
-! subroutine WRITE_DATA:
-! ---------------------
+! subroutine WRITE_SNAPSHOT:
+! -------------------------
 !
 !   Subroutine stores block data in snapshots.  Block variables are grouped
 !   todether and stored in big 4D arrays separately.  This is a wrapper for
@@ -285,7 +285,7 @@ module io
 !
 !===============================================================================
 !
-  subroutine write_data()
+  subroutine write_snapshot()
 
 ! import external variables
 !
@@ -325,7 +325,7 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data
+  end subroutine write_snapshot
 !
 !===============================================================================
 !
