@@ -423,10 +423,6 @@ program amun
 !
     call generate_mesh()
 
-! store mesh statistics
-!
-    call store_mesh_stats(step, time)
-
 ! calculate new timestep
 !
     call new_time_step(dtnext)
@@ -436,6 +432,10 @@ program amun
     call init_integrals(.true.)
 
   end if
+
+! store mesh statistics
+!
+  call store_mesh_stats(step, time)
 
 #ifdef MPI
 ! reduce termination flag over all processors
