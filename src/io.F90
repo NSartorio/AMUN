@@ -211,7 +211,7 @@ module io
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
 !
-    call read_data_h5()
+    call read_restart_snapshot_h5()
 #endif /* HDF5 */
 
 ! calculate the next snapshot number
@@ -364,17 +364,17 @@ module io
 #ifdef HDF5
 !===============================================================================
 !
-! subroutine READ_DATA_H5:
-! -----------------------
+! subroutine READ_RESTART_SNAPSHOT_H5:
+! -----------------------------------
 !
-!   Subroutine reads parameters, meta and data blocks stored in
-!   the HDF5 format restart files and reconstructs the data structure
+!   Subroutine reads restart snapshot, i.e. parameters, meta and data blocks
+!   stored in the HDF5 format restart files and reconstructs the data structure
 !   in order to resume a terminated job.
 !
 !
 !===============================================================================
 !
-  subroutine read_data_h5()
+  subroutine read_restart_snapshot_h5()
 
 ! import external procedures and variables
 !
@@ -683,7 +683,7 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_data_h5
+  end subroutine read_restart_snapshot_h5
 !
 !===============================================================================
 !
