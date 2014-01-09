@@ -414,8 +414,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
     if (.not. info) then
-      call print_error("io::read_data_h5", "File " // trim(fl)                 &
-                                                        // " does not exist!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                  , "File " // trim(fl) // " does not exist!")
       return
     end if ! file does not exist
 
@@ -426,7 +426,7 @@ module io
 ! in the case of error, print a message and quit the subroutine
 !
     if (err < 0) then
-      call print_error("io::read_data_h5"                                      &
+      call print_error("io::read_restart_snapshot_h5"                          &
                             , "Cannot initialize the HDF5 Fortran interface!")
       return
     end if
@@ -438,7 +438,8 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
     if (err < 0) then
-      call print_error("io::read_data_h5", "Cannot check the file format!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                            , "Cannot check the file format!")
       call h5close_f(err)
       return
     end if
@@ -446,8 +447,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
     if (.not. info) then
-      call print_error("io::read_data_h5", "File " // trim(fl)                 &
-                                                   // " is not an HDF5 file!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
       call h5close_f(err)
       return
     end if
@@ -459,7 +460,8 @@ module io
 ! if the file could not be opened, print message and quit
 !
     if (err < 0) then
-      call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                           , "Cannot open file: " // trim(fl))
       call h5close_f(err)
       return
     end if
@@ -479,7 +481,8 @@ module io
 ! if the file could not be closed print message and quit
 !
     if (err > 0) then
-      call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                          , "Cannot close file: " // trim(fl))
       call h5close_f(err)
       return
     end if
@@ -505,8 +508,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
       if (.not. info) then
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                        // " does not exist!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                  , "File " // trim(fl) // " does not exist!")
         call h5close_f(err)
         return
       end if ! file does not exist
@@ -518,7 +521,8 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
       if (err < 0) then
-        call print_error("io::read_data_h5", "Cannot check the file format!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                            , "Cannot check the file format!")
         call h5close_f(err)
         return
       end if
@@ -526,8 +530,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
       if (.not. info) then
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                   // " is not an HDF5 file!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
         call h5close_f(err)
         return
       end if
@@ -539,7 +543,8 @@ module io
 ! if the file could not be opened, print message and quit
 !
       if (err < 0) then
-        call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                           , "Cannot open file: " // trim(fl))
         call h5close_f(err)
         return
       end if
@@ -555,7 +560,8 @@ module io
 ! if the file could not be closed print message and quit
 !
       if (err > 0) then
-        call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                          , "Cannot close file: " // trim(fl))
         call h5close_f(err)
         return
       end if
@@ -587,8 +593,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
           if (.not. info) then
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                        // " does not exist!")
+            call print_error("io::read_restart_snapshot_h5"                    &
+                                  , "File " // trim(fl) // " does not exist!")
             call h5close_f(err)
             return
           end if ! file does not exist
@@ -600,7 +606,7 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
           if (err < 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                             , "Cannot check the file format!")
             call h5close_f(err)
             return
@@ -609,8 +615,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
           if (.not. info) then
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                   // " is not an HDF5 file!")
+            call print_error("io::read_restart_snapshot_h5"                    &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
             call h5close_f(err)
             return
           end if
@@ -622,7 +628,7 @@ module io
 ! if the file could not be opened, print message and quit
 !
           if (err < 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                            , "Cannot open file: " // trim(fl))
             call h5close_f(err)
             return
@@ -639,7 +645,7 @@ module io
 ! if the file could not be closed print message and quit
 !
           if (err > 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                           , "Cannot close file: " // trim(fl))
             call h5close_f(err)
             return
@@ -676,7 +682,7 @@ module io
 ! check if the interface has been closed successfuly
 !
     if (err > 0) then
-      call print_error("io::read_data_h5"                                      &
+      call print_error("io::read_restart_snapshot_h5"                          &
                                  , "Cannot close the HDF5 Fortran interface!")
       return
     end if
