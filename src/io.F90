@@ -312,9 +312,9 @@ module io
     isnap = isnap + 1
 
 #ifdef HDF5
-! store data file
+! store variable snapshot file
 !
-    call write_data_h5(ftype)
+    call write_snapshot_h5()
 #endif /* HDF5 */
 
 #ifdef PROFILE
@@ -796,33 +796,28 @@ module io
 !
 !===============================================================================
 !
-! write_data_h5: wrapper subroutine for the HDF5 format
+! subroutine WRITE_SNAPSHOT_H5:
+! ----------------------------
 !
-! info: subroutine performs the initialization and finalization of the HDF5
-!       interface, creates and closes the file, and also stores the parameters
-!        andvariables in the chosen format (i.e. for the restart, visualization,
-!       etc.)
+!   Subroutine writes the current simulation snapshot, i.e. parameters,
+!   coordinates and variables to the HDF5 format files for further processing.
 !
-! arguments: same as in write_data()
 !
 !===============================================================================
 !
-  subroutine write_data_h5(ftype)
+  subroutine write_snapshot_h5()
 
-! references to other modules
+! import external procedures and variables
 !
-    use error   , only : print_error
-    use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
-    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
-    use mpitools, only : nproc
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_TRUNC_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools       , only : nproc
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
-
-! input variables
-!
-    character, intent(in) :: ftype
 
 ! local variables
 !
@@ -836,118 +831,98 @@ module io
 !
     call h5open_f(err)
 
-! check if the interface has been initialized successfuly
+! in the case of error, print a message and quit the subroutine
 !
-    if (err .ge. 0) then
+    if (err < 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
 
-! prepare the filename
+! prepare the restart snapshot filename
 !
-      if (ftype .eq. 'r') then
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
-      else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
-      end if
+    write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
 
-! create the new HDF5 file
+! create the new HDF5 file to store the snapshot
 !
-      call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
+    call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
 
-! check if the file has been created successfuly
+! if the file could not be created, print message and quit
 !
-      if (err .ge. 0) then
+    if (err < 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                                         , "Cannot create file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
 ! write the global attributes
 !
-        call write_attributes_h5(fid)
+    call write_attributes_h5(fid)
 
 ! depending on the selected type of output file write the right groups
 !
-        select case(ftype)
-        case('c')
+    select case(ftype)
+
+    case('c')
 
 ! write the coordinates (data block bounds, refinement levels, etc.)
 !
-          call write_coordinates_h5(fid)
+      call write_coordinates_h5(fid)
 
 ! write the variables stored in data blocks (leafs)
 !
-          call write_conservative_variables_h5(fid)
+      call write_conservative_variables_h5(fid)
 
-        case('p')
+    case('p')
 
 ! write the coordinates (data block bounds, refinement levels, etc.)
 !
-          call write_coordinates_h5(fid)
+      call write_coordinates_h5(fid)
 
 ! write the variables stored in data blocks (leafs)
 !
-          call write_primitive_variables_h5(fid)
+      call write_primitive_variables_h5(fid)
 
-        case('r')
+    case default
 
-! write all metablocks which represent the internal structure of domain
+! print information about unsupported file format and quit
 !
-          call write_metablocks_h5(fid)
+      call print_error("io::write_snapshot_h5", "File type is not suppoerted!")
+      call h5fclose_f(fid, err)
+      call h5close_f(err)
+      return
 
-! write all datablocks which represent the all variables
+    end select
+
+! close the file
 !
-          call write_datablocks_h5(fid)
+    call h5fclose_f(fid, err)
 
-        case default
-        end select
-
-! terminate access to the current file
+! if the file could not be closed print message and quit
 !
-        call h5fclose_f(fid, err)
-
-! check if the file has been closed successfully
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-          call print_error("io::write_data_h5"  &
-                                            , "Cannot close file: " // trim(fl))
-
-        end if
-
-      else
-
-! print error about the problem with creating the HDF5 file
-!
-        call print_error("io::write_data_h5"  &
-                                           , "Cannot create file: " // trim(fl))
-
-      end if
+    if (err > 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                                          , "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
 ! close the FORTRAN interface
 !
-      call h5close_f(err)
+    call h5close_f(err)
 
 ! check if the interface has been closed successfuly
 !
-      if (err .gt. 0) then
-
-! print error about the problem with closing the HDF5 Fortran interface
-!
-        call print_error("io::write_data_h5"  &
-                                   , "Cannot close the HDF5 Fortran interface!")
-
-      end if
-
-    else
-
-! print the error about the problem with initialization of the HDF5 Fortran
-! interface
-!
-      call print_error("io::write_data_h5"  &
-                              , "Cannot initialize the HDF5 Fortran interface!")
-
+    if (err > 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data_h5
+  end subroutine write_snapshot_h5
 !
 !===============================================================================
 !
