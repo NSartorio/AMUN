@@ -539,6 +539,10 @@ program amun
 !
     call store_integrals()
 
+! write down the restart snapshot
+!
+    call write_restart_snapshot(thrs, nrun, iret)
+
 ! store data
 !
     call write_snapshot()
@@ -605,9 +609,9 @@ program amun
 !
   call start_timer(itm)
 
-! write down the restart dump
+! write down the restart snapshot
 !
-  call write_restart_snapshot()
+  call write_restart_snapshot(1.0d+16, nrun, iret)
 
 ! a label to go to if there are any problems, but since all modules have been
 ! initialized, we have to finalize them first
