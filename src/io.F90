@@ -47,27 +47,31 @@ module io
   integer            , save :: ioi, iow, ios
 #endif /* PROFILE */
 
-! data file type
+! MODULE PARAMETERS:
+! =================
 !
-  character         , save :: ftype   = "p"
-
-! the interval of the snapshots storing
+!   respath - the directory from which the restart snapshots should be read;
+!   ftype   - the type of snapshots to write:
+!        'p' -> all primitive variables (default);
+!        'c' -> all conserved variables;
+!   nrest   - for job restarting, this is the number of restart snapshot;
+!   irest   - the local counter for the restart snapshots;
+!   isnap   - the local counter for the regular snapshots;
+!   hrest   - the execution time interval for restart snapshot storing
+!             (in hours);
+!   hsnap   - the problem time interval for regular snapshot storing;
 !
-  real              , save :: dtout   = 1.0d+00
-
-! all module parameters
-!
-  integer           , save :: nres    = -1
   character(len=255), save :: respath = "./"
+  character         , save :: ftype   = "p"
+  integer           , save :: nrest   = -1
+  integer(kind=4)   , save :: irest   =  1
+  integer(kind=4)   , save :: isnap   = -1
+  real              , save :: hrest   =  6.0d+00
+  real              , save :: hsnap   =  1.0d+00
 
 ! flags to determine the way of data writing
 !
   logical           , save :: with_ghosts = .false.
-
-! counters for the stored data and restart files
-!
-  integer(kind=4)   , save :: isnap = -1
-  integer(kind=4)   , save :: nrest =  0
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
@@ -90,7 +94,8 @@ module io
 ! declare public subroutines
 !
   public :: initialize_io
-  public :: read_restart_data, write_restart_data, write_data
+  public :: read_restart_snapshot, write_restart_snapshot, write_snapshot
+  public :: restart_from_snapshot
   public :: next_tout
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -110,10 +115,15 @@ module io
 !
 !   Subroutine initializes module IO by setting its parameters.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     irun    - job execution counter;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_io()
+  subroutine initialize_io(verbose, irun, iret)
 
 ! import external procedures
 !
@@ -124,9 +134,15 @@ module io
 !
     implicit none
 
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: irun, iret
+
 ! local variables
 !
     character(len=255) :: ghosts = "off"
+    integer            :: dd, hh, mm, ss
 !
 !-------------------------------------------------------------------------------
 !
@@ -142,15 +158,16 @@ module io
     call start_timer(ioi)
 #endif /* PROFILE */
 
-! read values of the module parameters
+! get restart parameters
 !
-    call get_parameter_integer("nres"          , nres   )
-    call get_parameter_string ("respath"       , respath)
+    call get_parameter_string ("restart_path"     , respath)
+    call get_parameter_integer("restart_number"   , nrest  )
+    call get_parameter_real   ("restart_interval" , hrest  )
 
 ! get the interval between snapshots
 !
-    call get_parameter_string ("ftype"         , ftype  )
-    call get_parameter_real   ("dtout"         , dtout  )
+    call get_parameter_string ("snapshot_type"    , ftype  )
+    call get_parameter_real   ("snapshot_interval", hsnap  )
 
 ! get the flag determining if the ghost cells are stored
 !
@@ -165,6 +182,32 @@ module io
       with_ghosts = .false.
     end select
 
+! return the run number
+!
+    irun = max(1, nrest)
+
+! print info about snapshot parameters
+!
+    if (verbose) then
+      if (ftype == 'p') write (*,"(4x,a13,10x,'=',1x,a)")                      &
+                                     "snapshot type", "primitive variables"
+      if (ftype == 'c') write (*,"(4x,a13,10x,'=',1x,a)")                      &
+                                     "snapshot type", "conservative variables"
+      write (*,"(4x,a21,2x,'=',1x,e8.2)") "snapshot interval    ", hsnap
+      if (hrest > 0.0d+00) then
+        dd = int(hrest / 2.4d+01)
+        hh = int(mod(hrest, 2.4d+01))
+        mm = int(mod(6.0d+01 * hrest, 6.0d+01))
+        ss = int(mod(3.6d+03 * hrest, 6.0d+01))
+        write (*,"(4x,a16,7x,'=',1x,i2.2,'d',i2.2,'h',i2.2,'m',i2.2,'s')")     &
+                                            "restart interval", dd, hh, mm, ss
+      end if
+      if (restart_from_snapshot()) then
+        write (*,"(4x,a18,5x,'=',1x,'[',a,']')") "restart from path ", trim(respath)
+        write (*,"(4x,a21,2x,'=',1x,i4)") "restart from snapshot", nrest
+      end if
+    end if
+
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
 !
@@ -177,16 +220,41 @@ module io
 !
 !===============================================================================
 !
-! subroutine READ_RESTART_DATA:
-! ----------------------------
+! function RESTART_FROM_SNAPSHOT:
+! ------------------------------
 !
-!   Subroutine reads restart files in order to resume the job. This is
-!   a wrapper for specific format storing.
+!   Subroutine returns true if the job was selected to be restarted from
+!   a snapshot.
 !
 !
 !===============================================================================
 !
-  subroutine read_restart_data()
+  logical function restart_from_snapshot()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+    restart_from_snapshot = (nrest > 0)
+
+!-------------------------------------------------------------------------------
+!
+  end function restart_from_snapshot
+!
+!===============================================================================
+!
+! subroutine READ_RESTART_SNAPSHOT:
+! --------------------------------
+!
+!   Subroutine reads restart snapshot files in order to resume the job.
+!   This is a wrapper calling specific format subroutine.
+!
+!
+!===============================================================================
+!
+  subroutine read_restart_snapshot()
 
 ! import external variables
 !
@@ -204,19 +272,15 @@ module io
     call start_timer(ios)
 #endif /* PROFILE */
 
-! set restart file number
-!
-    nrest = nres
-
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
 !
-    call read_data_h5()
+    call read_restart_snapshot_h5()
 #endif /* HDF5 */
 
 ! calculate the next snapshot number
 !
-    isnap = int(time / dtout)
+    isnap = int(time / hsnap)
 
 #ifdef PROFILE
 ! stop accounting time for the data reading
@@ -226,24 +290,35 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_restart_data
+  end subroutine read_restart_snapshot
 !
 !===============================================================================
 !
-! subroutine WRITE_RESTART_DATA:
-! -----------------------------
+! subroutine WRITE_RESTART_SNAPSHOTS:
+! ----------------------------------
 !
-!   Subroutine stores block data in restart files.  This is a wrapper for
-!   specific format storing.
+!   Subroutine stores current snapshot in restart files.
+!   This is a wrapper calling specific format subroutine.
 !
+!   Arguments:
+!
+!     thrs - the interval time in hours for storing the restart snapshots;
+!     nrun - the restart snapshot number;
+!     iret - the return flag to inform if subroutine succeeded or failed;
 !
 !===============================================================================
 !
-  subroutine write_restart_data()
+  subroutine write_restart_snapshot(thrs, nrun, iret)
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! input and output arguments
+!
+    real   , intent(in)  :: thrs
+    integer, intent(in)  :: nrun
+    integer, intent(out) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -253,15 +328,22 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
-! increase the file counter
+! store restart snapshots at constant interval or when the job is done only
+! if hrest is a positive number
 !
-    nrest = nrest + 1
+    if (hrest > 0.0d+00 .and. thrs >= irest * hrest) then
 
 #ifdef HDF5
 ! store restart file
 !
-    call write_data_h5('r')
+      call write_restart_snapshot_h5(nrun, iret)
 #endif /* HDF5 */
+
+! increase the restart snapshot counter
+!
+      irest = irest + 1
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
@@ -271,12 +353,12 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_restart_data
+  end subroutine write_restart_snapshot
 !
 !===============================================================================
 !
-! subroutine WRITE_DATA:
-! ---------------------
+! subroutine WRITE_SNAPSHOT:
+! -------------------------
 !
 !   Subroutine stores block data in snapshots.  Block variables are grouped
 !   todether and stored in big 4D arrays separately.  This is a wrapper for
@@ -285,7 +367,7 @@ module io
 !
 !===============================================================================
 !
-  subroutine write_data()
+  subroutine write_snapshot()
 
 ! import external variables
 !
@@ -299,7 +381,7 @@ module io
 !
 ! exit the subroutine, if the time of the next snapshot is not reached
 !
-    if (dtout <= 0.0d+00 .or. isnap >= (int(time / dtout))) return
+    if (hsnap <= 0.0d+00 .or. isnap >= (int(time / hsnap))) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -312,9 +394,9 @@ module io
     isnap = isnap + 1
 
 #ifdef HDF5
-! store data file
+! store variable snapshot file
 !
-    call write_data_h5(ftype)
+    call write_snapshot_h5()
 #endif /* HDF5 */
 
 #ifdef PROFILE
@@ -325,7 +407,7 @@ module io
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data
+  end subroutine write_snapshot
 !
 !===============================================================================
 !
@@ -345,10 +427,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-    if (dtout > 0.0d+00) then
-      next_tout = (isnap + 1) * dtout
+    if (hsnap > 0.0d+00) then
+      next_tout = (isnap + 1) * hsnap
     else
-      next_tout = huge(dtout)
+      next_tout = huge(hsnap)
     end if
 
 !-------------------------------------------------------------------------------
@@ -364,17 +446,17 @@ module io
 #ifdef HDF5
 !===============================================================================
 !
-! subroutine READ_DATA_H5:
-! -----------------------
+! subroutine READ_RESTART_SNAPSHOT_H5:
+! -----------------------------------
 !
-!   Subroutine reads parameters, meta and data blocks stored in
-!   the HDF5 format restart files and reconstructs the data structure
+!   Subroutine reads restart snapshot, i.e. parameters, meta and data blocks
+!   stored in the HDF5 format restart files and reconstructs the data structure
 !   in order to resume a terminated job.
 !
 !
 !===============================================================================
 !
-  subroutine read_data_h5()
+  subroutine read_restart_snapshot_h5()
 
 ! import external procedures and variables
 !
@@ -394,10 +476,10 @@ module io
 
 ! local variables
 !
-    character(len=64) :: fl
-    integer(hid_t)    :: fid
-    integer           :: err, lfile
-    logical           :: info
+    character(len=255) :: fl
+    integer(hid_t)     :: fid
+    integer            :: err, lfile
+    logical            :: info
 !
 !-------------------------------------------------------------------------------
 !
@@ -405,7 +487,7 @@ module io
 !!
 ! prepare the filename
 !
-    write (fl, '("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
 
 ! check if the HDF5 file exists
 !
@@ -414,8 +496,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
     if (.not. info) then
-      call print_error("io::read_data_h5", "File " // trim(fl)                 &
-                                                        // " does not exist!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                  , "File " // trim(fl) // " does not exist!")
       return
     end if ! file does not exist
 
@@ -426,7 +508,7 @@ module io
 ! in the case of error, print a message and quit the subroutine
 !
     if (err < 0) then
-      call print_error("io::read_data_h5"                                      &
+      call print_error("io::read_restart_snapshot_h5"                          &
                             , "Cannot initialize the HDF5 Fortran interface!")
       return
     end if
@@ -438,7 +520,8 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
     if (err < 0) then
-      call print_error("io::read_data_h5", "Cannot check the file format!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                            , "Cannot check the file format!")
       call h5close_f(err)
       return
     end if
@@ -446,8 +529,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
     if (.not. info) then
-      call print_error("io::read_data_h5", "File " // trim(fl)                 &
-                                                   // " is not an HDF5 file!")
+      call print_error("io::read_restart_snapshot_h5"                          &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
       call h5close_f(err)
       return
     end if
@@ -459,7 +542,8 @@ module io
 ! if the file could not be opened, print message and quit
 !
     if (err < 0) then
-      call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                           , "Cannot open file: " // trim(fl))
       call h5close_f(err)
       return
     end if
@@ -479,7 +563,8 @@ module io
 ! if the file could not be closed print message and quit
 !
     if (err > 0) then
-      call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+      call print_error("io::read_restart_snapshot_h5"                          &
+                                          , "Cannot close file: " // trim(fl))
       call h5close_f(err)
       return
     end if
@@ -496,7 +581,7 @@ module io
 
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, nproc, '.h5'
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, nproc
 
 ! check if the HDF5 file exists
 !
@@ -505,8 +590,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
       if (.not. info) then
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                        // " does not exist!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                  , "File " // trim(fl) // " does not exist!")
         call h5close_f(err)
         return
       end if ! file does not exist
@@ -518,7 +603,8 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
       if (err < 0) then
-        call print_error("io::read_data_h5", "Cannot check the file format!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                            , "Cannot check the file format!")
         call h5close_f(err)
         return
       end if
@@ -526,8 +612,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
       if (.not. info) then
-        call print_error("io::read_data_h5", "File " // trim(fl)               &
-                                                   // " is not an HDF5 file!")
+        call print_error("io::read_restart_snapshot_h5"                        &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
         call h5close_f(err)
         return
       end if
@@ -539,7 +625,8 @@ module io
 ! if the file could not be opened, print message and quit
 !
       if (err < 0) then
-        call print_error("io::read_data_h5", "Cannot open file: " // trim(fl))
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                           , "Cannot open file: " // trim(fl))
         call h5close_f(err)
         return
       end if
@@ -555,7 +642,8 @@ module io
 ! if the file could not be closed print message and quit
 !
       if (err > 0) then
-        call print_error("io::read_data_h5", "Cannot close file: " // trim(fl))
+        call print_error("io::read_restart_snapshot_h5"                        &
+                                          , "Cannot close file: " // trim(fl))
         call h5close_f(err)
         return
       end if
@@ -578,7 +666,7 @@ module io
 
 ! prepare the filename
 !
-          write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, lfile, '.h5'
+          write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, lfile
 
 ! check if the HDF5 file exists
 !
@@ -587,8 +675,8 @@ module io
 ! if file does not exist, print error and quit the subroutine
 !
           if (.not. info) then
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                        // " does not exist!")
+            call print_error("io::read_restart_snapshot_h5"                    &
+                                  , "File " // trim(fl) // " does not exist!")
             call h5close_f(err)
             return
           end if ! file does not exist
@@ -600,7 +688,7 @@ module io
 ! if the format verification failed, close the interface, print error and exit
 !
           if (err < 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                             , "Cannot check the file format!")
             call h5close_f(err)
             return
@@ -609,8 +697,8 @@ module io
 ! the file is not in the HDF5 format, print message and quit
 !
           if (.not. info) then
-            call print_error("io::read_data_h5", "File " // trim(fl)           &
-                                                   // " is not an HDF5 file!")
+            call print_error("io::read_restart_snapshot_h5"                    &
+                             , "File " // trim(fl) // " is not an HDF5 file!")
             call h5close_f(err)
             return
           end if
@@ -622,7 +710,7 @@ module io
 ! if the file could not be opened, print message and quit
 !
           if (err < 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                            , "Cannot open file: " // trim(fl))
             call h5close_f(err)
             return
@@ -639,7 +727,7 @@ module io
 ! if the file could not be closed print message and quit
 !
           if (err > 0) then
-            call print_error("io::read_data_h5"                                &
+            call print_error("io::read_restart_snapshot_h5"                    &
                                           , "Cannot close file: " // trim(fl))
             call h5close_f(err)
             return
@@ -676,44 +764,48 @@ module io
 ! check if the interface has been closed successfuly
 !
     if (err > 0) then
-      call print_error("io::read_data_h5"                                      &
+      call print_error("io::read_restart_snapshot_h5"                          &
                                  , "Cannot close the HDF5 Fortran interface!")
       return
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_data_h5
+  end subroutine read_restart_snapshot_h5
 !
 !===============================================================================
 !
-! write_data_h5: wrapper subroutine for the HDF5 format
+! subroutine WRITE_RESTART_SNAPSHOT_H5:
+! ------------------------------------
 !
-! info: subroutine performs the initialization and finalization of the HDF5
-!       interface, creates and closes the file, and also stores the parameters
-!        andvariables in the chosen format (i.e. for the restart, visualization,
-!       etc.)
+!   Subroutine writes restart snapshot, i.e. parameters, meta and data blocks
+!   to the HDF5 format restart files in order to resume a terminated job later.
 !
-! arguments: same as in write_data()
+!   Arguments:
+!
+!     nrun - the snapshot number;
+!     iret - the return flag to inform if subroutine succeeded or failed;
 !
 !===============================================================================
 !
-  subroutine write_data_h5(ftype)
+  subroutine write_restart_snapshot_h5(nrun, iret)
 
-! references to other modules
+! import external procedures and variables
 !
-    use error   , only : print_error
-    use hdf5    , only : hid_t, H5F_ACC_TRUNC_F
-    use hdf5    , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
-    use mpitools, only : nproc
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_TRUNC_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools       , only : nproc
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! input and output arguments
 !
-    character, intent(in) :: ftype
+    integer, intent(in)  :: nrun
+    integer, intent(out) :: iret
 
 ! local variables
 !
@@ -727,304 +819,201 @@ module io
 !
     call h5open_f(err)
 
-! check if the interface has been initialized successfuly
+! in the case of error, print a message and quit the subroutine
 !
-    if (err .ge. 0) then
+    if (err < 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
 
-! prepare the filename
+! prepare the restart snapshot filename
 !
-      if (ftype .eq. 'r') then
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, nrest, nproc, '.h5'
-      else
-        write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
-      end if
+    write (fl, "('r',i6.6,'_',i5.5,'.h5')") nrun, nproc
 
-! create the new HDF5 file
+! create the new HDF5 file to store the snapshot
 !
-      call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
+    call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
 
-! check if the file has been created successfuly
+! if the file could not be created, print message and quit
 !
-      if (err .ge. 0) then
+    if (err < 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                         , "Cannot create file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
 ! write the global attributes
 !
-        call write_attributes_h5(fid)
-
-! depending on the selected type of output file write the right groups
-!
-        select case(ftype)
-        case('c')
-
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-          call write_coordinates_h5(fid)
-
-! write the variables stored in data blocks (leafs)
-!
-          call write_conservative_variables_h5(fid)
-
-        case('p')
-
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-          call write_coordinates_h5(fid)
-
-! write the variables stored in data blocks (leafs)
-!
-          call write_primitive_variables_h5(fid)
-
-        case('r')
+    call write_attributes_h5(fid)
 
 ! write all metablocks which represent the internal structure of domain
 !
-          call write_metablocks_h5(fid)
+    call write_metablocks_h5(fid)
 
 ! write all datablocks which represent the all variables
 !
-          call write_datablocks_h5(fid)
+    call write_datablocks_h5(fid)
 
-        case default
-        end select
-
-! terminate access to the current file
+! close the file
 !
-        call h5fclose_f(fid, err)
+    call h5fclose_f(fid, err)
 
-! check if the file has been closed successfully
+! if the file could not be closed print message and quit
 !
-        if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-          call print_error("io::write_data_h5"  &
-                                            , "Cannot close file: " // trim(fl))
-
-        end if
-
-      else
-
-! print error about the problem with creating the HDF5 file
-!
-        call print_error("io::write_data_h5"  &
-                                           , "Cannot create file: " // trim(fl))
-
-      end if
+    if (err > 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                          , "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
 ! close the FORTRAN interface
 !
-      call h5close_f(err)
+    call h5close_f(err)
 
 ! check if the interface has been closed successfuly
 !
-      if (err .gt. 0) then
-
-! print error about the problem with closing the HDF5 Fortran interface
-!
-        call print_error("io::write_data_h5"  &
-                                   , "Cannot close the HDF5 Fortran interface!")
-
-      end if
-
-    else
-
-! print the error about the problem with initialization of the HDF5 Fortran
-! interface
-!
-      call print_error("io::write_data_h5"  &
-                              , "Cannot initialize the HDF5 Fortran interface!")
-
+    if (err > 0) then
+      call print_error("io::write_restart_snapshot_h5"                         &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_data_h5
+  end subroutine write_restart_snapshot_h5
 !
 !===============================================================================
 !
-! read_restart_params_h5: subroutine reads parameters required to decide how to
-!                         restart the job
+! subroutine WRITE_SNAPSHOT_H5:
+! ----------------------------
+!
+!   Subroutine writes the current simulation snapshot, i.e. parameters,
+!   coordinates and variables to the HDF5 format files for further processing.
+!
 !
 !===============================================================================
 !
-  subroutine read_restart_params_h5()
+  subroutine write_snapshot_h5()
 
-! references to other modules
+! import external procedures and variables
 !
-    use error   , only : print_error
-    use hdf5    , only : hid_t
-    use hdf5    , only : H5F_ACC_RDONLY_F
-    use hdf5    , only : h5open_f, h5close_f, h5fis_hdf5_f, h5fopen_f          &
-                       , h5fclose_f, h5gopen_f, h5gclose_f                     &
-                       , h5aopen_by_name_f, h5aclose_f
+    use error          , only : print_error
+    use hdf5           , only : hid_t
+    use hdf5           , only : H5F_ACC_TRUNC_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use mpitools       , only : nproc
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
 ! local variables
 !
     character(len=64) :: fl
-    integer(hid_t)    :: fid, gid, aid
+    integer(hid_t)    :: fid
     integer           :: err
-    logical           :: info
 !
 !-------------------------------------------------------------------------------
 !
-! prepare the filename
+! initialize the FORTRAN interface
 !
-    write (fl,'("r",i6.6,"_",i5.5,a3)') nrest, 0, '.h5'
+    call h5open_f(err)
 
-! check if the HDF5 file exists
+! in the case of error, print a message and quit the subroutine
 !
-    inquire(file = fl, exist = info)
+    if (err < 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
 
-    if (info) then
-
-! check if this is an HDF5 file
+! prepare the restart snapshot filename
 !
-      call h5fis_hdf5_f(fl, info, err)
+    write (fl, "(a1,i6.6,'_',i5.5,'.h5')") ftype, isnap, nproc
 
-! check if it was possible to verify the file format
+! create the new HDF5 file to store the snapshot
 !
-      if (err .ge. 0) then
+    call h5fcreate_f(fl, H5F_ACC_TRUNC_F, fid, err)
 
-! check if the file is in HDF5 format
+! if the file could not be created, print message and quit
 !
-        if (info) then
+    if (err < 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                                         , "Cannot create file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
-! opent the current HDF5 file
+! write the global attributes
 !
-          call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+    call write_attributes_h5(fid)
 
-! check if the file has been opened successfuly
+! depending on the selected type of output file write the right groups
 !
-          if (err .ge. 0) then
+    select case(ftype)
 
-! read attribute 'nprocs'
+    case('c')
+
+! write the coordinates (data block bounds, refinement levels, etc.)
 !
-            call h5aopen_by_name_f(fid, "/attributes", "nprocs", aid, err)
+      call write_coordinates_h5(fid)
 
-! check if the attribute has been opened successfully
+! write the variables stored in data blocks (leafs)
 !
-            if (err .ge. 0) then
+      call write_conservative_variables_h5(fid)
 
-! read the attribute nprocs
+    case('p')
+
+! write the coordinates (data block bounds, refinement levels, etc.)
 !
-              call read_attribute_integer_h5(aid, "nprocs", nfiles)
+      call write_coordinates_h5(fid)
 
-! close the attribute
+! write the variables stored in data blocks (leafs)
 !
-              call h5aclose_f(aid, err)
+      call write_primitive_variables_h5(fid)
 
-! check if the attribute has been closed successfully
+    case default
+
+! print information about unsupported file format and quit
 !
-              if (err .gt. 0) then
+      call print_error("io::write_snapshot_h5", "File type is not suppoerted!")
+      call h5fclose_f(fid, err)
+      call h5close_f(err)
+      return
 
-! print error about the problem with closing the current file
+    end select
+
+! close the file
 !
-                call print_error("io::read_restart_params_h5"                  &
-                                       , "Cannot close the attribute nprocs!")
+    call h5fclose_f(fid, err)
 
-              end if
-
-            else
-
-! print error about the problem with opening the attribute
+! if the file could not be closed print message and quit
 !
-              call print_error("io::read_restart_params_h5"                    &
-                                        , "Cannot open the attribute nprocs!")
-
-            end if
-
-! read attribute 'toplev'
-!
-            call h5aopen_by_name_f(fid, "/attributes", "toplev", aid, err)
-
-! check if the attribute has been opened successfully
-!
-            if (err .ge. 0) then
-
-! read the attribute toplev
-!
-              call read_attribute_integer_h5(aid, "toplev", rtoplev)
-
-! close the attribute
-!
-              call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfully
-!
-              if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-                call print_error("io::read_restart_params_h5"                  &
-                                       , "Cannot close the attribute toplev!")
-
-              end if
-
-            else
-
-! print error about the problem with opening the attribute
-!
-              call print_error("io::read_restart_params_h5"                    &
-                                        , "Cannot open the attribute toplev!")
-
-            end if
-
-! terminate access to the current file
-!
-            call h5fclose_f(fid, err)
-
-! check if the file has been closed successfully
-!
-            if (err .gt. 0) then
-
-! print error about the problem with closing the current file
-!
-              call print_error("io::read_restart_params_h5"                    &
+    if (err > 0) then
+      call print_error("io::write_snapshot_h5"                                 &
                                           , "Cannot close file: " // trim(fl))
+      call h5close_f(err)
+      return
+    end if
 
-            end if
-
-          else
-
-! print error about the problem with opening the HDF5 file
+! close the FORTRAN interface
 !
-            call print_error("io::read_restart_params_h5"                      &
-                                           , "Cannot open file: " // trim(fl))
+    call h5close_f(err)
 
-          end if
-
-        else
-
-! print error about the wrong file format
+! check if the interface has been closed successfuly
 !
-          call print_error("io::read_restart_params_h5", "File " // trim(fl)   &
-                                                   // " is not an HDF5 file!")
-        end if
-
-      else
-
-! print error about the problem with checking the file format
-!
-        call print_error("io::read_restart_params_h5"                          &
-                                            , "Cannot check the file format!")
-
-      end if
-
-    else
-
-! print error if the file does not exist
-!
-      call print_error("io::read_restart_params_h5", "File " // trim(fl)       &
-                                                        // " does not exist!")
+    if (err > 0) then
+      call print_error("io::write_snapshot_h5"                                 &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_restart_params_h5
+  end subroutine write_snapshot_h5
 !
 !===============================================================================
 !
