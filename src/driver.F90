@@ -44,6 +44,7 @@ program amun
   use integrals     , only : init_integrals, clear_integrals, store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io
+  use io            , only : restart_from_snapshot
   use io            , only : read_restart_snapshot, write_restart_snapshot
   use io            , only : write_snapshot, next_tout
   use mesh          , only : initialize_mesh, finalize_mesh
@@ -78,7 +79,7 @@ program amun
 !
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
-  integer               :: nmax  = 0, ndat = 1, nres = -1, ires = -1
+  integer               :: nmax  = 0, ndat = 1
   real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
   real(kind=8)          :: dtnext = 0.0d+00
 
@@ -280,11 +281,6 @@ program amun
 !
   call get_parameter_integer("ndat" , ndat)
 
-! get counter and interval for restart snapshots
-!
-  call get_parameter_integer("nres" , nres)
-  call get_parameter_integer("ires" , ires)
-
 ! set up the MPI geometry
 !
   call setup_mpi(div(:), per(:), .false.)
@@ -394,11 +390,29 @@ program amun
 
 ! initialize module IO
 !
-  call initialize_io()
+  call initialize_io(master, nrun, iret)
 
 ! check if we initiate new problem or restart previous job
 !
-  if (nres < 0) then
+  if (restart_from_snapshot()) then
+
+! increase the run number
+!
+    nrun  = nrun + 1
+
+! initialize the mesh module
+!
+    call initialize_mesh(nrun, master, iret)
+
+! reconstruct the meta and data block structures from a given restart file
+!
+    call read_restart_snapshot()
+
+! initialize the integrals module
+!
+    call init_integrals(.false.)
+
+  else
 
 ! initialize the mesh module
 !
@@ -421,24 +435,6 @@ program amun
 !
     call init_integrals(.true.)
 
-  else
-
-! increase the run number
-!
-    nrun  = nres + 1
-
-! initialize the mesh module
-!
-    call initialize_mesh(nrun, master, iret)
-
-! reconstruct the meta and data block structures from a given restart file
-!
-    call read_restart_snapshot()
-
-! initialize the integrals module
-!
-    call init_integrals(.false.)
-
   end if
 
 #ifdef MPI
@@ -453,7 +449,7 @@ program amun
 
 ! store integrals and data to a file
 !
-  if (nres < 0) then
+  if (.not. restart_from_snapshot()) then
 
     call store_integrals()
     call write_snapshot()

@@ -95,6 +95,7 @@ module io
 !
   public :: initialize_io
   public :: read_restart_snapshot, write_restart_snapshot, write_snapshot
+  public :: restart_from_snapshot
   public :: next_tout
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -114,10 +115,15 @@ module io
 !
 !   Subroutine initializes module IO by setting its parameters.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     irun    - job execution counter;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_io()
+  subroutine initialize_io(verbose, irun, iret)
 
 ! import external procedures
 !
@@ -127,6 +133,11 @@ module io
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: irun, iret
 
 ! local variables
 !
@@ -148,8 +159,8 @@ module io
 
 ! read values of the module parameters
 !
-    call get_parameter_integer("nrest"         , nrest  )
-    call get_parameter_string ("respath"       , respath)
+    call get_parameter_integer("restart_number", nrest  )
+    call get_parameter_string ("restart_path"  , respath)
 
 ! get the interval between snapshots
 !
@@ -169,6 +180,17 @@ module io
       with_ghosts = .false.
     end select
 
+! return the run number
+!
+    irun = max(1, nrest)
+
+! print info about restarted job
+!
+    if (verbose .and. restart_from_snapshot()) then
+      write (*,"(4x,a22,1x,'=',1x,a )") "restart from path     ", trim(respath)
+      write (*,"(4x,a22,1x,'=',1x,i4)") "restart from snapshot ", nrest
+    end if
+
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
 !
@@ -178,6 +200,31 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_io
+!
+!===============================================================================
+!
+! function RESTART_FROM_SNAPSHOT:
+! ------------------------------
+!
+!   Subroutine returns true if the job was selected to be restarted from
+!   a snapshot.
+!
+!
+!===============================================================================
+!
+  logical function restart_from_snapshot()
+
+! local variables are not implicit by default
+!
+    implicit none
+!
+!-------------------------------------------------------------------------------
+!
+    restart_from_snapshot = (nrest > 0)
+
+!-------------------------------------------------------------------------------
+!
+  end function restart_from_snapshot
 !
 !===============================================================================
 !
@@ -398,10 +445,10 @@ module io
 
 ! local variables
 !
-    character(len=64) :: fl
-    integer(hid_t)    :: fid
-    integer           :: err, lfile
-    logical           :: info
+    character(len=255) :: fl
+    integer(hid_t)     :: fid
+    integer            :: err, lfile
+    logical            :: info
 !
 !-------------------------------------------------------------------------------
 !
@@ -409,7 +456,7 @@ module io
 !!
 ! prepare the filename
 !
-    write (fl, '("r",i6.6,"_",i5.5,a3)') irest, 0, '.h5'
+    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), irest, 0
 
 ! check if the HDF5 file exists
 !
@@ -503,7 +550,7 @@ module io
 
 ! prepare the filename
 !
-      write (fl,'("r",i6.6,"_",i5.5,a3)') irest, nproc, '.h5'
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), irest, nproc
 
 ! check if the HDF5 file exists
 !
@@ -588,7 +635,7 @@ module io
 
 ! prepare the filename
 !
-          write (fl,'("r",i6.6,"_",i5.5,a3)') irest, lfile, '.h5'
+          write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), irest, lfile
 
 ! check if the HDF5 file exists
 !
@@ -742,7 +789,7 @@ module io
 
 ! prepare the restart snapshot filename
 !
-    write (fl,'(a1,i6.6,"_",i5.5,a3)') 'r', irest, nproc, '.h5'
+    write (fl, "('r',i6.6,'_',i5.5,'.h5')") irest, nproc
 
 ! create the new HDF5 file to store the snapshot
 !
@@ -845,7 +892,7 @@ module io
 
 ! prepare the restart snapshot filename
 !
-    write (fl,'(a1,i6.6,"_",i5.5,a3)') ftype, isnap, nproc, '.h5'
+    write (fl, "(a1,i6.6,'_',i5.5,'.h5')") ftype, isnap, nproc
 
 ! create the new HDF5 file to store the snapshot
 !
@@ -961,7 +1008,7 @@ module io
 !
 ! prepare the filename
 !
-    write (fl,'("r",i6.6,"_",i5.5,a3)') irest, 0, '.h5'
+    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), irest, 0
 
 ! check if the HDF5 file exists
 !
