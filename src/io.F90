@@ -193,7 +193,7 @@ module io
                                      "snapshot type", "primitive variables"
       if (ftype == 'c') write (*,"(4x,a13,10x,'=',1x,a)")                      &
                                      "snapshot type", "conservative variables"
-      write (*,"(4x,a21,2x,'=',1x,e8.2)") "snapshot interval    ", hsnap
+      write (*,"(4x,a21,2x,'=',1x,e9.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
         dd = int(hrest / 2.4d+01)
         hh = int(mod(hrest, 2.4d+01))
