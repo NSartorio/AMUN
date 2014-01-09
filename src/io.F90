@@ -824,6 +824,7 @@ module io
     if (err < 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                             , "Cannot initialize the HDF5 Fortran interface!")
+      iret = 200
       return
     end if
 
@@ -841,6 +842,7 @@ module io
       call print_error("io::write_restart_snapshot_h5"                         &
                                          , "Cannot create file: " // trim(fl))
       call h5close_f(err)
+      iret = 201
       return
     end if
 
@@ -866,6 +868,7 @@ module io
       call print_error("io::write_restart_snapshot_h5"                         &
                                           , "Cannot close file: " // trim(fl))
       call h5close_f(err)
+      iret = 203
       return
     end if
 
@@ -878,6 +881,7 @@ module io
     if (err > 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                                  , "Cannot close the HDF5 Fortran interface!")
+      iret = 204
       return
     end if
 
