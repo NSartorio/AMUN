@@ -54,7 +54,7 @@ module io
 !   ftype   - the type of snapshots to write:
 !        'p' -> all primitive variables (default);
 !        'c' -> all conserved variables;
-!   nres    - for run restarting, this is the number of restart snapshot;
+!   nrest   - for job restarting, this is the number of restart snapshot;
 !   irest   - the local counter for the restart snapshots;
 !   isnap   - the local counter for the regular snapshots;
 !   dtres   - the execution time interval for restart snapshot storing
@@ -63,7 +63,7 @@ module io
 !
   character(len=255), save :: respath = "./"
   character         , save :: ftype   = "p"
-  integer           , save :: nres    = -1
+  integer           , save :: nrest   = -1
   integer(kind=4)   , save :: irest   =  0
   integer(kind=4)   , save :: isnap   = -1
   real              , save :: dtres   =  6.0d+00
@@ -148,7 +148,7 @@ module io
 
 ! read values of the module parameters
 !
-    call get_parameter_integer("nres"          , nres   )
+    call get_parameter_integer("nrest"         , nrest  )
     call get_parameter_string ("respath"       , respath)
 
 ! get the interval between snapshots
@@ -210,7 +210,7 @@ module io
 
 ! set restart file number
 !
-    irest = nres
+    irest = nrest
 
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
