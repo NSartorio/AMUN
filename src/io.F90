@@ -1180,7 +1180,7 @@ module io
     use coordinates, only : nn, ng, in, jn, kn, maxlev, toplev, ir, jr, kr
     use coordinates, only : initialize_coordinates, finalize_coordinates
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error, print_warning
+    use error    , only : print_error
     use evolution, only : step, time, dt, dtn
     use hdf5     , only : hid_t, hsize_t
     use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &

@@ -27,30 +27,44 @@
 !
 module error
 
+! module variables are not implicit by default
+!
   implicit none
 
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
 !
-! print_error: subroutine prints error
+! subroutine PRINT_ERROR:
+! ----------------------
+!
+!   Subroutine prints an error message with the module/subroutine where
+!   the error occured.
+!
+!   Arguments:
+!
+!     loc - string informing about the place where the error occured
+!           (for example 'module name::subroutine name:[line]');
+!     msg - string of the actual error message;
 !
 !===============================================================================
 !
-  subroutine print_error(position, text)
+  subroutine print_error(loc, msg)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    character(len=*), intent(in) :: position, text
+    character(len=*), intent(in) :: loc, msg
 !
 !-------------------------------------------------------------------------------
 !
     write(*,*)
-    write(*,"('[error in ', a, ']: ', a)") trim(position), trim(text)
-    write(*,*)
-    stop
+    write(*,"('[ERROR in ', a, ']: ', a)") trim(loc), trim(msg)
 
 !-------------------------------------------------------------------------------
 !
@@ -58,23 +72,34 @@ module error
 !
 !===============================================================================
 !
-! print_warning: subroutine prints warning
+! subroutine PRINT_WARNING:
+! ------------------------
+!
+!   Subroutine prints a warning message with the module/subroutine where
+!   the warning occured.
+!
+!   Arguments:
+!
+!     loc - string informing about the place where the warning occured
+!           (for example 'module name::subroutine name:[line]');
+!     msg - string of the actual warning message;
 !
 !===============================================================================
 !
-  subroutine print_warning(position, text)
+  subroutine print_warning(loc, msg)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    character(len=*), intent(in) :: position, text
+    character(len=*), intent(in) :: loc, msg
 !
 !-------------------------------------------------------------------------------
 !
     write(*,*)
-    write(*,"('[warning in ', a, ']: ', a)") trim(position), trim(text)
-    write(*,*)
+    write(*,"('[WARNING in ', a, ']: ', a)") trim(loc), trim(msg)
 
 !-------------------------------------------------------------------------------
 !
@@ -82,27 +107,38 @@ module error
 !
 !===============================================================================
 !
-! print_info: subroutine prints information
+! subroutine PRINT_NOTIFICATION:
+! -----------------------------
+!
+!   Subroutine prints a notification message with the module/subroutine where
+!   the notification occured.
+!
+!   Arguments:
+!
+!     loc - string informing about the place where the notification occured
+!           (for example 'module name::subroutine name:[line]');
+!     msg - string of the actual notification message;
 !
 !===============================================================================
 !
-  subroutine print_info(position, text)
+  subroutine print_notification(loc, msg)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    character(len=*), intent(in) :: position, text
+    character(len=*), intent(in) :: loc, msg
 !
 !-------------------------------------------------------------------------------
 !
     write(*,*)
-    write(*,"('[info in ', a, ']: ', a)") trim(position), trim(text)
-    write(*,*)
+    write(*,"('[NOTIFICATION in ', a, ']: ', a)") trim(loc), trim(msg)
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine print_info
+  end subroutine print_notification
 
 !===============================================================================
 !
