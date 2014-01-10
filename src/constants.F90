@@ -23,7 +23,7 @@
 !!
 !! module: CONSTANTS
 !!
-!!  This modules provides mathematical, physical, and unit conversion
+!!  This module provides mathematical, physical, and unit conversion
 !!  constants and factors.
 !!
 !!*****************************************************************************
