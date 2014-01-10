@@ -21,7 +21,10 @@
 !!
 !!******************************************************************************
 !!
-!! module: ERROR - handling errors
+!! module: ERROR
+!!
+!!  This module provides subroutines to print errors, warnings and
+!!  notifications in a unified format.
 !!
 !!******************************************************************************
 !
@@ -41,11 +44,11 @@ module error
 ! ----------------------
 !
 !   Subroutine prints an error message with the module/subroutine where
-!   the error occured.
+!   the error occurred.
 !
 !   Arguments:
 !
-!     loc - string informing about the place where the error occured
+!     loc - string informing about the place where the error occurred
 !           (for example 'module name::subroutine name:[line]');
 !     msg - string of the actual error message;
 !
@@ -76,11 +79,11 @@ module error
 ! ------------------------
 !
 !   Subroutine prints a warning message with the module/subroutine where
-!   the warning occured.
+!   the warning occurred.
 !
 !   Arguments:
 !
-!     loc - string informing about the place where the warning occured
+!     loc - string informing about the place where the warning occurred
 !           (for example 'module name::subroutine name:[line]');
 !     msg - string of the actual warning message;
 !
@@ -111,11 +114,11 @@ module error
 ! -----------------------------
 !
 !   Subroutine prints a notification message with the module/subroutine where
-!   the notification occured.
+!   the notification occurred.
 !
 !   Arguments:
 !
-!     loc - string informing about the place where the notification occured
+!     loc - string informing about the place where the notification occurred
 !           (for example 'module name::subroutine name:[line]');
 !     msg - string of the actual notification message;
 !
