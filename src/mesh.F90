@@ -462,7 +462,7 @@ module mesh
     use blocks         , only : get_mblocks, get_nleafs
     use coordinates    , only : minlev, maxlev, res
     use domains        , only : setup_domain
-    use error          , only : print_info, print_error
+    use error          , only : print_error
     use mpitools       , only : master, nproc, nprocs
     use problems       , only : setup_problem
     use refinement     , only : check_refinement_criterion
@@ -787,7 +787,7 @@ module mesh
     use blocks         , only : append_datablock, remove_datablock, link_blocks
     use coordinates    , only : minlev, maxlev, toplev, im, jm, km, res
     use equations      , only : nv
-    use error          , only : print_info, print_error
+    use error          , only : print_error
 #ifdef MPI
     use mpitools       , only : master, nprocs, nproc
     use mpitools       , only : reduce_sum_integer_array

@@ -41,7 +41,8 @@ program amun
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, new_time_step
   use evolution     , only : step, time, dt
-  use integrals     , only : init_integrals, clear_integrals, store_integrals
+  use integrals     , only : initialize_integrals, finalize_integrals
+  use integrals     , only : store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
   use io            , only : initialize_io
   use io            , only : restart_from_snapshot
@@ -408,10 +409,6 @@ program amun
 !
     call read_restart_snapshot()
 
-! initialize the integrals module
-!
-    call init_integrals(.false.)
-
   else
 
 ! initialize the mesh module
@@ -427,11 +424,15 @@ program amun
 !
     call new_time_step(dtnext)
 
+  end if
+
 ! initialize the integrals module
 !
-    call init_integrals(.true.)
+  call initialize_integrals(master, nrun, iret)
 
-  end if
+! check if the module was successfully initialized
+!
+  if (iret > 0) go to 10
 
 ! store mesh statistics
 !
@@ -618,9 +619,9 @@ program amun
 !
 10 continue
 
-! clear up the integrals module
+! finalize integrals module
 !
-  call clear_integrals()
+  call finalize_integrals()
 
 ! finalize the mesh module
 !

@@ -21,185 +21,324 @@
 !!
 !!******************************************************************************
 !!
-!! module: INTEGRALS - handles calculation of the integrals such as total mass,
-!!                     momenta, energies, etc., and stores them in a file
+!! module: INTEGRALS
+!!
+!!  This module provides subroutines to calculate and store integrals of
+!!  the conserved variables, and other useful statistics in the integrals file.
 !!
 !!******************************************************************************
 !
 module integrals
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
+! module variables are not implicit by default
+!
   implicit none
 
-  character(len=32) :: fname = "integrals.dat"
-  integer           :: funit = 10
+#ifdef PROFILE
+! timer indices
+!
+  integer            , save :: imi, ims
+#endif /* PROFILE */
 
+! MODULE PARAMETERS:
+! =================
+!
+!   funit - a file handler to the integrals file;
+!   iintd - the number of steps between subsequent intervals storing;
+!
+  integer(kind=4), save :: funit = 7
+  integer(kind=4), save :: iintd = 1
+
+! by default everything is private
+!
+  private
+
+! declare public subroutines
+!
+  public :: initialize_integrals, finalize_integrals
+  public :: store_integrals
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !===============================================================================
-!
-! init_integrals: subroutine initializes the integral variables to zero and
-!                 prepares the file where the integrals are stored
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
 !
 !===============================================================================
 !
-  subroutine init_integrals(flag)
+! subroutine INITIALIZE_INTEGRALS:
+! -------------------------------
+!
+!   Subroutine initializes module INTEGRALS by preparing the integrals file.
+!
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     irun    - job execution counter;
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine initialize_integrals(verbose, irun, iret)
 
-    use mpitools , only : master
+! import external variables and subroutines
+!
+    use error          , only : print_error
+    use mpitools       , only : master
+    use parameters     , only : get_parameter_integer
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    logical, intent(in) :: flag
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: irun, iret
 
-! local arguments
+! local variables
 !
-    logical :: info
+    character(len=32)      :: fname
+    logical                :: lex, lop
 !
 !-------------------------------------------------------------------------------
 !
-! only master process creates the file
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('integrals:: initialization'   , imi)
+    call set_timer('integrals:: integrals storing', ims)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! get the integrals storing interval
+!
+    call get_parameter_integer("integrals_interval", iintd)
+
+! make sure storage interval is larger than zero
+!
+    iintd = max(1, iintd)
+
+! only master process handles the integral file
 !
     if (master) then
 
-! check if the integrals file exists
+! find the first available file handler to use
 !
-      inquire(file = fname, exist = info)
+      funit = 6
+      lex   = .false.
+      lop   = .true.
+      do while(.not. lex .or. lop .and. funit < 100)
+        funit = funit + 1
+        inquire(unit = funit, exist = lex, opened = lop)
+      end do
 
-! if flag is set to .true. or the original integrals file does not exist, create
-! a new one and write the header in it, otherwise open the original file and
-! move the writing position to the end to allow for appending
+! check if the file handler could be found
 !
-      if (flag .or. .not. info) then
+      if (funit >= 100) then
+        call print_error('integrals::initialize_integrals'                     &
+                              , 'Could not find any available file handlers!')
+        iret = 300
+      end if
 
-! create a new integrals file
+! generate the integrals file name
 !
-        open(unit=funit, file=fname, form='formatted', status='replace')
+      write(fname, "('integrals_',i2.2,'.dat')") irun
+
+! create a new file
+!
+#ifdef INTEL
+      open (unit = funit, file = fname, form = 'formatted', status = 'replace' &
+                                                           , buffered = 'yes')
+#else /* INTEL */
+      open (unit = funit, file = fname, form = 'formatted', status = 'replace')
+#endif /* INTEL */
 
 ! write the integral file header
 !
-        write(funit,"('#')")
-        write(funit,"('#',a6,12(1x,a15))") 'step', 'time', 'dt', 'mass'        &
-                                         , 'momx', 'momy', 'momz'              &
-                                         , 'ener', 'ekin', 'emag', 'eint'      &
-                                         , 'fcor', 'finp'
-        write(funit,"('#')")
+      write(funit,"('#',a8,10(1x,a18))") 'step', 'time', 'dt'                  &
+                                       , 'mass', 'momx', 'momy', 'momz'        &
+                                       , 'ener', 'ekin', 'emag', 'eint'
+      write(funit,"('#')")
 
-      else
+    end if ! master
 
-! open the integrals file and set the position at the end of file
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
 !
-        open(unit=funit, file=fname, form='formatted', position='append')
+    call stop_timer(imi)
+#endif /* PROFILE */
 
-! write a marker that the job has been restarted from here
-!
-        write(funit,"('#',1x,a)") "job restarted from this point"
-
-      end if
-
-    end if
-!
 !-------------------------------------------------------------------------------
 !
-  end subroutine init_integrals
+  end subroutine initialize_integrals
 !
 !===============================================================================
 !
-! clear_integrals: subroutine closes the integrals file and frees all allocated
-!                  module variables
+! subroutine FINALIZE_INTEGRALS:
+! -----------------------------
+!
+!   Subroutine finalizes module INTEGRALS by closing the integrals file.
+!
 !
 !===============================================================================
 !
-  subroutine clear_integrals()
+  subroutine finalize_integrals()
 
+! import external variables
+!
     use mpitools, only : master
 
+! local variables are not implicit by default
+!
     implicit none
 !
 !-------------------------------------------------------------------------------
 !
-! close integrals.dat
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! close the integrals file
 !
     if (master) close(funit)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
 !
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
-  end subroutine clear_integrals
+  end subroutine finalize_integrals
 !
 !===============================================================================
 !
-! store_integrals: subroutine calculates the integrals and stores them in the
-!                  integrals file
+! subroutine STORE_INTEGRALS:
+! --------------------------
+!
+!   Subroutine calculates the integrals, collects from all processes and
+!   stores them in the integrals file.
+!
 !
 !===============================================================================
 !
   subroutine store_integrals()
 
-    use blocks   , only : block_meta, block_data, list_data
-    use coordinates, only : ib, ie, jb, je, kb, ke
-    use coordinates, only : advol
-    use evolution, only : step, time, dt
-    use mpitools , only : master
-#ifdef MPI
-    use mpitools , only : reduce_sum_real_array
-#endif /* MPI */
-    use equations, only : idn, imx, imy, imz, ien
-    use equations, only : ibx, iby, ibz
-
-    implicit none
-
-! local parameters
+! import external variables and subroutines
 !
-    integer, parameter :: narr = 16
+    use blocks         , only : block_meta, block_data, list_data
+    use coordinates    , only : ib, ie, jb, je, kb, ke
+    use coordinates    , only : advol
+    use equations      , only : idn, imx, imy, imz, ien, ibx, iby, ibz
+    use evolution      , only : step, time, dt
+    use mpitools       , only : master
+#ifdef MPI
+    use mpitools       , only : reduce_sum_real_array
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
 
 ! local variables
 !
-    integer      :: iret
-    real(kind=8) :: dvol
+    integer                       :: iret
+    real(kind=8)                  :: dvol, dvolh
+
+! local pointers
+!
+    type(block_data), pointer     :: pdata
+
+! local parameters
+!
+    integer, parameter            :: narr = 16
 
 ! local arrays
 !
     real(kind=8), dimension(narr) :: arr
-
-! local pointers
-!
-    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
-! reset the total mass
+! return if the storage interval was not reached
 !
-    arr(:) = 0.0d0
+    if (mod(step, iintd) > 0) return
 
-! iterate over all data blocks and sum up the density
+#ifdef PROFILE
+! start accounting time for the integrals storing
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! reset the integrals array
+!
+    arr(:) = 0.0d+00
+
+! associate the pointer with the first block on the data block list
 !
     pdata => list_data
+
+! iterate over all data blocks on the list
+!
     do while(associated(pdata))
 
-      dvol = advol(pdata%meta%level)
+! obtain the volume elements for the current block
+!
+      dvol  = advol(pdata%meta%level)
+      dvolh = 0.5d+00 * dvol
 
+! sum up density and momenta components
+!
       arr(1) = arr(1) + sum(pdata%u(idn,ib:ie,jb:je,kb:ke)) * dvol
       arr(2) = arr(2) + sum(pdata%u(imx,ib:ie,jb:je,kb:ke)) * dvol
       arr(3) = arr(3) + sum(pdata%u(imy,ib:ie,jb:je,kb:ke)) * dvol
       arr(4) = arr(4) + sum(pdata%u(imz,ib:ie,jb:je,kb:ke)) * dvol
+
+! sum up total energy
+!
       if (ien > 0) then
         arr(5) = arr(5) + sum(pdata%u(ien,ib:ie,jb:je,kb:ke)) * dvol
       end if
+
+! sum up kinetic energy
+!
       arr(6) = arr(6) + sum((pdata%u(imx,ib:ie,jb:je,kb:ke)**2                 &
                            + pdata%u(imy,ib:ie,jb:je,kb:ke)**2                 &
                            + pdata%u(imz,ib:ie,jb:je,kb:ke)**2)                &
-                           / pdata%u(idn,ib:ie,jb:je,kb:ke)) * 0.5d0 * dvol
+                           / pdata%u(idn,ib:ie,jb:je,kb:ke)) * dvolh
+
+! sum up magnetic energy
+!
       if (ibx > 0) then
         arr(7) = arr(7) + sum(pdata%u(ibx,ib:ie,jb:je,kb:ke)**2                &
                             + pdata%u(iby,ib:ie,jb:je,kb:ke)**2                &
-                            + pdata%u(ibz,ib:ie,jb:je,kb:ke)**2) * 0.5d0 * dvol
+                            + pdata%u(ibz,ib:ie,jb:je,kb:ke)**2) * dvolh
       end if
 
+! associate the pointer with the next block on the list
+!
       pdata => pdata%next
-    end do
+
+    end do ! data blocks
 
 #ifdef MPI
-! sum the integrals from all processors
+! sum the integral array from all processes
 !
     call reduce_sum_real_array(narr, arr(:), iret)
 #endif /* MPI */
@@ -208,12 +347,16 @@ module integrals
 !
     if (ien > 0) arr(8) = arr(5) - arr(6) - arr(7)
 
-! close integrals.dat
+! write down the integrals to the integrals file
 !
-    if (master) then
-      write(funit,"(i8,12(1x,1pe15.8))") step, time, dt, arr(1:10)
-    end if
+    if (master) write(funit,"(i9,10(1x,1e18.8))") step, time, dt, arr(1:8)
+
+#ifdef PROFILE
+! stop accounting time for the integrals storing
 !
+    call stop_timer(ims)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine store_integrals
