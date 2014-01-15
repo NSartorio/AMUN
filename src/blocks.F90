@@ -269,12 +269,12 @@ module blocks
   public :: allocate_metablock, deallocate_metablock
   public :: allocate_datablock, deallocate_datablock
   public :: link_blocks, unlink_blocks
+  public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
   public :: datablock_set_dims
-  public :: refine_block, derefine_block
 #ifdef DEBUG
   public :: check_metablock
 #endif /* DEBUG */
