@@ -30,9 +30,21 @@
 !
 module blocks
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer, save              :: imi, ima, imu, imp, imq, imr, imd
+#endif /* PROFILE */
 
 ! module parameters
 !
@@ -262,6 +274,22 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('blocks:: initialization'         , imi)
+    call set_timer('blocks:: meta block allocation'  , ima)
+    call set_timer('blocks:: meta block deallocation', imu)
+    call set_timer('blocks:: data block allocation'  , imp)
+    call set_timer('blocks:: data block deallocation', imq)
+    call set_timer('blocks:: refine'                 , imr)
+    call set_timer('blocks:: derefine'               , imd)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! nullify list pointers
 !
     nullify(list_meta)
@@ -290,6 +318,12 @@ module blocks
 !
     last_id = 0
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_blocks
@@ -316,6 +350,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! assiociate pmeta pointer with the first block in the list
 !
     pmeta => list_meta
@@ -331,6 +371,12 @@ module blocks
       pmeta => list_meta
 
     end do
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -362,6 +408,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for meta block allocation
+!
+    call start_timer(ima)
+#endif /* PROFILE */
+
 ! allocate block structure
 !
     allocate(pmeta)
@@ -417,6 +469,12 @@ module blocks
 !
     mblocks = mblocks + 1
 
+#ifdef PROFILE
+! stop accounting time for meta block allocation
+!
+    call stop_timer(ima)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_metablock
@@ -442,6 +500,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for meta block deallocation
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
     if (associated(pmeta)) then
 
 ! if this is the first block in the list, update the list_meta pointer
@@ -500,6 +564,12 @@ module blocks
       mblocks = mblocks - 1
 
     end if
+
+#ifdef PROFILE
+! stop accounting time for meta block deallocation
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1105,6 +1175,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for data block allocation
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 ! allocate the block structure
 !
     allocate(pdata)
@@ -1142,6 +1218,12 @@ module blocks
 !
     dblocks = dblocks + 1
 
+#ifdef PROFILE
+! stop accounting time for data block allocation
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine allocate_datablock
@@ -1172,6 +1254,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for data block deallocation
+!
+    call start_timer(imq)
+#endif /* PROFILE */
+
 ! check if the input pointer is associated with a data block
 !
     if (associated(pdata)) then
@@ -1212,6 +1300,12 @@ module blocks
       dblocks = dblocks - 1
 
     end if ! pdata associated with a data block
+
+#ifdef PROFILE
+! stop accounting time for data block deallocation
+!
+    call stop_timer(imq)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1393,6 +1487,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block refinement
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
 ! check if pointer is associated
 !
     if (associated(pblock)) then
@@ -1864,6 +1964,12 @@ module blocks
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for the block refinement
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine refine_block
@@ -1896,6 +2002,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the block derefinement
+!
+    call start_timer(imd)
+#endif /* PROFILE */
+
 ! prepare reference array
 !
 #if NDIMS == 3
@@ -1957,6 +2069,12 @@ module blocks
 ! reset the refinement flag of the parent block
 !
     pblock%refine = 0
+
+#ifdef PROFILE
+! stop accounting time for the block derefinement
+!
+    call stop_timer(imd)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

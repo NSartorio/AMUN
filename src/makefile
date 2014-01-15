@@ -122,7 +122,7 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 #-------------------------------------------------------------------------------
 
-blocks.o         : blocks.F90 error.o
+blocks.o         : blocks.F90 error.o timers.o
 boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
                    interpolations.o mpitools.o timers.o
 constants.o      : constants.F90
