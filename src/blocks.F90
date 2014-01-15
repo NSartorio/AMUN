@@ -1908,6 +1908,131 @@ module blocks
   end subroutine derefine_block
 !
 !===============================================================================
+!
+! set_last_id: subroutine sets the last identification value
+!
+!===============================================================================
+!
+  subroutine set_last_id(id)
+
+    use error, only : print_error
+
+    implicit none
+
+! input argument
+!
+    integer(kind=4), intent(in) :: id
+!
+!-------------------------------------------------------------------------------
+!
+    if (last_id .gt. id) then
+      call print_error("blocks::set_last_id"                                   &
+                                 , "New last_id must be larger than old one!")
+    else
+      last_id = id
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_last_id
+!
+!===============================================================================
+!
+! get_last_id: function returns the last identification value
+!
+!===============================================================================
+!
+  function get_last_id()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_last_id
+!
+!-------------------------------------------------------------------------------
+!
+    get_last_id = last_id
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_last_id
+!
+!===============================================================================
+!
+! get_mblocks: function returns the number of meta blocks
+!
+!===============================================================================
+!
+  function get_mblocks()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_mblocks
+!
+!-------------------------------------------------------------------------------
+!
+    get_mblocks = mblocks
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_mblocks
+!
+!===============================================================================
+!
+! get_dblocks: function returns the number of data blocks
+!
+!===============================================================================
+!
+  function get_dblocks()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_dblocks
+!
+!-------------------------------------------------------------------------------
+!
+    get_dblocks = dblocks
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_dblocks
+!
+!===============================================================================
+!
+! get_nleafs: function returns the number of leafs
+!
+!===============================================================================
+!
+  function get_nleafs()
+
+    implicit none
+
+! return variable
+!
+    integer(kind=4) :: get_nleafs
+!
+!-------------------------------------------------------------------------------
+!
+    get_nleafs = nleafs
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function get_nleafs
+!
+!===============================================================================
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
@@ -2139,131 +2264,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end function increase_id
-!
-!===============================================================================
-!
-! set_last_id: subroutine sets the last identification value
-!
-!===============================================================================
-!
-  subroutine set_last_id(id)
-
-    use error, only : print_error
-
-    implicit none
-
-! input argument
-!
-    integer(kind=4), intent(in) :: id
-!
-!-------------------------------------------------------------------------------
-!
-    if (last_id .gt. id) then
-      call print_error("blocks::set_last_id"                                   &
-                                 , "New last_id must be larger than old one!")
-    else
-      last_id = id
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine set_last_id
-!
-!===============================================================================
-!
-! get_last_id: function returns the last identification value
-!
-!===============================================================================
-!
-  function get_last_id()
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: get_last_id
-!
-!-------------------------------------------------------------------------------
-!
-    get_last_id = last_id
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_last_id
-!
-!===============================================================================
-!
-! get_mblocks: function returns the number of meta blocks
-!
-!===============================================================================
-!
-  function get_mblocks()
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: get_mblocks
-!
-!-------------------------------------------------------------------------------
-!
-    get_mblocks = mblocks
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_mblocks
-!
-!===============================================================================
-!
-! get_dblocks: function returns the number of data blocks
-!
-!===============================================================================
-!
-  function get_dblocks()
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: get_dblocks
-!
-!-------------------------------------------------------------------------------
-!
-    get_dblocks = dblocks
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_dblocks
-!
-!===============================================================================
-!
-! get_nleafs: function returns the number of leafs
-!
-!===============================================================================
-!
-  function get_nleafs()
-
-    implicit none
-
-! return variable
-!
-    integer(kind=4) :: get_nleafs
-!
-!-------------------------------------------------------------------------------
-!
-    get_nleafs = nleafs
-
-    return
-
-!-------------------------------------------------------------------------------
-!
-  end function get_nleafs
 !
 !===============================================================================
 !
