@@ -282,26 +282,36 @@ module blocks
 !
   contains
 !
-!!==============================================================================
+!===============================================================================
 !!
-!! INITIALIZATION/FINALIZATION SUBROUTINES
+!!***  PUBLIC SUBROUTINES  *****************************************************
 !!
+!===============================================================================
 !
 !===============================================================================
 !
 ! subroutine INITIALIZE_BLOCKS:
 ! ----------------------------
 !
-!   Subroutine initializes the variables related to the elementary block of
-!   the adaptive structure.
+!   Subroutine initializes the module structures, pointers and variables.
+!
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
-  subroutine initialize_blocks()
+  subroutine initialize_blocks(verbose, iret)
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -321,12 +331,9 @@ module blocks
     call start_timer(imi)
 #endif /* PROFILE */
 
-! nullify list pointers
+! reset identification counter
 !
-    nullify(list_meta)
-    nullify(list_data)
-    nullify(last_meta)
-    nullify(last_data)
+    last_id = 0
 
 ! reset the number of meta blocks, data blocks, and leafs
 !
@@ -337,7 +344,7 @@ module blocks
 ! set the initial number of variables and fluxes
 !
     nvars   = 1
-    nflux   = 0
+    nflux   = 1
 
 ! set the initial data block resolution
 !
@@ -345,9 +352,12 @@ module blocks
     ny      = 1
     nz      = 1
 
-! reset identification counter
+! nullify pointers defining the meta and data lists
 !
-    last_id = 0
+    nullify(list_meta)
+    nullify(list_data)
+    nullify(last_meta)
+    nullify(last_data)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -367,15 +377,23 @@ module blocks
 !   Subroutine iterates over all meta blocks and first deallocates all
 !   associated with them data blocks, and then their metadata structure.
 !
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
 !===============================================================================
 !
-  subroutine finalize_blocks()
+  subroutine finalize_blocks(iret)
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! a pointer to the current meta block
+! subroutine arguments
+!
+    integer, intent(inout)    :: iret
+
+! local variables
 !
     type(block_meta), pointer :: pmeta
 !
@@ -387,21 +405,30 @@ module blocks
     call start_timer(imi)
 #endif /* PROFILE */
 
-! assiociate pmeta pointer with the first block in the list
+! associate the pointer with the last block on the meta block list
 !
-    pmeta => list_meta
+    pmeta => last_meta
 
+! iterate until the first block on the list is reached
+!
     do while(associated(pmeta))
 
-! deallocate current meta block
+! deallocate the last meta block
 !
       call deallocate_metablock(pmeta)
 
-! associate pmeta pointer with the next meta block in the list
+! assign the pointer to the last block on the meta block list
 !
-      pmeta => list_meta
+      pmeta => last_meta
 
-    end do
+    end do ! meta blocks
+
+! nullify pointers defining the meta and data lists
+!
+    nullify(list_meta)
+    nullify(list_data)
+    nullify(last_meta)
+    nullify(last_data)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization

@@ -364,7 +364,7 @@ program amun
 
 ! initialize block module
 !
-  call initialize_blocks()
+  call initialize_blocks(master, iret)
 
 ! initialize boundaries module and print info
 !
@@ -633,7 +633,7 @@ program amun
 
 ! deallocate block structure
 !
-  call finalize_blocks()
+  call finalize_blocks(iret)
 
 ! finalize the random number generator
 !
