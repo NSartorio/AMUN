@@ -266,6 +266,7 @@ module blocks
   public :: initialize_blocks, finalize_blocks
   public :: append_metablock, remove_metablock
   public :: append_datablock, remove_datablock
+  public :: allocate_metablock, deallocate_metablock
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
   public :: allocate_datablock, deallocate_datablock
