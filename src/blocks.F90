@@ -264,9 +264,9 @@ module blocks
 ! declare public subroutines
 !
   public :: initialize_blocks, finalize_blocks
+  public :: append_metablock, remove_metablock
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
-  public :: append_metablock
   public :: allocate_datablock, deallocate_datablock
   public :: append_datablock, remove_datablock
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
@@ -415,7 +415,7 @@ module blocks
 
 ! deallocate the last meta block
 !
-      call deallocate_metablock(pmeta)
+      call remove_metablock(pmeta)
 
 ! assign the pointer to the last block on the meta block list
 !
@@ -440,10 +440,125 @@ module blocks
 !
   end subroutine finalize_blocks
 !
-!!==============================================================================
-!!
-!! META BLOCK SUBROUTINES
-!!
+!===============================================================================
+!
+! subroutine APPEND_METABLOCK:
+! ---------------------------
+!
+!   Subroutine allocates the memory for a new meta block by calling
+!   allocate_metablock() and appends its to the meta block list.
+!
+!   Arguments:
+!
+!     pmeta - the return pointer to the newly appended meta block;
+!
+!===============================================================================
+!
+  subroutine append_metablock(pmeta)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(out) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! allocate memory for the new meta block
+!
+    call allocate_metablock(pmeta)
+
+! check if there are any blocks in the meta block list
+!
+    if (associated(last_meta)) then
+
+! add the new block to the end of the list
+!
+      pmeta%prev     => last_meta
+      last_meta%next => pmeta
+
+    else
+
+! there are no blocks in the list, so add this one as the first block
+!
+      list_meta      => pmeta
+
+    end if
+
+! update the pointer to the last block on the list
+!
+    last_meta => pmeta
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_metablock
+!
+!===============================================================================
+!
+! subroutine REMOVE_METABLOCK:
+! ---------------------------
+!
+!   Subroutine removes the meta block from the meta block lists and
+!   releases the used memory.
+!
+!   Arguments:
+!
+!     pmeta - the pointer to the meta block which has to be removed from
+!             the meta block list;
+!
+!===============================================================================
+!
+  subroutine remove_metablock(pmeta)
+
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! check if the pointer is actually associated with any block
+!
+    if (associated(pmeta)) then
+
+! if this is the first block in the list, update the list_meta pointer
+!
+      if (pmeta%id == list_meta%id) list_meta => pmeta%next
+
+! if this is the last block in the list, update the last_meta pointer
+!
+      if (pmeta%id == last_meta%id) last_meta => pmeta%prev
+
+! update the %next and %prev pointers of the previous and next blocks,
+! respectively
+!
+      if (associated(pmeta%prev)) pmeta%prev%next => pmeta%next
+      if (associated(pmeta%next)) pmeta%next%prev => pmeta%prev
+
+! deallocate memory used by the meta block
+!
+      call deallocate_metablock(pmeta)
+
+    else
+
+! the argument contains a null pointer, so print an error
+!
+      call print_error("blocks::remove_metablock"                              &
+                                     , "Null pointer argument to meta block!")
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine remove_metablock
 !
 !===============================================================================
 !
@@ -566,24 +681,6 @@ module blocks
 
     if (associated(pmeta)) then
 
-! if this is the first block in the list, update the list_meta pointer
-!
-      if (pmeta%id .eq. list_meta%id) &
-        list_meta => pmeta%next
-
-! if this is the last block in the list, update the last_meta pointer
-!
-      if (pmeta%id .eq. last_meta%id) &
-        last_meta => pmeta%prev
-
-! update the pointer of previous and next blocks
-!
-      if (associated(pmeta%prev)) &
-        pmeta%prev%next => pmeta%next
-
-      if (associated(pmeta%next)) &
-        pmeta%next%prev => pmeta%prev
-
 ! nullify children
 !
       do i = 1, nchildren
@@ -632,44 +729,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_metablock
-!
-!===============================================================================
-!
-! append_metablock: subroutine allocates space for one meta block and appends it
-!                   to the meta block list
-!
-!===============================================================================
-!
-  subroutine append_metablock(pmeta)
-
-    implicit none
-
-! output arguments
-!
-    type(block_meta), pointer, intent(out) :: pmeta
-!
-!-------------------------------------------------------------------------------
-!
-! allocate block
-!
-    call allocate_metablock(pmeta)
-
-! add to the list
-!
-    if (associated(last_meta)) then
-      pmeta%prev => last_meta
-      last_meta%next => pmeta
-    else
-      list_meta => pmeta
-    end if
-
-! set the pointer to the last block in the list
-!
-    last_meta => pmeta
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine append_metablock
 !
 !!==============================================================================
 !!
@@ -2111,7 +2170,7 @@ module blocks
 !
     do p = 1, nchildren
       call metablock_unset_leaf(pblock%child(p)%ptr)
-      call deallocate_metablock(pblock%child(p)%ptr)
+      call remove_metablock(pblock%child(p)%ptr)
     end do
 
 ! set the leaf flag of parent block
