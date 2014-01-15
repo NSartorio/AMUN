@@ -1774,29 +1774,43 @@ module blocks
 !
 !===============================================================================
 !
-! derefine_block: subroutine derefines selected block
+! subroutine DEREFINE_BLOCK:
+! -------------------------
+!
+!   Subroutine derefines the current block by distrying all its children and
+!   restoring the block configuration, pointers and fields.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to derefined meta block;
 !
 !===============================================================================
 !
-  subroutine derefine_block(pblock)
+  subroutine derefine_block(pmeta)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input parameters
+! subroutine arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
-
-! local variables
-!
-    integer :: i, j, k, l, p
-
-! local arrays
-!
-    integer, dimension(ndims, nsides, nfaces) :: arr
+    type(block_meta), pointer, intent(inout) :: pmeta
 
 ! local pointers
 !
     type(block_meta), pointer :: pchild, pneigh
+
+! local variables
+!
+    integer       :: i, j, k, l, p
+
+! local saved variables
+!
+    logical, save :: first = .true.
+
+! local arrays
+!
+    integer, dimension(ndims, nsides, nfaces), save :: arr
 !
 !-------------------------------------------------------------------------------
 !
@@ -1806,67 +1820,82 @@ module blocks
     call start_timer(imd)
 #endif /* PROFILE */
 
+! prepare saved variables at the first execution
+!
+    if (first) then
+
 ! prepare reference array
 !
 #if NDIMS == 3
-    arr(1,1,:) = (/ 1, 3, 5, 7 /)
-    arr(1,2,:) = (/ 2, 4, 6, 8 /)
-    arr(2,1,:) = (/ 1, 2, 5, 6 /)
-    arr(2,2,:) = (/ 3, 4, 7, 8 /)
-    arr(3,1,:) = (/ 1, 2, 3, 4 /)
-    arr(3,2,:) = (/ 5, 6, 7, 8 /)
+      arr(1,1,:) = (/ 1, 3, 5, 7 /)
+      arr(1,2,:) = (/ 2, 4, 6, 8 /)
+      arr(2,1,:) = (/ 1, 2, 5, 6 /)
+      arr(2,2,:) = (/ 3, 4, 7, 8 /)
+      arr(3,1,:) = (/ 1, 2, 3, 4 /)
+      arr(3,2,:) = (/ 5, 6, 7, 8 /)
 #else /* NDIMS == 3 */
-    arr(1,1,:) = (/ 1, 3 /)
-    arr(1,2,:) = (/ 2, 4 /)
-    arr(2,1,:) = (/ 1, 2 /)
-    arr(2,2,:) = (/ 3, 4 /)
+      arr(1,1,:) = (/ 1, 3 /)
+      arr(1,2,:) = (/ 2, 4 /)
+      arr(2,1,:) = (/ 1, 2 /)
+      arr(2,2,:) = (/ 3, 4 /)
 #endif /* NDIMS == 3 */
 
-! iterate over all boundaries of the parent block
+! reset the first execution flag
+!
+      first = .false.
+
+    end if
+
+! iterate over dimensions, sides, and faces
 !
     do i = 1, ndims
       do j = 1, nsides
         do k = 1, nfaces
 
-! calculate the right child number
+! get the current child index
 !
           p = arr(i,j,k)
 
-! assign the pointer to the current neighbor
+! associate a pointer with the neighbor
 !
-          pneigh => pblock%child(p)%ptr%neigh(i,j,k)%ptr
+          pneigh => pmeta%child(p)%ptr%neigh(i,j,k)%ptr
 
-! assign the right neighbor to the current neighbor pointer
+! update the parent neighbor field
 !
-          pblock%neigh(i,j,k)%ptr => pneigh
+          pmeta%neigh(i,j,k)%ptr => pneigh
 
-! update the neighbor fields of neighbors
+! update the neigh field of the neighbor
 !
           if (associated(pneigh)) then
+
             l = 3 - j
             do p = 1, nfaces
-              pneigh%neigh(i,l,p)%ptr => pblock
+              pneigh%neigh(i,l,p)%ptr => pmeta
             end do
-          end if
 
-        end do
-      end do
-    end do
+          end if ! pneigh is associated
 
-! deallocate child blocks
+        end do ! nfaces
+      end do ! nsides
+    end do ! ndims
+
+! iterate over children
 !
     do p = 1, nchildren
-      call metablock_unset_leaf(pblock%child(p)%ptr)
-      call remove_metablock(pblock%child(p)%ptr)
-    end do
 
-! set the leaf flag of parent block
+! remove the child from the meta block list
 !
-    call metablock_set_leaf(pblock)
+      call remove_metablock(pmeta%child(p)%ptr)
+
+    end do ! nchild
+
+! update the parent leaf flag
+!
+    call metablock_set_leaf(pmeta)
 
 ! reset the refinement flag of the parent block
 !
-    pblock%refine = 0
+    call metablock_set_refine(pmeta, 0)
 
 #ifdef PROFILE
 ! stop accounting time for the block derefinement
