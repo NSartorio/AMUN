@@ -23,8 +23,9 @@
 !!
 !! module: BLOCKS
 !!
-!!  This module allocates, deallocates, and handles blocks of the adaptive mesh
-!!  structures.
+!!  This module provides data structures, variables and subroutines to
+!!  construct and dynamically modify the hierarchy of blocks corresponding
+!!  to the simulated mesh geometry.
 !!
 !!******************************************************************************
 !
@@ -46,16 +47,43 @@ module blocks
   integer, save              :: imi, ima, imu, imp, imq, imr, imd
 #endif /* PROFILE */
 
-! module parameters
+! MODULE PARAMETERS:
+! =================
+!
+!   ndims     - the number of dimensions (2 or 3);
+!   nsides    - the number of sides along each direction (2);
+!   nfaces    - the number of faces at each side (2 for 2D, 4 for 3D);
+!   nchildren - the number of child blocks for each block (4 for 2D, 8 for 3D);
 !
   integer(kind=4), parameter :: ndims     = NDIMS
   integer(kind=4), parameter :: nsides    = 2
   integer(kind=4), parameter :: nfaces    = 2**(ndims - 1)
   integer(kind=4), parameter :: nchildren = 2**ndims
 
-!! BLOCK STRUCTURE POINTERS (they have to be defined before block structures)
-!!
-! define pointers to meta, data, and info block structures
+! MODULE VARIABLES:
+! ================
+!
+! the identification of the last allocated block (always increases)
+!
+  integer(kind=4), save      :: last_id
+
+! the number of allocated meta and data blocks, and the number of leafs
+!
+  integer(kind=4), save      :: mblocks, dblocks, nleafs
+
+! the number of variables and fluxes stored in data blocks
+!
+  integer(kind=4), save      :: nvars, nflux
+
+! the spacial dimensions of allocatable data block arrays
+!
+  integer(kind=4), save      :: nx, ny, nz
+
+! BLOCK STRUCTURE POINTERS:
+! ========================
+!
+! define pointers to meta, data, and info block structures defined below;
+! they have to be defined before block structures
 !
   type pointer_meta
     type(block_meta), pointer :: ptr
@@ -69,9 +97,12 @@ module blocks
     type(block_info), pointer :: ptr
   end type pointer_info
 
-!! BLOCK STRUCTURES
+! BLOCK STRUCTURES:
+! ================
 !
-! define the META block structure
+! define the META block structure; each process keeps exactly same meta block
+! structure all the time, so processes can know how the block structure changes
+! and where to move data blocks;
 !
   type block_meta
                                  ! pointers to the previous and next meta blocks
@@ -94,11 +125,13 @@ module blocks
                                  !
     type(block_data)  , pointer :: data
 
-                                 ! the block identification
+                                 ! the identification number (unique for each
+                                 ! block)
                                  !
     integer(kind=4)             :: id
 
-                                 ! the number of associated cpu
+                                 ! the process number to which the meta block
+                                 ! is bounded
                                  !
     integer(kind=4)             :: cpu
 
@@ -106,17 +139,19 @@ module blocks
                                  !
     integer(kind=4)             :: level
 
-                                 ! the configuration flag for its children order
+                                 ! the number describing the configuration of
+                                 ! the child meta blocks
                                  !
     integer(kind=4)             :: config
 
                                  ! the refinement flag, -1, 0, and 1 for
-                                 ! derefinement, no change, and refinement,
-                                 ! respectively
+                                 ! the block marked to be derefined, not
+                                 ! changed, and refined, respectively
                                  !
     integer(kind=4)             :: refine
 
-                                 ! the position of the block in its parent block
+                                 ! the position of the block in its siblings
+                                 ! group
                                  !
     integer(kind=4)             :: pos(ndims)
 
@@ -125,17 +160,28 @@ module blocks
                                  !
     integer(kind=4)             :: coord(ndims)
 
-                                 ! the leaf flag
+                                 ! the leaf flag, signifying that the block is
+                                 ! the highest block in the local block
+                                 ! structure
                                  !
     logical                     :: leaf
 
-                                 ! the block coordinates in the physical units
+                                 ! the flag indicates that the corresponding
+                                 ! data needs to be updated (e.g. boundaries or
+                                 ! primitive variables), therefore it is
+                                 ! usually .true.
                                  !
-    real                        :: xmin, xmax, ymin, ymax, zmin, zmax
+    logical                     :: update
+
+                                 ! the block bounds in the coordinate units
+                                 !
+    real(kind=8)                :: xmin, xmax, ymin, ymax, zmin, zmax
 
   end type block_meta
 
-! define the DATA block structure
+! define the DATA block structure; all data blocks are divided between
+! processes, therefore the same data block cannot be associated with two
+! different processes, but they can be moved from one process to another;
 !
   type block_data
                                  ! pointers to the previous and next data blocks
@@ -146,12 +192,14 @@ module blocks
                                  !
     type(block_meta), pointer :: meta
 
-                                 ! a pointer to the array conserved variables
+                                 ! a pointer to the current conserved variable
+                                 ! array
                                  !
     real, dimension(:,:,:,:)  , pointer     :: u
 
                                  ! an allocatable arrays to store all conserved
-                                 ! variables
+                                 ! variables (required two for Runge-Kutta
+                                 ! temporal integration methods)
                                  !
     real, dimension(:,:,:,:)  , allocatable :: u0, u1
 
@@ -163,13 +211,6 @@ module blocks
                                  ! an allocatable array to store all fluxes
                                  !
     real, dimension(:,:,:,:,:), allocatable :: f
-
-#ifdef DEBUG
-                                 ! an allocatable array to store refinement
-                                 ! values
-                                 !
-    real, dimension(:,:,:)    , allocatable :: c
-#endif /* DEBUG */
 
   end type block_data
 
@@ -188,7 +229,9 @@ module blocks
                                  !
     type(block_meta)  , pointer :: neigh
 
-                                 ! the direction, side and face indices
+                                 ! the direction, side and face numbers
+                                 ! indicating the neighbor block orientation
+                                 ! with respect to the block
                                  !
     integer(kind=4)             :: direction, side, face
 
@@ -199,41 +242,27 @@ module blocks
 
   end type block_info
 
-!! POINTER TO THE FIST AND LAST BLOCKS IN THE LISTS
-!!
-! chains of meta blocks and data blocks
+! POINTERS TO THE FIST AND LAST BLOCKS IN THE LISTS:
+! =================================================
+!
+! these pointers construct the lists of meta and data blocks;
 !
   type(block_meta), pointer, save :: list_meta, last_meta
   type(block_data), pointer, save :: list_data, last_data
-
-!! MODULE VARIABLES
-!!
-! the identification of the last allocated block (should always increase)
-!
-  integer(kind=4)     , save :: last_id
-
-! the numbers of allocated meta and data blocks, and leafs
-!
-  integer(kind=4)     , save :: mblocks, dblocks, nleafs
-
-! the numbers of variables and fluxes stored in data blocks
-!
-  integer(kind=4)     , save :: nvars, nflux
-
-! the spacial dimensions of data block allocatable arrays
-!
-  integer(kind=4)     , save :: nx, ny, nz
 
 ! all variables and subroutines are private by default
 !
   private
 
-! declare public subroutines
+! declare public pointers, structures, and variables
 !
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
   public :: list_meta, list_data
-  public :: nchildren, ndims, nsides, nfaces
+  public :: ndims, nsides, nfaces, nchildren
+
+! declare public subroutines
+!
   public :: initialize_blocks, finalize_blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
@@ -249,6 +278,8 @@ module blocks
   public :: check_metablock
 #endif /* DEBUG */
 
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
   contains
 !
 !!==============================================================================
@@ -1207,12 +1238,6 @@ module blocks
 ! allocate the space for numerical fluxes
 !
     if (nflux > 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
-
-#ifdef DEBUG
-! allocate the space for the refinement criterion array
-!
-    allocate(pdata%c(nx,ny,nz))
-#endif /* DEBUG */
 
 ! increase the number of allocated meta blocks
 !
