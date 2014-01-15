@@ -268,8 +268,8 @@ module blocks
   public :: append_datablock, remove_datablock
   public :: allocate_metablock, deallocate_metablock
   public :: allocate_datablock, deallocate_datablock
-  public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
+  public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
@@ -1091,6 +1091,78 @@ module blocks
 !
   end subroutine deallocate_datablock
 !
+!===============================================================================
+!
+! subroutine LINK_BLOCKS:
+! ----------------------
+!
+!   Subroutine links meta and data blocks.
+!
+!   Arguments:
+!
+!     pmeta - the meta block pointer;
+!     pdata - the data block pointer;
+!
+!===============================================================================
+!
+  subroutine link_blocks(pmeta, pdata)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! associate the corresponging pointers
+!
+    pmeta%data => pdata
+    pdata%meta => pmeta
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine link_blocks
+!
+!===============================================================================
+!
+! subroutine UNLINK_BLOCKS:
+! ------------------------
+!
+!   Subroutine unlinks meta and data blocks.
+!
+!   Arguments:
+!
+!     pmeta - the meta block pointer;
+!     pdata - the data block pointer;
+!
+!===============================================================================
+!
+  subroutine unlink_blocks(pmeta, pdata)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! nullify the corresponging pointers
+!
+    nullify(pmeta%data)
+    nullify(pdata%meta)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine unlink_blocks
+!
 !!==============================================================================
 !!
 !! TOOL SUBROUTINES
@@ -1251,78 +1323,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end function get_nleafs
-!
-!===============================================================================
-!
-! subroutine LINK_BLOCKS:
-! ----------------------
-!
-!   Subroutine links a data block to meta block.
-!
-!   Arguments:
-!
-!     pmeta - the meta block pointer;
-!     pdata - the data block pointer;
-!
-!===============================================================================
-!
-  subroutine link_blocks(pmeta, pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    type(block_data), pointer, intent(inout) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! set the pointers
-!
-    pmeta%data => pdata
-    pdata%meta => pmeta
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine link_blocks
-!
-!===============================================================================
-!
-! subroutine UNLINK_BLOCKS:
-! ------------------------
-!
-!   Subroutine unlinks meta block with a data block linked to it.
-!
-!   Arguments:
-!
-!     pmeta - the meta block pointer;
-!     pdata - the data block pointer;
-!
-!===============================================================================
-!
-  subroutine unlink_blocks(pmeta, pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    type(block_data), pointer, intent(inout) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! clean up the block pointers
-!
-    nullify(pmeta%data)
-    nullify(pdata%meta)
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine unlink_blocks
 !
 !===============================================================================
 !
