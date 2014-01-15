@@ -693,16 +693,25 @@ module blocks
 !
 !===============================================================================
 !
-! allocate_metablock: subroutine allocates space for one meta block and returns
-!                     the pointer to this block
+! subroutine ALLOCATE_METABLOCK:
+! -----------------------------
+!
+!   Subroutine allocates memory for one meta block, initializes its fields
+!   and returns a pointer associated with it.
+!
+!   Arguments:
+!
+!     pmeta - the pointer associated with the newly allocated meta block;
 !
 !===============================================================================
 !
   subroutine allocate_metablock(pmeta)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(out) :: pmeta
 
@@ -713,68 +722,81 @@ module blocks
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for meta block allocation
+! start accounting time for the meta block allocation
 !
     call start_timer(ima)
 #endif /* PROFILE */
 
-! allocate block structure
+! allocate the meta block structure for one object
 !
     allocate(pmeta)
 
-! nullify pointers
+! nullify fields pointing to previous and next block on the meta block list
 !
     nullify(pmeta%prev)
     nullify(pmeta%next)
+
+! nullify the field pointing to the parent
+!
     nullify(pmeta%parent)
-    nullify(pmeta%data)
+
+! nullify fields pointing to children
+!
     do i = 1, nchildren
       nullify(pmeta%child(i)%ptr)
     end do
-    do k = 1, nfaces
+
+! nullify fields pointing to neighbors
+!
+    do i = 1, ndims
       do j = 1, nsides
-        do i = 1, ndims
+        do k = 1, nfaces
           nullify(pmeta%neigh(i,j,k)%ptr)
         end do
       end do
     end do
 
+! nullify the field pointing to the associated data block
+!
+    nullify(pmeta%data)
+
 ! set unique ID
 !
-    pmeta%id = increase_id()
+    pmeta%id       = increase_id()
 
-! unset the CPU number of current block, level, the configuration, refine and
-! leaf flags
+! unset the process number, level, the children configuration, refine, leaf,
+! and update flags
 !
-    pmeta%cpu    = -1
-    pmeta%level  = -1
-    pmeta%config = -1
-    pmeta%refine =  0
-    pmeta%leaf   = .false.
+    pmeta%cpu      = -1
+    pmeta%level    = -1
+    pmeta%config   = -1
+    pmeta%refine   =  0
+    pmeta%leaf     = .false.
+    pmeta%update   = .true.
 
 ! initialize the position in the parent block
 !
     pmeta%pos(:)   = -1
 
-! initialize the coordinate
+! initialize the effective coordinates
 !
     pmeta%coord(:) = 0
 
-! initialize bounds of the block
+! initialize coordinate bounds of the block
 !
-    pmeta%xmin = 0.0
-    pmeta%xmax = 1.0
-    pmeta%ymin = 0.0
-    pmeta%ymax = 1.0
-    pmeta%zmin = 0.0
-    pmeta%zmax = 1.0
+    pmeta%xmin     = 0.0d+00
+    pmeta%xmax     = 1.0d+00
+    pmeta%ymin     = 0.0d+00
+    pmeta%ymax     = 1.0d+00
+    pmeta%zmin     = 0.0d+00
+    pmeta%zmax     = 1.0d+00
 
 ! increase the number of allocated meta blocks
 !
-    mblocks = mblocks + 1
+    mblocks        = mblocks + 1
 
 #ifdef PROFILE
-! stop accounting time for meta block allocation
+! stop accounting time for the meta block allocation
 !
     call stop_timer(ima)
 #endif /* PROFILE */
@@ -785,16 +807,30 @@ module blocks
 !
 !===============================================================================
 !
-! deallocate_metablock: subroutine deallocates space occupied by a given meta
-!                       block
+! subroutine DEALLOCATE_METABLOCK:
+! -------------------------------
+!
+!   Subroutine releases memory used by the meta block associated with
+!   the pointer argument.
+!
+!   Arguments:
+!
+!     pmeta - the pointer associated with the meta block which will be
+!             deallocated;
 !
 !===============================================================================
 !
   subroutine deallocate_metablock(pmeta)
 
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
 
@@ -805,54 +841,74 @@ module blocks
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for meta block deallocation
+! start accounting time for the meta block deallocation
 !
     call start_timer(imu)
 #endif /* PROFILE */
 
+! check if the pointer is actually associated with any block
+!
     if (associated(pmeta)) then
 
-! nullify children
+! decrease the number of leafs
+!
+      if (pmeta%leaf) nleafs = nleafs - 1
+
+! decrease the number of allocated meta blocks
+!
+      mblocks = mblocks - 1
+
+! nullify fields pointing to previous and next block on the meta block list
+!
+      nullify(pmeta%prev)
+      nullify(pmeta%next)
+
+! nullify the field pointing to the parent
+!
+      nullify(pmeta%parent)
+
+! nullify fields pointing to children
 !
       do i = 1, nchildren
         nullify(pmeta%child(i)%ptr)
       end do
 
-! nullify neighbors
+! nullify fields pointing to neighbors
 !
-      do k = 1, nfaces
+      do i = 1, ndims
         do j = 1, nsides
-          do i = 1, ndims
+          do k = 1, nfaces
             nullify(pmeta%neigh(i,j,k)%ptr)
           end do
         end do
       end do
 
-! if corresponding data block is allocated, deallocate it too
+! if there is a data block is associated, remove it
 !
-      if (associated(pmeta%data)) &
-        call remove_datablock(pmeta%data)
+      if (associated(pmeta%data)) call remove_datablock(pmeta%data)
 
-! nullify pointers
+! nullify the field pointing to the associated data block
 !
-      nullify(pmeta%next)
-      nullify(pmeta%prev)
       nullify(pmeta%data)
-      nullify(pmeta%parent)
 
-! free and nullify the block
+! release the memory occupied by the block
 !
       deallocate(pmeta)
+
+! nullify the pointer to the deallocated meta block
+!
       nullify(pmeta)
 
-! decrease the number of allocated blocks
-!
-      mblocks = mblocks - 1
+    else
 
+! the argument contains a null pointer, so print an error
+!
+      call print_error("blocks::deallocate_metablock"                          &
+                                     , "Null pointer argument to meta block!")
     end if
 
 #ifdef PROFILE
-! stop accounting time for meta block deallocation
+! stop accounting time for the meta block deallocation
 !
     call stop_timer(imu)
 #endif /* PROFILE */
