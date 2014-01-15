@@ -1163,6 +1163,203 @@ module blocks
 !
   end subroutine unlink_blocks
 !
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
+!
+!===============================================================================
+!
+! subroutine INSERT_METABLOCK_AFTER:
+! ---------------------------------
+!
+!   Subroutine allocates memory for one meta block, inserts it to the meta
+!   block list after the provided pointer and returns a pointer associated
+!   with it.
+!
+!   Arguments:
+!
+!     pmeta - the pointer associated with the newly appended meta block;
+!     pprev - the pointer after which the new block has to be inserted;
+!
+!===============================================================================
+!
+  subroutine insert_metablock_after(pprev, pmeta)
+
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(in)  :: pprev
+    type(block_meta), pointer, intent(out) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! allocate memory for the new meta block
+!
+    call allocate_metablock(pmeta)
+
+! if pprev is associated, insert the new block after it
+!
+    if (associated(pprev)) then
+
+! associate the %prev and %next pointers
+!
+      pmeta%prev => pprev
+      pmeta%next => pprev%next
+
+! update the pointer of the next and previous blocks
+!
+      if (associated(pprev%next)) pprev%next%prev => pmeta
+      pprev%next => pmeta
+
+! check if last_meta is associated
+!
+      if (associated(last_meta)) then
+
+! update the last_meta pointer if necessary
+!
+        if (pprev%id == last_meta%id) last_meta => pmeta
+
+      else
+
+! strange situation, pprev is associated, but last_meta not
+!
+        call print_error("blocks::intert_metablock_after"                      &
+                       , "Argument pprev is associated but last_meta is not!")
+
+      end if
+
+    else
+
+! if pprev is null and list_meta is associated, there is something wrong
+!
+      if (associated(list_meta)) then
+
+! strange situation, pprev is null but list_meta is associated
+!
+        call print_error("blocks::intert_metablock_after"                      &
+                      , "Argument pprev is null but list_meta is associated!")
+
+      else
+
+! pprev and list_meta are nulls, so add the first block to the list by
+! associating list_meta and last_meta
+!
+        list_meta => pmeta
+        last_meta => pmeta
+
+      end if
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine insert_metablock_after
+!
+!===============================================================================
+!
+! subroutine INSERT_METABLOCK_BEFORE:
+! ----------------------------------
+!
+!   Subroutine allocates memory for one meta block, inserts it to the meta
+!   block list before the provided pointer and returns a pointer associated
+!   with it.
+!
+!   Arguments:
+!
+!     pmeta - the pointer associated with the newly appended meta block;
+!     pnext - the pointer before which the new block has to be inserted;
+!
+!===============================================================================
+!
+  subroutine insert_metablock_before(pnext, pmeta)
+
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(in)  :: pnext
+    type(block_meta), pointer, intent(out) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! allocate memory for the new meta block
+!
+    call allocate_metablock(pmeta)
+
+! if pnext is associated, insert the new block before it
+!
+    if (associated(pnext)) then
+
+! associate the %prev and %next pointers
+!
+      pmeta%prev => pnext%prev
+      pmeta%next => pnext
+
+! update the pointer of the next and previous blocks
+!
+      if (associated(pnext%prev)) pnext%prev%next => pmeta
+      pnext%prev => pmeta
+
+! check if list_meta is associated
+!
+      if (associated(list_meta)) then
+
+! update the list_meta pointer if necessary
+!
+        if (pnext%id == list_meta%id) list_meta => pmeta
+
+      else
+
+! strange situation, pnext is associated, but list_meta not
+!
+        call print_error("blocks::intert_metablock_before"                     &
+                       , "Argument pnext is associated but list_meta is not!")
+
+      end if
+
+    else
+
+! if pnext is null and last_meta is associated, there is something wrong
+!
+      if (associated(last_meta)) then
+
+! strange situation, pnext is null but last_meta is associated
+!
+        call print_error("blocks::intert_metablock_before"                     &
+                      , "Argument pnext is null but last_meta is associated!")
+
+      else
+
+! pnext and last_meta are nulls, so add the first block to the list by
+! associating list_meta and last_meta
+!
+        list_meta => pmeta
+        last_meta => pmeta
+
+      end if
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine insert_metablock_before
+!
+!
 !!==============================================================================
 !!
 !! TOOL SUBROUTINES
