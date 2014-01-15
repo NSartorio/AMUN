@@ -1354,7 +1354,7 @@ module blocks
 
 ! set the child configuration number
 !
-        pchild%config = config(p)
+        call metablock_set_config(pchild, config(p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
