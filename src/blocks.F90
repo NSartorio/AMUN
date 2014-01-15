@@ -265,10 +265,10 @@ module blocks
 !
   public :: initialize_blocks, finalize_blocks
   public :: append_metablock, remove_metablock
+  public :: append_datablock, remove_datablock
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
   public :: allocate_datablock, deallocate_datablock
-  public :: append_datablock, remove_datablock
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
@@ -445,12 +445,12 @@ module blocks
 ! subroutine APPEND_METABLOCK:
 ! ---------------------------
 !
-!   Subroutine allocates the memory for a new meta block by calling
-!   allocate_metablock() and appends its to the meta block list.
+!   Subroutine allocates memory for one meta block, appends it to the meta
+!   block list and returns a pointer associated with it.
 !
 !   Arguments:
 !
-!     pmeta - the return pointer to the newly appended meta block;
+!     pmeta - the pointer associated with the newly appended meta block;
 !
 !===============================================================================
 !
@@ -500,13 +500,12 @@ module blocks
 ! subroutine REMOVE_METABLOCK:
 ! ---------------------------
 !
-!   Subroutine removes the meta block from the meta block lists and
-!   releases the used memory.
+!   Subroutine removes a meta block associated with the input pointer from
+!   the meta block list, and deallocates space used by it.
 !
 !   Arguments:
 !
-!     pmeta - the pointer to the meta block which has to be removed from
-!             the meta block list;
+!     pmeta - the pointer pointing to the meta block which will be removed;
 !
 !===============================================================================
 !
@@ -559,6 +558,138 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine remove_metablock
+!
+!===============================================================================
+!
+! subroutine APPEND_DATABLOCK:
+! ---------------------------
+!
+!   Subroutine allocates memory for one data block, appends it to the data
+!   block list and returns a pointer associated with it.
+!
+!   Arguments:
+!
+!     pdata - the pointer associated with the newly appended data block;
+!
+!===============================================================================
+!
+  subroutine append_datablock(pdata)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(out) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! allocate memory for the new data block
+!
+    call allocate_datablock(pdata)
+
+! check if there are any blocks in the data block list
+!
+    if (associated(last_data)) then
+
+! add the new block to the end of the list
+!
+      pdata%prev     => last_data
+      last_data%next => pdata
+
+    else
+
+! there are no blocks in the list, so add this one as the first block
+!
+      list_data      => pdata
+
+    end if
+
+! update the pointer to the last block on the list
+!
+    last_data => pdata
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_datablock
+!
+!===============================================================================
+!
+! subroutine REMOVE_DATABLOCK:
+! ---------------------------
+!
+!   Subroutine removes a data block associated with the input pointer from
+!   the data block list, and deallocates space used by it.
+!
+!   Arguments:
+!
+!     pdata - the pointer pointing to the data block which will be removed;
+!
+!===============================================================================
+!
+  subroutine remove_datablock(pdata)
+
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! check if the pointer is actually associated with any block
+!
+    if (associated(pdata)) then
+
+! check if the data block has associated meta block
+!
+      if (associated(pdata%meta)) then
+
+! if this is the first block in the list, update the list_data pointer
+!
+        if (pdata%meta%id == list_data%meta%id) list_data => pdata%next
+
+! if this is the last block in the list, update the last_data pointer
+!
+        if (pdata%meta%id == last_data%meta%id) last_data => pdata%prev
+
+! update the %next and %prev pointers of the previous and next blocks,
+! respectively
+!
+        if (associated(pdata%prev)) pdata%prev%next => pdata%next
+        if (associated(pdata%next)) pdata%next%prev => pdata%prev
+
+      else ! %meta associated
+
+! there is no meta block associated, so print an error
+!
+        call print_error("blocks::remove_datablock"                            &
+                            , "No meta block associated with the data block!")
+
+      end if ! %meta associated
+
+! deallocate the associated data block
+!
+      call deallocate_datablock(pdata)
+
+    else
+
+! the argument contains a null pointer, so print an error
+!
+      call print_error("blocks::remove_datablock"                              &
+                                     , "Null pointer argument to data block!")
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine remove_datablock
 !
 !===============================================================================
 !
@@ -1254,18 +1385,6 @@ module blocks
 !
   end subroutine metablock_set_bounds
 !
-!!==============================================================================
-!!
-!! DATA BLOCK SUBROUTINES
-!!
-!
-!===============================================================================
-!
-! allocate_datablock: subroutine allocates space for one data block and returns
-!                     the pointer to this block
-!
-!===============================================================================
-!
 !===============================================================================
 !
 ! subroutine ALLOCATE_DATABLOCK:
@@ -1421,113 +1540,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine deallocate_datablock
-!
-!===============================================================================
-!
-! subroutine APPEND_DATABLOCK:
-! ---------------------------
-!
-!   Subroutine allocates space for one data block and appends it to the data
-!   block list returning a pointer associated with it.
-!
-!   Arguments:
-!
-!     pdata - the pointer associated with the created data block;
-!
-!===============================================================================
-!
-  subroutine append_datablock(pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer, intent(out) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! allocate the data block
-!
-    call allocate_datablock(pdata)
-
-! add the allocated block to the data block list
-!
-    if (associated(last_data)) then
-      pdata%prev     => last_data
-      last_data%next => pdata
-    else
-      list_data => pdata
-    end if
-
-! set the pointer to the last block in the list
-!
-    last_data => pdata
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine append_datablock
-!
-!===============================================================================
-!
-! subroutine REMOVE_DATABLOCK:
-! ---------------------------
-!
-!   Subroutine removes a data block associated with the input pointer from
-!   the data block list, and deallocates space used by this block.
-!
-!   Arguments:
-!
-!     pdata - the pointer pointing to the data block for removing;
-!
-!===============================================================================
-!
-  subroutine remove_datablock(pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! check if the input pointer is associated with a data block
-!
-    if (associated(pdata)) then
-
-! remove from the meta block list if the meta pointer is set
-!
-      if (associated(pdata%meta)) then
-
-! if this is the first block in the list, update the list_data pointer
-!
-        if (pdata%meta%id == list_data%meta%id) list_data => pdata%next
-
-! if this is the last block in the list, update the last_data pointer
-!
-        if (pdata%meta%id == last_data%meta%id) last_data => pdata%prev
-
-! update the pointer of previous and next blocks
-!
-        if (associated(pdata%prev)) pdata%prev%next => pdata%next
-
-        if (associated(pdata%next)) pdata%next%prev => pdata%prev
-
-      end if ! %meta associated
-
-! deallocate the associated data block
-!
-      call deallocate_datablock(pdata)
-
-    end if ! pdata associated with a data block
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine remove_datablock
 !
 !===============================================================================
 !
