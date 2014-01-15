@@ -267,9 +267,9 @@ module blocks
   public :: append_metablock, remove_metablock
   public :: append_datablock, remove_datablock
   public :: allocate_metablock, deallocate_metablock
+  public :: allocate_datablock, deallocate_datablock
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: link_blocks, unlink_blocks
-  public :: allocate_datablock, deallocate_datablock
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
@@ -918,6 +918,179 @@ module blocks
 !
   end subroutine deallocate_metablock
 !
+!===============================================================================
+!
+! subroutine ALLOCATE_DATABLOCK:
+! -----------------------------
+!
+!   Subroutine allocates memory for one data block, initializes its fields
+!   and returns a pointer associated with it.
+!
+!   Arguments:
+!
+!     pdata - the pointer associated with the newly allocated data block;
+!
+!===============================================================================
+!
+  subroutine allocate_datablock(pdata)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(out) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the data block allocation
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
+! allocate the block structure
+!
+    allocate(pdata)
+
+! nullify field pointing to the previous and next blocks on the data block list
+!
+    nullify(pdata%prev)
+    nullify(pdata%next)
+
+! nullify the field pointing to the associate meta block list
+!
+    nullify(pdata%meta)
+
+! allocate space for conserved variables
+!
+    allocate(pdata%u0(nvars,nx,ny,nz), pdata%u1(nvars,nx,ny,nz))
+
+! allocate space for primitive variables
+!
+    allocate(pdata%q(nvars,nx,ny,nz))
+
+! allocate space for numerical fluxes
+!
+    allocate(pdata%f(ndims,nflux,nx,ny,nz))
+
+! initiate the conserved variable pointer
+!
+    pdata%u => pdata%u0
+
+! increase the number of allocated data blocks
+!
+    dblocks = dblocks + 1
+
+#ifdef PROFILE
+! stop accounting time for the data block allocation
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine allocate_datablock
+!
+!===============================================================================
+!
+! subroutine DEALLOCATE_DATABLOCK:
+! -------------------------------
+!
+!   Subroutine releases memory used by the data block associated with
+!   the pointer argument.
+!
+!   Arguments:
+!
+!     pdata - the pointer associated with the data block which will be
+!             deallocated;
+!
+!===============================================================================
+!
+  subroutine deallocate_datablock(pdata)
+
+! import external procedures
+!
+    use error          , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the data block deallocation
+!
+    call start_timer(imq)
+#endif /* PROFILE */
+
+! check if the pointer is actually associated with any block
+!
+    if (associated(pdata)) then
+
+! decrease the number of allocated data blocks
+!
+      dblocks = dblocks - 1
+
+! nullify field pointing to the previous and next blocks on the data block list
+!
+      nullify(pdata%prev)
+      nullify(pdata%next)
+
+! nullify the field pointing to the associate meta block list
+!
+      nullify(pdata%meta)
+
+! nullify pointer to the current conserved variable array
+!
+      nullify(pdata%u)
+
+! deallocate conserved variables
+!
+      if (allocated(pdata%u0)) deallocate(pdata%u0)
+      if (allocated(pdata%u1)) deallocate(pdata%u1)
+
+! deallocate primitive variables
+!
+      if (allocated(pdata%q )) deallocate(pdata%q )
+
+! deallocate numerical fluxes
+!
+      if (allocated(pdata%f )) deallocate(pdata%f )
+
+! release the memory occupied by the block
+!
+      deallocate(pdata)
+
+! nullify the pointer to the deallocated meta block
+!
+      nullify(pdata)
+
+    else
+
+! the argument contains a null pointer, so print an error
+!
+      call print_error("blocks::deallocate_datablock"                          &
+                                     , "Null pointer argument to data block!")
+
+    end if ! pdata associated with a data block
+
+#ifdef PROFILE
+! stop accounting time for the data block deallocation
+!
+    call stop_timer(imq)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine deallocate_datablock
+!
 !!==============================================================================
 !!
 !! TOOL SUBROUTINES
@@ -1441,162 +1614,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_bounds
-!
-!===============================================================================
-!
-! subroutine ALLOCATE_DATABLOCK:
-! -----------------------------
-!
-!   Subroutine allocates space for one data block and returns a pointer
-!   associated with it.
-!
-!   Arguments:
-!
-!     pdata - the pointer associated with the created data block;
-!
-!===============================================================================
-!
-  subroutine allocate_datablock(pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer, intent(out) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for data block allocation
-!
-    call start_timer(imp)
-#endif /* PROFILE */
-
-! allocate the block structure
-!
-    allocate(pdata)
-
-! nullify all pointers
-!
-    nullify(pdata%prev)
-    nullify(pdata%next)
-    nullify(pdata%meta)
-
-! allocate the space for conserved variables
-!
-    allocate(pdata%u0(nvars,nx,ny,nz))
-    allocate(pdata%u1(nvars,nx,ny,nz))
-
-! allocate the space for primitive variables
-!
-    allocate(pdata%q(nvars,nx,ny,nz))
-
-! initiate the conserved variable pointer
-!
-    pdata%u => pdata%u0
-
-! allocate the space for numerical fluxes
-!
-    if (nflux > 0) allocate(pdata%f(ndims,nflux,nx,ny,nz))
-
-! increase the number of allocated meta blocks
-!
-    dblocks = dblocks + 1
-
-#ifdef PROFILE
-! stop accounting time for data block allocation
-!
-    call stop_timer(imp)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine allocate_datablock
-!
-!===============================================================================
-!
-! subroutine DEALLOCATE_DATABLOCK:
-! -------------------------------
-!
-!   Subroutine deallocates space of the data block associated with the input
-!   pointer.
-!
-!   Arguments:
-!
-!     pdata - the pointer pointing to the data block for deallocating;
-!
-!===============================================================================
-!
-  subroutine deallocate_datablock(pdata)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer, intent(inout) :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for data block deallocation
-!
-    call start_timer(imq)
-#endif /* PROFILE */
-
-! check if the input pointer is associated with a data block
-!
-    if (associated(pdata)) then
-
-! deallocate conservative variables
-!
-      if (allocated(pdata%u0)) deallocate(pdata%u0)
-      if (allocated(pdata%u1)) deallocate(pdata%u1)
-
-! deallocate primitive variables
-!
-      if (allocated(pdata%q)) deallocate(pdata%q)
-
-! deallocate numerical fluxes
-!
-      if (allocated(pdata%f)) deallocate(pdata%f)
-
-#ifdef DEBUG
-! deallocate the refinement critarion array
-!
-      if (allocated(pdata%c)) deallocate(pdata%c)
-#endif /* DEBUG */
-
-! nullify pointers
-!
-      nullify(pdata%u)
-      nullify(pdata%next)
-      nullify(pdata%prev)
-      nullify(pdata%meta)
-
-! free and nullify the block
-!
-      deallocate(pdata)
-      nullify(pdata)
-
-! decrease the number of allocated blocks
-!
-      dblocks = dblocks - 1
-
-    end if ! pdata associated with a data block
-
-#ifdef PROFILE
-! stop accounting time for data block deallocation
-!
-    call stop_timer(imq)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine deallocate_datablock
 !
 !===============================================================================
 !
