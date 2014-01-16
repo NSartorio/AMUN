@@ -272,7 +272,7 @@ module blocks
   public :: link_blocks, unlink_blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
-  public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
+  public :: metablock_set_id, metablock_set_process, metablock_set_refine      &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
@@ -1432,7 +1432,7 @@ module blocks
 
 ! set the child process number
 !
-        call metablock_set_cpu(pchild, pmeta%cpu)
+        call metablock_set_process(pchild, pmeta%cpu)
 
 ! calculate the block position indices
 !
@@ -2165,28 +2165,39 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_cpu: subroutine sets the cpu number
+! subroutine METABLOCK_SET_PROCESS:
+! --------------------------------
+!
+!   Subroutine sets the process number of the meta block pointed by
+!   the input argument.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the updated meta block;
+!     np    - the process number;
 !
 !===============================================================================
 !
-  subroutine metablock_set_cpu(pmeta, cpu)
+  subroutine metablock_set_process(pmeta, np)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: cpu
+    integer(kind=4)          , intent(in)    :: np
 !
 !-------------------------------------------------------------------------------
 !
-! set the cpu field
+! set the block's %cpu field
 !
-    pmeta%cpu = cpu
+    pmeta%cpu = np
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine metablock_set_cpu
+  end subroutine metablock_set_process
 !
 !===============================================================================
 !

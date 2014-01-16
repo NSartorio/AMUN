@@ -2417,7 +2417,7 @@ module io
     use blocks  , only : block_meta, list_meta
     use blocks  , only : nchildren, nsides, nfaces
     use blocks  , only : get_mblocks
-    use blocks  , only : metablock_set_id, metablock_set_cpu                   &
+    use blocks  , only : metablock_set_id, metablock_set_process               &
                        , metablock_set_refine, metablock_set_config            &
                        , metablock_set_level, metablock_set_position           &
                        , metablock_set_coord, metablock_set_bounds             &
@@ -2550,7 +2550,7 @@ module io
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id      (pmeta, id (l))
-        call metablock_set_cpu     (pmeta, min(lcpu, cpu(l)))
+        call metablock_set_process (pmeta, min(lcpu, cpu(l)))
         call metablock_set_refine  (pmeta, ref(l))
         call metablock_set_config  (pmeta, cfg(l))
         call metablock_set_level   (pmeta, lev(l))
