@@ -2520,6 +2520,73 @@ module blocks
   end subroutine metablock_unset_leaf
 !
 !===============================================================================
+!
+! subroutine METABLOCK_SET_UPDATE:
+! -------------------------------
+!
+!   Subroutine marks the meta block pointed by the input argument to be updated.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
+!
+!===============================================================================
+!
+  subroutine metablock_set_update(pmeta)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! set the block's update flag
+!
+    pmeta%update = .true.
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_update
+!
+!===============================================================================
+!
+! subroutine METABLOCK_UNSET_UPDATE:
+! ---------------------------------
+!
+!   Subroutine marks the meta block pointed by the input argument to not
+!   be updated.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
+!
+!===============================================================================
+!
+  subroutine metablock_unset_update(pmeta)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! unset the block's update flag
+!
+    pmeta%update = .false.
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_unset_update
+!
+!===============================================================================
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
