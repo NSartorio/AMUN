@@ -272,9 +272,10 @@ module blocks
   public :: link_blocks, unlink_blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
-  public :: metablock_set_id, metablock_set_process, metablock_set_level       &
-          , metablock_set_refine, metablock_set_config, metablock_set_position &
-          , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
+  public :: metablock_set_id, metablock_set_process, metablock_set_level
+  public :: metablock_set_config, metablock_set_refine
+  public :: metablock_set_position, metablock_set_coord
+  public :: metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
   public :: check_metablock
 #endif /* DEBUG */
@@ -2237,6 +2238,31 @@ module blocks
 !
 !===============================================================================
 !
+! metablock_set_config: subroutine sets the configuration flag
+!
+!===============================================================================
+!
+  subroutine metablock_set_config(pmeta, config)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: config
+!
+!-------------------------------------------------------------------------------
+!
+! set the config flag
+!
+    pmeta%config = config
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_config
+!
+!===============================================================================
+!
 ! metablock_set_refine: subroutine sets the refine flag
 !
 !===============================================================================
@@ -2274,87 +2300,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_refine
-!
-!===============================================================================
-!
-! metablock_set_leaf: subroutine marks the block as a leaf
-!
-!===============================================================================
-!
-  subroutine metablock_set_leaf(pmeta)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-!
-!-------------------------------------------------------------------------------
-!
-! set the leaf flag
-!
-    pmeta%leaf = .true.
-
-! increase the number of leafs
-!
-    nleafs = nleafs + 1
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_set_leaf
-!
-!===============================================================================
-!
-! metablock_unset_leaf: subroutine unmarks the block as a leaf
-!
-!===============================================================================
-!
-  subroutine metablock_unset_leaf(pmeta)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-!
-!-------------------------------------------------------------------------------
-!
-! set the leaf flag
-!
-    pmeta%leaf = .false.
-
-! decrease the number of leafs
-!
-    nleafs = nleafs - 1
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_unset_leaf
-!
-!===============================================================================
-!
-! metablock_set_config: subroutine sets the configuration flag
-!
-!===============================================================================
-!
-  subroutine metablock_set_config(pmeta, config)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: config
-!
-!-------------------------------------------------------------------------------
-!
-! set the config flag
-!
-    pmeta%config = config
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_set_config
 !
 !===============================================================================
 !
@@ -2446,6 +2391,62 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_bounds
+!
+!===============================================================================
+!
+! metablock_set_leaf: subroutine marks the block as a leaf
+!
+!===============================================================================
+!
+  subroutine metablock_set_leaf(pmeta)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pmeta%leaf = .true.
+
+! increase the number of leafs
+!
+    nleafs = nleafs + 1
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_leaf
+!
+!===============================================================================
+!
+! metablock_unset_leaf: subroutine unmarks the block as a leaf
+!
+!===============================================================================
+!
+  subroutine metablock_unset_leaf(pmeta)
+
+    implicit none
+
+! input/output arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! set the leaf flag
+!
+    pmeta%leaf = .false.
+
+! decrease the number of leafs
+!
+    nleafs = nleafs - 1
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_unset_leaf
 !
 !===============================================================================
 !!
