@@ -2296,7 +2296,7 @@ module io
           id (l)   = pmeta%id
           cpu(l)   = pmeta%cpu
           lev(l)   = pmeta%level
-          cfg(l)   = pmeta%config
+          cfg(l)   = pmeta%conf
           ref(l)   = pmeta%refine
           pos(l,:) = pmeta%pos(:)
           cor(l,:) = pmeta%coord(:)

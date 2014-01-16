@@ -142,7 +142,7 @@ module blocks
                                  ! the number describing the configuration of
                                  ! the child meta blocks
                                  !
-    integer(kind=4)             :: config
+    integer(kind=4)             :: conf
 
                                  ! the refinement flag, -1, 0, and 1 for
                                  ! the block marked to be derefined, not
@@ -815,7 +815,7 @@ module blocks
 !
     pmeta%cpu      = -1
     pmeta%level    = -1
-    pmeta%config   = -1
+    pmeta%conf     = -1
     pmeta%refine   =  0
     pmeta%leaf     = .false.
     pmeta%update   = .true.
@@ -1275,7 +1275,7 @@ module blocks
 !!
 ! set corresponding configuration of the new blocks
 !
-      select case(pmeta%config)
+      select case(pmeta%conf)
       case(0)
 
 #if NDIMS == 2
@@ -2244,7 +2244,7 @@ module blocks
 !   Arguments:
 !
 !     pmeta - a pointer to the updated meta block;
-!     cfg   - the configuration number;
+!     cf    - the configuration number;
 !
 !===============================================================================
 !
@@ -2263,7 +2263,7 @@ module blocks
 !
 ! set the block's children configuration number
 !
-    pmeta%config = cf
+    pmeta%conf = cf
 
 !-------------------------------------------------------------------------------
 !
