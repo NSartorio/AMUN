@@ -274,7 +274,7 @@ module blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
-  public :: metablock_set_position, metablock_set_coord
+  public :: metablock_set_position, metablock_set_coordinates
   public :: metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
   public :: check_metablock
@@ -1466,7 +1466,7 @@ module blocks
 
 ! set the effective resolution coordinates
 !
-        call metablock_set_coord(pchild, ic, jc, kc)
+        call metablock_set_coordinates(pchild, ic, jc, kc)
 
 ! set the child block bounds
 !
@@ -2365,22 +2365,33 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_coord: subroutine sets the coordinates of the meta block
+! subroutine METABLOCK_SET_COORDINATES:
+! ------------------------------------
+!
+!   Subroutine sets the effective resolution coordinates of the meta block
+!   pointed by the input argument.
+!
+!   Arguments:
+!
+!     pmeta      - a pointer to the updated meta block;
+!     px, py, pz - the effective resolution coordinates;
 !
 !===============================================================================
 !
-  subroutine metablock_set_coord(pmeta, px, py, pz)
+  subroutine metablock_set_coordinates(pmeta, px, py, pz)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: px, py, pz
 !
 !-------------------------------------------------------------------------------
 !
-! set the coordinates
+! set the block's effective resolution coordinates
 !
     pmeta%coord(1) = px
     pmeta%coord(2) = py
@@ -2390,7 +2401,7 @@ module blocks
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine metablock_set_coord
+  end subroutine metablock_set_coordinates
 !
 !===============================================================================
 !

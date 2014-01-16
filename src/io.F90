@@ -2420,7 +2420,7 @@ module io
     use blocks  , only : metablock_set_id, metablock_set_process               &
                        , metablock_set_refinement, metablock_set_configuration &
                        , metablock_set_level, metablock_set_position           &
-                       , metablock_set_coord, metablock_set_bounds             &
+                       , metablock_set_coordinates, metablock_set_bounds       &
                        , metablock_set_leaf
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
@@ -2555,7 +2555,7 @@ module io
         call metablock_set_configuration(pmeta, cfg(l))
         call metablock_set_level        (pmeta, lev(l))
         call metablock_set_position     (pmeta, pos(l,1), pos(l,2), pos(l,3))
-        call metablock_set_coord        (pmeta, cor(l,1), cor(l,2), cor(l,3))
+        call metablock_set_coordinates  (pmeta, cor(l,1), cor(l,2), cor(l,3))
         call metablock_set_bounds       (pmeta, xmn(l), xmx(l), ymn(l), ymx(l) &
                                                              , zmn(l), zmx(l))
 
