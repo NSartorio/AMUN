@@ -2325,23 +2325,33 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_position: subroutine sets the position of the meta block in the
-!                         parent block
+! subroutine METABLOCK_SET_POSITION:
+! ---------------------------------
+!
+!   Subroutine sets the position coordinates in the parent block of
+!   the meta block pointed by the input argument.
+!
+!   Arguments:
+!
+!     pmeta      - a pointer to the updated meta block;
+!     px, py, pz - the block position coordinates;
 !
 !===============================================================================
 !
   subroutine metablock_set_position(pmeta, px, py, pz)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: px, py, pz
 !
 !-------------------------------------------------------------------------------
 !
-! set the position in the parent block
+! set the block's position in the parent block
 !
     pmeta%pos(1) = px
     pmeta%pos(2) = py
