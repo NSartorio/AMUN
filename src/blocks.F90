@@ -1909,27 +1909,46 @@ module blocks
 !
 !===============================================================================
 !
-! set_last_id: subroutine sets the last identification value
+! subroutine SET_LAST_ID:
+! ----------------------
+!
+!   Subroutine sets the last identification number.  This subroutine should
+!   be only used when the job is resumed.
+!
+!   Arguments:
+!
+!     id - the identification number to set;
 !
 !===============================================================================
 !
   subroutine set_last_id(id)
 
-    use error, only : print_error
+! import external procedures
+!
+    use error          , only : print_error
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input argument
+! subroutine arguments
 !
     integer(kind=4), intent(in) :: id
 !
 !-------------------------------------------------------------------------------
 !
-    if (last_id .gt. id) then
+! check if the new last_id is larger than the already existing
+!
+    if (last_id > id) then
+
       call print_error("blocks::set_last_id"                                   &
-                                 , "New last_id must be larger than old one!")
+                             , "New last_id must be larger than the old one!")
     else
+
+! set the last identification number
+!
       last_id = id
+
     end if
 
 !-------------------------------------------------------------------------------
@@ -1938,23 +1957,29 @@ module blocks
 !
 !===============================================================================
 !
-! get_last_id: function returns the last identification value
+! function GET_LAST_ID:
+! --------------------
+!
+!   Function returns the last identification number.
+!
 !
 !===============================================================================
 !
-  function get_last_id()
+  function get_last_id() result(id)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! return variable
 !
-    integer(kind=4) :: get_last_id
+    integer(kind=4) :: id
 !
 !-------------------------------------------------------------------------------
 !
-    get_last_id = last_id
-
-    return
+! set the return value
+!
+    id = last_id
 
 !-------------------------------------------------------------------------------
 !
@@ -1962,23 +1987,29 @@ module blocks
 !
 !===============================================================================
 !
-! get_mblocks: function returns the number of meta blocks
+! function GET_MBLOCKS:
+! --------------------
+!
+!   Function returns the number of meta blocks.
+!
 !
 !===============================================================================
 !
-  function get_mblocks()
+  function get_mblocks() result(nr)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! return variable
 !
-    integer(kind=4) :: get_mblocks
+    integer(kind=4) :: nr
 !
 !-------------------------------------------------------------------------------
 !
-    get_mblocks = mblocks
-
-    return
+! set the return value
+!
+    nr = mblocks
 
 !-------------------------------------------------------------------------------
 !
@@ -1986,23 +2017,29 @@ module blocks
 !
 !===============================================================================
 !
-! get_dblocks: function returns the number of data blocks
+! function GET_DBLOCKS:
+! --------------------
+!
+!   Function returns the number of data blocks.
+!
 !
 !===============================================================================
 !
-  function get_dblocks()
+  function get_dblocks() result(nr)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! return variable
 !
-    integer(kind=4) :: get_dblocks
+    integer(kind=4) :: nr
 !
 !-------------------------------------------------------------------------------
 !
-    get_dblocks = dblocks
-
-    return
+! set the return value
+!
+    nr = dblocks
 
 !-------------------------------------------------------------------------------
 !
@@ -2010,23 +2047,29 @@ module blocks
 !
 !===============================================================================
 !
-! get_nleafs: function returns the number of leafs
+! function GET_NLEAFS:
+! -------------------
+!
+!   Function returns the number of leafs.
+!
 !
 !===============================================================================
 !
-  function get_nleafs()
+  function get_nleafs() result(nr)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! return variable
 !
-    integer(kind=4) :: get_nleafs
+    integer(kind=4) :: nr
 !
 !-------------------------------------------------------------------------------
 !
-    get_nleafs = nleafs
-
-    return
+! set the return value
+!
+    nr = nleafs
 
 !-------------------------------------------------------------------------------
 !
