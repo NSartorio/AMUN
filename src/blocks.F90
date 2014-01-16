@@ -272,6 +272,7 @@ module blocks
   public :: link_blocks, unlink_blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
+  public :: set_blocks_update
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
@@ -2119,6 +2120,57 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end function get_nleafs
+!
+!===============================================================================
+!
+! subroutine SET_BLOCKS_UPDATE:
+! ----------------------------
+!
+!   Subroutine sets the update flag of all meta block in the list.
+!
+!   Arguments:
+!
+!     flag - the flag to be set;
+!
+!===============================================================================
+!
+  subroutine set_blocks_update(flag)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)       :: flag
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! associate the pointer with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all blocks in the list
+!
+    do while(associated(pmeta))
+
+! mark the block for update
+!
+      pmeta%update = flag
+
+! associate the pointer with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_blocks_update
 !
 !===============================================================================
 !
