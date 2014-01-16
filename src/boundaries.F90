@@ -460,7 +460,7 @@ module boundaries
 ! check if the block and neighbor belong to the same process, if so, update
 ! fluxes directly
 !
-                  if (pmeta%cpu == nproc .and. pneigh%cpu == nproc) then
+                  if (pmeta%process == nproc .and. pneigh%process == nproc) then
 #endif /* MPI */
 
 ! update directional flux from the neighbor
@@ -523,8 +523,8 @@ module boundaries
 
 ! increase the counter for the number of blocks to exchange
 !
-                    block_counter(idir,pmeta%cpu,pneigh%cpu) =                 &
-                                  block_counter(idir,pmeta%cpu,pneigh%cpu) + 1
+                    block_counter(idir,pmeta%process,pneigh%process) =         &
+                          block_counter(idir,pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
@@ -546,17 +546,17 @@ module boundaries
 
 ! check if the list is empty
 !
-                    if (associated(block_array(idir,pmeta%cpu,pneigh%cpu)%ptr))&
-                                                                          then
+                    if (associated(block_array(idir,pmeta%process,pneigh%process)%ptr)) then
 ! if it is, associate the newly created block with it
 !
-                      pinfo%prev => block_array(idir,pmeta%cpu,pneigh%cpu)%ptr
+                      pinfo%prev =>                                            &
+                            block_array(idir,pmeta%process,pneigh%process)%ptr
 
                     end if ! %ptr associated
 
 ! point the list to the newly created block
 !
-                    block_array(idir,pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                    block_array(idir,pmeta%process,pneigh%process)%ptr => pinfo
 
                   end if ! pmeta and pneigh on local process
 #endif /* MPI */
@@ -973,7 +973,7 @@ module boundaries
 #ifdef MPI
 ! check if the current block belongs to the local process
 !
-        if (pmeta%cpu == nproc) then
+        if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! iterate over all neighbors
@@ -1144,11 +1144,11 @@ module boundaries
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                  if (pmeta%cpu == pneigh%cpu) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belongs to the current process
 !
-                    if (pmeta%cpu == nproc) then
+                    if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! assign a pointer to the data structure of the current block
@@ -1193,8 +1193,8 @@ module boundaries
 
 ! increase the counter for number of blocks to exchange
 !
-                    block_counter(pmeta%cpu,pneigh%cpu) =                      &
-                                       block_counter(pmeta%cpu,pneigh%cpu) + 1
+                    block_counter(pmeta%process,pneigh%process) =              &
+                               block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
@@ -1216,12 +1216,12 @@ module boundaries
 
 ! if the list is not empty append the newly created block
 !
-                    if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr))     &
-                           pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
+                    if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
+                   pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
 
 ! point the list to the newly created block
 !
-                    block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
                   end if ! block and neighbor belong to different processes
 #endif /* MPI */
@@ -1608,11 +1608,11 @@ module boundaries
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                if (pmeta%cpu == pneigh%cpu) then
+                if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belongs to the current process
 !
-                  if (pmeta%cpu == nproc) then
+                  if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! process each direction separatelly
@@ -1687,8 +1687,8 @@ module boundaries
 
 ! increase the counter for number of blocks to exchange
 !
-                  block_counter(pmeta%cpu,pneigh%cpu) =                        &
-                                       block_counter(pmeta%cpu,pneigh%cpu) + 1
+                  block_counter(pmeta%process,pneigh%process) =                &
+                               block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
@@ -1710,12 +1710,12 @@ module boundaries
 
 ! if the list is not empty append the created block
 !
-                  if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr))       &
-                           pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
+                  if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
+                   pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
 
 ! point the list to the last created block
 !
-                  block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                  block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
                 end if ! block and neighbor on different processors
 #endif /* MPI */
@@ -2119,11 +2119,11 @@ module boundaries
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                  if (pmeta%cpu == pneigh%cpu) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belong to the current process
 !
-                    if (pmeta%cpu == nproc) then
+                    if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! find the neighbor side and face pointing to the current block
@@ -2188,8 +2188,8 @@ module boundaries
 
 ! increase the counter for the number of blocks to exchange
 !
-                    block_counter(pmeta%cpu,pneigh%cpu) =                      &
-                                       block_counter(pmeta%cpu,pneigh%cpu) + 1
+                    block_counter(pmeta%process,pneigh%process) =              &
+                               block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
@@ -2211,12 +2211,12 @@ module boundaries
 
 ! if the list is not empty append the newly created info object to it
 !
-                    if (associated(block_array(pmeta%cpu,pneigh%cpu)%ptr))     &
-                           pinfo%prev => block_array(pmeta%cpu,pneigh%cpu)%ptr
+                    if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
+                     pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
 
 ! point the list to the newly created info object
 !
-                    block_array(pmeta%cpu,pneigh%cpu)%ptr => pinfo
+                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
                   end if ! block and neighbor belong to different processes
 #endif /* MPI */

@@ -133,7 +133,7 @@ module blocks
                                  ! the process number to which the meta block
                                  ! is bounded
                                  !
-    integer(kind=4)             :: cpu
+    integer(kind=4)             :: process
 
                                  ! the level of refinement
                                  !
@@ -813,7 +813,7 @@ module blocks
 ! unset the process number, level, the children configuration, refine, leaf,
 ! and update flags
 !
-    pmeta%cpu       = -1
+    pmeta%process   = -1
     pmeta%level     = -1
     pmeta%conf      = -1
     pmeta%refine    =  0
@@ -1430,7 +1430,7 @@ module blocks
 
 ! set the child process number
 !
-        call metablock_set_process(pchild, pmeta%cpu)
+        call metablock_set_process(pchild, pmeta%process)
 
 ! calculate the block position indices
 !
@@ -2189,9 +2189,9 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
-! set the block's %cpu field
+! set the block's %process field
 !
-    pmeta%cpu = np
+    pmeta%process = np
 
 !-------------------------------------------------------------------------------
 !

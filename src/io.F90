@@ -2294,7 +2294,7 @@ module io
           if (associated(pmeta%data)  ) dat(l) = 1
 
           id (l)   = pmeta%id
-          cpu(l)   = pmeta%cpu
+          cpu(l)   = pmeta%process
           lev(l)   = pmeta%level
           cfg(l)   = pmeta%conf
           ref(l)   = pmeta%refine
