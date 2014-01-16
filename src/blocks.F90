@@ -2318,38 +2318,36 @@ module blocks
 !
   end subroutine insert_metablock_before
 !
+!===============================================================================
 !
-!!==============================================================================
-!!
-!! TOOL SUBROUTINES
-!!
+! function INCREASE_ID:
+! --------------------
+!
+!   Function increases the last identification number by 1 and returns its
+!   value.
+!
 !
 !===============================================================================
 !
-! increase_id: function increases the last identification by 1 and returns its
-!              value
-!
-!===============================================================================
-!
-  function increase_id()
+  function increase_id() result(id)
 
+! local variables are not implicit by default
+!
     implicit none
 
 ! return variable
 !
-    integer(kind=4) :: increase_id
+    integer(kind=4) :: id
 !
 !-------------------------------------------------------------------------------
 !
-! increase ID by 1
+! increase the last identification number by 1
 !
     last_id = last_id + 1
 
-! return ID
+! return its value
 !
-    increase_id = last_id
-
-    return
+    id      = last_id
 
 !-------------------------------------------------------------------------------
 !
