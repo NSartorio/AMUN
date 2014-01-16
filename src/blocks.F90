@@ -275,7 +275,7 @@ module blocks
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
-  public :: metablock_set_bounds, metablock_set_leaf
+  public :: metablock_set_bounds, metablock_set_leaf, metablock_unset_leaf
 #ifdef DEBUG
   public :: check_metablock
 #endif /* DEBUG */
@@ -2450,21 +2450,30 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_leaf: subroutine marks the block as a leaf
+! subroutine METABLOCK_SET_LEAF:
+! -----------------------------
+!
+!   Subroutine marks the meta block pointed by the input argument as the leaf.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
 !
 !===============================================================================
 !
   subroutine metablock_set_leaf(pmeta)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
-! set the leaf flag
+! set the block's leaf flag
 !
     pmeta%leaf = .true.
 
@@ -2478,21 +2487,30 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_unset_leaf: subroutine unmarks the block as a leaf
+! subroutine METABLOCK_UNSET_LEAF:
+! -------------------------------
+!
+!   Subroutine marks the meta block pointed by the input argument as non-leaf.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
 !
 !===============================================================================
 !
   subroutine metablock_unset_leaf(pmeta)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
 !
 !-------------------------------------------------------------------------------
 !
-! set the leaf flag
+! unset the block's leaf flag
 !
     pmeta%leaf = .false.
 
