@@ -273,7 +273,7 @@ module blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: metablock_set_id, metablock_set_process, metablock_set_level
-  public :: metablock_set_config, metablock_set_refine
+  public :: metablock_set_configuration, metablock_set_refine
   public :: metablock_set_position, metablock_set_coord
   public :: metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
@@ -1402,7 +1402,7 @@ module blocks
 
 ! set the child configuration number
 !
-        call metablock_set_config(pchild, config(p))
+        call metablock_set_configuration(pchild, config(p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
@@ -2238,28 +2238,39 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_config: subroutine sets the configuration flag
+! subroutine METABLOCK_SET_CONFIGURATION:
+! --------------------------------------
+!
+!   Subroutine sets the children block configuration number of the meta block
+!   pointed by the input argument.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the updated meta block;
+!     cfg   - the configuration number;
 !
 !===============================================================================
 !
-  subroutine metablock_set_config(pmeta, config)
+  subroutine metablock_set_configuration(pmeta, cf)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: config
+    integer(kind=4)          , intent(in)    :: cf
 !
 !-------------------------------------------------------------------------------
 !
-! set the config flag
+! set the block's children configuration number
 !
-    pmeta%config = config
+    pmeta%config = cf
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine metablock_set_config
+  end subroutine metablock_set_configuration
 !
 !===============================================================================
 !
