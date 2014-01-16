@@ -264,6 +264,7 @@ module blocks
 ! declare public subroutines
 !
   public :: initialize_blocks, finalize_blocks
+  public :: set_block_dimensions
   public :: append_metablock, remove_metablock
   public :: append_datablock, remove_datablock
   public :: allocate_metablock, deallocate_metablock
@@ -274,7 +275,6 @@ module blocks
   public :: metablock_set_id, metablock_set_cpu, metablock_set_refine          &
           , metablock_set_config, metablock_set_level, metablock_set_position  &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
-  public :: datablock_set_dims
 #ifdef DEBUG
   public :: check_metablock
 #endif /* DEBUG */
@@ -440,6 +440,53 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_blocks
+!
+!===============================================================================
+!
+! subroutine SET_BLOCK_DIMENSIONS:
+! -------------------------------
+!
+!   Subroutine sets the number of variables, fluxes and block dimensions
+!   (without ghost cells) for arrays allocated in data blocks.
+!
+!   Arguments:
+!
+!     nv - the number of variables stored in %u and %q;
+!     nf - the number of fluxes stored in %f;
+!     ni - the block dimension along X;
+!     nj - the block dimension along Y;
+!     nk - the block dimension along Z;
+!
+!===============================================================================
+!
+  subroutine set_block_dimensions(nv, nf, ni, nj, nk)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(kind=4), intent(in) :: nv, nf, ni, nj, nk
+!
+!-------------------------------------------------------------------------------
+!
+! set the number of variables and fluxes
+!
+    nvars = nv
+    nflux = nf
+
+! set the block dimensions
+!
+    nx    = ni
+    ny    = nj
+#if NDIMS == 3
+    nz    = nk
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_block_dimensions
 !
 !===============================================================================
 !
@@ -2598,35 +2645,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_bounds
-!
-!===============================================================================
-!
-! datablock_set_dims: subroutine sets the number of variables and dimensions
-!                     for arrays allocated in data blocks
-!
-!===============================================================================
-!
-  subroutine datablock_set_dims(nv, nf, ni, nj, nk)
-
-    implicit none
-
-! input arguments
-!
-    integer(kind=4), intent(in) :: nv, nf, ni, nj, nk
-!
-!-------------------------------------------------------------------------------
-!
-    nvars = nv
-    nflux = nf
-    nx    = ni
-    ny    = nj
-#if NDIMS == 3
-    nz    = nk
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine datablock_set_dims
 !
 #ifdef DEBUG
 !!==============================================================================

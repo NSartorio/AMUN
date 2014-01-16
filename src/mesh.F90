@@ -86,7 +86,7 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : datablock_set_dims
+    use blocks         , only : set_block_dimensions
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : toplev, im, jm, km
     use equations      , only : nv
@@ -131,7 +131,7 @@ module mesh
 
 ! set data block dimensions
 !
-    call datablock_set_dims(nv, nv, im, jm, km)
+    call set_block_dimensions(nv, nv, im, jm, km)
 
 ! only master prepares the mesh statistics file
 !
