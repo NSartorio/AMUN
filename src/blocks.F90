@@ -2124,28 +2124,40 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_id: subroutine sets the identification value
+! subroutine METABLOCK_SET_ID:
+! ---------------------------
+!
+!   Subroutine sets the identification number of the meta block pointed by
+!   the input argument. This subroutine should be used only when resuming jobs.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the updated meta block;
+!     id    - the identification number to set;
 !
 !===============================================================================
 !
   subroutine metablock_set_id(pmeta, id)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: id
 !
 !-------------------------------------------------------------------------------
 !
-! set the id field
+! set the meta block %id field
 !
     pmeta%id = id
 
-! check if the id is larger then last_id, if so reset last_id to id
+! check if the last identification number is smaller than id, if so set
+! the value of last_id to id
 !
-    if (last_id .lt. id) last_id = id
+    if (last_id < id) last_id = id
 
 !-------------------------------------------------------------------------------
 !
