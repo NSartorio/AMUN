@@ -2418,7 +2418,7 @@ module io
     use blocks  , only : nchildren, nsides, nfaces
     use blocks  , only : get_mblocks
     use blocks  , only : metablock_set_id, metablock_set_process               &
-                       , metablock_set_refine, metablock_set_configuration     &
+                       , metablock_set_refinement, metablock_set_configuration &
                        , metablock_set_level, metablock_set_position           &
                        , metablock_set_coord, metablock_set_bounds             &
                        , metablock_set_leaf
@@ -2551,7 +2551,7 @@ module io
 
         call metablock_set_id           (pmeta, id (l))
         call metablock_set_process      (pmeta, min(lcpu, cpu(l)))
-        call metablock_set_refine       (pmeta, ref(l))
+        call metablock_set_refinement   (pmeta, ref(l))
         call metablock_set_configuration(pmeta, cfg(l))
         call metablock_set_level        (pmeta, lev(l))
         call metablock_set_position     (pmeta, pos(l,1), pos(l,2), pos(l,3))

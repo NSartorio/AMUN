@@ -273,7 +273,7 @@ module blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: metablock_set_id, metablock_set_process, metablock_set_level
-  public :: metablock_set_configuration, metablock_set_refine
+  public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coord
   public :: metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
@@ -1780,7 +1780,7 @@ module blocks
 
 ! reset the refinement flag
 !
-      call metablock_set_refine(pmeta, 0)
+      call metablock_set_refinement(pmeta, 0)
 
 ! nullify the parent's neighbor pointers
 !
@@ -1943,7 +1943,7 @@ module blocks
 
 ! reset the refinement flag of the parent block
 !
-    call metablock_set_refine(pmeta, 0)
+    call metablock_set_refinement(pmeta, 0)
 
 #ifdef PROFILE
 ! stop accounting time for the block derefinement
@@ -2274,43 +2274,54 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_refine: subroutine sets the refine flag
+! subroutine METABLOCK_SET_REFINEMENT:
+! -----------------------------------
+!
+!   Subroutine sets the refinement flag of the meta block pointed by
+!   the input argument.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the updated meta block;
+!     rf    - the refinement flag;
 !
 !===============================================================================
 !
-  subroutine metablock_set_refine(pmeta, refine)
+  subroutine metablock_set_refinement(pmeta, rf)
 
-    use error, only : print_error
+! import external procedures
+!
+    use error          , only : print_error
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input arguments
-!
     type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: refine
+    integer(kind=4)          , intent(in)    :: rf
 !
 !-------------------------------------------------------------------------------
 !
-! check if the refine value is correct
+! check if the refinement value is correct
 !
-    if (abs(refine) .gt. 1) then
+    if (abs(rf) > 1) then
 
 ! print error about wrong refine flag
 !
-      call print_error("blocks::metablock_set_refine"                          &
-                                            , "New refine flag is incorrect!")
+      call print_error("blocks::metablock_set_refinement"                      &
+                                           , "The refinement value is wrong!")
 
     else
 
-! set the refine field
+! set the block's refinement field
 !
-      pmeta%refine = refine
+      pmeta%refine = rf
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine metablock_set_refine
+  end subroutine metablock_set_refinement
 !
 !===============================================================================
 !
