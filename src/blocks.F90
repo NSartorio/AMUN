@@ -272,8 +272,8 @@ module blocks
   public :: link_blocks, unlink_blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
-  public :: metablock_set_id, metablock_set_process, metablock_set_refine      &
-          , metablock_set_config, metablock_set_level, metablock_set_position  &
+  public :: metablock_set_id, metablock_set_process, metablock_set_level       &
+          , metablock_set_refine, metablock_set_config, metablock_set_position &
           , metablock_set_coord, metablock_set_bounds, metablock_set_leaf
 #ifdef DEBUG
   public :: check_metablock
@@ -2201,6 +2201,42 @@ module blocks
 !
 !===============================================================================
 !
+! subroutine METABLOCK_SET_LEVEL:
+! ------------------------------
+!
+!   Subroutine sets the refinement level number of the meta block pointed
+!   by the input argument.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the updated meta block;
+!     lv    - the refinement level number;
+!
+!===============================================================================
+!
+  subroutine metablock_set_level(pmeta, lv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+    integer(kind=4)          , intent(in)    :: lv
+!
+!-------------------------------------------------------------------------------
+!
+! set the block's refinement level
+!
+    pmeta%level = lv
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine metablock_set_level
+!
+!===============================================================================
+!
 ! metablock_set_refine: subroutine sets the refine flag
 !
 !===============================================================================
@@ -2319,31 +2355,6 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_set_config
-!
-!===============================================================================
-!
-! metablock_set_level: subroutine sets the level of data block
-!
-!===============================================================================
-!
-  subroutine metablock_set_level(pmeta, level)
-
-    implicit none
-
-! input/output arguments
-!
-    type(block_meta), pointer, intent(inout) :: pmeta
-    integer(kind=4)          , intent(in)    :: level
-!
-!-------------------------------------------------------------------------------
-!
-! set the refinement level
-!
-    pmeta%level = level
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine metablock_set_level
 !
 !===============================================================================
 !
