@@ -2405,31 +2405,44 @@ module blocks
 !
 !===============================================================================
 !
-! metablock_set_bounds: subroutine sets the bounds of data block
+! subroutine METABLOCK_SET_BOUNDS:
+! -------------------------------
+!
+!   Subroutine sets the physical coordinate bounds of the meta block pointed
+!   by the input argument.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
+!     xmn, xmx - the coordinate bounds along X;
+!     ymn, ymx - the coordinate bounds along Y;
+!     zmn, zmx - the coordinate bounds along Z;
 !
 !===============================================================================
 !
-  subroutine metablock_set_bounds(pmeta, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine metablock_set_bounds(pmeta, xmn, xmx, ymn, ymx, zmn, zmx)
 
+! local variables are not implicit by default
+!
     implicit none
 
-! input/output arguments
+! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
-    real                     , intent(in)    :: xmin, xmax
-    real                     , intent(in)    :: ymin, ymax
-    real                     , intent(in)    :: zmin, zmax
+    real(kind=8)             , intent(in)    :: xmn, xmx
+    real(kind=8)             , intent(in)    :: ymn, ymx
+    real(kind=8)             , intent(in)    :: zmn, zmx
 !
 !-------------------------------------------------------------------------------
 !
-! set bounds of the block
+! set the block's coordinate bounds
 !
-    pmeta%xmin = xmin
-    pmeta%xmax = xmax
-    pmeta%ymin = ymin
-    pmeta%ymax = ymax
-    pmeta%zmin = zmin
-    pmeta%zmax = zmax
+    pmeta%xmin = xmn
+    pmeta%xmax = xmx
+    pmeta%ymin = ymn
+    pmeta%ymax = ymx
+    pmeta%zmin = zmn
+    pmeta%zmax = zmx
 
 !-------------------------------------------------------------------------------
 !
