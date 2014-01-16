@@ -158,7 +158,7 @@ module blocks
                                  ! the coordinate of the lower corner of the
                                  ! block in the effective resolution units
                                  !
-    integer(kind=4)             :: coord(ndims)
+    integer(kind=4)             :: coords(ndims)
 
                                  ! the leaf flag, signifying that the block is
                                  ! the highest block in the local block
@@ -808,38 +808,38 @@ module blocks
 
 ! set unique ID
 !
-    pmeta%id       = increase_id()
+    pmeta%id        = increase_id()
 
 ! unset the process number, level, the children configuration, refine, leaf,
 ! and update flags
 !
-    pmeta%cpu      = -1
-    pmeta%level    = -1
-    pmeta%conf     = -1
-    pmeta%refine   =  0
-    pmeta%leaf     = .false.
-    pmeta%update   = .true.
+    pmeta%cpu       = -1
+    pmeta%level     = -1
+    pmeta%conf      = -1
+    pmeta%refine    =  0
+    pmeta%leaf      = .false.
+    pmeta%update    = .true.
 
 ! initialize the position in the parent block
 !
-    pmeta%pos(:)   = -1
+    pmeta%pos(:)    = -1
 
 ! initialize the effective coordinates
 !
-    pmeta%coord(:) = 0
+    pmeta%coords(:) = 0
 
 ! initialize coordinate bounds of the block
 !
-    pmeta%xmin     = 0.0d+00
-    pmeta%xmax     = 1.0d+00
-    pmeta%ymin     = 0.0d+00
-    pmeta%ymax     = 1.0d+00
-    pmeta%zmin     = 0.0d+00
-    pmeta%zmax     = 1.0d+00
+    pmeta%xmin      = 0.0d+00
+    pmeta%xmax      = 1.0d+00
+    pmeta%ymin      = 0.0d+00
+    pmeta%ymax      = 1.0d+00
+    pmeta%zmin      = 0.0d+00
+    pmeta%zmax      = 1.0d+00
 
 ! increase the number of allocated meta blocks
 !
-    mblocks        = mblocks + 1
+    mblocks         = mblocks + 1
 
 #ifdef PROFILE
 ! stop accounting time for the meta block allocation
@@ -1441,10 +1441,10 @@ module blocks
 
 ! calculate the block coordinates in effective resolution units
 !
-        ic  = pmeta%coord(1) + i * res(1)
-        jc  = pmeta%coord(2) + j * res(2)
+        ic  = pmeta%coords(1) + i * res(1)
+        jc  = pmeta%coords(2) + j * res(2)
 #if NDIMS == 3
-        kc  = pmeta%coord(3) + k * res(3)
+        kc  = pmeta%coords(3) + k * res(3)
 #endif /* NDIMS == 3 */
 
 ! calculate block bounds
@@ -2390,10 +2390,10 @@ module blocks
 !
 ! set the block's effective resolution coordinates
 !
-    pmeta%coord(1) = px
-    pmeta%coord(2) = py
+    pmeta%coords(1) = px
+    pmeta%coords(2) = py
 #if NDIMS == 3
-    pmeta%coord(3) = pz
+    pmeta%coords(3) = pz
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------

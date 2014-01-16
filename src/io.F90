@@ -2299,7 +2299,7 @@ module io
           cfg(l)   = pmeta%conf
           ref(l)   = pmeta%refine
           pos(l,:) = pmeta%pos(:)
-          cor(l,:) = pmeta%coord(:)
+          cor(l,:) = pmeta%coords(:)
 
           if (pmeta%leaf) lea(l) = 1
 
@@ -3065,7 +3065,7 @@ module io
 
 ! fill in the coordinate array
 !
-          cor(l,:)   = pdata%meta%coord(:)
+          cor(l,:)   = pdata%meta%coords(:)
 
 ! fill in the bounds array
 !
