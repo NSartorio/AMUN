@@ -3589,10 +3589,18 @@ module schemes
 
           else ! sm = 0
 
-! intermediate flux is constant across the contact discontinuity and since there
-! are no Alfven waves, we can calculate the flux using the HLL formula
+! intermediate flux is constant across the contact discontinuity and all except
+! the parallel momentum flux are zero
 !
-            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+            f(idn,i) =   0.0d+00
+            f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
+            f(imy,i) =   0.0d+00
+            f(imz,i) =   0.0d+00
+            f(ibx,i) = fl(ibx,i)
+            f(iby,i) =   0.0d+00
+            f(ibz,i) =   0.0d+00
+            f(ibp,i) = fl(ibp,i)
+            f(ien,i) =   0.0d+00
 
           end if ! sm = 0
 
