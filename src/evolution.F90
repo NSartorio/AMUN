@@ -694,6 +694,7 @@ module evolution
 
 ! include external variables
 !
+    use blocks        , only : block_meta, list_meta
     use blocks        , only : block_data, list_data
 
 ! local variables are not implicit by default
@@ -702,22 +703,30 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer :: pblock
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
+! associate the pointer with the first block on the data block list
+!
+    pdata => list_data
+
 ! iterate over all data blocks
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
+
+! associate pmeta with the corresponding meta block
+!
+      pmeta => pdata%meta
 
 ! convert conserved variables to primitive ones for the current block
 !
-      call update_primitive_variables(pblock%u, pblock%q)
+      if (pmeta%update) call update_primitive_variables(pdata%u, pdata%q)
 
 ! assign pointer to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
     end do
 
