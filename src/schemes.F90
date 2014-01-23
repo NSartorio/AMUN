@@ -1118,7 +1118,7 @@ module schemes
 
 !  calculate the flux along the Z direction
 !
-      do j = jbl, ieu
+      do j = jbl, jeu
         do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
