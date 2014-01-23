@@ -3348,37 +3348,10 @@ module schemes
 
               else ! sm = 0
 
-! conservative variables for the inmost left intermediate state
+! in the case when Sₘ = 0 and Bₓ² > 0, all variables are continuous, therefore
+! the flux can be averaged from the Alfvén waves using the simple HLL formula
 !
-                ui(idn) = dnl
-                ui(imx) = 0.0d+00
-                ui(imy) = dnl * vy
-                ui(imz) = dnl * vz
-                ui(ibx) = bx
-                ui(iby) = by
-                ui(ibz) = bz
-                ui(ibp) = ql(ibp,i)
-                ui(ien) = (wcl(ien) - bx * vb) / cal
-
-! the inmost left intermediate flux
-!
-                f(:,i)  = cal * ui(:) - wcl(:)
-
-! conservative variables for the inmost right intermediate state
-!
-                ui(idn) = dnr
-                ui(imx) = 0.0d+00
-                ui(imy) = dnr * vy
-                ui(imz) = dnr * vz
-                ui(ibx) = bx
-                ui(iby) = by
-                ui(ibz) = bz
-                ui(ibp) = qr(ibp,i)
-                ui(ien) = (wcr(ien) - bx * vb) / car
-
-! the inmost right intermediate flux
-!
-                f(:,i)  = 0.5d+00 * (f(:,i) + (car * ui(:) - wcr(:)))
+                f(:,i) = (sml * wcr(:) - smr * wcl(:)) / (smr - sml)
 
               end if ! sm = 0
 
@@ -3616,18 +3589,10 @@ module schemes
 
           else ! sm = 0
 
-! intermediate flux is constant across the contact discontinuity and all except
-! the parallel momentum flux are zero
+! intermediate flux is constant across the contact discontinuity and since there
+! are no Alfven waves, we can calculate the flux using the HLL formula
 !
-            f(idn,i) =   0.0d+00
-            f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
-            f(imy,i) =   0.0d+00
-            f(imz,i) =   0.0d+00
-            f(ibx,i) = fl(ibx,i)
-            f(iby,i) =   0.0d+00
-            f(ibz,i) =   0.0d+00
-            f(ibp,i) = fl(ibp,i)
-            f(ien,i) =   0.0d+00
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
