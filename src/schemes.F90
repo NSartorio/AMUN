@@ -2901,37 +2901,10 @@ module schemes
 
           else ! sm = 0
 
-! conservative variables for the left intermediate state
+! when Sₘ = 0 all variables are continuous, therefore the flux reduces
+! to the HLL one
 !
-            ui(idn) =  wl(idn) / sl
-            ui(imx) =  0.0d+00
-            ui(imy) =  ui(idn) * vy
-            ui(imz) =  ui(idn) * vz
-            ui(ibx) =  bx
-            ui(iby) =  by
-            ui(ibz) =  bz
-            ui(ibp) =  ql(ibp,i)
-            ui(ien) = (wl(ien) - bx * vb) / sl
-
-! the left intermediate flux
-!
-            f(:,i)  = sl * ui(:) - wl(:)
-
-! conservative variables for the right intermediate state
-!
-            ui(idn) =  wr(idn) / sr
-            ui(imx) =  0.0d+00
-            ui(imy) =  ui(idn) * vy
-            ui(imz) =  ui(idn) * vz
-            ui(ibx) =  bx
-            ui(iby) =  by
-            ui(ibz) =  bz
-            ui(ibp) =  qr(ibp,i)
-            ui(ien) = (wr(ien) - bx * vb) / sr
-
-! the right intermediate flux
-!
-            f(:,i)  = 0.5d+00 * (f(:,i) + (sr * ui(:) - wr(:)))
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
