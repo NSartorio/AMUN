@@ -1425,6 +1425,10 @@ module blocks
 !
         call metablock_set_leaf(pchild)
 
+! mark the child to be updated
+!
+        call metablock_set_update(pchild)
+
 ! set the child refinement level
 !
         call metablock_set_level(pchild, pmeta%level + 1)
@@ -1741,6 +1745,10 @@ module blocks
         end do ! nsides
       end do ! ndims
 
+! mark all neighbors to be updated as well
+!
+      call neighbors_set_update(pmeta)
+
 !! ASSOCIATE DATA BLOCKS IF NECESSARY
 !!
 ! allocate data blocks if requested
@@ -1766,9 +1774,6 @@ module blocks
         end do ! nchildren
 
       end if ! allocate data blocks for children
-
-!! SET SURROUNDING NEIGHBORS TO BE UPDATED TOO
-!!
 
 !! RESET PARENT'S FIELDS
 !!
@@ -1942,6 +1947,14 @@ module blocks
 ! reset the refinement flag of the parent block
 !
     call metablock_set_refinement(pmeta, 0)
+
+! mark the parent to be updated
+!
+    call metablock_set_update(pmeta)
+
+! mark all neighbors to be updated as well
+!
+    call neighbors_set_update(pmeta)
 
 #ifdef PROFILE
 ! stop accounting time for the block derefinement
@@ -2868,6 +2881,467 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end function increase_id
+!
+!===============================================================================
+!
+! subroutine NEIGHBORDS_SET_UPDATE:
+! --------------------------------
+!
+!   Subroutine marks all the neighbors (including edge and corner ones) of
+!   the meta block pointed by the input argument to be updated.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the updated meta block;
+!
+!===============================================================================
+!
+  subroutine neighbors_set_update(pmeta)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+
+! local pointers
+!
+    type(block_meta), pointer                :: pneigh
+!
+!-------------------------------------------------------------------------------
+!
+#if NDIMS == 3
+!! 3D CASE: WALK AROUND THE CORNERS
+!!
+! around (0,0,0) corner
+!
+! (1,1,1) - X = (1,2,1) - Y = (2,1,2)
+!
+    pneigh => pmeta%neigh(1,1,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,1,1) - Z = (3,2,1) - X = (1,1,3)
+!
+    pneigh => pmeta%neigh(3,1,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,1,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (2,1,1) - Y = (2,2,1) - Z = (3,1,3) - X = [1,1,4]
+!
+    pneigh => pmeta%neigh(2,1,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,1,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(1,1,4)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (0,1,0) corner
+!
+! (2,2,1) + Y = (2,1,1) - X = (1,1,1)
+!
+    pneigh => pmeta%neigh(2,2,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,1,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,1,3) - Z = (3,2,3) + Y = (2,2,3)
+!
+    pneigh => pmeta%neigh(3,1,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,1,2) - X = (1,2,2) - Z = (3,1,4) + Y = [2,2,4]
+!
+    pneigh => pmeta%neigh(1,1,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,1,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(2,2,4)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (1,1,0) corner
+!
+! (1,2,2) + X = (1,1,2) + Y = (2,2,1)
+!
+    pneigh => pmeta%neigh(1,2,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,1,4) - Z = (3,2,4) + X = (1,2,4)
+!
+    pneigh => pmeta%neigh(3,1,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,2,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (2,2,2) + Y = (2,1,2) - Z = (3,1,2) + X = [1,2,3]
+!
+    pneigh => pmeta%neigh(2,2,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,1,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(1,2,3)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (1,0,0) corner
+!
+! (2,1,2) - Y = (2,2,2) + X = (1,2,2)
+!
+    pneigh => pmeta%neigh(2,1,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,2,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,1,2) - Z = (3,2,2) - Y = (2,1,4)
+!
+    pneigh => pmeta%neigh(3,1,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,2,1) + X = (1,1,1) - Z = (3,1,1) - Y = [2,1,3]
+!
+    pneigh => pmeta%neigh(1,2,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,1,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(2,1,3)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (0,0,1) corner
+!
+! (1,1,3) - X = (1,2,3) + Z = (3,2,2)
+!
+    pneigh => pmeta%neigh(1,1,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,2,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (2,1,3) - Y = (2,2,3) - X = (1,1,4)
+!
+    pneigh => pmeta%neigh(2,1,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,1,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,2,1) + Z = (3,1,1) - Y = (2,1,1) - X = [1,1,2]
+!
+    pneigh => pmeta%neigh(3,2,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(1,1,2)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (0,1,1) corner
+!
+! (2,2,3) + Y = (2,1,3) + Z = (3,2,1)
+!
+    pneigh => pmeta%neigh(2,2,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,2,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,1,4) - X = (1,2,4) + Y = (2,2,4)
+!
+    pneigh => pmeta%neigh(1,1,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,2,3) + Z = (3,1,3) - X = (1,1,2) + Z = [2,2,2]
+!
+    pneigh => pmeta%neigh(3,2,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,1,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(2,2,2)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (1,1,1) corner
+!
+! (1,2,4) + X = (1,1,4) + Z = (3,2,3)
+!
+    pneigh => pmeta%neigh(1,2,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,2,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (2,2,4) + Y = (2,1,4) + X = (1,2,3)
+!
+    pneigh => pmeta%neigh(2,2,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,2,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,2,4) + Z = (3,1,4) + Y = (2,2,2) + X = [1,2,1]
+!
+    pneigh => pmeta%neigh(3,2,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(1,2,1)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+! around (1,0,1) corner
+!
+! (2,1,4) - Y = (2,2,4) + Z = (3,2,4)
+!
+    pneigh => pmeta%neigh(2,1,4)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(3,2,4)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (3,2,2) + Z = (3,1,2) + X = (1,2,1)
+!
+    pneigh => pmeta%neigh(3,2,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(1,2,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,2,3) + X = (1,1,3) - Y = (2,1,3) + Z = [3,2,3]
+!
+    pneigh => pmeta%neigh(1,2,3)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,3)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+
+        pneigh => pneigh%neigh(3,2,3)%ptr
+        if (associated(pneigh)) then
+          call metablock_set_update(pneigh)
+        end if
+      end if
+    end if
+
+#else /* NDIMS == 3 */
+!! 2D CASE
+!!
+! (0,0)-(0,½) edge and (0,0) corner
+!
+    pneigh => pmeta%neigh(1,1,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (0,½)-(0,1) edge and (0,1) corner
+!
+    pneigh => pmeta%neigh(1,1,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,2)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,0)-(1,½) edge and (1,0) corner
+!
+    pneigh => pmeta%neigh(1,2,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,1,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (1,½)-(1,1) edge and (1,1) corner
+!
+    pneigh => pmeta%neigh(1,2,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+
+      pneigh => pneigh%neigh(2,2,1)%ptr
+      if (associated(pneigh)) then
+        call metablock_set_update(pneigh)
+      end if
+    end if
+
+! (0,0)-(½,0) edge
+!
+    pneigh => pmeta%neigh(2,1,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+    end if
+
+! (½,0)-(1,0) edge
+!
+    pneigh => pmeta%neigh(2,1,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+    end if
+
+! (0,1)-(½,1) edge
+!
+    pneigh => pmeta%neigh(2,2,1)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+    end if
+
+! (½,1)-(1,1) edge
+!
+    pneigh => pmeta%neigh(2,2,2)%ptr
+    if (associated(pneigh)) then
+      call metablock_set_update(pneigh)
+    end if
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine neighbors_set_update
 
 !===============================================================================
 !
