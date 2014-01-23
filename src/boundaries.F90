@@ -970,30 +970,37 @@ module boundaries
 !
       if (pmeta%leaf .and. pmeta%level == ilev) then
 
+! process only if this block is marked for update
+!
+        if (pmeta%update) then
+
 #ifdef MPI
 ! check if the current block belongs to the local process
 !
-        if (pmeta%process == nproc) then
+          if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! iterate over all neighbors
 !
-          do iside = 1, nsides
+            do iside = 1, nsides
 
 ! assign a neighbor pointer to the current neighbor
 !
-            pneigh => pmeta%neigh(idir,iside,1)%ptr
+              pneigh => pmeta%neigh(idir,iside,1)%ptr
 
 ! make sure that the neighbor is not associated, then apply specific boundaries
 !
-            if (.not. associated(pneigh))                                      &
+              if (.not. associated(pneigh))                                    &
                                call boundary_specific(pmeta%data, idir, iside)
 
-          end do ! sides
+            end do ! sides
 
 #ifdef MPI
-        end if ! block belong to the local process
+          end if ! block belong to the local process
 #endif /* MPI */
+
+        end if ! pmeta is marked for update
+
       end if ! leaf
 
 ! assign the pointer to the next block on the list
@@ -1137,96 +1144,104 @@ module boundaries
 !
               if (pneigh%level == pmeta%level) then
 
+! process only if this block and its neighbor are marked for update
+!
+                if (pmeta%update .and. pneigh%update) then
+
 ! copy blocks only for the first face
 !
-                if (iface == 1) then
+                  if (iface == 1) then
 
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                  if (pmeta%process == pneigh%process) then
+                    if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belongs to the current process
 !
-                    if (pmeta%process == nproc) then
+                      if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! assign a pointer to the data structure of the current block
 !
-                      pdata  => pmeta%data
+                        pdata  => pmeta%data
 
 ! update boundaries of the current block
 !
-                      select case(idir)
-                      case(1)
-                        if (iside == 1) then
-                          call boundary_copy(pdata                             &
+                        select case(idir)
+                        case(1)
+                          if (iside == 1) then
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,iel:ie,:,:), idir, iside)
-                        else
-                          call boundary_copy(pdata                             &
+                          else
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,ib:ibu,:,:), idir, iside)
-                        end if
-                      case(2)
-                        if (iside == 1) then
-                          call boundary_copy(pdata                             &
+                          end if
+                        case(2)
+                          if (iside == 1) then
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,:,jel:je,:), idir, iside)
-                        else
-                          call boundary_copy(pdata                             &
+                          else
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,:,jb:jbu,:), idir, iside)
-                        end if
+                          end if
 #if NDIMS == 3
-                      case(3)
-                        if (iside == 1) then
-                          call boundary_copy(pdata                             &
+                        case(3)
+                          if (iside == 1) then
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,:,:,kel:ke), idir, iside)
-                        else
-                          call boundary_copy(pdata                             &
+                          else
+                            call boundary_copy(pdata                           &
                                    , pneigh%data%u(:,:,:,kb:kbu), idir, iside)
-                        end if
+                          end if
 #endif /* NDIMS == 3 */
-                      end select
+                        end select
 
 #ifdef MPI
-                    end if ! pmeta on the current process
+                      end if ! pmeta on the current process
 
-                  else ! block and neighbor belong to different processes
+                    else ! block and neighbor belong to different processes
 
 ! increase the counter for number of blocks to exchange
 !
-                    block_counter(pmeta%process,pneigh%process) =              &
+                      block_counter(pmeta%process,pneigh%process) =            &
                                block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
-                    allocate(pinfo)
+                      allocate(pinfo)
 
 ! fill out its fields
 !
-                    pinfo%block            => pmeta
-                    pinfo%neigh            => pneigh
-                    pinfo%direction        =  idir
-                    pinfo%side             =  iside
-                    pinfo%face             =  iface
-                    pinfo%level_difference =  pmeta%level - pneigh%level
+                      pinfo%block            => pmeta
+                      pinfo%neigh            => pneigh
+                      pinfo%direction        =  idir
+                      pinfo%side             =  iside
+                      pinfo%face             =  iface
+                      pinfo%level_difference =  pmeta%level - pneigh%level
 
 ! nullify pointer fields
 !
-                    nullify(pinfo%prev)
-                    nullify(pinfo%next)
+                      nullify(pinfo%prev)
+                      nullify(pinfo%next)
 
 ! if the list is not empty append the newly created block
 !
-                    if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
-                   pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
+                      if (associated(block_array(pmeta%process                 &
+                                                        ,pneigh%process)%ptr)) &
+                        pinfo%prev => block_array(pmeta%process                &
+                                                        ,pneigh%process)%ptr
 
 ! point the list to the newly created block
 !
-                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
+                      block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
-                  end if ! block and neighbor belong to different processes
+                    end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                end if ! iface = 1
+                  end if ! iface = 1
+
+                end if ! pmeta and pneigh marked for update
 
               end if ! neighbor at the same level
 
@@ -1605,120 +1620,128 @@ module boundaries
 !
               if (pmeta%level < pneigh%level) then
 
+! process only if this block and its neighbor are marked for update
+!
+                if (pmeta%update .and. pneigh%update) then
+
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belongs to the current process
 !
-                  if (pmeta%process == nproc) then
+                    if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! process each direction separatelly
 !
-                    select case(idir)
+                      select case(idir)
 
-                      case(1)
-
-! prepare indices of the neighbor slices used for the boundary update
-!
-                        if (iside == 1) then
-                          il = ie - nd + 1
-                          iu = ie
-                        else
-                          il = ib
-                          iu = ib + nd - 1
-                        end if
-                        jl = 1
-                        ju = jm
-                        kl = 1
-                        ku = km
-
-                      case(2)
+                        case(1)
 
 ! prepare indices of the neighbor slices used for the boundary update
 !
-                        if (iside == 1) then
-                          jl = je - nd + 1
-                          ju = je
-                        else
-                          jl = jb
-                          ju = jb + nd - 1
-                        end if
-                        il = 1
-                        iu = im
-                        kl = 1
-                        ku = km
+                          if (iside == 1) then
+                            il = ie - nd + 1
+                            iu = ie
+                          else
+                            il = ib
+                            iu = ib + nd - 1
+                          end if
+                          jl = 1
+                          ju = jm
+                          kl = 1
+                          ku = km
+
+                        case(2)
+
+! prepare indices of the neighbor slices used for the boundary update
+!
+                          if (iside == 1) then
+                            jl = je - nd + 1
+                            ju = je
+                          else
+                            jl = jb
+                            ju = jb + nd - 1
+                          end if
+                          il = 1
+                          iu = im
+                          kl = 1
+                          ku = km
 
 #if NDIMS == 3
-                      case(3)
+                        case(3)
 
 ! prepare indices of the neighbor slices used for the boundary update
 !
-                        if (iside == 1) then
-                          kl = ke - nd + 1
-                          ku = ke
-                        else
-                          kl = kb
-                          ku = kb + nd - 1
-                        end if
-                        il = 1
-                        iu = im
-                        jl = 1
-                        ju = jm
+                          if (iside == 1) then
+                            kl = ke - nd + 1
+                            ku = ke
+                          else
+                            kl = kb
+                            ku = kb + nd - 1
+                          end if
+                          il = 1
+                          iu = im
+                          jl = 1
+                          ju = jm
 #endif /* NDIMS == 3 */
-                    end select
+                      end select
 
 ! assign a pointer to the associate data block
 !
-                    pdata  => pmeta%data
+                      pdata  => pmeta%data
 
 ! update boundaries of the current block
 !
-                    call boundary_restrict(pdata                               &
+                      call boundary_restrict(pdata                             &
                                          , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
                                                         , idir, iside, iface)
 
 #ifdef MPI
-                  end if ! block on the current processor
+                    end if ! block on the current processor
 
-                else ! block and neighbor on different processors
+                  else ! block and neighbor on different processors
 
 ! increase the counter for number of blocks to exchange
 !
-                  block_counter(pmeta%process,pneigh%process) =                &
+                    block_counter(pmeta%process,pneigh%process) =              &
                                block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
-                  allocate(pinfo)
+                    allocate(pinfo)
 
 ! fill out its fields
 !
-                  pinfo%block            => pmeta
-                  pinfo%neigh            => pneigh
-                  pinfo%direction        =  idir
-                  pinfo%side             =  iside
-                  pinfo%face             =  iface
-                  pinfo%level_difference =  pmeta%level - pneigh%level
+                    pinfo%block            => pmeta
+                    pinfo%neigh            => pneigh
+                    pinfo%direction        =  idir
+                    pinfo%side             =  iside
+                    pinfo%face             =  iface
+                    pinfo%level_difference =  pmeta%level - pneigh%level
 
 ! nullify pointers
 !
-                  nullify(pinfo%prev)
-                  nullify(pinfo%next)
+                    nullify(pinfo%prev)
+                    nullify(pinfo%next)
 
 ! if the list is not empty append the created block
 !
-                  if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
-                   pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
+                    if (associated(block_array(pmeta%process                   &
+                                                        ,pneigh%process)%ptr)) &
+                        pinfo%prev => block_array(pmeta%process                &
+                                                        ,pneigh%process)%ptr
 
 ! point the list to the last created block
 !
-                  block_array(pmeta%process,pneigh%process)%ptr => pinfo
+                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
-                end if ! block and neighbor on different processors
+                  end if ! block and neighbor on different processors
 #endif /* MPI */
+
+                end if ! pmeta and pneigh marked for update
 
               end if ! block at lower level than neighbor
 
@@ -2112,116 +2135,124 @@ module boundaries
 !
               if (pneigh%level < pmeta%level) then
 
+! process only if this block and its neighbor are marked for update
+!
+                if (pmeta%update .and. pneigh%update) then
+
 ! perform update only for the first face, since all faces point the same block
 !
-                if (iface == 1) then
+                  if (iface == 1) then
 
 #ifdef MPI
 ! check if the current meta block and its neighbor belong to the same process
 !
-                  if (pmeta%process == pneigh%process) then
+                    if (pmeta%process == pneigh%process) then
 
 ! check if the current meta block belong to the current process
 !
-                    if (pmeta%process == nproc) then
+                      if (pmeta%process == nproc) then
 #endif /* MPI */
 
 ! find the neighbor side and face pointing to the current block
 !
-                      nside = 3 - iside
-                      nface = 1
-                      do while(pmeta%id /=                                     &
+                        nside = 3 - iside
+                        nface = 1
+                        do while(pmeta%id /=                                   &
                                         pneigh%neigh(idir,nside,nface)%ptr%id)
-                        nface = nface + 1
-                      end do
+                          nface = nface + 1
+                        end do
 
 ! prepare indices of the neighbor slices used for the boundary update
 !
-                      il = 1
-                      iu = im
-                      jl = 1
-                      ju = jm
-                      kl = 1
-                      ku = km
+                        il = 1
+                        iu = im
+                        jl = 1
+                        ju = jm
+                        kl = 1
+                        ku = km
 
-                      select case(idir)
-                      case(1)
-                        if (iside == 1) then
-                          il = ie - nh
-                          iu = ie + 1
-                        else
-                          il = ib - 1
-                          iu = ib + nh
-                        end if
-                      case(2)
-                        if (iside == 1) then
-                          jl = je - nh
-                          ju = je + 1
-                        else
-                          jl = jb - 1
-                          ju = jb + nh
-                        end if
-                      case(3)
-                        if (iside == 1) then
-                          kl = ke - nh
-                          ku = ke + 1
-                        else
-                          kl = kb - 1
-                          ku = kb + nh
-                        end if
-                      end select
+                        select case(idir)
+                        case(1)
+                          if (iside == 1) then
+                            il = ie - nh
+                            iu = ie + 1
+                          else
+                            il = ib - 1
+                            iu = ib + nh
+                          end if
+                        case(2)
+                          if (iside == 1) then
+                            jl = je - nh
+                            ju = je + 1
+                          else
+                            jl = jb - 1
+                            ju = jb + nh
+                          end if
+                        case(3)
+                          if (iside == 1) then
+                            kl = ke - nh
+                            ku = ke + 1
+                          else
+                            kl = kb - 1
+                            ku = kb + nh
+                          end if
+                        end select
 
 ! assign a pointer to the associated data block
 !
-                      pdata  => pmeta%data
+                        pdata  => pmeta%data
 
 ! update boundaries of the current block from its neighbor
 !
-                      call boundary_prolong(pdata                              &
+                        call boundary_prolong(pdata                            &
                                          , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
                                                          , idir, iside, nface)
 
 #ifdef MPI
-                    end if ! pmeta on the current process
+                      end if ! pmeta on the current process
 
-                  else ! block and neighbor belong to different processes
+                    else ! block and neighbor belong to different processes
 
 ! increase the counter for the number of blocks to exchange
 !
-                    block_counter(pmeta%process,pneigh%process) =              &
+                      block_counter(pmeta%process,pneigh%process) =            &
                                block_counter(pmeta%process,pneigh%process) + 1
 
 ! allocate a new info object
 !
-                    allocate(pinfo)
+                      allocate(pinfo)
 
 ! fill out its fields
 !
-                    pinfo%block            => pmeta
-                    pinfo%neigh            => pneigh
-                    pinfo%direction        =  idir
-                    pinfo%side             =  iside
-                    pinfo%face             =  iface
-                    pinfo%level_difference =  pmeta%level - pneigh%level
+                      pinfo%block            => pmeta
+                      pinfo%neigh            => pneigh
+                      pinfo%direction        =  idir
+                      pinfo%side             =  iside
+                      pinfo%face             =  iface
+                      pinfo%level_difference =  pmeta%level - pneigh%level
 
 ! nullify pointers
 !
-                    nullify(pinfo%prev)
-                    nullify(pinfo%next)
+                      nullify(pinfo%prev)
+                      nullify(pinfo%next)
 
 ! if the list is not empty append the newly created info object to it
 !
-                    if (associated(block_array(pmeta%process,pneigh%process)%ptr))&
-                     pinfo%prev => block_array(pmeta%process,pneigh%process)%ptr
+                      if (associated(block_array(pmeta%process                 &
+                                                        ,pneigh%process)%ptr)) &
+                        pinfo%prev => block_array(pmeta%process                &
+                                                        ,pneigh%process)%ptr
 
 ! point the list to the newly created info object
 !
-                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
+                      block_array(pmeta%process,pneigh%process)%ptr => pinfo
 
-                  end if ! block and neighbor belong to different processes
+                    end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                end if ! iface = 1
+                  end if ! iface = 1
+
+                end if ! pmeta and pneigh marked for update
 
               end if ! neighbor belongs to lower level
 
