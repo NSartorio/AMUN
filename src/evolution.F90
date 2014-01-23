@@ -211,6 +211,7 @@ module evolution
 
 ! include external procedures
 !
+    use blocks        , only : set_blocks_update
     use boundaries    , only : boundary_variables
     use mesh          , only : update_mesh
 
@@ -240,6 +241,10 @@ module evolution
 !
     if (toplev > 1) then
 
+! set all meta blocks to not be updated
+!
+      call set_blocks_update(.false.)
+
 ! check refinement and refine
 !
       call update_mesh()
@@ -248,11 +253,15 @@ module evolution
 !
       call boundary_variables()
 
-    end if ! toplev > 1
-
 ! update primitive variables
 !
-    call update_variables()
+      call update_variables()
+
+! set all meta blocks to be updated
+!
+      call set_blocks_update(.true.)
+
+    end if ! toplev > 1
 
 !-------------------------------------------------------------------------------
 !
