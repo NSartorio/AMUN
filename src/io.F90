@@ -2294,12 +2294,12 @@ module io
           if (associated(pmeta%data)  ) dat(l) = 1
 
           id (l)   = pmeta%id
-          cpu(l)   = pmeta%cpu
+          cpu(l)   = pmeta%process
           lev(l)   = pmeta%level
-          cfg(l)   = pmeta%config
+          cfg(l)   = pmeta%conf
           ref(l)   = pmeta%refine
           pos(l,:) = pmeta%pos(:)
-          cor(l,:) = pmeta%coord(:)
+          cor(l,:) = pmeta%coords(:)
 
           if (pmeta%leaf) lea(l) = 1
 
@@ -2417,10 +2417,10 @@ module io
     use blocks  , only : block_meta, list_meta
     use blocks  , only : nchildren, nsides, nfaces
     use blocks  , only : get_mblocks
-    use blocks  , only : metablock_set_id, metablock_set_cpu                   &
-                       , metablock_set_refine, metablock_set_config            &
+    use blocks  , only : metablock_set_id, metablock_set_process               &
+                       , metablock_set_refinement, metablock_set_configuration &
                        , metablock_set_level, metablock_set_position           &
-                       , metablock_set_coord, metablock_set_bounds             &
+                       , metablock_set_coordinates, metablock_set_bounds       &
                        , metablock_set_leaf
     use error   , only : print_error
     use hdf5    , only : hid_t, hsize_t
@@ -2549,14 +2549,14 @@ module io
 
         block_array(id(l))%ptr => pmeta
 
-        call metablock_set_id      (pmeta, id (l))
-        call metablock_set_cpu     (pmeta, min(lcpu, cpu(l)))
-        call metablock_set_refine  (pmeta, ref(l))
-        call metablock_set_config  (pmeta, cfg(l))
-        call metablock_set_level   (pmeta, lev(l))
-        call metablock_set_position(pmeta, pos(l,1), pos(l,2), pos(l,3))
-        call metablock_set_coord   (pmeta, cor(l,1), cor(l,2), cor(l,3))
-        call metablock_set_bounds  (pmeta, xmn(l), xmx(l), ymn(l), ymx(l)      &
+        call metablock_set_id           (pmeta, id (l))
+        call metablock_set_process      (pmeta, min(lcpu, cpu(l)))
+        call metablock_set_refinement   (pmeta, ref(l))
+        call metablock_set_configuration(pmeta, cfg(l))
+        call metablock_set_level        (pmeta, lev(l))
+        call metablock_set_position     (pmeta, pos(l,1), pos(l,2), pos(l,3))
+        call metablock_set_coordinates  (pmeta, cor(l,1), cor(l,2), cor(l,3))
+        call metablock_set_bounds       (pmeta, xmn(l), xmx(l), ymn(l), ymx(l) &
                                                              , zmn(l), zmx(l))
 
         if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
@@ -3065,7 +3065,7 @@ module io
 
 ! fill in the coordinate array
 !
-          cor(l,:)   = pdata%meta%coord(:)
+          cor(l,:)   = pdata%meta%coords(:)
 
 ! fill in the bounds array
 !

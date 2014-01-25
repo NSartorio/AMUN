@@ -211,6 +211,7 @@ module evolution
 
 ! include external procedures
 !
+    use blocks        , only : set_blocks_update
     use boundaries    , only : boundary_variables
     use mesh          , only : update_mesh
 
@@ -240,6 +241,10 @@ module evolution
 !
     if (toplev > 1) then
 
+! set all meta blocks to not be updated
+!
+      call set_blocks_update(.false.)
+
 ! check refinement and refine
 !
       call update_mesh()
@@ -248,11 +253,15 @@ module evolution
 !
       call boundary_variables()
 
-    end if ! toplev > 1
-
 ! update primitive variables
 !
-    call update_variables()
+      call update_variables()
+
+! set all meta blocks to be updated
+!
+      call set_blocks_update(.true.)
+
+    end if ! toplev > 1
 
 !-------------------------------------------------------------------------------
 !
@@ -694,6 +703,7 @@ module evolution
 
 ! include external variables
 !
+    use blocks        , only : block_meta, list_meta
     use blocks        , only : block_data, list_data
 
 ! local variables are not implicit by default
@@ -702,22 +712,30 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer :: pblock
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
 !
 !-------------------------------------------------------------------------------
 !
+! associate the pointer with the first block on the data block list
+!
+    pdata => list_data
+
 ! iterate over all data blocks
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
+
+! associate pmeta with the corresponding meta block
+!
+      pmeta => pdata%meta
 
 ! convert conserved variables to primitive ones for the current block
 !
-      call update_primitive_variables(pblock%u, pblock%q)
+      if (pmeta%update) call update_primitive_variables(pdata%u, pdata%q)
 
 ! assign pointer to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
     end do
 

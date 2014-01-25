@@ -86,7 +86,7 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : datablock_set_dims
+    use blocks         , only : set_block_dimensions
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : toplev, im, jm, km
     use equations      , only : nv
@@ -131,7 +131,7 @@ module mesh
 
 ! set data block dimensions
 !
-    call datablock_set_dims(nv, nv, im, jm, km)
+    call set_block_dimensions(nv, nv, im, jm, km)
 
 ! only master prepares the mesh statistics file
 !
@@ -387,9 +387,9 @@ module mesh
 
 ! increase the block level and process counts
 !
-            ldist(pmeta%level) = ldist(pmeta%level) + 1
+            ldist(pmeta%level)     = ldist(pmeta%level)     + 1
 #ifdef MPI
-            cdist(pmeta%cpu+1) = cdist(pmeta%cpu+1) + 1
+            cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
 #endif /* MPI */
 
           end if ! the leaf
@@ -701,7 +701,7 @@ module mesh
 
 ! assign the process number to the current block
 !
-      pmeta%cpu = np
+      pmeta%process = np
 
 ! check if the current block is the leaf
 !
@@ -714,7 +714,7 @@ module mesh
 ! if the block belongs to the current process, append a new data block, link it
 ! to the current meta block and initialize the problem
 !
-        if (pmeta%cpu == nproc) then
+        if (pmeta%process == nproc) then
 
 ! append new data block
 !
@@ -1175,13 +1175,14 @@ module mesh
 ! check if the parent blocks is on the same processor as the next block, if not
 ! move it to the same processor
 !
-          if (pmeta%cpu /= pmeta%next%cpu) pmeta%cpu = pmeta%next%cpu
+          if (pmeta%process /= pmeta%next%process)                             &
+                                            pmeta%process = pmeta%next%process
 
 ! find the case when child blocks are spread across at least 2 processors
 !
           flag = .false.
           do p = 1, nchildren
-            flag = flag .or. (pmeta%child(p)%ptr%cpu /= pmeta%cpu)
+            flag = flag .or. (pmeta%child(p)%ptr%process /= pmeta%process)
           end do
 
           if (flag) then
@@ -1192,16 +1193,16 @@ module mesh
 
 ! generate the tag for communication
 !
-              itag = pmeta%child(p)%ptr%cpu * nprocs + pmeta%cpu               &
+              itag = pmeta%child(p)%ptr%process * nprocs + pmeta%process       &
                                                               + nprocs + p + 1
 
 ! if the current children is not on the same processor, then ...
 !
-              if (pmeta%child(p)%ptr%cpu /= pmeta%cpu) then
+              if (pmeta%child(p)%ptr%process /= pmeta%process) then
 
 ! if the meta block is on the same process
 !
-                if (pmeta%cpu == nproc) then
+                if (pmeta%process == nproc) then
 
 ! allocate data blocks for children on the processor which will receive data
 !
@@ -1210,8 +1211,8 @@ module mesh
 
 ! receive the data
 !
-                  call receive_real_array(size(rbuf), pmeta%child(p)%ptr%cpu   &
-                                                           , itag, rbuf, iret)
+                  call receive_real_array(size(rbuf)                           &
+                               , pmeta%child(p)%ptr%process, itag, rbuf, iret)
 
 ! coppy buffer to data
 !
@@ -1221,7 +1222,7 @@ module mesh
 
 ! send data to the right processor and deallocate data block
 !
-                if (pmeta%child(p)%ptr%cpu == nproc) then
+                if (pmeta%child(p)%ptr%process == nproc) then
 
 ! copy data to buffer
 !
@@ -1229,7 +1230,8 @@ module mesh
 
 ! send data
 !
-                  call send_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
+                  call send_real_array(size(rbuf), pmeta%process               &
+                                                           , itag, rbuf, iret)
 
 ! deallocate data block
 !
@@ -1239,7 +1241,7 @@ module mesh
 
 ! set the current processor of the block
 !
-                pmeta%child(p)%ptr%cpu = pmeta%cpu
+                pmeta%child(p)%ptr%process = pmeta%process
 
               end if ! if child is are on different processes
 
@@ -1274,7 +1276,7 @@ module mesh
 
               if (associated(pparent)) then
 #ifdef MPI
-                if (pmeta%cpu .eq. nproc) then
+                if (pmeta%process .eq. nproc) then
 #endif /* MPI */
                   if (.not. associated(pparent%data)) then
                     call append_datablock(pdata)
@@ -1313,7 +1315,7 @@ module mesh
             if (pmeta%refine .eq. 1) then
               pparent => pmeta
 #ifdef MPI
-              if (pmeta%cpu .eq. nproc) then
+              if (pmeta%process .eq. nproc) then
 #endif /* MPI */
                 call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
                 call prolong_block(pparent)
@@ -1435,7 +1437,7 @@ module mesh
 
 ! check if the block belongs to another process
 !
-      if (pmeta%cpu /= np) then
+      if (pmeta%process /= np) then
 
 ! check if the block is the leaf
 !
@@ -1443,11 +1445,11 @@ module mesh
 
 ! generate a tag for communication
 !
-          itag = pmeta%cpu * nprocs + np + nprocs + 1
+          itag = pmeta%process * nprocs + np + nprocs + 1
 
 ! sends the block to the right process
 !
-          if (nproc == pmeta%cpu) then
+          if (nproc == pmeta%process) then
 
 ! copy data to buffer
 !
@@ -1464,7 +1466,7 @@ module mesh
 
 ! send data block
 !
-          end if ! nproc == pmeta%cpu
+          end if ! nproc == pmeta%process
 
 ! receive the block from another process
 !
@@ -1477,7 +1479,7 @@ module mesh
 
 ! receive the data
 !
-            call receive_real_array(size(rbuf), pmeta%cpu, itag, rbuf, iret)
+            call receive_real_array(size(rbuf), pmeta%process, itag, rbuf, iret)
 
 ! coppy the buffer to data block
 !
@@ -1490,9 +1492,9 @@ module mesh
 
 ! set new processor number
 !
-        pmeta%cpu = np
+        pmeta%process = np
 
-      end if ! pmeta%cpu /= np
+      end if ! pmeta%process /= np
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
@@ -1882,65 +1884,6 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
-#ifdef DEBUG
-!
-!===============================================================================
-!
-! check_mesh: subroutine checks if the block structure is correct
-! subroutine CHECK_MESH:
-! ---------------------
-!
-!   Subroutine checks if the meta block structure is correct.
-!
-!   Arguments:
-!
-!     string - the identification string;
-!
-!===============================================================================
-!
-  subroutine check_mesh(string)
-
-! import external procedures and variables
-!
-    use blocks         , only : block_meta, list_meta
-    use blocks         , only : check_metablock
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    character(len=*), intent(in) :: string
-
-! local pointers
-!
-    type(block_meta), pointer    :: pmeta
-
-!-------------------------------------------------------------------------------
-!
-! assign the pointer with the first block on the list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while(associated(pmeta))
-
-! check the current block
-!
-      call check_metablock(pmeta, string)
-
-! assign the pointer with the next block on the meta block list
-!
-      pmeta => pmeta%next
-
-    end do ! over meta blocks
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine check_mesh
-#endif /* DEBUG */
 
 !===============================================================================
 !

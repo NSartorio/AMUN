@@ -1118,7 +1118,7 @@ module schemes
 
 !  calculate the flux along the Z direction
 !
-      do j = jbl, ieu
+      do j = jbl, jeu
         do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
@@ -2901,37 +2901,10 @@ module schemes
 
           else ! sm = 0
 
-! conservative variables for the left intermediate state
+! when Sₘ = 0 all variables are continuous, therefore the flux reduces
+! to the HLL one
 !
-            ui(idn) =  wl(idn) / sl
-            ui(imx) =  0.0d+00
-            ui(imy) =  ui(idn) * vy
-            ui(imz) =  ui(idn) * vz
-            ui(ibx) =  bx
-            ui(iby) =  by
-            ui(ibz) =  bz
-            ui(ibp) =  ql(ibp,i)
-            ui(ien) = (wl(ien) - bx * vb) / sl
-
-! the left intermediate flux
-!
-            f(:,i)  = sl * ui(:) - wl(:)
-
-! conservative variables for the right intermediate state
-!
-            ui(idn) =  wr(idn) / sr
-            ui(imx) =  0.0d+00
-            ui(imy) =  ui(idn) * vy
-            ui(imz) =  ui(idn) * vz
-            ui(ibx) =  bx
-            ui(iby) =  by
-            ui(ibz) =  bz
-            ui(ibp) =  qr(ibp,i)
-            ui(ien) = (wr(ien) - bx * vb) / sr
-
-! the right intermediate flux
-!
-            f(:,i)  = 0.5d+00 * (f(:,i) + (sr * ui(:) - wr(:)))
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
@@ -3348,37 +3321,10 @@ module schemes
 
               else ! sm = 0
 
-! conservative variables for the inmost left intermediate state
+! in the case when Sₘ = 0 and Bₓ² > 0, all variables are continuous, therefore
+! the flux can be averaged from the Alfvén waves using the simple HLL formula
 !
-                ui(idn) = dnl
-                ui(imx) = 0.0d+00
-                ui(imy) = dnl * vy
-                ui(imz) = dnl * vz
-                ui(ibx) = bx
-                ui(iby) = by
-                ui(ibz) = bz
-                ui(ibp) = ql(ibp,i)
-                ui(ien) = (wcl(ien) - bx * vb) / cal
-
-! the inmost left intermediate flux
-!
-                f(:,i)  = cal * ui(:) - wcl(:)
-
-! conservative variables for the inmost right intermediate state
-!
-                ui(idn) = dnr
-                ui(imx) = 0.0d+00
-                ui(imy) = dnr * vy
-                ui(imz) = dnr * vz
-                ui(ibx) = bx
-                ui(iby) = by
-                ui(ibz) = bz
-                ui(ibp) = qr(ibp,i)
-                ui(ien) = (wcr(ien) - bx * vb) / car
-
-! the inmost right intermediate flux
-!
-                f(:,i)  = 0.5d+00 * (f(:,i) + (car * ui(:) - wcr(:)))
+                f(:,i) = (sml * wcr(:) - smr * wcl(:)) / (smr - sml)
 
               end if ! sm = 0
 

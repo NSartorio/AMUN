@@ -136,8 +136,8 @@ module domains
     use blocks     , only : pointer_meta, block_meta, block_data               &
                           , append_metablock, append_datablock                 &
                           , link_blocks, metablock_set_leaf                    &
-                          , metablock_set_config, metablock_set_level          &
-                          , metablock_set_coord, metablock_set_bounds
+                          , metablock_set_configuration, metablock_set_level   &
+                          , metablock_set_coordinates, metablock_set_bounds
     use blocks     , only : nsides, nfaces
     use boundaries , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
@@ -228,8 +228,9 @@ module domains
 
 ! set the configuration type
 !
-          call metablock_set_config(block_array(loc(1),loc(2),loc(3))%ptr      &
-                                         , cfg(loc(1),loc(2),loc(3)))
+          call metablock_set_configuration(                                    &
+                                        block_array(loc(1),loc(2),loc(3))%ptr  &
+                                                  , cfg(loc(1),loc(2),loc(3)))
 
 ! increase the block number
 !
@@ -305,7 +306,7 @@ module domains
 
 ! set block coordinates
 !
-          call metablock_set_coord(pmeta, il, jl, kl)
+          call metablock_set_coordinates(pmeta, il, jl, kl)
 
 ! set the bounds
 !
