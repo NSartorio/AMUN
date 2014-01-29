@@ -460,7 +460,7 @@ module mesh
     use blocks         , only : append_datablock, remove_datablock
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
-    use coordinates    , only : minlev, maxlev, res
+    use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
     use error          , only : print_error
     use mpitools       , only : master, nproc, nprocs
@@ -651,7 +651,7 @@ module mesh
 
 ! perform the refinement without creating new data blocks
 !
-            call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
+            call refine_block(pmeta, .false.)
 
           end if ! selected for refinement and at the current level
 
@@ -785,7 +785,7 @@ module mesh
     use blocks         , only : get_nleafs
     use blocks         , only : refine_block, derefine_block
     use blocks         , only : append_datablock, remove_datablock, link_blocks
-    use coordinates    , only : minlev, maxlev, toplev, im, jm, km, res
+    use coordinates    , only : minlev, maxlev, toplev, im, jm, km
     use equations      , only : nv
     use error          , only : print_error
 #ifdef MPI
@@ -1317,12 +1317,12 @@ module mesh
 #ifdef MPI
               if (pmeta%process .eq. nproc) then
 #endif /* MPI */
-                call refine_block(pmeta, res(pmeta%level + 1,:), .true.)
+                call refine_block(pmeta, .true.)
                 call prolong_block(pparent)
                 call remove_datablock(pparent%data)
 #ifdef MPI
               else
-                call refine_block(pmeta, res(pmeta%level + 1,:), .false.)
+                call refine_block(pmeta, .false.)
               end if
 #endif /* MPI */
             end if

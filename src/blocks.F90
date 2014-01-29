@@ -150,13 +150,11 @@ module blocks
                                  !
     integer(kind=4)             :: refine
 
-                                 ! the position of the block in its siblings
-                                 ! group
+                                 ! the block position in its parent
                                  !
     integer(kind=4)             :: pos(ndims)
 
-                                 ! the coordinate of the lower corner of the
-                                 ! block in the effective resolution units
+                                 ! the block global coordinates at its level
                                  !
     integer(kind=4)             :: coords(ndims)
 
@@ -825,7 +823,7 @@ module blocks
 !
     pmeta%pos(:)    = -1
 
-! initialize the effective coordinates
+! initialize the block coordinates in the current level
 !
     pmeta%coords(:) = 0
 
@@ -1225,7 +1223,7 @@ module blocks
 !
 !===============================================================================
 !
-  subroutine refine_block(pmeta, res, fdata)
+  subroutine refine_block(pmeta, fdata)
 
 ! import external procedures
 !
@@ -1238,7 +1236,6 @@ module blocks
 ! subroutine arguments
 !
     type(block_meta), pointer    , intent(inout) :: pmeta
-    integer(kind=4), dimension(3), intent(in)    :: res
     logical                      , intent(in)    :: fdata
 
 ! pointers
@@ -1446,10 +1443,10 @@ module blocks
 
 ! calculate the block coordinates in effective resolution units
 !
-        ic  = pmeta%coords(1) + i * res(1)
-        jc  = pmeta%coords(2) + j * res(2)
+        ic  = 2 * pmeta%coords(1) + i
+        jc  = 2 * pmeta%coords(2) + j
 #if NDIMS == 3
-        kc  = pmeta%coords(3) + k * res(3)
+        kc  = 2 * pmeta%coords(3) + k
 #endif /* NDIMS == 3 */
 
 ! calculate block bounds

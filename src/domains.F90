@@ -149,7 +149,7 @@ module domains
 
 ! local variables
 !
-    integer :: i, j, k, n, p, il, jl, kl
+    integer :: i, j, k, n, p, ic, jc, kc
     real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
 
 ! local arrays
@@ -263,7 +263,7 @@ module domains
 
 ! claculate the block position along Z
 !
-      kl  = (k - 1) * res(1,3)
+      kc  = k - 1
 
 ! calculate the Z bounds
 !
@@ -274,7 +274,7 @@ module domains
 
 ! claculate the block position along Y
 !
-        jl  = (j - 1) * res(1,2)
+        jc  = j - 1
 
 ! calculate the Y bounds
 !
@@ -285,7 +285,7 @@ module domains
 
 ! claculate the block position along Y
 !
-          il  = (i - 1) * res(1,1)
+          ic  = i - 1
 
 ! calculate the Z bounds
 !
@@ -306,7 +306,7 @@ module domains
 
 ! set block coordinates
 !
-          call metablock_set_coordinates(pmeta, il, jl, kl)
+          call metablock_set_coordinates(pmeta, ic, jc, kc)
 
 ! set the bounds
 !
