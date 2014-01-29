@@ -1218,7 +1218,6 @@ module blocks
 !   Arguments:
 !
 !     pmeta - a pointer to meta block for which children will be created;
-!     res   - the resolution of the block;
 !     fdata - a flag indicating if data blocks for children should be allocated;
 !
 !===============================================================================
