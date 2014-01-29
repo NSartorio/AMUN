@@ -141,7 +141,7 @@ module domains
     use blocks     , only : nsides, nfaces
     use boundaries , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry
     use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coordinates, only : ir, jr, kr, res
+    use coordinates, only : ir, jr, kr
 
 ! local variables are not implicit by default
 !

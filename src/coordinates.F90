@@ -78,7 +78,7 @@ module coordinates
 
 ! the effective resolution of the full domain
 !
-  integer,dimension(NDIMS), save :: effres  = 1
+  integer,dimension(3), save :: effres  = 1
 
 ! the block coordinates for all levels of refinement
 !
@@ -86,10 +86,6 @@ module coordinates
   real, dimension(:  ), allocatable, save :: adx , ady , adz, adr
   real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
   real, dimension(:  ), allocatable, save :: advol
-
-! the block resolution in the units of effective resolution for all levels
-!
-  integer(kind=4), dimension(:,:), allocatable, save :: res
 
 ! by default everything is private
 !
@@ -125,7 +121,7 @@ module coordinates
 
 ! local variables
 !
-    integer :: i, j, k, l
+    integer :: i, j, k, l, ff
     integer :: ni, nj, nk
     logical :: info
 
@@ -238,7 +234,6 @@ module coordinates
     allocate(adyi (toplev))
     allocate(adzi (toplev))
     allocate(advol(toplev))
-    allocate(res  (toplev, 3))
 
 ! reset all coordinate variables to initial values
 !
@@ -253,7 +248,6 @@ module coordinates
     adyi (:)   = 1.0d0
     adzi (:)   = 1.0d0
     advol(:)   = 1.0d0
-    res  (:,:) = 1
 
 ! generate the coordinate variables for each level
 !
@@ -300,15 +294,6 @@ module coordinates
 !
       advol(l) = adx(l) * ady(l) * adz(l)
 
-! calculate the effective block resolution at each level
-!
-      j         = 2**(maxlev - l)
-      res(l,1)  = max(1, in * j)
-      res(l,2)  = max(1, jn * j)
-#if NDIMS == 3
-      res(l,3)  = max(1, kn * j)
-#endif /* NDIMS == 3 */
-
     end do
 
 ! print general information about the level resolutions
@@ -323,9 +308,10 @@ module coordinates
 
 ! the effective resolution
 !
-      rm(1) = ir * res(1,1)
-      rm(2) = jr * res(1,2)
-      rm(3) = kr * res(1,3)
+      ff    = 2**(maxlev - 1)
+      rm(1) = cm(1) * ff
+      rm(2) = cm(2) * ff
+      rm(3) = cm(3) * ff
 
 ! the effective resolution
 !
@@ -341,8 +327,8 @@ module coordinates
 !
       write(*,"(4x,a,  1x,i6 )" ) "refinement to level    =", toplev
       write(*,"(4x,a,3(1x,i6 ))") "base configuration     =", ir, jr, kr
-      write(*,"(4x,a,3(1x,i6 ))") "top level blocks       =", dm(:)
-      write(*,"(4x,a,  3x,i18)" ) "maximum cover blocks   =", product(dm(:))
+      write(*,"(4x,a,3(1x,i6 ))") "top level blocks       =", dm(1:NDIMS)
+      write(*,"(4x,a,  3x,i18)" ) "maximum cover blocks   =", product(dm(1:NDIMS))
       write(*,"(4x,a,3(1x,i6 ))") "base resolution        =", cm(1:NDIMS)
       write(*,"(4x,a,3(1x,i6 ))") "effective resolution   =", rm(1:NDIMS)
 
@@ -386,7 +372,6 @@ module coordinates
     if (allocated(adyi) ) deallocate(adyi)
     if (allocated(adzi) ) deallocate(adzi)
     if (allocated(advol)) deallocate(advol)
-    if (allocated(res)  ) deallocate(res)
 
 !-------------------------------------------------------------------------------
 !
