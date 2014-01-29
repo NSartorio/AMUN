@@ -258,7 +258,7 @@ module mesh
 !
     use blocks         , only : ndims, block_meta, list_meta
     use blocks         , only : get_mblocks, get_nleafs
-    use coordinates    , only : ng, nd, im, jm, km, toplev, effres
+    use coordinates    , only : ng, nd, in, jn, kn, im, jm, km, ir, jr, kr, toplev
     use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
@@ -273,7 +273,7 @@ module mesh
 ! local variables
 !
     integer(kind=4) :: l, n
-    real(kind=8)    :: cv, ef
+    real(kind=8)    :: cv, ef, ff
 
 ! local pointers
 !
@@ -340,11 +340,12 @@ module mesh
 
 ! prepare coverage and efficiency factors
 !
+          ff  = 2**(toplev - 1)
           fcv = 1.0d+00 / n
-          fef = 1.0d+00 * im / (effres(1) + nd)
-          fef =     fef * jm / (effres(2) + nd)
+          fef = 1.0d+00 * im / (ir * in * ff + nd)
+          fef =     fef * jm / (jr * jn * ff + nd)
 #if NDIMS == 3
-          fef =     fef * km / (effres(3) + nd)
+          fef =     fef * km / (kr * kn * ff + nd)
 #endif /* NDIMS == 3 */
 
 ! reset the first execution flag

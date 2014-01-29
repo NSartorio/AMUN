@@ -76,10 +76,6 @@ module coordinates
   real, save :: zmax = 1.0d0
   real, save :: zlen = 1.0d0
 
-! the effective resolution of the full domain
-!
-  integer,dimension(3), save :: effres  = 1
-
 ! the block coordinates for all levels of refinement
 !
   real, dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -312,10 +308,6 @@ module coordinates
       rm(1) = cm(1) * ff
       rm(2) = cm(2) * ff
       rm(3) = cm(3) * ff
-
-! the effective resolution
-!
-      effres(1:NDIMS) = rm(1:NDIMS)
 
 ! the top level block division
 !
