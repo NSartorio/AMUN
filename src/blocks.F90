@@ -195,22 +195,22 @@ module blocks
                                  ! a pointer to the current conserved variable
                                  ! array
                                  !
-    real, dimension(:,:,:,:)  , pointer     :: u
+    real(kind=8), dimension(:,:,:,:)  , pointer     :: u
 
                                  ! an allocatable arrays to store all conserved
                                  ! variables (required two for Runge-Kutta
                                  ! temporal integration methods)
                                  !
-    real, dimension(:,:,:,:)  , allocatable :: u0, u1
+    real(kind=8), dimension(:,:,:,:)  , allocatable :: u0, u1
 
                                  ! an allocatable array to store all primitive
                                  ! variables
                                  !
-    real, dimension(:,:,:,:)  , allocatable :: q
+    real(kind=8), dimension(:,:,:,:)  , allocatable :: q
 
                                  ! an allocatable array to store all fluxes
                                  !
-    real, dimension(:,:,:,:,:), allocatable :: f
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: f
 
   end type block_data
 
@@ -1248,8 +1248,8 @@ module blocks
 
 ! local variables
 !
-    integer :: p, q, i, j, k, ic, jc, kc
-    real    :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
+    integer      :: p, q, i, j, k, ic, jc, kc
+    real(kind=8) :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
 ! local arrays
 !
