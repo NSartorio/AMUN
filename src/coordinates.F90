@@ -34,54 +34,57 @@ module coordinates
 !
   implicit none
 
+! MODULE PARAMETERS:
+! =================
+!
 ! the domain block dimensions
 !
-  integer, save :: nn =  8, in =  8, jn =  8, kn =  1
+  integer     , save :: nn =  8, in =  8, jn =  8, kn =  1
 
 ! the number of ghost zones
 !
-  integer, save :: ng =  2, nh =  1, nd = 4
+  integer     , save :: ng =  2, nh =  1, nd =  4
 
 ! the domain block dimensions including the ghost zones
 !
-  integer, save :: im = 12, jm = 12, km =  1
+  integer     , save :: im = 12, jm = 12, km =  1
 
 ! the domain division
 !
-  integer, save :: ir =  1, jr =  1, kr =  1
+  integer     , save :: ir =  1, jr =  1, kr =  1
 
 ! the limits of refinement level
 !
-  integer, save :: minlev = 1, maxlev = 1, toplev = 1
+  integer     , save :: minlev = 1, maxlev = 1, toplev = 1
 
 ! block indices
 !
-  integer, save :: ih  =  6, jh  =  6, kh  =  1
-  integer, save :: ib  =  3, jb  =  3, kb  =  1
-  integer, save :: ie  = 10, je  = 10, ke  =  1
-  integer, save :: ibl =  2, jbl =  2, kbl =  1
-  integer, save :: ibu =  4, jbu =  4, kbu =  1
-  integer, save :: iel =  9, jel =  9, kel =  1
-  integer, save :: ieu = 11, jeu = 11, keu =  1
+  integer     , save :: ih  =  6, jh  =  6, kh  =  1
+  integer     , save :: ib  =  3, jb  =  3, kb  =  1
+  integer     , save :: ie  = 10, je  = 10, ke  =  1
+  integer     , save :: ibl =  2, jbl =  2, kbl =  1
+  integer     , save :: ibu =  4, jbu =  4, kbu =  1
+  integer     , save :: iel =  9, jel =  9, kel =  1
+  integer     , save :: ieu = 11, jeu = 11, keu =  1
 
 ! the domain bounds
 !
-  real, save :: xmin = 0.0d0
-  real, save :: xmax = 1.0d0
-  real, save :: xlen = 1.0d0
-  real, save :: ymin = 0.0d0
-  real, save :: ymax = 1.0d0
-  real, save :: ylen = 1.0d0
-  real, save :: zmin = 0.0d0
-  real, save :: zmax = 1.0d0
-  real, save :: zlen = 1.0d0
+  real(kind=8), save :: xmin = 0.0d+00
+  real(kind=8), save :: xmax = 1.0d+00
+  real(kind=8), save :: xlen = 1.0d+00
+  real(kind=8), save :: ymin = 0.0d+00
+  real(kind=8), save :: ymax = 1.0d+00
+  real(kind=8), save :: ylen = 1.0d+00
+  real(kind=8), save :: zmin = 0.0d+00
+  real(kind=8), save :: zmax = 1.0d+00
+  real(kind=8), save :: zlen = 1.0d+00
 
 ! the block coordinates for all levels of refinement
 !
-  real, dimension(:,:), allocatable, save :: ax  , ay  , az
-  real, dimension(:  ), allocatable, save :: adx , ady , adz, adr
-  real, dimension(:  ), allocatable, save :: adxi, adyi, adzi
-  real, dimension(:  ), allocatable, save :: advol
+  real(kind=8), dimension(:,:), allocatable, save :: ax  , ay  , az
+  real(kind=8), dimension(:  ), allocatable, save :: adx , ady , adz, adr
+  real(kind=8), dimension(:  ), allocatable, save :: adxi, adyi, adzi
+  real(kind=8), dimension(:  ), allocatable, save :: advol
 
 ! by default everything is private
 !
@@ -98,11 +101,16 @@ module coordinates
 !
 !   Subroutine initializes mesh coordinates and other coordinate parameters.
 !
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
+!
 !===============================================================================
 !
   subroutine initialize_coordinates(verbose, iret)
 
-! include external procedures and variables
+! include external procedures
 !
     use parameters, only : get_parameter_integer, get_parameter_real
 
@@ -140,7 +148,7 @@ module coordinates
     kn = nn
 #endif /* NDIMS == 3 */
 
-! change individual block dimension if set
+! change individual block dimension if requested
 !
     call get_parameter_integer("icells", in    )
     call get_parameter_integer("jcells", jn    )
@@ -217,7 +225,7 @@ module coordinates
     call get_parameter_real   ("zmin"  , zmin  )
     call get_parameter_real   ("zmax"  , zmax  )
 
-! allocate space for coordinate variables and resolutions
+! allocate space for coordinate variables
 !
     allocate(ax   (toplev, im))
     allocate(ay   (toplev, jm))
@@ -233,17 +241,17 @@ module coordinates
 
 ! reset all coordinate variables to initial values
 !
-    ax   (:,:) = 0.0d0
-    ay   (:,:) = 0.0d0
-    az   (:,:) = 0.0d0
-    adx  (:)   = 1.0d0
-    ady  (:)   = 1.0d0
-    adz  (:)   = 1.0d0
-    adr  (:)   = 1.0d0
-    adxi (:)   = 1.0d0
-    adyi (:)   = 1.0d0
-    adzi (:)   = 1.0d0
-    advol(:)   = 1.0d0
+    ax   (:,:) = 0.0d+00
+    ay   (:,:) = 0.0d+00
+    az   (:,:) = 0.0d+00
+    adx  (:)   = 1.0d+00
+    ady  (:)   = 1.0d+00
+    adz  (:)   = 1.0d+00
+    adr  (:)   = 1.0d+00
+    adxi (:)   = 1.0d+00
+    adyi (:)   = 1.0d+00
+    adzi (:)   = 1.0d+00
+    advol(:)   = 1.0d+00
 
 ! generate the coordinate variables for each level
 !
@@ -251,10 +259,10 @@ module coordinates
 
 ! calculate the block resolution at each level
 !
-      j  = 2**(l - 1)
-      ni = in * j
-      nj = jn * j
-      nk = kn * j
+      ff      = 2**(l - 1)
+      ni      = in * ff
+      nj      = jn * ff
+      nk      = kn * ff
 
 ! calculate the cell sizes for each level
 !
@@ -272,25 +280,25 @@ module coordinates
 
 ! calculate the inverse of cell size
 !
-      adxi(l) = 1.0d0 / adx(l)
-      adyi(l) = 1.0d0 / ady(l)
+      adxi(l) = 1.0d+00 / adx(l)
+      adyi(l) = 1.0d+00 / ady(l)
 #if NDIMS == 3
-      adzi(l) = 1.0d0 / adz(l)
+      adzi(l) = 1.0d+00 / adz(l)
 #endif /* NDIMS == 3 */
 
 ! calculate the block coordinates for each level
 !
-      ax(l,:) = ((/(i, i = 1, im)/) - ng - 0.5d0) * adx(l)
-      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 0.5d0) * ady(l)
+      ax(l,:) = ((/(i, i = 1, im)/) - ng - 5.0d-01) * adx(l)
+      ay(l,:) = ((/(j, j = 1, jm)/) - ng - 5.0d-01) * ady(l)
 #if NDIMS == 3
-      az(l,:) = ((/(k, k = 1, km)/) - ng - 0.5d0) * adz(l)
+      az(l,:) = ((/(k, k = 1, km)/) - ng - 5.0d-01) * adz(l)
 #endif /* NDIMS == 3 */
 
 ! calculate the cell volume at each level
 !
       advol(l) = adx(l) * ady(l) * adz(l)
 
-    end do
+    end do ! l = 1, toplev
 
 ! print general information about the level resolutions
 !
@@ -315,16 +323,20 @@ module coordinates
       dm(2) = rm(2) / jn
       dm(3) = rm(3) / kn
 
+! obtain the maximum number of block
+!
+      ff    = product(dm(1:NDIMS))
+
 ! print info
 !
       write(*,"(4x,a,  1x,i6 )" ) "refinement to level    =", toplev
       write(*,"(4x,a,3(1x,i6 ))") "base configuration     =", ir, jr, kr
       write(*,"(4x,a,3(1x,i6 ))") "top level blocks       =", dm(1:NDIMS)
-      write(*,"(4x,a,  3x,i18)" ) "maximum cover blocks   =", product(dm(1:NDIMS))
+      write(*,"(4x,a,  3x,i18)" ) "maximum cover blocks   =", ff
       write(*,"(4x,a,3(1x,i6 ))") "base resolution        =", cm(1:NDIMS)
       write(*,"(4x,a,3(1x,i6 ))") "effective resolution   =", rm(1:NDIMS)
 
-    end if ! master
+    end if ! verbose
 
 !-------------------------------------------------------------------------------
 !
@@ -336,6 +348,10 @@ module coordinates
 ! -------------------------------
 !
 !   Subroutine deallocates mesh coordinates.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
 !
 !===============================================================================
 !
