@@ -1245,13 +1245,15 @@ module blocks
 
 ! local variables
 !
-    integer      :: p, q, i, j, k, ic, jc, kc
-    real(kind=8) :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
+    logical, save :: first = .true.
+    integer       :: p, q, i, j, k, ic, jc, kc, cf
+    real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
 ! local arrays
 !
-    integer, dimension(nchildren)           :: config, order
-    integer, dimension(ndims,nsides,nfaces) :: set
+    integer, dimension(0:79,nchildren)     , save :: order
+    integer, dimension(0:79,nchildren)     , save :: config
+    integer, dimension(ndims,nsides,nfaces), save :: set
 !
 !-------------------------------------------------------------------------------
 !
@@ -1260,6 +1262,87 @@ module blocks
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! prepare some arrays
+!
+    if (first) then
+
+! prepare order array
+!
+      do p = 1, nchildren
+        order ( :,p) = p
+      end do
+#if NDIMS == 2
+      order ( 0,:) = (/  1,  2,  3,  4 /)
+      order (12,:) = (/  1,  3,  4,  2 /)
+      order (13,:) = (/  1,  2,  4,  3 /)
+      order (42,:) = (/  4,  3,  1,  2 /)
+      order (43,:) = (/  4,  2,  1,  3 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      order ( 0,:) = (/  1,  2,  3,  4,  5,  6,  7,  8 /)
+      order (12,:) = (/  1,  3,  7,  5,  6,  8,  4,  2 /)
+      order (13,:) = (/  1,  5,  6,  2,  4,  8,  7,  3 /)
+      order (15,:) = (/  1,  2,  4,  3,  7,  8,  6,  5 /)
+      order (42,:) = (/  4,  8,  7,  3,  1,  5,  6,  2 /)
+      order (43,:) = (/  4,  2,  6,  8,  7,  5,  1,  3 /)
+      order (48,:) = (/  4,  3,  1,  2,  6,  5,  7,  8 /)
+      order (62,:) = (/  6,  5,  7,  8,  4,  3,  1,  2 /)
+      order (65,:) = (/  6,  8,  4,  2,  1,  3,  7,  5 /)
+      order (68,:) = (/  6,  2,  1,  5,  7,  3,  4 , 8 /)
+      order (73,:) = (/  7,  8,  6,  5,  1,  2,  4,  3 /)
+      order (75,:) = (/  7,  3,  4,  8,  6,  2,  1,  5 /)
+      order (78,:) = (/  7,  5,  1,  3,  4,  2,  6,  8 /)
+#endif /* NDIMS == 3 */
+
+! prepare config array
+!
+      config( :,:) = 0
+#if NDIMS == 2
+      config( 0,:) = (/  0,  0,  0,  0 /)
+      config(12,:) = (/ 13, 12, 12, 42 /)
+      config(13,:) = (/ 12, 13, 13, 43 /)
+      config(42,:) = (/ 43, 42, 42, 12 /)
+      config(43,:) = (/ 42, 43, 43, 13 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      config( 0,:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+      config(12,:) = (/ 13, 15, 15, 78, 78, 62, 62, 42 /)
+      config(13,:) = (/ 15, 12, 12, 68, 68, 43, 43, 73 /)
+      config(15,:) = (/ 12, 13, 13, 48, 48, 75, 75, 65 /)
+      config(42,:) = (/ 48, 43, 43, 75, 75, 12, 12, 62 /)
+      config(43,:) = (/ 42, 48, 48, 65, 65, 73, 73, 13 /)
+      config(48,:) = (/ 43, 42, 42, 15, 15, 68, 68, 78 /)
+      config(62,:) = (/ 65, 68, 68, 73, 73, 42, 42, 12 /)
+      config(65,:) = (/ 68, 62, 62, 43, 43, 15, 15, 75 /)
+      config(68,:) = (/ 62, 65, 65, 13, 13, 78, 78, 48 /)
+      config(73,:) = (/ 78, 75, 75, 62, 62, 13, 13, 43 /)
+      config(75,:) = (/ 73, 78, 78, 42, 42, 65, 65, 15 /)
+      config(78,:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
+#endif /* NDIMS == 3 */
+
+! prepare set array
+!
+#if NDIMS == 2
+      set(1,1,:) = (/ 1, 3 /)
+      set(1,2,:) = (/ 2, 4 /)
+      set(2,1,:) = (/ 1, 2 /)
+      set(2,2,:) = (/ 3, 4 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      set(1,1,:) = (/ 1, 3, 5, 7 /)
+      set(1,2,:) = (/ 2, 4, 6, 8 /)
+      set(2,1,:) = (/ 1, 2, 5, 6 /)
+      set(2,2,:) = (/ 3, 4, 7, 8 /)
+      set(3,1,:) = (/ 1, 2, 3, 4 /)
+      set(3,2,:) = (/ 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if
 
 ! check if pointer is associated
 !
@@ -1273,105 +1356,7 @@ module blocks
 !!
 ! set corresponding configuration of the new blocks
 !
-      select case(pmeta%conf)
-      case(0)
-
-#if NDIMS == 2
-        config(:) = (/ 0, 0, 0, 0 /)
-        order (:) = (/ 1, 2, 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
-        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
-#endif /* NDIMS == 3 */
-
-      case(12)
-
-#if NDIMS == 2
-        config(:) = (/ 13, 12, 12, 42 /)
-        order (:) = (/  1,  3,  4,  2 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 13, 15, 15, 78, 78, 62, 62, 42 /)
-        order (:) = (/  1,  3,  7,  5,  6,  8,  4,  2 /)
-#endif /* NDIMS == 3 */
-
-      case(13)
-
-#if NDIMS == 2
-        config(:) = (/ 12, 13, 13, 43 /)
-        order (:) = (/  1,  2,  4,  3 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 15, 12, 12, 68, 68, 43, 43, 73 /)
-        order (:) = (/  1,  5,  6,  2,  4,  8,  7,  3 /)
-
-      case(15)
-
-        config(:) = (/ 12, 13, 13, 48, 48, 75, 75, 65 /)
-        order (:) = (/  1,  2,  4,  3,  7,  8,  6,  5 /)
-#endif /* NDIMS == 3 */
-
-      case(42)
-
-#if NDIMS == 2
-        config(:) = (/ 43, 42, 42, 12 /)
-        order (:) = (/  4,  3,  1,  2 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 48, 43, 43, 75, 75, 12, 12, 62 /)
-        order (:) = (/  4,  8,  7,  3,  1,  5,  6,  2 /)
-#endif /* NDIMS == 3 */
-
-      case(43)
-
-#if NDIMS == 2
-        config(:) = (/ 42, 43, 43, 13 /)
-        order (:) = (/  4,  2,  1,  3 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 42, 48, 48, 65, 65, 73, 73, 13 /)
-        order (:) = (/  4,  2,  6,  8,  7,  5,  1,  3 /)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-      case(48)
-
-        config(:) = (/ 43, 42, 42, 15, 15, 68, 68, 78 /)
-        order (:) = (/  4,  3,  1,  2,  6,  5,  7,  8 /)
-
-      case(62)
-
-        config(:) = (/ 65, 68, 68, 73, 73, 42, 42, 12 /)
-        order (:) = (/  6,  5,  7,  8,  4,  3,  1,  2 /)
-
-      case(65)
-
-        config(:) = (/ 68, 62, 62, 43, 43, 15, 15, 75 /)
-        order (:) = (/  6,  8,  4,  2,  1,  3,  7,  5 /)
-
-      case(68)
-
-        config(:) = (/ 62, 65, 65, 13, 13, 78, 78, 48 /)
-        order (:) = (/  6,  2,  1,  5,  7,  3,  4 , 8 /)
-
-      case(73)
-
-        config(:) = (/ 78, 75, 75, 62, 62, 13, 13, 43 /)
-        order (:) = (/  7,  8,  6,  5,  1,  2,  4,  3 /)
-
-      case(75)
-
-        config(:) = (/ 73, 78, 78, 42, 42, 65, 65, 15 /)
-        order (:) = (/  7,  3,  4,  8,  6,  2,  1,  5 /)
-
-      case(78)
-
-        config(:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
-        order (:) = (/  7,  5,  1,  3,  4,  2,  6,  8 /)
-#endif /* NDIMS == 3 */
-
-      end select
+      cf  = pmeta%conf
 
 ! calculate sizes of the child blocks
 !
@@ -1397,12 +1382,12 @@ module blocks
 
 ! set the child configuration number
 !
-        call metablock_set_configuration(pchild, config(p))
+        call metablock_set_configuration(pchild, config(cf,p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
 !
-        pmeta%child(order(p))%ptr => pchild
+        pmeta%child(order(cf,p))%ptr => pchild
 
       end do ! nchildren
 
@@ -1663,23 +1648,6 @@ module blocks
 
 !! UPDATE NEIGHBORS AND EXTERNAL NEIGHBORS OF CHILDREN
 !!
-! prepare set array
-!
-#if NDIMS == 2
-      set(1,1,:) = (/ 1, 3 /)
-      set(1,2,:) = (/ 2, 4 /)
-      set(2,1,:) = (/ 1, 2 /)
-      set(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      set(1,1,:) = (/ 1, 3, 5, 7 /)
-      set(1,2,:) = (/ 2, 4, 6, 8 /)
-      set(2,1,:) = (/ 1, 2, 5, 6 /)
-      set(2,2,:) = (/ 3, 4, 7, 8 /)
-      set(3,1,:) = (/ 1, 2, 3, 4 /)
-      set(3,2,:) = (/ 5, 6, 7, 8 /)
-#endif /* NDIMS == 3 */
-
 ! set pointers to neighbors and update neighbors' pointers
 !
       do i = 1, ndims
