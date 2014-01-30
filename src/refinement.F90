@@ -246,7 +246,7 @@ module refinement
 
 ! return variable
 !
-    integer(kind=1)                       :: criterion
+    integer(kind=4)                       :: criterion
 
 ! local variables
 !
