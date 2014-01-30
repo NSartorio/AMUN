@@ -385,8 +385,8 @@ program amun
 !
   if (master) then
     write (*,*)
-    write (*,"(1x,a)"         ) "Snapshots:"
-    write (*,"(4x,a22,1x,'='1x,a)") "precise snapshot times", trim(prec_snap)
+    write (*,"(1x,a)"              ) "Snapshots:"
+    write (*,"(4x,a22,1x,'=',1x,a)") "precise snapshot times", trim(prec_snap)
   end if
 
 ! initialize module IO
