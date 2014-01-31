@@ -483,7 +483,7 @@ module problems
     real(kind=8), save :: vper   = 1.00d-02
     real(kind=8), save :: buni   = 1.00d+00
     real(kind=8), save :: bgui   = 0.00d+00
-    real(kind=8), save :: angle  = 4.50d+01
+    real(kind=8), save :: angle  = 0.00d+00
 
 ! local saved parameters
 !
