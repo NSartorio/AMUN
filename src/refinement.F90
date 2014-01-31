@@ -343,7 +343,6 @@ module refinement
     integer      :: j, jm1, jp1
     integer      :: k, km1, kp1
     real(kind=4) :: fl, fr, fc, fx, fy, fz
-    real(kind=4) :: eloc
 
 ! local parameters
 !
@@ -353,7 +352,7 @@ module refinement
 !
 ! reset indicators
 !
-    eloc = 0.0e+00
+    error = 0.0e+00
 
 ! calculate local refinement criterion for variable which exists
 !
@@ -379,7 +378,7 @@ module refinement
             fl   = pdata%q(iqt,im1,j,k) - pdata%q(iqt,i  ,j,k)
             fc   = abs(pdata%q(iqt,ip1,j,k)) + abs(pdata%q(iqt,im1,j,k))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fx   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
+            fx   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 
 ! calculate the second derivative error along the Y direction
 !
@@ -387,7 +386,7 @@ module refinement
             fl   = pdata%q(iqt,i,jm1,k) - pdata%q(iqt,i,j  ,k)
             fc   = abs(pdata%q(iqt,i,jp1,k)) + abs(pdata%q(iqt,i,jm1,k))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fy   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
+            fy   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 
 #if NDIMS == 3
 ! calculate the second derivative error along the Z direction
@@ -396,16 +395,16 @@ module refinement
             fl   = pdata%q(iqt,i,j,km1) - pdata%q(iqt,i,j,k  )
             fc   = abs(pdata%q(iqt,i,j,kp1)) + abs(pdata%q(iqt,i,j,km1))       &
                                            + 2.0d+00 * abs(pdata%q(iqt,i,j,k))
-            fz   = (fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
+            fz   = abs(fr + fl) / (abs(fr) + abs(fl) + epsref * fc + eps)
 #endif /* NDIMS == 3 */
 
-! calculate the square of the second derivative error
+! take the maximum second derivative error
 !
 #if NDIMS == 2
-            eloc = max(eloc, fx * fx + fy * fy)
+            error = max(error, fx, fy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            eloc = max(eloc, fx * fx + fy * fy + fz * fz)
+            error = max(error, fx, fy, fz)
 #endif /* NDIMS == 3 */
 
           end do
@@ -413,10 +412,6 @@ module refinement
       end do
 
     end if ! iqt > 0
-
-! calculate the second derivative error
-!
-    error = sqrt(eloc)
 
 ! return the refinement flag
 !
