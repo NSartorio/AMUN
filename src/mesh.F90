@@ -461,6 +461,7 @@ module mesh
     use blocks         , only : append_datablock, remove_datablock
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
+    use blocks         , only : set_neighbors_refine
     use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
     use error          , only : print_error
@@ -597,29 +598,9 @@ module mesh
 !
           if (pmeta%leaf .and. pmeta%level == lev .and. pmeta%refine == 1) then
 
-! iterate over all neighbors
+! select all neighbors which lay on lower levels to be refined as well
 !
-            do idir = 1, ndims
-              do iside = 1, nsides
-                do iface = 1, nfaces
-
-! assign pointer to the neighbor
-!
-                  pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! check if the neighbor is associated
-!
-                  if (associated(pneigh)) then
-
-! if the neighbor has lower level, select it to be refined too
-!
-                    if (pneigh%level < pmeta%level) pneigh%refine = 1
-
-                  end if ! neighbor's pointer is associated
-
-                end do ! iface
-              end do ! iside
-            end do ! idir
+            call set_neighbors_refine(pmeta)
 
           end if ! leaf at level n and marked for refinement
 
@@ -786,6 +767,7 @@ module mesh
     use blocks         , only : get_nleafs
     use blocks         , only : refine_block, derefine_block
     use blocks         , only : append_datablock, remove_datablock, link_blocks
+    use blocks         , only : set_neighbors_refine
     use coordinates    , only : minlev, maxlev, toplev, im, jm, km
     use equations      , only : nv
     use error          , only : print_error
@@ -994,68 +976,9 @@ module mesh
 !
         if (pmeta%leaf .and. pmeta%level == l) then
 
-! iterte over all neighbors of the current leaf
+! select all neighbors which lay on lower levels to be refined as well
 !
-          do i = 1, ndims
-            do j = 1, nsides
-              do k = 1, nfaces
-
-! assign a pointer to the current neighbor
-!
-                pneigh => pmeta%neigh(i,j,k)%ptr
-
-! check if the pointer is associated with any block
-!
-                if (associated(pneigh)) then
-
-!=== conditions for blocks selected to be refined
-!
-                  if (pmeta%refine == 1) then
-
-! if the neighbor is set to be derefined, reset its flag (this applies to
-! blocks at the current or lower level)
-!
-                    pneigh%refine = max(0, pneigh%refine)
-
-! if the neighbor is at lower level, always set it to be refined
-!
-                    if (pneigh%level < pmeta%level) pneigh%refine = 1
-
-                  end if ! refine = 1
-
-!=== conditions for blocks which stay at the same level
-!
-                  if (pmeta%refine == 0) then
-
-! if the neighbor lays at lower level and is set to be derefined, cancel its
-! derefinement
-!
-                    if (pneigh%level < pmeta%level)                            &
-                                         pneigh%refine = max(0, pneigh%refine)
-
-                  end if ! refine = 0
-
-!=== conditions for blocks which are selected to be derefined
-!
-                  if (pmeta%refine == -1) then
-
-! if the neighbor is at lower level and is set to be derefined, cancel its
-! derefinement
-!
-                    if (pneigh%level < pmeta%level)                            &
-                                         pneigh%refine = max(0, pneigh%refine)
-
-! if a neighbor is set to be refined, cancel the derefinement of current block
-!
-                    if (pneigh%refine == 1) pmeta%refine = 0
-
-                  end if ! refine = -1
-
-                end if ! associated(pneigh)
-
-              end do ! nfaces
-            end do ! nsides
-          end do ! ndims
+          call set_neighbors_refine(pmeta)
 
         end if ! the leaf at level l
 
