@@ -31,13 +31,25 @@
 !
 module problems
 
+#ifdef PROFILE
+! include external procedures
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
 
-! module variable to store the problem name
+#ifdef PROFILE
+! timer indices
 !
-  character(len=32), save :: problem = "blast"
+  integer, save :: imi, imu
+#endif /* PROFILE */
+
+! pointer to the problem setup subroutine
+!
+  procedure(setup_problem_blast), pointer, save :: setup_problem => null()
 
 ! by default everything is private
 !
@@ -45,7 +57,8 @@ module problems
 
 ! declare public subroutines
 !
-  public :: initialize_problems, setup_problem
+  public :: initialize_problems, finalize_problems
+  public :: setup_problem
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -57,29 +70,81 @@ module problems
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_PROBLEMS:
 ! ------------------------------
 !
 !   Subroutine prepares module PROBLEMS.
 !
+!   Arguments:
+!
+!     verbose - a logical flag turning the information printing;
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine initialize_problems()
+  subroutine initialize_problems(verbose, iret)
 
 ! include external procedures and variables
 !
-    use parameters , only : get_parameter_string
+    use error          , only : print_error
+    use parameters     , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
+! local variables
+!
+    character(len=64)      :: problem_name  = "blast"
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('problems:: initialize', imi)
+    call set_timer('problems:: update'    , imu)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the problem name
 !
-    call get_parameter_string("problem", problem)
+    call get_parameter_string("problem", problem_name)
+
+! associate the setup_problem pointer with the respective problem setup
+! subroutine
+!
+    select case(trim(problem_name))
+
+! general test problems
+!
+    case("blast")
+      setup_problem => setup_problem_blast
+
+    case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
+      setup_problem => setup_problem_kelvin_helmholtz
+
+    case default
+      call print_error("problems::initialize_problems()"                       &
+                     , "Setup subroutine is not implemented for this problem!")
+      iret = 600
+    end select
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -87,56 +152,48 @@ module problems
 !
 !===============================================================================
 !
-! subroutine SETUP_PROBLEM:
-! ------------------------
+! subroutine FINALIZE_PROBLEMS:
+! ----------------------------
 !
-!   Subroutine sets the initial conditions for selected problem.
+!   Subroutine releases memory used by the module.
 !
 !   Arguments:
 !
-!     pdata - pointer to the datablock structure of the currently initialized
-!             block;
-!
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine setup_problem(pdata)
-
-! include external procedures and variables
-!
-    use blocks     , only : block_data
-    use error      , only : print_error
+  subroutine finalize_problems(iret)
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    type(block_data), pointer, intent(inout) :: pdata
+    integer, intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
-! select the setup subroutine depending on the problem name
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
 !
-    select case(problem)
+    call start_timer(imi)
+#endif /* PROFILE */
 
-! general test problems
+! nullify procedure pointers
 !
-    case("blast")
-      call setup_problem_blast(pdata)
+    nullify(setup_problem)
 
-    case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
-      call setup_problem_kelvin_helmholtz(pdata)
-
-    case default
-      call print_error("problems::init_problem()"                              &
-                     , "Setup subroutime is not implemented for this problem!")
-    end select
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine setup_problem
+  end subroutine finalize_problems
 !
 !===============================================================================
 !!
@@ -214,6 +271,12 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare problem constants during the first subroutine call
 !
     if (first) then
@@ -432,6 +495,12 @@ module problems
       end do ! j = 1, jm
     end do ! k = 1, km
 
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_blast
@@ -504,6 +573,12 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare problem constants during the first subroutine call
 !
     if (first) then
@@ -615,6 +690,12 @@ module problems
 
       end do ! j = 1, jm
     end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
