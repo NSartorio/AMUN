@@ -88,7 +88,7 @@ module shapes
 
 ! include external procedures and variables
 !
-    use parameters , only : get_parameter_string
+    use parameters     , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -230,7 +230,7 @@ module shapes
 !
 !   Arguments:
 !
-!     pdata - pointer to the datablock structure of the currently initialized
+!     pdata - pointer to the data block structure of the currently initialized
 !             block;
 !
 !===============================================================================
@@ -277,7 +277,7 @@ module shapes
 !
 !   Arguments:
 !
-!     pdata - pointer to the datablock structure of the currently initialized
+!     pdata - pointer to the data block structure of the currently initialized
 !             block;
 !
 !===============================================================================
@@ -471,7 +471,7 @@ module shapes
 
             q(1:nv,i) = pdata%q(1:nv,i,j,k)
 
-! integrate density or pressure in cells which are crossed by the circule with
+! integrate density or pressure in cells which are crossed by the circle with
 ! the given radius
 !
           else
