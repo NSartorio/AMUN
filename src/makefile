@@ -84,11 +84,12 @@ default: $(name).x
 sources = blocks.F90 boundaries.F90 constants.F90 coordinates.F90 domains.F90  \
           driver.F90 equations.F90 error.F90 evolution.F90 integrals.F90       \
           interpolations.F90 io.F90 mesh.F90 mpitools.F90 parameters.F90       \
-          problems.F90 random.F90 refinement.F90 schemes.F90 timers.F90
+          problems.F90 random.F90 refinement.F90 schemes.F90 shapes.F90        \
+          timers.F90
 objects = blocks.o boundaries.o constants.o coordinates.o domains.o driver.o   \
           equations.o error.o evolution.o integrals.o interpolations.o io.o    \
           mesh.o mpitools.o parameters.o problems.o random.o refinement.o      \
-          schemes.o timers.o
+          schemes.o shapes.o timers.o
 files   = $(sources) makefile make.default license.txt hosts
 
 $(name).x: $(objects)
@@ -130,11 +131,12 @@ coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    integrals.o interpolations.o io.o mesh.o mpitools.o         \
                    parameters.o problems.o random.o refinement.o    \
-                   schemes.o
+                   schemes.o shapes.o
 equations.o      : equations.F90 coordinates.o parameters.o timers.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
-                   equations.o mesh.o mpitools.o parameters.o schemes.o
+                   equations.o mesh.o mpitools.o parameters.o schemes.o        \
+                   shapes.o
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
 integrals.o      : integrals.F90 blocks.o coordinates.o equations.o error.o    \
                    evolution.o mpitools.o parameters.o timers.o
@@ -153,6 +155,7 @@ refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    parameters.o timers.o
 schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o      \
                    timers.o
+shapes.o         : shapes.F90 blocks.o parameters.o timers.o
 random.o         : random.F90 mpitools.o parameters.o
 timers.o         : timers.F90
 

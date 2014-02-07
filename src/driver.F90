@@ -67,6 +67,7 @@ program amun
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement, finalize_refinement
   use schemes       , only : initialize_schemes, finalize_schemes
+  use shapes        , only : initialize_shapes, finalize_shapes
   use timers        , only : initialize_timers, finalize_timers
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
@@ -381,6 +382,10 @@ program amun
 !
   call initialize_problems()
 
+! initialize module SHAPES
+!
+  call initialize_shapes(master, iret)
+
 ! initialize boundaries module and print info
 !
   if (master) then
@@ -622,6 +627,10 @@ program amun
 ! finalize integrals module
 !
   call finalize_integrals()
+
+! finalize module SHAPES
+!
+  call finalize_shapes(iret)
 
 ! finalize the mesh module
 !
