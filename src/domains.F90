@@ -56,6 +56,8 @@ module domains
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_DOMAINS:
 ! -----------------------------
 !
@@ -120,6 +122,8 @@ module domains
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine SETUP_DOMAIN_DEFAULT:
 ! -------------------------------
 !
@@ -133,15 +137,16 @@ module domains
 
 ! include external procedures and variables
 !
-    use blocks     , only : pointer_meta, block_meta, block_data               &
-                          , append_metablock, append_datablock                 &
-                          , link_blocks, metablock_set_leaf                    &
-                          , metablock_set_configuration, metablock_set_level   &
-                          , metablock_set_coordinates, metablock_set_bounds
-    use blocks     , only : nsides, nfaces
-    use boundaries , only : xlbndry, xubndry, ylbndry, yubndry, zlbndry, zubndry
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use coordinates, only : ir, jr, kr, res
+    use blocks         , only : pointer_meta, block_meta, block_data
+    use blocks         , only : append_metablock, append_datablock, link_blocks
+    use blocks         , only : metablock_set_leaf, metablock_set_level
+    use blocks         , only : metablock_set_configuration
+    use blocks         , only : metablock_set_coordinates, metablock_set_bounds
+    use blocks         , only : nsides, nfaces
+    use boundaries     , only : xlbndry, ylbndry, zlbndry
+    use boundaries     , only : xubndry, yubndry, zubndry
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : ir, jr, kr
 
 ! local variables are not implicit by default
 !
@@ -149,7 +154,7 @@ module domains
 
 ! local variables
 !
-    integer :: i, j, k, n, p, il, jl, kl
+    integer :: i, j, k, n, p, ic, jc, kc
     real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
 
 ! local arrays
@@ -184,21 +189,21 @@ module domains
 !
     cfg(1:ir,1:jr:2,1:kr:2) = 12
 
-    if (jr .gt. 1) then
+    if (jr > 1) then
       cfg(1:ir,2:jr:2,1:kr:2) = 43
       cfg(  ir,1:jr  ,1:kr:2) = 13
     end if
 
-    if (kr .gt. 1) then
+    if (kr > 1) then
       cfg(1:ir,1:jr:2,2:kr:2) = 65
-      if (jr .gt. 1) then
+      if (jr > 1) then
         cfg(1:ir,2:jr:2,2:kr:2) = 78
         cfg(  ir,1:jr  ,2:kr:2) = 75
       end if
-      if (ir .eq. 1 .or. mod(jr,2) .eq. 1) then
+      if (ir == 1 .or. mod(jr,2) == 1) then
         cfg(  ir,  jr  ,1:kr  ) = 15
       else
-        cfg(  1       ,  jr  ,1:kr  ) = 48
+        cfg(  1 ,  jr  ,1:kr  ) = 48
       end if
     end if
 
@@ -216,11 +221,11 @@ module domains
 
     p = 1
     do k = 1, kr
-      if (del(3) .eq. 1) loc(3) = loc(3) + del(3)
+      if (del(3) == 1) loc(3) = loc(3) + del(3)
       do j = 1, jr
-        if (del(2) .eq. 1) loc(2) = loc(2) + del(2)
+        if (del(2) == 1) loc(2) = loc(2) + del(2)
         do i = 1, ir
-          if (del(1) .eq. 1) loc(1) = loc(1) + del(1)
+          if (del(1) == 1) loc(1) = loc(1) + del(1)
 
 ! append a new metablock
 !
@@ -236,12 +241,12 @@ module domains
 !
           p = p + 1
 
-          if (del(1) .eq. -1) loc(1) = loc(1) + del(1)
+          if (del(1) == -1) loc(1) = loc(1) + del(1)
         end do
-        if (del(2) .eq. -1) loc(2) = loc(2) + del(2)
+        if (del(2) == -1) loc(2) = loc(2) + del(2)
         del(1) = - del(1)
       end do
-      if (del(3) .eq. -1) loc(3) = loc(3) + del(3)
+      if (del(3) == -1) loc(3) = loc(3) + del(3)
       del(2) = - del(2)
     end do
 
@@ -263,34 +268,34 @@ module domains
 
 ! claculate the block position along Z
 !
-      kl  = (k - 1) * res(1,3)
+      kc  = k - 1
 
 ! calculate the Z bounds
 !
-      zmn = zmin + (k - 1) * zl
-      zmx = zmin +  k      * zl
+      zmn = zmin + kc * zl
+      zmx = zmin + k  * zl
 
       do j = 1, jr
 
 ! claculate the block position along Y
 !
-        jl  = (j - 1) * res(1,2)
+        jc  = j - 1
 
 ! calculate the Y bounds
 !
-        ymn = ymin + (j - 1) * yl
-        ymx = ymin +  j      * yl
+        ymn = ymin + jc * yl
+        ymx = ymin + j  * yl
 
         do i = 1, ir
 
 ! claculate the block position along Y
 !
-          il  = (i - 1) * res(1,1)
+          ic  = i - 1
 
 ! calculate the Z bounds
 !
-          xmn = xmin + (i - 1) * xl
-          xmx = xmin +  i      * xl
+          xmn = xmin + ic * xl
+          xmx = xmin + i  * xl
 
 ! assign a pointer
 !
@@ -306,7 +311,7 @@ module domains
 
 ! set block coordinates
 !
-          call metablock_set_coordinates(pmeta, il, jl, kl)
+          call metablock_set_coordinates(pmeta, ic, jc, kc)
 
 ! set the bounds
 !
@@ -344,13 +349,13 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (xlbndry .eq. 'periodic' .and. xubndry .eq. 'periodic') then
+    if (xlbndry == 'periodic' .and. xubndry == 'periodic') then
       do k = 1, kr
         do j = 1, jr
 
 ! assign pointers
 !
-          pmeta => block_array(      1 ,j,k)%ptr
+          pmeta => block_array( 1,j,k)%ptr
           pnext => block_array(ir,j,k)%ptr
 
 ! assign their neighbor pointers
@@ -390,13 +395,13 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (ylbndry .eq. 'periodic' .and. yubndry .eq. 'periodic') then
+    if (ylbndry == 'periodic' .and. yubndry == 'periodic') then
       do k = 1, kr
         do i = 1, ir
 
 ! assign pointers
 !
-          pmeta => block_array(i,      1 ,k)%ptr
+          pmeta => block_array(i, 1,k)%ptr
           pnext => block_array(i,jr,k)%ptr
 
 ! assign their neighbor pointers
@@ -408,8 +413,8 @@ module domains
         end do
       end do
     end if
-#if NDIMS == 3
 
+#if NDIMS == 3
 ! assign boundaries along the Z direction
 !
     do k = 1, kr - 1
@@ -437,13 +442,13 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (zlbndry .eq. 'periodic' .and. zubndry .eq. 'periodic') then
+    if (zlbndry == 'periodic' .and. zubndry == 'periodic') then
       do j = 1, jr
         do i = 1, ir
 
 ! assign pointers
 !
-          pmeta => block_array(i,j,      1 )%ptr
+          pmeta => block_array(i,j, 1)%ptr
           pnext => block_array(i,j,kr)%ptr
 
 ! assign their neighbor pointers

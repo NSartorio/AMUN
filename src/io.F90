@@ -2987,7 +2987,7 @@ module io
     use error , only : print_error
     use hdf5  , only : hid_t, hsize_t
     use hdf5  , only : h5gcreate_f, h5gclose_f
-    use coordinates, only : adx, ady, adz, res
+    use coordinates, only : adx, ady, adz
 
 ! declare variables
 !
@@ -3086,7 +3086,6 @@ module io
 !
         call write_vector_integer_h5(gid, 'levels', cm(1), lev)
         call write_vector_integer_h5(gid, 'refine', cm(1), ref)
-        call write_array2_integer_h5(gid, 'blkres', rm(:), res(1:maxlev,1:NDIMS))
         call write_array2_integer_h5(gid, 'coords', cm(:), cor)
         call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
         call write_vector_double_h5 (gid, 'dx'    , am(1), adx(1:maxlev))

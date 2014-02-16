@@ -63,10 +63,11 @@ program amun
 #endif /* MPI */
   use parameters    , only : get_parameter_integer, get_parameter_real         &
                            , get_parameter_string
-  use problems      , only : initialize_problems
+  use problems      , only : initialize_problems, finalize_problems
   use random        , only : initialize_random, finalize_random
   use refinement    , only : initialize_refinement, finalize_refinement
   use schemes       , only : initialize_schemes, finalize_schemes
+  use shapes        , only : initialize_shapes, finalize_shapes
   use timers        , only : initialize_timers, finalize_timers
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
@@ -379,14 +380,18 @@ program amun
 
 ! initialize module PROBLEMS
 !
-  call initialize_problems()
+  call initialize_problems(master, iret)
+
+! initialize module SHAPES
+!
+  call initialize_shapes(master, iret)
 
 ! initialize boundaries module and print info
 !
   if (master) then
     write (*,*)
-    write (*,"(1x,a)"         ) "Snapshots:"
-    write (*,"(4x,a22,1x,'='1x,a)") "precise snapshot times", trim(prec_snap)
+    write (*,"(1x,a)"              ) "Snapshots:"
+    write (*,"(4x,a22,1x,'=',1x,a)") "precise snapshot times", trim(prec_snap)
   end if
 
 ! initialize module IO
@@ -622,6 +627,14 @@ program amun
 ! finalize integrals module
 !
   call finalize_integrals()
+
+! finalize module PROBLEMS
+!
+  call finalize_problems(iret)
+
+! finalize module SHAPES
+!
+  call finalize_shapes(iret)
 
 ! finalize the mesh module
 !

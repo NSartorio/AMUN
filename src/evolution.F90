@@ -700,6 +700,7 @@ module evolution
 ! include external procedures
 !
     use equations     , only : update_primitive_variables
+    use shapes        , only : update_shapes
 
 ! include external variables
 !
@@ -729,9 +730,13 @@ module evolution
 !
       pmeta => pdata%meta
 
-! convert conserved variables to primitive ones for the current block
+! convert conserved variables to primitive ones for the current block and
+! update shapes if necessary
 !
-      if (pmeta%update) call update_primitive_variables(pdata%u, pdata%q)
+      if (pmeta%update) then
+        call update_primitive_variables(pdata%u, pdata%q)
+        call update_shapes(pdata)
+      end if
 
 ! assign pointer to the next block
 !

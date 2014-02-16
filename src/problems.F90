@@ -31,13 +31,25 @@
 !
 module problems
 
+#ifdef PROFILE
+! include external procedures
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
 
-! module variable to store the problem name
+#ifdef PROFILE
+! timer indices
 !
-  character(len=32), save :: problem = "blast"
+  integer, save :: imi, imu
+#endif /* PROFILE */
+
+! pointer to the problem setup subroutine
+!
+  procedure(setup_problem_blast), pointer, save :: setup_problem => null()
 
 ! by default everything is private
 !
@@ -45,7 +57,8 @@ module problems
 
 ! declare public subroutines
 !
-  public :: initialize_problems, setup_problem
+  public :: initialize_problems, finalize_problems
+  public :: setup_problem
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -57,29 +70,84 @@ module problems
 !!
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine INITIALIZE_PROBLEMS:
 ! ------------------------------
 !
 !   Subroutine prepares module PROBLEMS.
 !
+!   Arguments:
+!
+!     verbose - a logical flag turning the information printing;
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine initialize_problems()
+  subroutine initialize_problems(verbose, iret)
 
 ! include external procedures and variables
 !
-    use parameters , only : get_parameter_string
+    use error          , only : print_error
+    use parameters     , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+
+! local variables
+!
+    character(len=64)      :: problem_name  = "blast"
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('problems:: initialize', imi)
+    call set_timer('problems:: update'    , imu)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the problem name
 !
-    call get_parameter_string("problem", problem)
+    call get_parameter_string("problem", problem_name)
+
+! associate the setup_problem pointer with the respective problem setup
+! subroutine
+!
+    select case(trim(problem_name))
+
+! general test problems
+!
+    case("blast")
+      setup_problem => setup_problem_blast
+
+    case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
+      setup_problem => setup_problem_kelvin_helmholtz
+
+    case("reconnection")
+      setup_problem => setup_problem_reconnection
+
+    case default
+      call print_error("problems::initialize_problems()"                       &
+                     , "Setup subroutine is not implemented for this problem!")
+      iret = 600
+    end select
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -87,63 +155,55 @@ module problems
 !
 !===============================================================================
 !
-! subroutine SETUP_PROBLEM:
-! ------------------------
+! subroutine FINALIZE_PROBLEMS:
+! ----------------------------
 !
-!   Subroutine sets the initial conditions for selected problem.
+!   Subroutine releases memory used by the module.
 !
 !   Arguments:
 !
-!     pdata - pointer to the datablock structure of the currently initialized
-!             block;
-!
+!     iret    - an integer flag for error return value;
 !
 !===============================================================================
 !
-  subroutine setup_problem(pdata)
-
-! include external procedures and variables
-!
-    use blocks     , only : block_data
-    use error      , only : print_error
+  subroutine finalize_problems(iret)
 
 ! local variables are not implicit by default
 !
     implicit none
 
-! input arguments
+! subroutine arguments
 !
-    type(block_data), pointer, intent(inout) :: pdata
+    integer, intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
-! select the setup subroutine depending on the problem name
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
 !
-    select case(problem)
+    call start_timer(imi)
+#endif /* PROFILE */
 
-! general test problems
+! nullify procedure pointers
 !
-    case("blast")
-      call setup_problem_blast(pdata)
+    nullify(setup_problem)
 
-! specific problems
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
 !
-    case("reconnection")
-      call setup_problem_reconnection(pdata)
-
-    case default
-      call print_error("problems::init_problem()"                              &
-                     , "Setup subroutime is not implemented for this problem!")
-    end select
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine setup_problem
+  end subroutine finalize_problems
 !
 !===============================================================================
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
+!===============================================================================
+!
 !===============================================================================
 !
 ! subroutine SETUP_PROBLEM_BLAST:
@@ -214,6 +274,12 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare problem constants during the first subroutine call
 !
     if (first) then
@@ -432,9 +498,211 @@ module problems
       end do ! j = 1, jm
     end do ! k = 1, km
 
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_blast
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_KELVIN_HELMHOLTZ:
+! -----------------------------------------
+!
+!   Subroutine sets the initial conditions for the Kelvin-Helmholtz instability
+!   problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_kelvin_helmholtz(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use constants  , only : d2r
+    use coordinates, only : im, jm, km
+    use coordinates, only : ay, ady
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real
+    use random     , only : randomn
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: ycut   = 2.50d-01
+    real(kind=8), save :: dens   = 1.00d+00
+    real(kind=8), save :: drat   = 2.00d+00
+    real(kind=8), save :: pres   = 2.50d+00
+    real(kind=8), save :: vamp   = 1.00d+00
+    real(kind=8), save :: vper   = 1.00d-02
+    real(kind=8), save :: buni   = 1.00d+00
+    real(kind=8), save :: bgui   = 0.00d+00
+    real(kind=8), save :: angle  = 0.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: yl, yu, dy, dyh
+    real(kind=8)  :: sn, cs
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("ycut"  , ycut  )
+      call get_parameter_real("dens"  , dens  )
+      call get_parameter_real("drat"  , drat  )
+      call get_parameter_real("pres"  , pres  )
+      call get_parameter_real("vamp"  , vamp  )
+      call get_parameter_real("vper"  , vper  )
+      call get_parameter_real("buni"  , buni  )
+      call get_parameter_real("bgui"  , bgui  )
+      call get_parameter_real("angle" , angle )
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+
+! calculate mesh intervals and areas
+!
+    dy   = ady(pdata%meta%level)
+    dyh  = 0.5d+00 * dy
+
+! set the ambient density and pressure
+!
+    q(idn,:) = dens
+    if (ipr > 0) q(ipr,:) = pres
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+! calculate the orientation angles
+!
+      sn = sin(d2r * angle)
+      cs = sqrt(1.0d+00 - sn * sn)
+
+! set magnetic field components
+!
+      q(ibx,:) = buni * cs
+      q(iby,:) = buni * sn
+      q(ibz,:) = bgui
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! calculate the corner Y coordinates
+!
+        yl = abs(y(j)) - dyh
+        yu = abs(y(j)) + dyh
+
+! set the primitive variables for two regions
+!
+        if (yu <= ycut) then
+          q(idn,1:im) =   dens * drat
+          q(ivx,1:im) =   vamp
+        else if (yl >= ycut) then
+          q(idn,1:im) =   dens
+          q(ivx,1:im) = - vamp
+        else
+          q(idn,1:im) = dens * ((yu - ycut) * drat + (ycut - yl)) / dy
+          q(ivx,1:im) = vamp * ((yu - ycut)        - (ycut - yl)) / dy
+        end if
+
+! reset remaining velocity components
+!
+        q(ivy,1:im) = 0.0d+00
+        q(ivz,1:im) = 0.0d+00
+
+! set the pressure
+!
+        if (ipr > 0) q(ipr,:) = pres
+
+! add a random seed velocity component
+!
+        do i = 1, im
+          q(ivx,i) = q(ivx,i) + vper * randomn()
+          q(ivy,i) = q(ivy,i) + vper * randomn()
+#if NDIMS == 3
+          q(ivz,i) = q(ivz,i) + vper * randomn()
+#endif /* NDIMS == 3 */
+        end do
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_kelvin_helmholtz
 !
 !===============================================================================
 !

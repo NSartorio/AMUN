@@ -45,7 +45,7 @@ module timers
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
   integer(kind=4)  , dimension(ntimers), save :: tcount, torder
   integer(kind=8)                      , save :: ticks, tbegin
-  real   (kind=8)                      , save :: conv
+  real   (kind=8)                      , save :: conv    = 1.0d+00
 
 ! by default everything is private
 !
@@ -110,7 +110,7 @@ module timers
 
 ! prepare the conversion factor
 !
-    conv           = 1.0d+00 / max(1, ticks)
+    if (ticks > 0) conv = 1.0d+00 / ticks
 
 !-------------------------------------------------------------------------------
 !
@@ -311,7 +311,7 @@ module timers
 !
 ! estimate the accounted time for the specified timer
 !
-    get_timer = conv * max(0, times(timer))
+    get_timer = max(0.0d+00, conv * times(timer))
 
 ! return the value
 !
@@ -476,7 +476,7 @@ module timers
 
 ! estimate the total execution time
 !
-    get_timer_total = conv * max(0, tend - tbegin)
+    get_timer_total = max(0.0d+00, conv * (tend - tbegin))
 
 ! return the value
 !

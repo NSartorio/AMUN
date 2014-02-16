@@ -150,13 +150,11 @@ module blocks
                                  !
     integer(kind=4)             :: refine
 
-                                 ! the position of the block in its siblings
-                                 ! group
+                                 ! the block position in its parent
                                  !
     integer(kind=4)             :: pos(ndims)
 
-                                 ! the coordinate of the lower corner of the
-                                 ! block in the effective resolution units
+                                 ! the block global coordinates at its level
                                  !
     integer(kind=4)             :: coords(ndims)
 
@@ -195,22 +193,22 @@ module blocks
                                  ! a pointer to the current conserved variable
                                  ! array
                                  !
-    real, dimension(:,:,:,:)  , pointer     :: u
+    real(kind=8), dimension(:,:,:,:)  , pointer     :: u
 
                                  ! an allocatable arrays to store all conserved
                                  ! variables (required two for Runge-Kutta
                                  ! temporal integration methods)
                                  !
-    real, dimension(:,:,:,:)  , allocatable :: u0, u1
+    real(kind=8), dimension(:,:,:,:)  , allocatable :: u0, u1
 
                                  ! an allocatable array to store all primitive
                                  ! variables
                                  !
-    real, dimension(:,:,:,:)  , allocatable :: q
+    real(kind=8), dimension(:,:,:,:)  , allocatable :: q
 
                                  ! an allocatable array to store all fluxes
                                  !
-    real, dimension(:,:,:,:,:), allocatable :: f
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: f
 
   end type block_data
 
@@ -273,6 +271,7 @@ module blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: set_blocks_update
+  public :: set_neighbors_refine
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
@@ -825,7 +824,7 @@ module blocks
 !
     pmeta%pos(:)    = -1
 
-! initialize the effective coordinates
+! initialize the block coordinates in the current level
 !
     pmeta%coords(:) = 0
 
@@ -1220,12 +1219,11 @@ module blocks
 !   Arguments:
 !
 !     pmeta - a pointer to meta block for which children will be created;
-!     res   - the resolution of the block;
 !     fdata - a flag indicating if data blocks for children should be allocated;
 !
 !===============================================================================
 !
-  subroutine refine_block(pmeta, res, fdata)
+  subroutine refine_block(pmeta, fdata)
 
 ! import external procedures
 !
@@ -1238,7 +1236,6 @@ module blocks
 ! subroutine arguments
 !
     type(block_meta), pointer    , intent(inout) :: pmeta
-    integer(kind=4), dimension(3), intent(in)    :: res
     logical                      , intent(in)    :: fdata
 
 ! pointers
@@ -1248,13 +1245,15 @@ module blocks
 
 ! local variables
 !
-    integer :: p, q, i, j, k, ic, jc, kc
-    real    :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
+    logical, save :: first = .true.
+    integer       :: p, q, i, j, k, ic, jc, kc, cf
+    real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
 ! local arrays
 !
-    integer, dimension(nchildren)           :: config, order
-    integer, dimension(ndims,nsides,nfaces) :: set
+    integer, dimension(0:79,nchildren)     , save :: order
+    integer, dimension(0:79,nchildren)     , save :: config
+    integer, dimension(ndims,nsides,nfaces), save :: set
 !
 !-------------------------------------------------------------------------------
 !
@@ -1263,6 +1262,87 @@ module blocks
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! prepare some arrays
+!
+    if (first) then
+
+! prepare order array
+!
+      do p = 1, nchildren
+        order ( :,p) = p
+      end do
+#if NDIMS == 2
+      order ( 0,:) = (/  1,  2,  3,  4 /)
+      order (12,:) = (/  1,  3,  4,  2 /)
+      order (13,:) = (/  1,  2,  4,  3 /)
+      order (42,:) = (/  4,  3,  1,  2 /)
+      order (43,:) = (/  4,  2,  1,  3 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      order ( 0,:) = (/  1,  2,  3,  4,  5,  6,  7,  8 /)
+      order (12,:) = (/  1,  3,  7,  5,  6,  8,  4,  2 /)
+      order (13,:) = (/  1,  5,  6,  2,  4,  8,  7,  3 /)
+      order (15,:) = (/  1,  2,  4,  3,  7,  8,  6,  5 /)
+      order (42,:) = (/  4,  8,  7,  3,  1,  5,  6,  2 /)
+      order (43,:) = (/  4,  2,  6,  8,  7,  5,  1,  3 /)
+      order (48,:) = (/  4,  3,  1,  2,  6,  5,  7,  8 /)
+      order (62,:) = (/  6,  5,  7,  8,  4,  3,  1,  2 /)
+      order (65,:) = (/  6,  8,  4,  2,  1,  3,  7,  5 /)
+      order (68,:) = (/  6,  2,  1,  5,  7,  3,  4 , 8 /)
+      order (73,:) = (/  7,  8,  6,  5,  1,  2,  4,  3 /)
+      order (75,:) = (/  7,  3,  4,  8,  6,  2,  1,  5 /)
+      order (78,:) = (/  7,  5,  1,  3,  4,  2,  6,  8 /)
+#endif /* NDIMS == 3 */
+
+! prepare config array
+!
+      config( :,:) = 0
+#if NDIMS == 2
+      config( 0,:) = (/  0,  0,  0,  0 /)
+      config(12,:) = (/ 13, 12, 12, 42 /)
+      config(13,:) = (/ 12, 13, 13, 43 /)
+      config(42,:) = (/ 43, 42, 42, 12 /)
+      config(43,:) = (/ 42, 43, 43, 13 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      config( 0,:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
+      config(12,:) = (/ 13, 15, 15, 78, 78, 62, 62, 42 /)
+      config(13,:) = (/ 15, 12, 12, 68, 68, 43, 43, 73 /)
+      config(15,:) = (/ 12, 13, 13, 48, 48, 75, 75, 65 /)
+      config(42,:) = (/ 48, 43, 43, 75, 75, 12, 12, 62 /)
+      config(43,:) = (/ 42, 48, 48, 65, 65, 73, 73, 13 /)
+      config(48,:) = (/ 43, 42, 42, 15, 15, 68, 68, 78 /)
+      config(62,:) = (/ 65, 68, 68, 73, 73, 42, 42, 12 /)
+      config(65,:) = (/ 68, 62, 62, 43, 43, 15, 15, 75 /)
+      config(68,:) = (/ 62, 65, 65, 13, 13, 78, 78, 48 /)
+      config(73,:) = (/ 78, 75, 75, 62, 62, 13, 13, 43 /)
+      config(75,:) = (/ 73, 78, 78, 42, 42, 65, 65, 15 /)
+      config(78,:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
+#endif /* NDIMS == 3 */
+
+! prepare set array
+!
+#if NDIMS == 2
+      set(1,1,:) = (/ 1, 3 /)
+      set(1,2,:) = (/ 2, 4 /)
+      set(2,1,:) = (/ 1, 2 /)
+      set(2,2,:) = (/ 3, 4 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      set(1,1,:) = (/ 1, 3, 5, 7 /)
+      set(1,2,:) = (/ 2, 4, 6, 8 /)
+      set(2,1,:) = (/ 1, 2, 5, 6 /)
+      set(2,2,:) = (/ 3, 4, 7, 8 /)
+      set(3,1,:) = (/ 1, 2, 3, 4 /)
+      set(3,2,:) = (/ 5, 6, 7, 8 /)
+#endif /* NDIMS == 3 */
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if
 
 ! check if pointer is associated
 !
@@ -1276,105 +1356,7 @@ module blocks
 !!
 ! set corresponding configuration of the new blocks
 !
-      select case(pmeta%conf)
-      case(0)
-
-#if NDIMS == 2
-        config(:) = (/ 0, 0, 0, 0 /)
-        order (:) = (/ 1, 2, 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 0, 0, 0, 0, 0, 0, 0, 0 /)
-        order (:) = (/ 1, 2, 3, 4, 5, 6, 7, 8 /)
-#endif /* NDIMS == 3 */
-
-      case(12)
-
-#if NDIMS == 2
-        config(:) = (/ 13, 12, 12, 42 /)
-        order (:) = (/  1,  3,  4,  2 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 13, 15, 15, 78, 78, 62, 62, 42 /)
-        order (:) = (/  1,  3,  7,  5,  6,  8,  4,  2 /)
-#endif /* NDIMS == 3 */
-
-      case(13)
-
-#if NDIMS == 2
-        config(:) = (/ 12, 13, 13, 43 /)
-        order (:) = (/  1,  2,  4,  3 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 15, 12, 12, 68, 68, 43, 43, 73 /)
-        order (:) = (/  1,  5,  6,  2,  4,  8,  7,  3 /)
-
-      case(15)
-
-        config(:) = (/ 12, 13, 13, 48, 48, 75, 75, 65 /)
-        order (:) = (/  1,  2,  4,  3,  7,  8,  6,  5 /)
-#endif /* NDIMS == 3 */
-
-      case(42)
-
-#if NDIMS == 2
-        config(:) = (/ 43, 42, 42, 12 /)
-        order (:) = (/  4,  3,  1,  2 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 48, 43, 43, 75, 75, 12, 12, 62 /)
-        order (:) = (/  4,  8,  7,  3,  1,  5,  6,  2 /)
-#endif /* NDIMS == 3 */
-
-      case(43)
-
-#if NDIMS == 2
-        config(:) = (/ 42, 43, 43, 13 /)
-        order (:) = (/  4,  2,  1,  3 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-        config(:) = (/ 42, 48, 48, 65, 65, 73, 73, 13 /)
-        order (:) = (/  4,  2,  6,  8,  7,  5,  1,  3 /)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-      case(48)
-
-        config(:) = (/ 43, 42, 42, 15, 15, 68, 68, 78 /)
-        order (:) = (/  4,  3,  1,  2,  6,  5,  7,  8 /)
-
-      case(62)
-
-        config(:) = (/ 65, 68, 68, 73, 73, 42, 42, 12 /)
-        order (:) = (/  6,  5,  7,  8,  4,  3,  1,  2 /)
-
-      case(65)
-
-        config(:) = (/ 68, 62, 62, 43, 43, 15, 15, 75 /)
-        order (:) = (/  6,  8,  4,  2,  1,  3,  7,  5 /)
-
-      case(68)
-
-        config(:) = (/ 62, 65, 65, 13, 13, 78, 78, 48 /)
-        order (:) = (/  6,  2,  1,  5,  7,  3,  4 , 8 /)
-
-      case(73)
-
-        config(:) = (/ 78, 75, 75, 62, 62, 13, 13, 43 /)
-        order (:) = (/  7,  8,  6,  5,  1,  2,  4,  3 /)
-
-      case(75)
-
-        config(:) = (/ 73, 78, 78, 42, 42, 65, 65, 15 /)
-        order (:) = (/  7,  3,  4,  8,  6,  2,  1,  5 /)
-
-      case(78)
-
-        config(:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
-        order (:) = (/  7,  5,  1,  3,  4,  2,  6,  8 /)
-#endif /* NDIMS == 3 */
-
-      end select
+      cf  = pmeta%conf
 
 ! calculate sizes of the child blocks
 !
@@ -1400,12 +1382,12 @@ module blocks
 
 ! set the child configuration number
 !
-        call metablock_set_configuration(pchild, config(p))
+        call metablock_set_configuration(pchild, config(cf,p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
 !
-        pmeta%child(order(p))%ptr => pchild
+        pmeta%child(order(cf,p))%ptr => pchild
 
       end do ! nchildren
 
@@ -1446,10 +1428,10 @@ module blocks
 
 ! calculate the block coordinates in effective resolution units
 !
-        ic  = pmeta%coords(1) + i * res(1)
-        jc  = pmeta%coords(2) + j * res(2)
+        ic  = 2 * pmeta%coords(1) + i
+        jc  = 2 * pmeta%coords(2) + j
 #if NDIMS == 3
-        kc  = pmeta%coords(3) + k * res(3)
+        kc  = 2 * pmeta%coords(3) + k
 #endif /* NDIMS == 3 */
 
 ! calculate block bounds
@@ -1666,23 +1648,6 @@ module blocks
 
 !! UPDATE NEIGHBORS AND EXTERNAL NEIGHBORS OF CHILDREN
 !!
-! prepare set array
-!
-#if NDIMS == 2
-      set(1,1,:) = (/ 1, 3 /)
-      set(1,2,:) = (/ 2, 4 /)
-      set(2,1,:) = (/ 1, 2 /)
-      set(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      set(1,1,:) = (/ 1, 3, 5, 7 /)
-      set(1,2,:) = (/ 2, 4, 6, 8 /)
-      set(2,1,:) = (/ 1, 2, 5, 6 /)
-      set(2,2,:) = (/ 3, 4, 7, 8 /)
-      set(3,1,:) = (/ 1, 2, 3, 4 /)
-      set(3,2,:) = (/ 5, 6, 7, 8 /)
-#endif /* NDIMS == 3 */
-
 ! set pointers to neighbors and update neighbors' pointers
 !
       do i = 1, ndims
@@ -1747,7 +1712,7 @@ module blocks
 
 ! mark all neighbors to be updated as well
 !
-      call neighbors_set_update(pmeta)
+      call set_neighbors_update(pmeta)
 
 !! ASSOCIATE DATA BLOCKS IF NECESSARY
 !!
@@ -1954,7 +1919,7 @@ module blocks
 
 ! mark all neighbors to be updated as well
 !
-    call neighbors_set_update(pmeta)
+    call set_neighbors_update(pmeta)
 
 #ifdef PROFILE
 ! stop accounting time for the block derefinement
@@ -2652,6 +2617,49 @@ module blocks
   end subroutine metablock_unset_update
 !
 !===============================================================================
+!
+! subroutine SET_NEIGHBORS_REFINE:
+! -------------------------------
+!
+!   Subroutine marks all neighbors (including edge and corner ones) of
+!   the meta block pointed by the input argument to be refined if they
+!   fell under some certain conditions.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the refined meta block;
+!
+!===============================================================================
+!
+  subroutine set_neighbors_refine(pmeta)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta
+
+! local pointers
+!
+    procedure(reset_neighbors_update), pointer :: pprocedure
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the procedure pointer
+!
+    pprocedure => reset_neighbors_refinement
+
+! iterate over all neighbors and coll pprocedure
+!
+    call iterate_over_neighbors(pmeta, pprocedure)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_neighbors_refine
+!
+!===============================================================================
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
@@ -2884,19 +2892,19 @@ module blocks
 !
 !===============================================================================
 !
-! subroutine NEIGHBORDS_SET_UPDATE:
-! --------------------------------
+! subroutine SET_NEIGHBORS_UPDATE:
+! -------------------------------
 !
-!   Subroutine marks all the neighbors (including edge and corner ones) of
-!   the meta block pointed by the input argument to be updated.
+!   Subroutine marks all neighbors (including edge and corner ones) of
+!   the meta block pointed by the input argument to be updated too.
 !
 !   Arguments:
 !
-!     pmeta    - a pointer to the updated meta block;
+!     pmeta    - a pointer to the refined meta block;
 !
 !===============================================================================
 !
-  subroutine neighbors_set_update(pmeta)
+  subroutine set_neighbors_update(pmeta)
 
 ! local variables are not implicit by default
 !
@@ -2908,7 +2916,157 @@ module blocks
 
 ! local pointers
 !
-    type(block_meta), pointer                :: pneigh
+    procedure(reset_neighbors_update), pointer :: pprocedure
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the procedure pointer
+!
+    pprocedure => reset_neighbors_update
+
+! iterate over all neighbors and coll pprocedure
+!
+    call iterate_over_neighbors(pmeta, pprocedure)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine set_neighbors_update
+!
+!===============================================================================
+!
+! subroutine RESET_NEIGHBORS_UPDATE:
+! ---------------------------------
+!
+!   Subroutine set the neighbor to be updated as well.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the refined meta block;
+!     pneigh   - a pointer to the neighbor meta block;
+!
+!===============================================================================
+!
+  subroutine reset_neighbors_update(pmeta, pneigh)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta, pneigh
+!
+!-------------------------------------------------------------------------------
+!
+! set the neighbor to be updated
+!
+    call metablock_set_update(pneigh)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reset_neighbors_update
+!
+!===============================================================================
+!
+! subroutine RESET_NEIGHBORS_REFINEMENT:
+! -------------------------------------
+!
+!   Subroutine checks the level of the neighbor block and depending on
+!   the refinement flags of both block resets it to the correct value.
+!
+!   Arguments:
+!
+!     pmeta    - a pointer to the refined meta block;
+!     pneigh   - a pointer to the neighbor meta block;
+!
+!===============================================================================
+!
+  subroutine reset_neighbors_refinement(pmeta, pneigh)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta, pneigh
+!
+!-------------------------------------------------------------------------------
+!
+!=== conditions for blocks selected to be refined
+!
+    if (pmeta%refine == 1) then
+
+! if the neighbor is set to be derefined, reset its flag (this applies to
+! blocks at the current or lower level)
+!
+      pneigh%refine = max(0, pneigh%refine)
+
+! if the neighbor is at lower level, always set it to be refined
+!
+      if (pneigh%level < pmeta%level) pneigh%refine = 1
+
+    end if ! refine = 1
+
+!=== conditions for blocks which stay at the same level
+!
+    if (pmeta%refine == 0) then
+
+! if the neighbor lays at lower level and is set to be derefined, cancel its
+! derefinement
+!
+      if (pneigh%level < pmeta%level) pneigh%refine = max(0, pneigh%refine)
+
+    end if ! refine = 0
+
+!=== conditions for blocks which are selected to be derefined
+!
+    if (pmeta%refine == -1) then
+
+! if the neighbor is at lower level and is set to be derefined, cancel its
+! derefinement
+!
+      if (pneigh%level < pmeta%level) pneigh%refine = max(0, pneigh%refine)
+
+! if a neighbor is set to be refined, cancel the derefinement of current block
+!
+      if (pneigh%refine == 1) pmeta%refine = 0
+
+    end if ! refine = -1
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reset_neighbors_refinement
+!
+!===============================================================================
+!
+! subroutine ITERATE_OVER_NEIGHBORS:
+! ---------------------------------
+!
+!   Subroutine iterates over all neighbors of the meta block (including edge
+!   and corner ones) and executes a subroutine provided by the pointer.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the meta block which neighbors are iterated over;
+!     pproc - a pointer to the subroutine called with each pair (pmeta, pneigh);
+!
+!===============================================================================
+!
+  subroutine iterate_over_neighbors(pmeta, pprocedure)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta)                 , pointer, intent(inout) :: pmeta
+    procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
+
+! local pointers
+!
+    type(block_meta), pointer :: pneigh
 !
 !-------------------------------------------------------------------------------
 !
@@ -2921,11 +3079,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -2933,11 +3091,11 @@ module blocks
 !
     pneigh => pmeta%neigh(3,1,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,1,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -2945,15 +3103,15 @@ module blocks
 !
     pneigh => pmeta%neigh(2,1,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,1,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(1,1,4)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -2964,11 +3122,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,2,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,1,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -2976,11 +3134,11 @@ module blocks
 !
     pneigh => pmeta%neigh(3,1,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -2988,15 +3146,15 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,1,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(2,2,4)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3007,11 +3165,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3019,11 +3177,11 @@ module blocks
 !
     pneigh => pmeta%neigh(3,1,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,2,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3031,15 +3189,15 @@ module blocks
 !
     pneigh => pmeta%neigh(2,2,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,1,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(1,2,3)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3050,11 +3208,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,1,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,2,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3062,11 +3220,11 @@ module blocks
 !
     pneigh => pmeta%neigh(3,1,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3074,15 +3232,15 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,1,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(2,1,3)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3093,11 +3251,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,2,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3105,11 +3263,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,1,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,1,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3117,15 +3275,15 @@ module blocks
 !
     pneigh => pmeta%neigh(3,2,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(1,1,2)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3136,11 +3294,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,2,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,2,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3148,11 +3306,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3160,15 +3318,15 @@ module blocks
 !
     pneigh => pmeta%neigh(3,2,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,1,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(2,2,2)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3179,11 +3337,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,2,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3191,11 +3349,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,2,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,2,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3203,15 +3361,15 @@ module blocks
 !
     pneigh => pmeta%neigh(3,2,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(1,2,1)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3222,11 +3380,11 @@ module blocks
 !
     pneigh => pmeta%neigh(2,1,4)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(3,2,4)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3234,11 +3392,11 @@ module blocks
 !
     pneigh => pmeta%neigh(3,2,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(1,2,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3246,15 +3404,15 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,3)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,3)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
 
         pneigh => pneigh%neigh(3,2,3)%ptr
         if (associated(pneigh)) then
-          call metablock_set_update(pneigh)
+          call pprocedure(pmeta, pneigh)
         end if
       end if
     end if
@@ -3266,11 +3424,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3278,11 +3436,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,1,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,2)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3290,11 +3448,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,1,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3302,11 +3460,11 @@ module blocks
 !
     pneigh => pmeta%neigh(1,2,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
 
       pneigh => pneigh%neigh(2,2,1)%ptr
       if (associated(pneigh)) then
-        call metablock_set_update(pneigh)
+        call pprocedure(pmeta, pneigh)
       end if
     end if
 
@@ -3314,34 +3472,34 @@ module blocks
 !
     pneigh => pmeta%neigh(2,1,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
     end if
 
 ! (½,0)-(1,0) edge
 !
     pneigh => pmeta%neigh(2,1,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
     end if
 
 ! (0,1)-(½,1) edge
 !
     pneigh => pmeta%neigh(2,2,1)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
     end if
 
 ! (½,1)-(1,1) edge
 !
     pneigh => pmeta%neigh(2,2,2)%ptr
     if (associated(pneigh)) then
-      call metablock_set_update(pneigh)
+      call pprocedure(pmeta, pneigh)
     end if
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine neighbors_set_update
+  end subroutine iterate_over_neighbors
 
 !===============================================================================
 !
