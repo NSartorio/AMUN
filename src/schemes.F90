@@ -451,6 +451,8 @@ module schemes
 !!
 !===============================================================================
 !
+!***** ISOTHERMAL HYDRODYNAMICS *****
+!
 !===============================================================================
 !
 ! subroutine UPDATE_FLUX_HD_ISO:
@@ -466,7 +468,6 @@ module schemes
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
-!
 !
 !===============================================================================
 !
@@ -491,14 +492,14 @@ module schemes
 
 ! local variables
 !
-    integer                              :: i, j, k
+    integer                        :: i, j, k
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im)       :: qx, fx
-    real(kind=8), dimension(nv,jm)       :: qy, fy
+    real(kind=8), dimension(nv,im) :: qx, fx
+    real(kind=8), dimension(nv,jm) :: qy, fy
 #if NDIMS == 3
-    real(kind=8), dimension(nv,km)       :: qz, fz
+    real(kind=8), dimension(nv,km) :: qz, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -613,557 +614,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_iso
-!
-!===============================================================================
-!
-! subroutine UPDATE_FLUX_HD_ADI:
-! -----------------------------
-!
-!   Subroutine solves the Riemann problem along each direction and calculates
-!   the numerical fluxes, which are used later to calculate the conserved
-!   variable increment.
-!
-!   Arguments:
-!
-!     idir - direction along which the flux is calculated;
-!     dx   - the spatial step;
-!     q    - the array of primitive variables;
-!     f    - the array of numerical fluxes;
-!
-!
-!===============================================================================
-!
-  subroutine update_flux_hd_adi(idir, dx, q, f)
-
-! include external variables
-!
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
-
-! local variables
-!
-    integer                              :: i, j, k
-
-! local temporary arrays
-!
-    real(kind=8), dimension(nv,im)       :: qx, fx
-    real(kind=8), dimension(nv,jm)       :: qy, fy
-#if NDIMS == 3
-    real(kind=8), dimension(nv,km)       :: qz, fz
-#endif /* NDIMS == 3 */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for flux update
-!
-    call start_timer(imf)
-#endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
-
-! select the directional flux to compute
-!
-    select case(idir)
-    case(1)
-
-!  calculate the flux along the X-direction
-!
-      do k = kbl, keu
-        do j = jbl, jeu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
-
-! update the array of fluxes
-!
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
-
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
-
-!  calculate the flux along the Y direction
-!
-      do k = kbl, keu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
-
-! update the array of fluxes
-!
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
-
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
-
-#if NDIMS == 3
-    case(3)
-
-!  calculate the flux along the Z direction
-!
-      do j = jbl, jeu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
-
-! update the array of fluxes
-!
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
-
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
-
-    end select
-
-#ifdef PROFILE
-! stop accounting time for flux update
-!
-    call stop_timer(imf)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_flux_hd_adi
-!
-!===============================================================================
-!
-! subroutine UPDATE_FLUX_MHD_ADI:
-! ------------------------------
-!
-!   Subroutine solves the Riemann problem along each direction and calculates
-!   the numerical fluxes, which are used later to calculate the conserved
-!   variable increment.
-!
-!   Arguments:
-!
-!     idir - direction along which the flux is calculated;
-!     dx   - the spatial step;
-!     q    - the array of primitive variables;
-!     f    - the array of numerical fluxes;
-!
-!
-!===============================================================================
-!
-  subroutine update_flux_mhd_iso(idir, dx, q, f)
-
-! include external variables
-!
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
-    use equations  , only : ibx, iby, ibz, ibp
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
-
-! local variables
-!
-    integer                              :: i, j, k
-
-! local temporary arrays
-!
-    real(kind=8), dimension(nv,im)       :: qx, fx
-    real(kind=8), dimension(nv,jm)       :: qy, fy
-#if NDIMS == 3
-    real(kind=8), dimension(nv,km)       :: qz, fz
-#endif /* NDIMS == 3 */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for flux update
-!
-    call start_timer(imf)
-#endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
-
-! select the directional flux to compute
-!
-    select case(idir)
-    case(1)
-
-!  calculate the flux along the X-direction
-!
-      do k = kbl, keu
-        do j = jbl, jeu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ibx,1:im) = q(ibx,1:im,j,k)
-          qx(iby,1:im) = q(iby,1:im,j,k)
-          qx(ibz,1:im) = q(ibz,1:im,j,k)
-          qx(ibp,1:im) = q(ibp,1:im,j,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
-
-! update the array of fluxes
-!
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ibx,1:im,j,k) = fx(ibx,1:im)
-          f(iby,1:im,j,k) = fx(iby,1:im)
-          f(ibz,1:im,j,k) = fx(ibz,1:im)
-          f(ibp,1:im,j,k) = fx(ibp,1:im)
-
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
-
-!  calculate the flux along the Y direction
-!
-      do k = kbl, keu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ibx,1:jm) = q(iby,i,1:jm,k)
-          qy(iby,1:jm) = q(ibz,i,1:jm,k)
-          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
-
-! update the array of fluxes
-!
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
-          f(iby,i,1:jm,k) = fy(ibx,1:jm)
-          f(ibz,i,1:jm,k) = fy(iby,1:jm)
-          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
-
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
-
-#if NDIMS == 3
-    case(3)
-
-!  calculate the flux along the Z direction
-!
-      do j = jbl, jeu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ibx,1:km) = q(ibz,i,j,1:km)
-          qz(iby,1:km) = q(ibx,i,j,1:km)
-          qz(ibz,1:km) = q(iby,i,j,1:km)
-          qz(ibp,1:km) = q(ibp,i,j,1:km)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
-
-! update the array of fluxes
-!
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ibx,i,j,1:km) = fz(iby,1:km)
-          f(iby,i,j,1:km) = fz(ibz,1:km)
-          f(ibz,i,j,1:km) = fz(ibx,1:km)
-          f(ibp,i,j,1:km) = fz(ibp,1:km)
-
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
-
-    end select
-
-#ifdef PROFILE
-! stop accounting time for flux update
-!
-    call stop_timer(imf)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_flux_mhd_iso
-!
-!===============================================================================
-!
-! subroutine UPDATE_FLUX_MHD_ADI:
-! ------------------------------
-!
-!   Subroutine solves the Riemann problem along each direction and calculates
-!   the numerical fluxes, which are used later to calculate the conserved
-!   variable increment.
-!
-!   Arguments:
-!
-!     idir - direction along which the flux is calculated;
-!     dx   - the spatial step;
-!     q    - the array of primitive variables;
-!     f    - the array of numerical fluxes;
-!
-!
-!===============================================================================
-!
-  subroutine update_flux_mhd_adi(idir, dx, q, f)
-
-! include external variables
-!
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
-    use equations  , only : ibx, iby, ibz, ibp
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
-
-! local variables
-!
-    integer                              :: i, j, k
-
-! local temporary arrays
-!
-    real(kind=8), dimension(nv,im)       :: qx, fx
-    real(kind=8), dimension(nv,jm)       :: qy, fy
-#if NDIMS == 3
-    real(kind=8), dimension(nv,km)       :: qz, fz
-#endif /* NDIMS == 3 */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for flux update
-!
-    call start_timer(imf)
-#endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
-
-! select the directional flux to compute
-!
-    select case(idir)
-    case(1)
-
-!  calculate the flux along the X-direction
-!
-      do k = kbl, keu
-        do j = jbl, jeu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ibx,1:im) = q(ibx,1:im,j,k)
-          qx(iby,1:im) = q(iby,1:im,j,k)
-          qx(ibz,1:im) = q(ibz,1:im,j,k)
-          qx(ibp,1:im) = q(ibp,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
-
-! update the array of fluxes
-!
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ibx,1:im,j,k) = fx(ibx,1:im)
-          f(iby,1:im,j,k) = fx(iby,1:im)
-          f(ibz,1:im,j,k) = fx(ibz,1:im)
-          f(ibp,1:im,j,k) = fx(ibp,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
-
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
-
-!  calculate the flux along the Y direction
-!
-      do k = kbl, keu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ibx,1:jm) = q(iby,i,1:jm,k)
-          qy(iby,1:jm) = q(ibz,i,1:jm,k)
-          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
-
-! update the array of fluxes
-!
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
-          f(iby,i,1:jm,k) = fy(ibx,1:jm)
-          f(ibz,i,1:jm,k) = fy(iby,1:jm)
-          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
-
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
-
-#if NDIMS == 3
-    case(3)
-
-!  calculate the flux along the Z direction
-!
-      do j = jbl, jeu
-        do i = ibl, ieu
-
-! copy directional variable vectors to pass to the one dimensional solver
-!
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ibx,1:km) = q(ibz,i,j,1:km)
-          qz(iby,1:km) = q(ibx,i,j,1:km)
-          qz(ibz,1:km) = q(iby,i,j,1:km)
-          qz(ibp,1:km) = q(ibp,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! call one dimensional Riemann solver in order to obtain numerical fluxes
-!
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
-
-! update the array of fluxes
-!
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ibx,i,j,1:km) = fz(iby,1:km)
-          f(iby,i,j,1:km) = fz(ibz,1:km)
-          f(ibz,i,j,1:km) = fz(ibx,1:km)
-          f(ibp,i,j,1:km) = fz(ibp,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
-
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
-
-    end select
-
-#ifdef PROFILE
-! stop accounting time for flux update
-!
-    call stop_timer(imf)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_flux_mhd_adi
 !
 !===============================================================================
 !
@@ -1296,6 +746,178 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_hd_iso_hll
+!
+!===============================================================================
+!
+!***** ADIABATIC HYDRODYNAMICS *****
+!
+!===============================================================================
+!
+! subroutine UPDATE_FLUX_HD_ADI:
+! -----------------------------
+!
+!   Subroutine solves the Riemann problem along each direction and calculates
+!   the numerical fluxes, which are used later to calculate the conserved
+!   variable increment.
+!
+!   Arguments:
+!
+!     idir - direction along which the flux is calculated;
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     f    - the array of numerical fluxes;
+!
+!===============================================================================
+!
+  subroutine update_flux_hd_adi(idir, dx, q, f)
+
+! include external variables
+!
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer                             , intent(in)    :: idir
+    real(kind=8)                        , intent(in)    :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+
+! local variables
+!
+    integer                        :: i, j, k
+
+! local temporary arrays
+!
+    real(kind=8), dimension(nv,im) :: qx, fx
+    real(kind=8), dimension(nv,jm) :: qy, fy
+#if NDIMS == 3
+    real(kind=8), dimension(nv,km) :: qz, fz
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! reset the flux array
+!
+    f(:,:,:,:) = 0.0d+00
+
+! select the directional flux to compute
+!
+    select case(idir)
+    case(1)
+
+!  calculate the flux along the X-direction
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qx(idn,1:im) = q(idn,1:im,j,k)
+          qx(ivx,1:im) = q(ivx,1:im,j,k)
+          qx(ivy,1:im) = q(ivy,1:im,j,k)
+          qx(ivz,1:im) = q(ivz,1:im,j,k)
+          qx(ipr,1:im) = q(ipr,1:im,j,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+
+! update the array of fluxes
+!
+          f(idn,1:im,j,k) = fx(idn,1:im)
+          f(imx,1:im,j,k) = fx(imx,1:im)
+          f(imy,1:im,j,k) = fx(imy,1:im)
+          f(imz,1:im,j,k) = fx(imz,1:im)
+          f(ien,1:im,j,k) = fx(ien,1:im)
+
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
+
+    case(2)
+
+!  calculate the flux along the Y direction
+!
+      do k = kbl, keu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qy(idn,1:jm) = q(idn,i,1:jm,k)
+          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
+          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
+          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
+          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+
+! update the array of fluxes
+!
+          f(idn,i,1:jm,k) = fy(idn,1:jm)
+          f(imx,i,1:jm,k) = fy(imz,1:jm)
+          f(imy,i,1:jm,k) = fy(imx,1:jm)
+          f(imz,i,1:jm,k) = fy(imy,1:jm)
+          f(ien,i,1:jm,k) = fy(ien,1:jm)
+
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
+
+#if NDIMS == 3
+    case(3)
+
+!  calculate the flux along the Z direction
+!
+      do j = jbl, jeu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qz(idn,1:km) = q(idn,i,j,1:km)
+          qz(ivx,1:km) = q(ivz,i,j,1:km)
+          qz(ivy,1:km) = q(ivx,i,j,1:km)
+          qz(ivz,1:km) = q(ivy,i,j,1:km)
+          qz(ipr,1:km) = q(ipr,i,j,1:km)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+
+! update the array of fluxes
+!
+          f(idn,i,j,1:km) = fz(idn,1:km)
+          f(imx,i,j,1:km) = fz(imy,1:km)
+          f(imy,i,j,1:km) = fz(imz,1:km)
+          f(imz,i,j,1:km) = fz(imx,1:km)
+          f(ien,i,j,1:km) = fz(ien,1:km)
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
+
+    end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_flux_hd_adi
 !
 !===============================================================================
 !
@@ -1623,8 +1245,199 @@ module schemes
 !
 !===============================================================================
 !
+!***** ISOTHERMAL MAGNETOHYDRODYNAMICS *****
+!
+!===============================================================================
+!
+! subroutine UPDATE_FLUX_MHD_ISO:
+! ------------------------------
+!
+!   Subroutine solves the Riemann problem along each direction and calculates
+!   the numerical fluxes, which are used later to calculate the conserved
+!   variable increment.
+!
+!   Arguments:
+!
+!     idir - direction along which the flux is calculated;
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     f    - the array of numerical fluxes;
+!
+!===============================================================================
+!
+  subroutine update_flux_mhd_iso(idir, dx, q, f)
+
+! include external variables
+!
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
+    use equations  , only : ibx, iby, ibz, ibp
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer                             , intent(in)    :: idir
+    real(kind=8)                        , intent(in)    :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+
+! local variables
+!
+    integer                        :: i, j, k
+
+! local temporary arrays
+!
+    real(kind=8), dimension(nv,im) :: qx, fx
+    real(kind=8), dimension(nv,jm) :: qy, fy
+#if NDIMS == 3
+    real(kind=8), dimension(nv,km) :: qz, fz
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! reset the flux array
+!
+    f(:,:,:,:) = 0.0d+00
+
+! select the directional flux to compute
+!
+    select case(idir)
+    case(1)
+
+!  calculate the flux along the X-direction
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qx(idn,1:im) = q(idn,1:im,j,k)
+          qx(ivx,1:im) = q(ivx,1:im,j,k)
+          qx(ivy,1:im) = q(ivy,1:im,j,k)
+          qx(ivz,1:im) = q(ivz,1:im,j,k)
+          qx(ibx,1:im) = q(ibx,1:im,j,k)
+          qx(iby,1:im) = q(iby,1:im,j,k)
+          qx(ibz,1:im) = q(ibz,1:im,j,k)
+          qx(ibp,1:im) = q(ibp,1:im,j,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+
+! update the array of fluxes
+!
+          f(idn,1:im,j,k) = fx(idn,1:im)
+          f(imx,1:im,j,k) = fx(imx,1:im)
+          f(imy,1:im,j,k) = fx(imy,1:im)
+          f(imz,1:im,j,k) = fx(imz,1:im)
+          f(ibx,1:im,j,k) = fx(ibx,1:im)
+          f(iby,1:im,j,k) = fx(iby,1:im)
+          f(ibz,1:im,j,k) = fx(ibz,1:im)
+          f(ibp,1:im,j,k) = fx(ibp,1:im)
+
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
+
+    case(2)
+
+!  calculate the flux along the Y direction
+!
+      do k = kbl, keu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qy(idn,1:jm) = q(idn,i,1:jm,k)
+          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
+          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
+          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
+          qy(ibx,1:jm) = q(iby,i,1:jm,k)
+          qy(iby,1:jm) = q(ibz,i,1:jm,k)
+          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
+          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+
+! update the array of fluxes
+!
+          f(idn,i,1:jm,k) = fy(idn,1:jm)
+          f(imx,i,1:jm,k) = fy(imz,1:jm)
+          f(imy,i,1:jm,k) = fy(imx,1:jm)
+          f(imz,i,1:jm,k) = fy(imy,1:jm)
+          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
+          f(iby,i,1:jm,k) = fy(ibx,1:jm)
+          f(ibz,i,1:jm,k) = fy(iby,1:jm)
+          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
+
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
+
+#if NDIMS == 3
+    case(3)
+
+!  calculate the flux along the Z direction
+!
+      do j = jbl, jeu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qz(idn,1:km) = q(idn,i,j,1:km)
+          qz(ivx,1:km) = q(ivz,i,j,1:km)
+          qz(ivy,1:km) = q(ivx,i,j,1:km)
+          qz(ivz,1:km) = q(ivy,i,j,1:km)
+          qz(ibx,1:km) = q(ibz,i,j,1:km)
+          qz(iby,1:km) = q(ibx,i,j,1:km)
+          qz(ibz,1:km) = q(iby,i,j,1:km)
+          qz(ibp,1:km) = q(ibp,i,j,1:km)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+
+! update the array of fluxes
+!
+          f(idn,i,j,1:km) = fz(idn,1:km)
+          f(imx,i,j,1:km) = fz(imy,1:km)
+          f(imy,i,j,1:km) = fz(imz,1:km)
+          f(imz,i,j,1:km) = fz(imx,1:km)
+          f(ibx,i,j,1:km) = fz(iby,1:km)
+          f(iby,i,j,1:km) = fz(ibz,1:km)
+          f(ibz,i,j,1:km) = fz(ibx,1:km)
+          f(ibp,i,j,1:km) = fz(ibp,1:km)
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
+
+    end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_flux_mhd_iso
+!
+!===============================================================================
+!
 ! subroutine RIEMANN_MHD_ISO_HLL:
-! -----------------------------
+! ------------------------------
 !
 !   Subroutine solves one dimensional Riemann problem using
 !   the Harten-Lax-van Leer (HLL) method.
@@ -2545,6 +2358,203 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_iso_hlldm
+!
+!===============================================================================
+!
+!***** ADIABATIC MAGNETOHYDRODYNAMICS *****
+!
+!===============================================================================
+!
+! subroutine UPDATE_FLUX_MHD_ADI:
+! ------------------------------
+!
+!   Subroutine solves the Riemann problem along each direction and calculates
+!   the numerical fluxes, which are used later to calculate the conserved
+!   variable increment.
+!
+!   Arguments:
+!
+!     idir - direction along which the flux is calculated;
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     f    - the array of numerical fluxes;
+!
+!===============================================================================
+!
+  subroutine update_flux_mhd_adi(idir, dx, q, f)
+
+! include external variables
+!
+    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
+    use equations  , only : ibx, iby, ibz, ibp
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer                             , intent(in)    :: idir
+    real(kind=8)                        , intent(in)    :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+
+! local variables
+!
+    integer                        :: i, j, k
+
+! local temporary arrays
+!
+    real(kind=8), dimension(nv,im) :: qx, fx
+    real(kind=8), dimension(nv,jm) :: qy, fy
+#if NDIMS == 3
+    real(kind=8), dimension(nv,km) :: qz, fz
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! reset the flux array
+!
+    f(:,:,:,:) = 0.0d+00
+
+! select the directional flux to compute
+!
+    select case(idir)
+    case(1)
+
+!  calculate the flux along the X-direction
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qx(idn,1:im) = q(idn,1:im,j,k)
+          qx(ivx,1:im) = q(ivx,1:im,j,k)
+          qx(ivy,1:im) = q(ivy,1:im,j,k)
+          qx(ivz,1:im) = q(ivz,1:im,j,k)
+          qx(ibx,1:im) = q(ibx,1:im,j,k)
+          qx(iby,1:im) = q(iby,1:im,j,k)
+          qx(ibz,1:im) = q(ibz,1:im,j,k)
+          qx(ibp,1:im) = q(ibp,1:im,j,k)
+          qx(ipr,1:im) = q(ipr,1:im,j,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+
+! update the array of fluxes
+!
+          f(idn,1:im,j,k) = fx(idn,1:im)
+          f(imx,1:im,j,k) = fx(imx,1:im)
+          f(imy,1:im,j,k) = fx(imy,1:im)
+          f(imz,1:im,j,k) = fx(imz,1:im)
+          f(ibx,1:im,j,k) = fx(ibx,1:im)
+          f(iby,1:im,j,k) = fx(iby,1:im)
+          f(ibz,1:im,j,k) = fx(ibz,1:im)
+          f(ibp,1:im,j,k) = fx(ibp,1:im)
+          f(ien,1:im,j,k) = fx(ien,1:im)
+
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
+
+    case(2)
+
+!  calculate the flux along the Y direction
+!
+      do k = kbl, keu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qy(idn,1:jm) = q(idn,i,1:jm,k)
+          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
+          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
+          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
+          qy(ibx,1:jm) = q(iby,i,1:jm,k)
+          qy(iby,1:jm) = q(ibz,i,1:jm,k)
+          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
+          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
+          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+
+! update the array of fluxes
+!
+          f(idn,i,1:jm,k) = fy(idn,1:jm)
+          f(imx,i,1:jm,k) = fy(imz,1:jm)
+          f(imy,i,1:jm,k) = fy(imx,1:jm)
+          f(imz,i,1:jm,k) = fy(imy,1:jm)
+          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
+          f(iby,i,1:jm,k) = fy(ibx,1:jm)
+          f(ibz,i,1:jm,k) = fy(iby,1:jm)
+          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
+          f(ien,i,1:jm,k) = fy(ien,1:jm)
+
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
+
+#if NDIMS == 3
+    case(3)
+
+!  calculate the flux along the Z direction
+!
+      do j = jbl, jeu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qz(idn,1:km) = q(idn,i,j,1:km)
+          qz(ivx,1:km) = q(ivz,i,j,1:km)
+          qz(ivy,1:km) = q(ivx,i,j,1:km)
+          qz(ivz,1:km) = q(ivy,i,j,1:km)
+          qz(ibx,1:km) = q(ibz,i,j,1:km)
+          qz(iby,1:km) = q(ibx,i,j,1:km)
+          qz(ibz,1:km) = q(iby,i,j,1:km)
+          qz(ibp,1:km) = q(ibp,i,j,1:km)
+          qz(ipr,1:km) = q(ipr,i,j,1:km)
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+
+! update the array of fluxes
+!
+          f(idn,i,j,1:km) = fz(idn,1:km)
+          f(imx,i,j,1:km) = fz(imy,1:km)
+          f(imy,i,j,1:km) = fz(imz,1:km)
+          f(imz,i,j,1:km) = fz(imx,1:km)
+          f(ibx,i,j,1:km) = fz(iby,1:km)
+          f(iby,i,j,1:km) = fz(ibz,1:km)
+          f(ibz,i,j,1:km) = fz(ibx,1:km)
+          f(ibp,i,j,1:km) = fz(ibp,1:km)
+          f(ien,i,j,1:km) = fz(ien,1:km)
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
+
+    end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_flux_mhd_adi
 !
 !===============================================================================
 !
