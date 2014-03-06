@@ -371,10 +371,11 @@ module equations
 
 ! set pointers to subroutines
 !
-        prim2cons => prim2cons_mhd_adi
-        cons2prim => cons2prim_mhd_adi
-        fluxspeed => fluxspeed_mhd_adi
-        maxspeed  => maxspeed_mhd_adi
+        prim2cons       => prim2cons_mhd_adi
+        cons2prim       => cons2prim_mhd_adi
+        fluxspeed       => fluxspeed_mhd_adi
+        maxspeed        => maxspeed_mhd_adi
+        eigensystem_roe => esystem_roe_mhd_adi
 
       case default
 
@@ -2404,6 +2405,329 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end function maxspeed_mhd_adi
+!
+!===============================================================================
+!
+! subroutine ESYSTEM_ROE_MHD_ADI:
+! ------------------------------
+!
+!   Subroutine computes eigenvalues and eigenvectors for a given set of
+!   equations and input variables.
+!
+!   Arguments:
+!
+!     x - ratio of the perpendicular magnetic field component difference
+!     y - ratio of the density
+!     q - the intermediate Roe state vector;
+!     c - the vector of eigenvalues;
+!     r - the matrix of right eigenvectors;
+!     l - the matrix of left eigenvectors;
+!
+!   References:
+!
+!     [1] Stone, J. M. & Gardiner, T. A.,
+!         "ATHENA: A New Code for Astrophysical MHD",
+!         The Astrophysical Journal Suplement Series, 2008, 178, pp. 137-177
+!     [2] Balsara, D. S.
+!         "Linearized Formulation of the Riemann Problem for Adiabatic and
+!          Isothermal Magnetohydrodynamics",
+!         The Astrophysical Journal Suplement Series, 1998, 116, pp. 119-131
+!
+!===============================================================================
+!
+  subroutine esystem_roe_mhd_adi(x, y, q, c, r, l)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8)                  , intent(in)    :: x, y
+    real(kind=8), dimension(nv)   , intent(in)    :: q
+    real(kind=8), dimension(nv)   , intent(inout) :: c
+    real(kind=8), dimension(nv,nv), intent(inout) :: l, r
+
+! saved variables
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: gammam2
+
+! local variables
+!
+    real(kind=8) :: di, vsq, btsq, bt_starsq, casq, hp, twid_asq
+    real(kind=8) :: ct2, tsum, tdif, cf2_cs2, cfsq, cf, cssq, cs, ca, bt
+    real(kind=8) :: bt_star, bet2, bet3, bet2_star, bet3_star, bet_starsq, vbet
+    real(kind=8) :: alpha_f, alpha_s, af_prime, as_prime
+    real(kind=8) :: sqrtd, isqrtd, s, twid_a, qf, qs, afpbb, aspbb
+    real(kind=8) :: qa, qb, qc, qd
+    real(kind=8) :: norm, cff, css, af, as, afpb, aspb
+    real(kind=8) :: q2_star, q3_star, vqstr
+
+! local parameters
+!
+    real(kind=8), parameter :: eps = epsilon(di)
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the internal arrays at the first run
+!
+    if (first) then
+
+! prepare coefficients
+!
+      gammam2  = gamma - 2.0d+00
+
+! reset all elements
+!
+      evroe(:, : ,:) = 0.0d+00
+
+! initiate the matrix of right eigenvectors
+!
+      evroe(2,4,idn) = 1.0d+00
+
+! unset the first execution flag
+!
+      first = .false.
+
+    end if ! first execution
+
+! prepare coefficients for eigenvalues
+!
+    di        = 1.0d+00 / q(idn)
+    casq      = q(ibx) * q(ibx) * di
+    ca        = sqrt(casq)
+    vsq       = q(ivx) * q(ivx) + q(ivy) * q(ivy) + q(ivz) * q(ivz)
+    btsq      = q(iby) * q(iby) + q(ibz) * q(ibz)
+    bt_starsq = (gammam1 - gammam2 * y) * btsq
+    hp        = q(ien) - (casq + btsq * di)
+    twid_asq  = max(eps, (gammam1 * (hp - 0.5d+00 * vsq) - gammam2 * x))
+    ct2       = bt_starsq * di
+    tsum      = casq + ct2 + twid_asq
+    tdif      = casq + ct2 - twid_asq
+    cf2_cs2   = sqrt((tdif * tdif + 4.0d+00 * twid_asq * ct2))
+    cfsq      = 0.5d+00 * (tsum + cf2_cs2)
+    cf        = sqrt(cfsq)
+    cssq      = twid_asq * casq / cfsq
+    cs        = sqrt(cssq)
+
+! prepare eigenvalues
+!
+    c(1)      = q(ivx) - cf
+    c(2)      = q(ivx) - ca
+    c(3)      = q(ivx) - cs
+    c(4)      = q(ivx)
+    c(5)      = q(ivx)
+    c(6)      = q(ivx) + cs
+    c(7)      = q(ivx) + ca
+    c(8)      = q(ivx) + cf
+    c(9)      = c(8)
+
+! calculate the eigenvectors only if the waves propagate in both direction
+!
+    if (c(1) >= 0.0d+00) return
+    if (c(8) <= 0.0d+00) return
+
+! prepare remaining coefficients for eigenvectors
+!
+    bt        = sqrt(btsq)
+    bt_star   = sqrt(bt_starsq)
+    if (bt == 0.0d+00) then
+      bet2 = 1.0d+00
+      bet3 = 0.0d+00
+    else
+      bet2 = q(iby) / bt
+      bet3 = q(ibz) / bt
+    end if
+    bet2_star  = bet2 / sqrt(gammam1 - gammam2 * y)
+    bet3_star  = bet3 / sqrt(gammam1 - gammam2 * y)
+    bet_starsq = bet2_star * bet2_star + bet3_star * bet3_star
+    vbet       = q(ivy) * bet2_star + q(ivz) * bet3_star
+
+    if ( (cfsq - cssq) == 0.0d+00 ) then
+      alpha_f = 1.0d+00
+      alpha_s = 0.0d+00
+    else if ( (twid_asq - cssq) <= 0.0d+00 ) then
+      alpha_f = 0.0d+00
+      alpha_s = 1.0d+00
+    else if ( (cfsq - twid_asq) <= 0.0d+00 ) then
+      alpha_f = 1.0d+00
+      alpha_s = 0.0d+00
+    else
+      alpha_f = sqrt((twid_asq - cssq) / (cfsq - cssq))
+      alpha_s = sqrt((cfsq - twid_asq) / (cfsq - cssq))
+    end if
+
+    sqrtd    = sqrt(q(idn))
+    isqrtd   = 1.0d+00 / sqrtd
+    s        = sign(1.0d+00, q(ibx))
+    twid_a   = sqrt(twid_asq)
+    qf       = cf * alpha_f * s
+    qs       = cs * alpha_s * s
+    af_prime = twid_a * alpha_f * isqrtd
+    as_prime = twid_a * alpha_s * isqrtd
+    afpbb    = af_prime * bt_star * bet_starsq
+    aspbb    = as_prime * bt_star * bet_starsq
+
+! update the varying elements of the matrix of right eigenvectors
+!
+    evroe(2,1,idn) = alpha_f
+    evroe(2,3,idn) = alpha_s
+    evroe(2,6,idn) = alpha_s
+    evroe(2,8,idn) = alpha_f
+
+    evroe(2,1,ivx) = alpha_f * c(1)
+    evroe(2,3,ivx) = alpha_s * c(3)
+    evroe(2,4,ivx) = q(ivx)
+    evroe(2,6,ivx) = alpha_s * c(6)
+    evroe(2,8,ivx) = alpha_f * c(8)
+
+    qa = alpha_f * q(ivy)
+    qb = alpha_s * q(ivy)
+    qc = qs * bet2_star
+    qd = qf * bet2_star
+
+    evroe(2,1,ivy) = qa + qc
+    evroe(2,2,ivy) = - bet3
+    evroe(2,3,ivy) = qb - qd
+    evroe(2,4,ivy) = q(ivy)
+    evroe(2,6,ivy) = qb + qd
+    evroe(2,7,ivy) = bet3
+    evroe(2,8,ivy) = qa - qc
+
+    qa = alpha_f * q(ivz)
+    qb = alpha_s * q(ivz)
+    qc = qs * bet3_star
+    qd = qf * bet3_star
+
+    evroe(2,1,ivz) = qa + qc
+    evroe(2,2,ivz) = bet2
+    evroe(2,3,ivz) = qb - qd
+    evroe(2,4,ivz) = q(ivz)
+    evroe(2,6,ivz) = qb + qd
+    evroe(2,7,ivz) = - bet2
+    evroe(2,8,ivz) = qa - qc
+
+    evroe(2,1,ipr) = alpha_f * (hp - q(ivx) * cf) + qs * vbet + aspbb
+    evroe(2,2,ipr) = -(q(ivy) * bet3 - q(ivz) * bet2)
+    evroe(2,3,ipr) = alpha_s * (hp - q(ivx) * cs) - qf * vbet - afpbb
+    evroe(2,4,ipr) = 0.5d+00 * vsq + gammam2 * x / gammam1
+    evroe(2,6,ipr) = alpha_s * (hp + q(ivx) * cs) + qf * vbet - afpbb
+    evroe(2,7,ipr) = - evroe(2,2,ipr)
+    evroe(2,8,ipr) = alpha_f * (hp + q(ivx) * cf) - qs * vbet + aspbb
+
+    evroe(2,1,iby) = as_prime * bet2_star
+    evroe(2,2,iby) = - bet3 * s * isqrtd
+    evroe(2,3,iby) = - af_prime * bet2_star
+    evroe(2,6,iby) = evroe(2,3,iby)
+    evroe(2,7,iby) = evroe(2,2,iby)
+    evroe(2,8,iby) = evroe(2,1,iby)
+
+    evroe(2,1,ibz) = as_prime * bet3_star
+    evroe(2,2,ibz) = bet2 * s * isqrtd
+    evroe(2,3,ibz) = - af_prime * bet3_star
+    evroe(2,6,ibz) = evroe(2,3,ibz)
+    evroe(2,7,ibz) = evroe(2,2,ibz)
+    evroe(2,8,ibz) = evroe(2,1,ibz)
+
+! update the varying elements of the matrix of left eigenvectors
+!
+    norm = 0.5d+00 / twid_asq
+    cff  = norm * alpha_f * cf
+    css  = norm * alpha_s * cs
+    qf   = qf * norm
+    qs   = qs * norm
+    af   = norm * af_prime * q(idn)
+    as   = norm * as_prime * q(idn)
+    afpb = norm * af_prime * bt_star
+    aspb = norm * as_prime * bt_star
+
+    norm    = norm * gammam1
+    alpha_f = alpha_f * norm
+    alpha_s = alpha_s * norm
+    q2_star = bet2_star / bet_starsq
+    q3_star = bet3_star / bet_starsq
+    vqstr   = (q(ivy) * q2_star + q(ivz) * q3_star)
+    norm    = 2.0d+00 * norm
+
+! left-going fast wave
+!
+    evroe(1,idn,1) = alpha_f * (vsq - hp) + cff * (cf + q(ivx))                &
+                                                           - qs * vqstr - aspb
+    evroe(1,ivx,1) = - alpha_f * q(ivx) - cff
+    evroe(1,ivy,1) = - alpha_f * q(ivy) + qs * q2_star
+    evroe(1,ivz,1) = - alpha_f * q(ivz) + qs * q3_star
+    evroe(1,ipr,1) = alpha_f
+    evroe(1,iby,1) = as * q2_star - alpha_f * q(iby)
+    evroe(1,ibz,1) = as * q3_star - alpha_f * q(ibz)
+
+! left-going Alfvèn wave
+!
+    evroe(1,idn,2) = 0.5d+00 * (q(ivy) * bet3 - q(ivz) * bet2)
+    evroe(1,ivy,2) = - 0.5d+00 * bet3
+    evroe(1,ivz,2) = 0.5d+00 * bet2
+    evroe(1,iby,2) = - 0.5d+00 * sqrtd * bet3 * s
+    evroe(1,ibz,2) = 0.5d+00 * sqrtd * bet2 * s
+
+! left-going slow wave
+!
+    evroe(1,idn,3) = alpha_s * (vsq - hp) + css * (cs + q(ivx))                &
+                                                           + qf * vqstr + afpb
+    evroe(1,ivx,3) = - alpha_s * q(ivx) - css
+    evroe(1,ivy,3) = - alpha_s * q(ivy) - qf * q2_star
+    evroe(1,ivz,3) = - alpha_s * q(ivz) - qf * q3_star
+    evroe(1,ipr,3) = alpha_s
+    evroe(1,iby,3) = - af * q2_star - alpha_s * q(iby)
+    evroe(1,ibz,3) = - af * q3_star - alpha_s * q(ibz)
+
+! entropy wave
+!
+    evroe(1,idn,4) = 1.0d+00 - norm * (0.5d+00 * vsq - gammam2 * x / gammam1)
+    evroe(1,ivx,4) = norm * q(ivx)
+    evroe(1,ivy,4) = norm * q(ivy)
+    evroe(1,ivz,4) = norm * q(ivz)
+    evroe(1,ipr,4) = - norm
+    evroe(1,iby,4) = norm * q(iby)
+    evroe(1,ibz,4) = norm * q(ibz)
+
+! right-going slow wave
+!
+    evroe(1,idn,6) = alpha_s * (vsq - hp) + css * (cs - q(ivx))                &
+                                                           - qf * vqstr + afpb
+    evroe(1,ivx,6) = - alpha_s * q(ivx) + css
+    evroe(1,ivy,6) = - alpha_s * q(ivy) + qf * q2_star
+    evroe(1,ivz,6) = - alpha_s * q(ivz) + qf * q3_star
+    evroe(1,ipr,6) = alpha_s
+    evroe(1,iby,6) = evroe(1,iby,3)
+    evroe(1,ibz,6) = evroe(1,ibz,3)
+
+! right-going Alfvèn wave
+!
+    evroe(1,idn,7) = - evroe(1,idn,2)
+    evroe(1,ivy,7) = - evroe(1,ivy,2)
+    evroe(1,ivz,7) = - evroe(1,ivz,2)
+    evroe(1,iby,7) =   evroe(1,iby,2)
+    evroe(1,ibz,7) =   evroe(1,ibz,2)
+
+! right-going fast wave
+!
+    evroe(1,idn,8) = alpha_f * (vsq - hp) + cff * (cf - q(ivx))                &
+                                                           + qs * vqstr - aspb
+    evroe(1,ivx,8) = - alpha_f * q(ivx) + cff
+    evroe(1,ivy,8) = - alpha_f * q(ivy) - qs * q2_star
+    evroe(1,ivz,8) = - alpha_f * q(ivz) - qs * q3_star
+    evroe(1,ipr,8) = alpha_f
+    evroe(1,iby,8) = evroe(1,iby,1)
+    evroe(1,ibz,8) = evroe(1,ibz,1)
+
+! copy matrices of eigenvectors
+!
+    l(1:nv,1:nv) = evroe(1,1:nv,1:nv)
+    r(1:nv,1:nv) = evroe(2,1:nv,1:nv)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine esystem_roe_mhd_adi
 
 !===============================================================================
 !
