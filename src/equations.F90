@@ -63,16 +63,20 @@ module equations
 
 ! pointers to the conversion procedures
 !
-  procedure(prim2cons_hd_iso), pointer, save :: prim2cons => null()
-  procedure(cons2prim_hd_iso), pointer, save :: cons2prim => null()
+  procedure(prim2cons_hd_iso)  , pointer, save :: prim2cons       => null()
+  procedure(cons2prim_hd_iso)  , pointer, save :: cons2prim       => null()
 
 ! pointer to the flux procedure
 !
-  procedure(fluxspeed_hd_iso), pointer, save :: fluxspeed => null()
+  procedure(fluxspeed_hd_iso)  , pointer, save :: fluxspeed       => null()
 
 ! pointer to the maxspeed procedure
 !
-  procedure(maxspeed_hd_iso) , pointer, save :: maxspeed  => null()
+  procedure(maxspeed_hd_iso)   , pointer, save :: maxspeed        => null()
+
+! pointer to the Roe eigensystem procedure
+!
+  procedure(esystem_roe_hd_iso), pointer, save :: eigensystem_roe => null()
 
 
 ! the system of equations and the equation of state
@@ -96,6 +100,10 @@ module equations
 ! variable names
 !
   character(len=4), dimension(:), allocatable, save :: pvars, cvars
+
+! eigenvectors
+!
+  real(kind=8), dimension(:,:,:), allocatable, save :: evroe
 
 ! adiabatic heat ratio
 !
@@ -123,6 +131,7 @@ module equations
   public :: prim2cons, cons2prim
   public :: fluxspeed
   public :: maxspeed, reset_maxspeed, get_maxspeed
+  public :: eigensystem_roe
   public :: update_primitive_variables
   public :: gamma
   public :: csnd
@@ -237,10 +246,11 @@ module equations
 
 ! set pointers to subroutines
 !
-        prim2cons => prim2cons_hd_iso
-        cons2prim => cons2prim_hd_iso
-        fluxspeed => fluxspeed_hd_iso
-        maxspeed  => maxspeed_hd_iso
+        prim2cons       => prim2cons_hd_iso
+        cons2prim       => cons2prim_hd_iso
+        fluxspeed       => fluxspeed_hd_iso
+        maxspeed        => maxspeed_hd_iso
+        eigensystem_roe => esystem_roe_hd_iso
 
       case("adi", "ADI", "adiabatic", "ADIABATIC")
 
@@ -435,6 +445,10 @@ module equations
 !
     csnd2 = csnd * csnd
 
+! allocate space for Roe eigenvectors
+!
+    allocate(evroe(2,nv,nv))
+
 ! print information about the equation module
 !
     if (verbose) then
@@ -490,12 +504,17 @@ module equations
     if (allocated(pvars)) deallocate(pvars)
     if (allocated(cvars)) deallocate(cvars)
 
+! deallocate Roe eigenvectors
+!
+    if (allocated(evroe)) deallocate(evroe)
+
 ! release the procedure pointers
 !
     nullify(prim2cons)
     nullify(cons2prim)
     nullify(fluxspeed)
-    nullify(maxspeed )
+    nullify(maxspeed)
+    nullify(eigensystem_roe)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -910,6 +929,117 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end function maxspeed_hd_iso
+!
+!===============================================================================
+!
+! subroutine ESYSTEM_ROE_HD_ISO:
+! -----------------------------
+!
+!   Subroutine computes eigenvalues and eigenvectors for a given set of
+!   equations and input variables.
+!
+!   Arguments:
+!
+!     q - the intermediate Roe state vector;
+!     c - the vector of eigenvalues;
+!     r - the matrix of right eigenvectors;
+!     l - the matrix of left eigenvectors;
+!
+!   References:
+!
+!     [1] Roe, P. L.
+!         "Approximate Riemann Solvers, Parameter Vectors, and Difference
+!          Schemes",
+!         Journal of Computational Physics, 1981, 43, pp. 357-372
+!     [2] Stone, J. M. & Gardiner, T. A.,
+!         "ATHENA: A New Code for Astrophysical MHD",
+!         The Astrophysical Journal Suplement Series, 2008, 178, pp. 137-177
+!
+!===============================================================================
+!
+  subroutine esystem_roe_hd_iso(q, c, r, l)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8), dimension(nv)   , intent(in)    :: q
+    real(kind=8), dimension(nv)   , intent(inout) :: c
+    real(kind=8), dimension(nv,nv), intent(inout) :: l, r
+
+! local variables
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: ch
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the internal arrays at the first run
+!
+    if (first) then
+
+! prepare constants
+!
+      ch      = 0.5d+00 / csnd
+
+! reset all elements
+!
+      evroe(:, : ,:) = 0.0d+00
+
+! initiate the matrix of left eigenvectors
+!
+      evroe(1,ivx,1) = - ch
+      evroe(1,ivy,2) = 1.0d+00
+      evroe(1,ivz,3) = 1.0d+00
+      evroe(1,ivx,4) =   ch
+
+! initiate the matrix of right eigenvectors
+!
+      evroe(2,1,idn) = 1.0d+00
+      evroe(2,2,ivy) = 1.0d+00
+      evroe(2,3,ivz) = 1.0d+00
+      evroe(2,4,idn) = 1.0d+00
+
+! unset the first execution flag
+!
+      first = .false.
+
+    end if ! first execution
+
+! prepare eigenvalues
+!
+    c(1)           = q(ivx) - csnd
+    c(2)           = q(ivx)
+    c(3)           = q(ivx)
+    c(4)           = q(ivx) + csnd
+
+! update the varying elements of the matrix of left eigenvectors
+!
+    evroe(1,idn,1) =   ch * c(4)
+    evroe(1,idn,2) = - q(ivy)
+    evroe(1,idn,3) = - q(ivz)
+    evroe(1,idn,4) = - ch * c(1)
+
+! update the varying elements of the matrix of right eigenvectors
+!
+    evroe(2,1,ivx) = c(1)
+    evroe(2,1,ivy) = q(ivy)
+    evroe(2,1,ivz) = q(ivz)
+
+    evroe(2,4,ivx) = c(4)
+    evroe(2,4,ivy) = q(ivy)
+    evroe(2,4,ivz) = q(ivz)
+
+! copy matrices of eigenvectors
+!
+    l(1:nv,1:nv) = evroe(1,1:nv,1:nv)
+    r(1:nv,1:nv) = evroe(2,1:nv,1:nv)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine esystem_roe_hd_iso
 !
 !*******************************************************************************
 !
