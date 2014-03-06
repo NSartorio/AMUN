@@ -202,6 +202,16 @@ module schemes
 !
           riemann => riemann_hd_adi_hllc
 
+        case("roe", "ROE")
+
+! set the solver name
+!
+          name_sol =  "ROE"
+
+! set pointers to subroutines
+!
+          riemann => riemann_hd_adi_roe
+
 ! in the case of unknown Riemann solver, revert to HLL
 !
         case default
@@ -1525,6 +1535,155 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_hd_adi_hllc
+!
+!===============================================================================
+!
+! subroutine RIEMANN_HD_ADI_ROE:
+! -----------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Roe's method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Roe, P. L.
+!         "Approximate Riemann Solvers, Parameter Vectors, and Difference
+!          Schemes",
+!         Journal of Computational Physics, 1981, 43, pp. 357-372
+!     [2] Toro, E. F.,
+!         "Riemann Solvers and Numerical Methods for Fluid dynamics",
+!         Springer-Verlag Berlin Heidelberg, 2009
+!
+!===============================================================================
+!
+  subroutine riemann_hd_adi_roe(n, ql, qr, f)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ien
+    use equations      , only : prim2cons, fluxspeed, eigensystem_roe
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                        :: p, i
+    real(kind=8)                   :: sdl, sdr, sds
+    real(kind=8)                   :: xx
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n)  :: ul, ur, fl, fr
+    real(kind=8), dimension(n)     :: cl, cr
+    real(kind=8), dimension(nv)    :: qi, ci, al
+    real(kind=8), dimension(nv,nv) :: li, ri
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
+! calculate corresponding conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at the states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+
+! iterate over all points
+!
+    do i = 1, n
+
+! calculate variables for the Roe intermediate state
+!
+      sdl     = sqrt(ql(idn,i))
+      sdr     = sqrt(qr(idn,i))
+      sds     = sdl + sdr
+
+! prepare the Roe intermediate state vector (eq. 11.60 in [2])
+!
+      qi(idn) =  sdl * sdr
+      qi(ivx) = (sdl * ql(ivx,i) + sdr * qr(ivx,i)) / sds
+      qi(ivy) = (sdl * ql(ivy,i) + sdr * qr(ivy,i)) / sds
+      qi(ivz) = (sdl * ql(ivz,i) + sdr * qr(ivz,i)) / sds
+      qi(ipr) = ((ul(ien,i) + ql(ipr,i)) / sdl                                 &
+              +  (ur(ien,i) + qr(ipr,i)) / sdr) / sds
+
+! obtain eigenvalues and eigenvectors
+!
+      call eigensystem_roe(qi(:), ci(:), ri(:,:), li(:,:))
+
+! return upwind fluxes
+!
+      if (ci(1) >= 0.0d+00) then
+
+        f(:,i) = fl(:,i)
+
+      else if (ci(nv) <= 0.0d+00) then
+
+        f(:,i) = fr(:,i)
+
+      else
+
+! calculate wave amplitudes α = L.ΔU
+!
+        al(1:nv) = 0.0d+00
+        do p = 1, nv
+          al(1:nv) = al(1:nv) + li(p,1:nv) * (ur(p,i) - ul(p,i))
+        end do
+
+! calculate the flux average
+!
+        f(1:nv,i) = 0.5d+00 * (fl(1:nv,i) + fr(1:nv,i))
+
+! correct the flux by adding the characteristic wave contribution: ∑(α|λ|K)
+!
+        if (qi(ivx) >= 0.0d+00) then
+          do p = 1, nv
+            xx        = - 0.5d+00 * al(p) * abs(ci(p))
+            f(1:nv,i) = f(1:nv,i) + xx * ri(p,1:nv)
+          end do
+        else
+          do p = nv, 1, - 1
+            xx        = - 0.5d+00 * al(p) * abs(ci(p))
+            f(1:nv,i) = f(1:nv,i) + xx * ri(p,1:nv)
+          end do
+        end if
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_hd_adi_roe
 !
 !===============================================================================
 !

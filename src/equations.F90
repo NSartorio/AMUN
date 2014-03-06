@@ -269,10 +269,11 @@ module equations
 
 ! set pointers to subroutines
 !
-        prim2cons => prim2cons_hd_adi
-        cons2prim => cons2prim_hd_adi
-        fluxspeed => fluxspeed_hd_adi
-        maxspeed  => maxspeed_hd_adi
+        prim2cons       => prim2cons_hd_adi
+        cons2prim       => cons2prim_hd_adi
+        fluxspeed       => fluxspeed_hd_adi
+        maxspeed        => maxspeed_hd_adi
+        eigensystem_roe => esystem_roe_hd_adi
 
 ! warn about the unimplemented equation of state
 !
@@ -1334,6 +1335,155 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end function maxspeed_hd_adi
+!
+!===============================================================================
+!
+! subroutine ESYSTEM_ROE_HD_ADI:
+! -----------------------------
+!
+!   Subroutine computes eigenvalues and eigenvectors for a given set of
+!   equations and input variables.
+!
+!   Arguments:
+!
+!     q - the intermediate Roe state vector;
+!     c - the vector of eigenvalues;
+!     r - the matrix of right eigenvectors;
+!     l - the matrix of left eigenvectors;
+!
+!   References:
+!
+!     [1] Roe, P. L.
+!         "Approximate Riemann Solvers, Parameter Vectors, and Difference
+!          Schemes",
+!         Journal of Computational Physics, 1981, 43, pp. 357-372
+!     [2] Stone, J. M. & Gardiner, T. A.,
+!         "ATHENA: A New Code for Astrophysical MHD",
+!         The Astrophysical Journal Suplement Series, 2008, 178, pp. 137-177
+!
+!===============================================================================
+!
+  subroutine esystem_roe_hd_adi(q, c, r, l)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8), dimension(nv)   , intent(in)    :: q
+    real(kind=8), dimension(nv)   , intent(inout) :: c
+    real(kind=8), dimension(nv,nv), intent(inout) :: l, r
+
+! local variables
+!
+    logical, save :: first = .true.
+    real(kind=8)  :: vv, vh, c2, na, cc, vc, ng, nd, nw, nh, nc
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the internal arrays at the first run
+!
+    if (first) then
+
+! reset all elements
+!
+      evroe(:, : ,:) = 0.0d+00
+
+! initiate the matrix of left eigenvectors
+!
+      evroe(1,ivy,2) = 1.0d+00
+      evroe(1,ivz,3) = 1.0d+00
+
+! initiate the matrix of right eigenvectors
+!
+      evroe(2,1,idn) = 1.0d+00
+      evroe(2,2,ivy) = 1.0d+00
+      evroe(2,3,ivz) = 1.0d+00
+      evroe(2,4,idn) = 1.0d+00
+      evroe(2,5,idn) = 1.0d+00
+
+! unset the first execution flag
+!
+      first = .false.
+
+    end if ! first execution
+
+! calculate characteristic speeds and useful variables
+!
+    vv = sum(q(ivx:ivz)**2)
+    vh = 0.5d+00 * vv
+    c2 = gammam1 * (q(ien) - vh)
+    na = 0.5d+00 / c2
+    cc = sqrt(c2)
+    vc = q(ivx) * cc
+    ng = na * gammam1
+    nd = 2.0d+00 * ng
+    nw = na * vc
+    nh = na * gammam1 * vh
+    nc = na * cc
+
+! prepare eigenvalues
+!
+    c(1)           = q(ivx) - cc
+    c(2)           = q(ivx)
+    c(3)           = q(ivx)
+    c(4)           = q(ivx)
+    c(5)           = q(ivx) + cc
+
+! update the varying elements of the matrix of left eigenvectors
+!
+    evroe(1,idn,1) =   nh + nw
+    evroe(1,ivx,1) = - ng * q(ivx) - nc
+    evroe(1,ivy,1) = - ng * q(ivy)
+    evroe(1,ivz,1) = - ng * q(ivz)
+    evroe(1,ien,1) =   ng
+
+    evroe(1,idn,2) = - q(ivy)
+
+    evroe(1,idn,3) = - q(ivz)
+
+    evroe(1,idn,4) = 1.0d+00 - ng * vv
+    evroe(1,ivx,4) =   nd * q(ivx)
+    evroe(1,ivy,4) =   nd * q(ivy)
+    evroe(1,ivz,4) =   nd * q(ivz)
+    evroe(1,ien,4) = - nd
+
+    evroe(1,idn,5) =   nh - nw
+    evroe(1,ivx,5) = - ng * q(ivx) + nc
+    evroe(1,ivy,5) = - ng * q(ivy)
+    evroe(1,ivz,5) = - ng * q(ivz)
+    evroe(1,ien,5) =   ng
+
+! update the varying elements of the matrix of right eigenvectors
+!
+    evroe(2,1,ivx) = q(ivx) - cc
+    evroe(2,1,ivy) = q(ivy)
+    evroe(2,1,ivz) = q(ivz)
+    evroe(2,1,ien) = q(ien) - vc
+
+    evroe(2,2,ien) = q(ivy)
+
+    evroe(2,3,ien) = q(ivz)
+
+    evroe(2,4,ivx) = q(ivx)
+    evroe(2,4,ivy) = q(ivy)
+    evroe(2,4,ivz) = q(ivz)
+    evroe(2,4,ien) = vh
+
+    evroe(2,5,ivx) = q(ivx) + cc
+    evroe(2,5,ivy) = q(ivy)
+    evroe(2,5,ivz) = q(ivz)
+    evroe(2,5,ien) = q(ien) + vc
+
+! copy matrices of eigenvectors
+!
+    l(1:nv,1:nv) = evroe(1,1:nv,1:nv)
+    r(1:nv,1:nv) = evroe(2,1:nv,1:nv)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine esystem_roe_hd_adi
 !
 !*******************************************************************************
 !
