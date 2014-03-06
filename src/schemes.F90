@@ -46,12 +46,16 @@ module schemes
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imu, imf, imr
+  integer            , save :: imi, imu, imf, ims, imr
 #endif /* PROFILE */
 
 ! pointer to the flux update procedure
 !
   procedure(update_flux_hd_iso), pointer, save :: update_flux => null()
+
+! pointer to the state reconstruction
+!
+  procedure(states_hd_iso)     , pointer, save :: states      => null()
 
 ! pointer to the Riemann solver
 !
@@ -93,8 +97,8 @@ module schemes
 
 ! include external procedures and variables
 !
-    use equations , only : eqsys, eos
-    use parameters, only : get_parameter_string
+    use equations      , only : eqsys, eos
+    use parameters     , only : get_parameter_string
 
 ! local variables are not implicit by default
 !
@@ -118,6 +122,7 @@ module schemes
     call set_timer('schemes:: initialization'  , imi)
     call set_timer('schemes:: increment update', imu)
     call set_timer('schemes:: flux update'     , imf)
+    call set_timer('schemes:: Riemann states'  , ims)
     call set_timer('schemes:: Riemann solver'  , imr)
 
 ! start accounting time for module initialization/finalization
@@ -146,6 +151,7 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_iso
+        states      => states_hd_iso
 
 ! select the Riemann solver
 !
@@ -171,6 +177,7 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_adi
+        states      => states_hd_adi
 
 ! select the Riemann solver
 !
@@ -215,6 +222,7 @@ module schemes
 ! set pointers to the subroutines
 !
         update_flux => update_flux_mhd_iso
+        states      => states_mhd_iso
 
 ! select the Riemann solver
 !
@@ -259,6 +267,7 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_mhd_adi
+        states      => states_mhd_adi
 
 ! select the Riemann solver
 !
@@ -354,6 +363,7 @@ module schemes
 ! nullify procedure pointers
 !
     nullify(update_flux)
+    nullify(states)
     nullify(riemann)
 
 #ifdef PROFILE
@@ -386,8 +396,8 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
 
 ! local variables are not implicit by default
 !
@@ -475,9 +485,9 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz
 
 ! local variables are not implicit by default
 !
@@ -496,10 +506,10 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, fx
-    real(kind=8), dimension(nv,jm) :: qy, fy
+    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
+    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
 #if NDIMS == 3
-    real(kind=8), dimension(nv,km) :: qz, fz
+    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -531,9 +541,13 @@ module schemes
           qx(ivy,1:im) = q(ivy,1:im,j,k)
           qx(ivz,1:im) = q(ivz,1:im,j,k)
 
+! reconstruct Riemann states
+!
+          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -559,9 +573,13 @@ module schemes
           qy(ivy,1:jm) = q(ivz,i,1:jm,k)
           qy(ivz,1:jm) = q(ivx,i,1:jm,k)
 
+! reconstruct Riemann states
+!
+          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -588,9 +606,13 @@ module schemes
           qz(ivy,1:km) = q(ivx,i,j,1:km)
           qz(ivz,1:km) = q(ivy,i,j,1:km)
 
+! reconstruct Riemann states
+!
+          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
@@ -617,36 +639,27 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_HD_ISO_HLL:
-! -----------------------------
+! subroutine STATES_HD_ISO:
+! ------------------------
 !
-!   Subroutine solves one dimensional Riemann problem using
-!   the Harten-Lax-van Leer (HLL) method.
+!   Subroutine reconstructs the Riemann states.
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
-!
-!   References:
-!
-!     [1] Harten, A., Lax, P. D. & Van Leer, B.
-!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
-!          Conservation Laws",
-!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
 !
 !===============================================================================
 !
-  subroutine riemann_hd_iso_hll(n, h, q, f)
+  subroutine states_hd_iso(n, h, q, ql, qr)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn
+    use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
 !
@@ -657,16 +670,90 @@ module schemes
     integer                      , intent(in)  :: n
     real(kind=8)                 , intent(in)  :: h
     real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
+
+! local variables
+!
+    integer :: p
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the state reconstruction
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! check if the reconstruction gives negative values of density,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_hd_iso
+!
+!===============================================================================
+!
+! subroutine RIEMANN_HD_ISO_HLL:
+! -----------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLL) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Harten, A., Lax, P. D. & Van Leer, B.
+!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
+!          Conservation Laws",
+!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!
+!===============================================================================
+!
+  subroutine riemann_hd_iso_hll(n, ql, qr, f)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : ivx
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, srml
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -677,17 +764,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -773,9 +849,9 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
 
 ! local variables are not implicit by default
 !
@@ -794,10 +870,10 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, fx
-    real(kind=8), dimension(nv,jm) :: qy, fy
+    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
+    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
 #if NDIMS == 3
-    real(kind=8), dimension(nv,km) :: qz, fz
+    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -830,9 +906,13 @@ module schemes
           qx(ivz,1:im) = q(ivz,1:im,j,k)
           qx(ipr,1:im) = q(ipr,1:im,j,k)
 
+! reconstruct Riemann states
+!
+          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -860,9 +940,13 @@ module schemes
           qy(ivz,1:jm) = q(ivx,i,1:jm,k)
           qy(ipr,1:jm) = q(ipr,i,1:jm,k)
 
+! reconstruct Riemann states
+!
+          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -891,9 +975,13 @@ module schemes
           qz(ivz,1:km) = q(ivy,i,j,1:km)
           qz(ipr,1:km) = q(ipr,i,j,1:km)
 
+! reconstruct Riemann states
+!
+          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
@@ -921,36 +1009,27 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_HD_ADI_HLL:
-! -----------------------------
+! subroutine STATES_HD_ADI:
+! ------------------------
 !
-!   Subroutine solves one dimensional Riemann problem using
-!   the Harten-Lax-van Leer (HLL) method.
+!   Subroutine reconstructs the Riemann states.
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
-!
-!   References:
-!
-!     [1] Harten, A., Lax, P. D. & Van Leer, B.
-!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
-!          Conservation Laws",
-!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
 !
 !===============================================================================
 !
-  subroutine riemann_hd_adi_hll(n, h, q, f)
+  subroutine states_hd_adi(n, h, q, ql, qr)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ipr, ivx
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ipr
+    use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
 !
@@ -961,16 +1040,91 @@ module schemes
     integer                      , intent(in)  :: n
     real(kind=8)                 , intent(in)  :: h
     real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
+
+! local variables
+!
+    integer :: p
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the state reconstruction
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! check if the reconstruction gives negative values of density or pressure,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_hd_adi
+!
+!===============================================================================
+!
+! subroutine RIEMANN_HD_ADI_HLL:
+! -----------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLL) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Harten, A., Lax, P. D. & Van Leer, B.
+!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
+!          Conservation Laws",
+!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!
+!===============================================================================
+!
+  subroutine riemann_hd_adi_hll(n, ql, qr, f)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : ivx
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, srml
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -981,18 +1135,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -1063,10 +1205,9 @@ module schemes
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
 !
 !   References:
 !
@@ -1076,14 +1217,13 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_hd_adi_hllc(n, h, q, f)
+  subroutine riemann_hd_adi_hllc(n, ql, qr, f)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, ivy, ivz, ipr, imx, imy, imz, ien
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, imx, imy, imz, ien
+    use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
 !
@@ -1092,20 +1232,19 @@ module schemes
 ! subroutine arguments
 !
     integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, sm
     real(kind=8)                  :: srml, slmm, srmm
     real(kind=8)                  :: dn, pr
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, ui
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -1116,18 +1255,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -1269,10 +1396,10 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz
-    use equations  , only : ibx, iby, ibz, ibp
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz
+    use equations      , only : ibx, iby, ibz, ibp
 
 ! local variables are not implicit by default
 !
@@ -1291,10 +1418,10 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, fx
-    real(kind=8), dimension(nv,jm) :: qy, fy
+    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
+    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
 #if NDIMS == 3
-    real(kind=8), dimension(nv,km) :: qz, fz
+    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -1330,9 +1457,13 @@ module schemes
           qx(ibz,1:im) = q(ibz,1:im,j,k)
           qx(ibp,1:im) = q(ibp,1:im,j,k)
 
+! reconstruct Riemann states
+!
+          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -1366,9 +1497,13 @@ module schemes
           qy(ibz,1:jm) = q(ibx,i,1:jm,k)
           qy(ibp,1:jm) = q(ibp,i,1:jm,k)
 
+! reconstruct Riemann states
+!
+          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -1403,9 +1538,13 @@ module schemes
           qz(ibz,1:km) = q(iby,i,j,1:km)
           qz(ibp,1:km) = q(ibp,i,j,1:km)
 
+! reconstruct Riemann states
+!
+          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
@@ -1436,37 +1575,28 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_MHD_ISO_HLL:
-! ------------------------------
+! subroutine STATES_MHD_ISO:
+! -------------------------
 !
-!   Subroutine solves one dimensional Riemann problem using
-!   the Harten-Lax-van Leer (HLL) method.
+!   Subroutine reconstructs the Riemann states.
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
-!
-!   References:
-!
-!     [1] Harten, A., Lax, P. D. & Van Leer, B.
-!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
-!          Conservation Laws",
-!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_iso_hll(n, h, q, f)
+  subroutine states_mhd_iso(n, h, q, ql, qr)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, ibx, ibp
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ibx, ibp
+    use equations      , only : cmax
+    use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
 !
@@ -1477,25 +1607,19 @@ module schemes
     integer                      , intent(in)  :: n
     real(kind=8)                 , intent(in)  :: h
     real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
 
 ! local variables
 !
-    integer                       :: p, i
-    real(kind=8)                  :: sl, sr, srml
-
-! local arrays to store the states
-!
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
-    real(kind=8), dimension(nv)   :: wl, wr
-    real(kind=8), dimension(n)    :: cl, cr
+    integer      :: i, p
+    real(kind=8) :: bx, bp
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for Riemann solver
+! start accounting time for the state reconstruction
 !
-    call start_timer(imr)
+    call start_timer(ims)
 #endif /* PROFILE */
 
 ! reconstruct the left and right states of primitive variables
@@ -1506,17 +1630,94 @@ module schemes
 
 ! obtain the state values for Bx and Psi for the GLM-MHD equations
 !
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
+    do i = 1, n
 
-! check if the reconstruction doesn't give the negative density or pressure,
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
+
+! check if the reconstruction gives negative values of density,
 ! if so, correct the states
 !
     call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_mhd_iso
+!
+!===============================================================================
+!
+! subroutine RIEMANN_MHD_ISO_HLL:
+! ------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLL) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Harten, A., Lax, P. D. & Van Leer, B.
+!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
+!          Conservation Laws",
+!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!
+!===============================================================================
+!
+  subroutine riemann_mhd_iso_hll(n, ql, qr, f)
+
+! include external variables and procedures
+!
+    use equations      , only : nv
+    use equations      , only : ivx
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                       :: i
+    real(kind=8)                  :: sl, sr, srml
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: wl, wr
+    real(kind=8), dimension(n)    :: cl, cr
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -1586,10 +1787,9 @@ module schemes
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
 !
 !   References:
 !
@@ -1600,15 +1800,13 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_iso_hlld(n, h, q, f)
+  subroutine riemann_mhd_iso_hlld(n, ql, qr, f)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
+    use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
 !
@@ -1617,19 +1815,18 @@ module schemes
 ! subroutine arguments
 !
     integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
     real(kind=8)                  :: bx, b2, dn, dnl, dnr, dvl, dvr
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -1640,26 +1837,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -1979,10 +2156,9 @@ module schemes
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
 !
 !   References:
 !
@@ -1992,15 +2168,13 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_iso_hlldm(n, h, q, f)
+  subroutine riemann_mhd_iso_hlldm(n, ql, qr, f)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
+    use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
 !
@@ -2009,19 +2183,18 @@ module schemes
 ! subroutine arguments
 !
     integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
     real(kind=8)                  :: bx, b2, dn, dnl, dnr, dvl, dvr, ca
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -2032,26 +2205,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -2385,10 +2538,10 @@ module schemes
 
 ! include external variables
 !
-    use coordinates, only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
-    use equations  , only : ibx, iby, ibz, ibp
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
+    use equations      , only : ibx, iby, ibz, ibp
 
 ! local variables are not implicit by default
 !
@@ -2407,10 +2560,10 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, fx
-    real(kind=8), dimension(nv,jm) :: qy, fy
+    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
+    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
 #if NDIMS == 3
-    real(kind=8), dimension(nv,km) :: qz, fz
+    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -2447,9 +2600,13 @@ module schemes
           qx(ibp,1:im) = q(ibp,1:im,j,k)
           qx(ipr,1:im) = q(ipr,1:im,j,k)
 
+! reconstruct Riemann states
+!
+          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, dx, qx(1:nv,1:im), fx(1:nv,1:im))
+          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -2485,9 +2642,13 @@ module schemes
           qy(ibp,1:jm) = q(ibp,i,1:jm,k)
           qy(ipr,1:jm) = q(ipr,i,1:jm,k)
 
+! reconstruct Riemann states
+!
+          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, dx, qy(1:nv,1:jm), fy(1:nv,1:jm))
+          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -2524,9 +2685,13 @@ module schemes
           qz(ibp,1:km) = q(ibp,i,j,1:km)
           qz(ipr,1:km) = q(ipr,i,j,1:km)
 
+! reconstruct Riemann states
+!
+          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, dx, qz(1:nv,1:km), fz(1:nv,1:km))
+          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
@@ -2558,37 +2723,28 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_MHD_ADI_HLL:
-! ------------------------------
+! subroutine STATES_MHD_ADI:
+! -------------------------
 !
-!   Subroutine solves one dimensional Riemann problem using
-!   the Harten-Lax-van Leer (HLL) method.
+!   Subroutine reconstructs the Riemann states.
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
-!
-!   References:
-!
-!     [1] Harten, A., Lax, P. D. & Van Leer, B.
-!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
-!          Conservation Laws",
-!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_adi_hll(n, h, q, f)
+  subroutine states_mhd_adi(n, h, q, ql, qr)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ipr, ivx, ibx, ibp
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ipr, ibx, ibp
+    use equations      , only : cmax
+    use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
 !
@@ -2599,16 +2755,108 @@ module schemes
     integer                      , intent(in)  :: n
     real(kind=8)                 , intent(in)  :: h
     real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
+
+! local variables
+!
+    integer      :: i, p
+    real(kind=8) :: bx, bp
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the state reconstruction
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do ! p = 1, nv
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
+
+! check if the reconstruction gives negative values of density or density,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_mhd_adi
+!
+!===============================================================================
+!
+! subroutine RIEMANN_MHD_ADI_HLL:
+! ------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLL) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Harten, A., Lax, P. D. & Van Leer, B.
+!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
+!          Conservation Laws",
+!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!
+!===============================================================================
+!
+  subroutine riemann_mhd_adi_hll(n, ql, qr, f)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : ivx
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, srml
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -2619,27 +2867,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -2710,10 +2937,9 @@ module schemes
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
 !
 !   References:
 !
@@ -2729,16 +2955,14 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_adi_hllc(n, h, q, f)
+  subroutine riemann_mhd_adi_hllc(n, ql, qr, f)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
-    use equations     , only : imx, imy, imz, ien
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
+    use equations      , only : imx, imy, imz, ien
+    use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
 !
@@ -2747,19 +2971,18 @@ module schemes
 ! subroutine arguments
 !
     integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
     real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, ui
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -2770,27 +2993,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3014,10 +3216,9 @@ module schemes
 !
 !   Arguments:
 !
-!     n - the length of input vectors;
-!     h - the spatial step;
-!     q - the input array of primitive variables;
-!     f - the output array of fluxes;
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
 !
 !   References:
 !
@@ -3028,16 +3229,14 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_mhd_adi_hlld(n, h, q, f)
+  subroutine riemann_mhd_adi_hlld(n, ql, qr, f)
 
 ! include external procedures
 !
-    use equations     , only : nv
-    use equations     , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
-    use equations     , only : imx, imy, imz, ien
-    use equations     , only : cmax
-    use equations     , only : prim2cons, fluxspeed
-    use interpolations, only : reconstruct, fix_positivity
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
+    use equations      , only : imx, imy, imz, ien
+    use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
 !
@@ -3046,20 +3245,19 @@ module schemes
 ! subroutine arguments
 !
     integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
     real(kind=8), dimension(nv,n), intent(out) :: f
 
 ! local variables
 !
-    integer                       :: p, i
+    integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
     real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb, dv
     real(kind=8)                  :: dnl, dnr, cal, car, sml, smr
 
 ! local arrays to store the states
 !
-    real(kind=8), dimension(nv,n) :: ql, qr, ul, ur, fl, fr
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
     real(kind=8), dimension(n)    :: cl, cr
 !
@@ -3070,27 +3268,6 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    cl(:) = 0.5d+00 * ((qr(ibx,:) + ql(ibx,:)) - (qr(ibp,:) - ql(ibp,:)) / cmax)
-    cr(:) = 0.5d+00 * ((qr(ibp,:) + ql(ibp,:)) - (qr(ibx,:) - ql(ibx,:)) * cmax)
-    ql(ibx,:) = cl(:)
-    qr(ibx,:) = cl(:)
-    ql(ibp,:) = cr(:)
-    qr(ibp,:) = cr(:)
-
-! check if the reconstruction doesn't give the negative density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
 
 ! calculate corresponding conserved variables of the left and right states
 !
