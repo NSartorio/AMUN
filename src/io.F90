@@ -61,17 +61,17 @@ module io
 !             (in hours);
 !   hsnap   - the problem time interval for regular snapshot storing;
 !
-  character(len=255), save :: respath = "./"
-  character         , save :: ftype   = "p"
-  integer           , save :: nrest   = -1
-  integer(kind=4)   , save :: irest   =  1
-  integer(kind=4)   , save :: isnap   = -1
-  real              , save :: hrest   =  6.0d+00
-  real              , save :: hsnap   =  1.0d+00
+  character(len=255), save :: respath     = "./"
+  character         , save :: ftype       = "p"
+  integer           , save :: nrest       = -1
+  integer(kind=4)   , save :: irest       =  1
+  integer(kind=4)   , save :: isnap       = -1
+  real              , save :: hrest       =  6.0d+00
+  real              , save :: hsnap       =  1.0d+00
 
 ! flags to determine the way of data writing
 !
-  logical           , save :: with_ghosts = .false.
+  logical           , save :: with_ghosts = .true.
 
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
@@ -141,7 +141,7 @@ module io
 
 ! local variables
 !
-    character(len=255) :: ghosts = "off"
+    character(len=255) :: ghosts = "on"
     integer            :: dd, hh, mm, ss
 !
 !-------------------------------------------------------------------------------
@@ -171,15 +171,15 @@ module io
 
 ! get the flag determining if the ghost cells are stored
 !
-    call get_parameter_string ("include_ghosts", ghosts )
+    call get_parameter_string ("include_ghosts"   , ghosts )
 
 ! check ghost cell storing flag
 !
     select case(trim(ghosts))
-    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
-      with_ghosts = .true.
-    case default
+    case ("off", "OFF", "n", "N", "false", "FALSE", "no", "NO")
       with_ghosts = .false.
+    case default
+      with_ghosts = .true.
     end select
 
 ! return the run number
@@ -193,6 +193,11 @@ module io
                                      "snapshot type", "primitive variables"
       if (ftype == 'c') write (*,"(4x,a13,10x,'=',1x,a)")                      &
                                      "snapshot type", "conservative variables"
+      if (with_ghosts) then
+        write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "on"
+      else
+        write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "off"
+      end if
       write (*,"(4x,a21,2x,'=',1x,e9.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
         dd = int(hrest / 2.4d+01)
