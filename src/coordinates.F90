@@ -49,6 +49,10 @@ module coordinates
 !
   integer     , save :: im = 12, jm = 12, km =  1
 
+! the domain block dimensions including the ghost zones
+!
+  integer     , save :: it = 11, jt = 11, kt =  1
+
 ! the domain division
 !
   integer     , save :: ir =  1, jr =  1, kr =  1
@@ -171,6 +175,14 @@ module coordinates
     jm = jn + 2 * ng
 #if NDIMS == 3
     km = kn + 2 * ng
+#endif /* NDIMS == 3 */
+
+! prepare indices
+!
+    it = im - nh + 1
+    jt = jm - nh + 1
+#if NDIMS == 3
+    kt = km - nh + 1
 #endif /* NDIMS == 3 */
 
 ! calculate block indices
