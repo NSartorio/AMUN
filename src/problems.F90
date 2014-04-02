@@ -131,6 +131,9 @@ module problems
     case("blast")
       setup_problem => setup_problem_blast
 
+    case("implosion")
+      setup_problem => setup_problem_implosion
+
     case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
       setup_problem => setup_problem_kelvin_helmholtz
 
@@ -504,6 +507,228 @@ module problems
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_blast
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_IMPLOSION:
+! ----------------------------------
+!
+!   Subroutine sets the initial conditions for the implosion problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_implosion(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data, ndims
+    use constants  , only : d2r
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az, adx, ady, adz
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: sline  = 1.50d-01
+    real(kind=8), save :: adens  = 1.00d+00
+    real(kind=8), save :: apres  = 1.00d+00
+    real(kind=8), save :: drat   = 1.25d-01
+    real(kind=8), save :: prat   = 1.40d-01
+    real(kind=8), save :: buni   = 1.00d+00
+    real(kind=8), save :: bgui   = 0.00d+00
+    real(kind=8), save :: angle  = 0.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: odens = 1.25d-01
+    real(kind=8), save :: opres = 1.40d-01
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: rl, ru, dx, dy, dz, dxh, dyh, dzh, ds, dl, dr
+    real(kind=8)  :: sn, cs
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x, xl, xu
+    real(kind=8), dimension(jm)    :: y, yl, yu
+    real(kind=8), dimension(km)    :: z, zl, zu
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("shock_line"      , sline )
+      call get_parameter_real("ambient_density" , adens )
+      call get_parameter_real("ambient_pressure", apres )
+      call get_parameter_real("density_ratio"   , drat  )
+      call get_parameter_real("pressure_ratio"  , prat  )
+      call get_parameter_real("buni"            , buni  )
+      call get_parameter_real("bgui"            , bgui  )
+      call get_parameter_real("angle"           , angle )
+
+! calculate parameters
+!
+      odens = drat * adens
+      opres = prat * apres
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+#endif /* NDIMS == 3 */
+
+! calculate mesh intervals and areas
+!
+    dx  = adx(pdata%meta%level)
+    dy  = ady(pdata%meta%level)
+#if NDIMS == 3
+    dz  = adz(pdata%meta%level)
+#endif /* NDIMS == 3 */
+    dxh  = 0.5d+00 * dx
+    dyh  = 0.5d+00 * dy
+#if NDIMS == 3
+    dzh  = 0.5d+00 * dz
+#endif /* NDIMS == 3 */
+
+! calculate edge coordinates
+!
+    xl(:) = x(:) - dxh
+    xu(:) = x(:) + dxh
+    yl(:) = y(:) - dyh
+    yu(:) = y(:) + dyh
+#if NDIMS == 3
+    zl(:) = z(:) - dzh
+    zu(:) = z(:) + dzh
+#endif /* NDIMS == 3 */
+
+! reset velocity components
+!
+    q(ivx,:) = 0.0d+00
+    q(ivy,:) = 0.0d+00
+    q(ivz,:) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+! calculate the orientation angles
+!
+      sn = sin(d2r * angle)
+      cs = sqrt(1.0d+00 - sn * sn)
+
+! set magnetic field components
+!
+      q(ibx,:) = buni * cs
+      q(iby,:) = buni * sn
+      q(ibz,:) = bgui
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions
+!
+    do k = 1, km
+      do j = 1, jm
+        do i = 1, im
+
+! calculate the distance from the origin
+!
+#if NDIMS == 3
+          rl = xl(i) + yl(j) + zl(k)
+          ru = xu(i) + yu(j) + zu(k)
+#else /* NDIMS == 3 */
+          rl = xl(i) + yl(j)
+          ru = xu(i) + yu(j)
+#endif /* NDIMS == 3 */
+
+! initialize density and pressure
+!
+          if (ru <= sline) then
+            q(idn,i) = odens
+            if (ipr > 0) q(ipr,i) = opres
+          else if (rl >= sline) then
+            q(idn,i) = adens
+            if (ipr > 0) q(ipr,i) = apres
+          else
+            ds = (sline - rl) / dx
+            if (ds <= 1.0d+00) then
+              dl = 5.0d-01 * ds**ndims
+              dr = 1.0d+00 - dl
+            else
+              ds = (ru - sline) / dx
+              dr = 5.0d-01 * ds**ndims
+              dl = 1.0d+00 - dr
+            end if
+
+            q(idn,i) = adens * dl + odens * dr
+            if (ipr > 0) q(ipr,i) = apres * dl + opres * dr
+          end if
+
+        end do ! i = 1, im
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_implosion
 !
 !===============================================================================
 !
