@@ -326,6 +326,10 @@ module boundaries
 !
     call update_corners()
 
+! convert updated primitive variables to conservative ones in all ghost cells
+!
+    call update_ghost_cells()
+
 #ifdef PROFILE
 ! stop accounting time for variable boundary update
 !
@@ -1018,6 +1022,110 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine update_corners
+!
+!===============================================================================
+!
+! subroutine UPDATE_GHOST_CELLS:
+! -----------------------------
+!
+!   Subroutine updates conservative variables in all ghost cells from
+!   already updated primitive variables.
+!
+!
+!===============================================================================
+!
+  subroutine update_ghost_cells()
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im , jm , km , in , jn , kn
+    use coordinates   , only : ib , jb , kb , ie , je , ke
+    use coordinates   , only : ibl, jbl, kbl, ieu, jeu, keu
+    use equations     , only : nv
+    use equations     , only : prim2cons
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer                   :: i, j, k
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! assign the pointer to the first block on the list
+!
+    pdata => list_data
+
+! scan all data blocks until the last is reached
+!
+    do while(associated(pdata))
+
+! update the X and Y boundary ghost cells
+!
+      do k = 1, km
+
+! update lower layers of the Y boundary
+!
+        do j = 1, jbl
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = 1, jbl
+
+! update upper layers of the Y boundary
+!
+        do j = jeu, jm
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = jeu, jm
+
+! update remaining left layers of the X boundary
+!
+        do i = 1, ibl
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+! update remaining right layers of the X boundary
+!
+        do i = ieu, im
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+      end do ! k = 1, km
+
+#if NDIMS == 3
+! update the Z boundary ghost cells
+!
+      do j = jb, je
+
+! update the remaining front layers of the Z boundary
+!
+        do k = 1, kbl
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = 1, kbl
+
+! update the remaining back layers of the Z boundary
+!
+        do k = keu, km
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = keu, km
+
+      end do ! j = jb, je
+#endif /* NDIMS == 3 */
+
+! assign the pointer to the next block on the list
+!
+      pdata => pdata%next
+
+    end do ! data blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_ghost_cells
 !
 !===============================================================================
 !
