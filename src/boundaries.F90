@@ -1390,27 +1390,27 @@ module boundaries
                         case(1)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,iel:ie,:,:), idir, iside)
+                                   , pneigh%data%q(:,iel:ie,:,:), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,ib:ibu,:,:), idir, iside)
+                                   , pneigh%data%q(:,ib:ibu,:,:), idir, iside)
                           end if
                         case(2)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,jel:je,:), idir, iside)
+                                   , pneigh%data%q(:,:,jel:je,:), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,jb:jbu,:), idir, iside)
+                                   , pneigh%data%q(:,:,jb:jbu,:), idir, iside)
                           end if
 #if NDIMS == 3
                         case(3)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,:,kel:ke), idir, iside)
+                                   , pneigh%data%q(:,:,:,kel:ke), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,:,kb:kbu), idir, iside)
+                                   , pneigh%data%q(:,:,:,kb:kbu), idir, iside)
                           end if
 #endif /* NDIMS == 3 */
                         end select
@@ -1539,9 +1539,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,iel:ie,:,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,iel:ie,:,:)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,ib:ibu,:,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,ib:ibu,:,:)
                 end if
 
 ! associate the pointer with the next block
@@ -1567,9 +1567,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jel:je,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jel:je,:)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jb:jbu,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jb:jbu,:)
                 end if
 
 ! associate the pointer with the next block
@@ -1596,9 +1596,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kel:ke)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kel:ke)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kb:kbu)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kb:kbu)
                 end if
 
 ! associate the pointer with the next block
@@ -2984,13 +2984,13 @@ module boundaries
 !   Arguments:
 !
 !     pdata - the pointer to modified data block;
-!     u     - the variable array from which boundaries are updated;
+!     q     - the variable array from which boundaries are updated;
 !     idir  - the direction to be processed;
 !     iside - the side to be processed;
 !
 !===============================================================================
 !
-  subroutine boundary_copy(pdata, u, idir, iside)
+  subroutine boundary_copy(pdata, q, idir, iside)
 
 ! import external procedures and variables
 !
@@ -3005,7 +3005,7 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
+    real   , dimension(:,:,:,:), intent(in)    :: q
     integer                    , intent(in)    :: idir, iside
 !
 !-------------------------------------------------------------------------------
@@ -3017,26 +3017,26 @@ module boundaries
     case(1)
 
       if (iside == 1) then
-        pdata%u(1:nv,  1:ibl,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+        pdata%q(1:nv,  1:ibl,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
       else
-        pdata%u(1:nv,ieu:im ,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+        pdata%q(1:nv,ieu:im ,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
       end if
 
     case(2)
 
       if (iside == 1) then
-        pdata%u(1:nv,1:im,  1:jbl,1:km) = u(1:nv,1:im,1:ng,1:km)
+        pdata%q(1:nv,1:im,  1:jbl,1:km) = q(1:nv,1:im,1:ng,1:km)
       else
-        pdata%u(1:nv,1:im,jeu:jm ,1:km) = u(1:nv,1:im,1:ng,1:km)
+        pdata%q(1:nv,1:im,jeu:jm ,1:km) = q(1:nv,1:im,1:ng,1:km)
       end if
 
 #if NDIMS == 3
     case(3)
 
       if (iside == 1) then
-        pdata%u(1:nv,1:im,1:jm,  1:kbl) = u(1:nv,1:im,1:jm,1:ng)
+        pdata%q(1:nv,1:im,1:jm,  1:kbl) = q(1:nv,1:im,1:jm,1:ng)
       else
-        pdata%u(1:nv,1:im,1:jm,keu:km ) = u(1:nv,1:im,1:jm,1:ng)
+        pdata%q(1:nv,1:im,1:jm,keu:km ) = q(1:nv,1:im,1:jm,1:ng)
       end if
 #endif /* NDIMS == 3 */
 
