@@ -2772,10 +2772,11 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : block_data
-    use coordinates    , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
-                            , jbl, je, jeu, kb, kbl, ke, keu
+    use coordinates    , only : im , jm , km , ng
+    use coordinates    , only : ib , jb , kb , ie , je , ke
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
     use equations      , only : nv
-    use equations      , only : idn, imx, imy, imz, ibx, iby, ibz, ibp
+    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use error          , only : print_warning
 
 ! local variables are not implicit by default
@@ -2816,15 +2817,15 @@ module boundaries
           it = ib  - i
           is = ibl + i
 
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
+          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
 
         end do
 
       case default ! "open" as default boundary conditions
 
         do i = 1, ng
-          pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
+          pdata%q(  :,i,:,:) = pdata%q(:,ib,:,:)
         end do
 
       end select
@@ -2843,14 +2844,14 @@ module boundaries
           it = ie  + i
           is = ieu - i
 
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
+          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
         end do
 
       case default ! "open" as default boundary conditions
 
         do i = ieu, im
-          pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
+          pdata%q(  :,i ,:,:) =   pdata%q(  :,ie,:,:)
         end do
 
       end select
@@ -2869,14 +2870,14 @@ module boundaries
           jt = jb  - j
           js = jbl + j
 
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
+          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
       case default ! "open" as default boundary conditions
 
         do j = 1, ng
-          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,jb,:)
         end do
 
       end select
@@ -2895,14 +2896,14 @@ module boundaries
           jt = je  + j
           js = jeu - j
 
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
+          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
       case default ! "open" as default boundary conditions
 
         do j = jeu, jm
-          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,je,:)
         end do
 
       end select
@@ -2922,14 +2923,14 @@ module boundaries
           kt = kb  - k
           ks = kbl + k
 
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
+          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
       case default ! "open" as default boundary conditions
 
         do k = 1, ng
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,kb)
         end do
 
       end select
@@ -2948,14 +2949,14 @@ module boundaries
           kt = ke  + k
           ks = keu - k
 
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
+          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
       case default ! "open" as default boundary conditions
 
         do k = keu, km
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,ke)
         end do
 
       end select
