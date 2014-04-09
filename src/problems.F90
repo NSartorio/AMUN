@@ -630,13 +630,13 @@ module problems
 
 ! calculate edge coordinates
 !
-    xl(:) = x(:) - dxh
-    xu(:) = x(:) + dxh
-    yl(:) = y(:) - dyh
-    yu(:) = y(:) + dyh
+    xl(:) = abs(x(:)) - dxh
+    xu(:) = abs(x(:)) + dxh
+    yl(:) = abs(y(:)) - dyh
+    yu(:) = abs(y(:)) + dyh
 #if NDIMS == 3
-    zl(:) = z(:) - dzh
-    zu(:) = z(:) + dzh
+    zl(:) = abs(z(:)) - dzh
+    zu(:) = abs(z(:)) + dzh
 #endif /* NDIMS == 3 */
 
 ! reset velocity components
