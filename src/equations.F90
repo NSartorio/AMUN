@@ -605,7 +605,8 @@ module equations
 
 ! include external procedures and variables
 !
-    use coordinates, only : im, jm, km
+    use coordinates, only : im, jm, km, in, jn, kn
+    use coordinates, only : ib, jb, kb, ie, je, ke
 
 ! local variables are not implicit by default
 !
@@ -618,29 +619,21 @@ module equations
 
 ! temporary variables
 !
-    integer                        :: j, k
-
-! temporary array to store conserved variable vector
-!
-    real(kind=8), dimension(nv,im) :: u
+    integer :: j, k
 !
 !-------------------------------------------------------------------------------
 !
 ! update primitive variables
 !
-    do k = 1, km
-      do j = 1, jm
-
-! copy variables to temporary array of conserved variables
-!
-        u(1:nv,1:im) = uu(1:nv,1:im,j,k)
+    do k = kb, ke
+      do j = jb, je
 
 ! convert conserved variables to primitive ones
 !
-        call cons2prim(im, u(1:nv,1:im), qq(1:nv,1:im,j,k))
+        call cons2prim(in, uu(1:nv,ib:ie,j,k), qq(1:nv,ib:ie,j,k))
 
-      end do ! j = 1, jm
-    end do ! k = 1, km
+      end do ! j = jb, je
+    end do ! k = kb, ke
 
 !-------------------------------------------------------------------------------
 !
