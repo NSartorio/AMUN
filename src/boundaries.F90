@@ -1914,7 +1914,7 @@ module boundaries
 ! update boundaries of the current block
 !
                       call boundary_restrict(pdata                             &
-                                         , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
+                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
                                                         , idir, iside, iface)
 
 #ifdef MPI
@@ -2046,7 +2046,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
 
 ! associate the pointer with the next block
 !
@@ -2081,7 +2081,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
 
 ! associate the pointer with the next block
 !
@@ -2117,7 +2117,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
 
 ! associate the pointer with the next block
 !
@@ -3058,12 +3058,12 @@ module boundaries
 !   Arguments:
 !
 !     pdata              - the input data block;
-!     u                  - the conserved array;
+!     q                  - the variable array from which boundaries are updated;
 !     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
-  subroutine boundary_restrict(pdata, u, idir, iside, iface)
+  subroutine boundary_restrict(pdata, q, idir, iside, iface)
 
 ! import external procedures and variables
 !
@@ -3080,7 +3080,7 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data)           , pointer, intent(inout) :: pdata
-    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: u
+    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: q
     integer                             , intent(in)    :: idir, iside, iface
 
 ! local variables
@@ -3220,22 +3220,22 @@ module boundaries
 ! update boundaries of the conserved variables
 !
 #if NDIMS == 2
-    pdata%u(:,is:it,js:jt, 1   ) =                                             &
-                               2.50d-01 *  ((u(1:nv,il:iu:2,jl:ju:2, 1     )   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
-                                        +   (u(1:nv,il:iu:2,jp:ju:2, 1     )   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2, 1     )))
+    pdata%q(:,is:it,js:jt, 1   ) =                                             &
+                               2.50d-01 *  ((q(1:nv,il:iu:2,jl:ju:2, 1     )   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
+                                        +   (q(1:nv,il:iu:2,jp:ju:2, 1     )   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2, 1     )))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    pdata%u(:,is:it,js:jt,ks:kt) =                                             &
-                               1.25d-01 * (((u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
-                                        +   (u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
-                                        +  ((u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
-                                        +   (u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+    pdata%q(:,is:it,js:jt,ks:kt) =                                             &
+                               1.25d-01 * (((q(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
+                                        +   (q(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
+                                        +  ((q(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
+                                        +   (q(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
