@@ -947,7 +947,7 @@ module boundaries
 
 ! local variables
 !
-    integer      :: n, i, j, k
+    integer      :: i, j, k, p
 
 ! local pointers
 !
@@ -965,50 +965,50 @@ module boundaries
 
 ! iterate over all variables
 !
-      do n = 1, nv
+      do p = 1, nv
 
 ! edges
 !
 #if NDIMS == 3
         do i = 1, im
 
-          pdata%u(n,i, 1:nh, 1:nh) = pdata%u(n,i,jbl,kbl)
-          pdata%u(n,i,jt:jm, 1:nh) = pdata%u(n,i,jeu,kbl)
-          pdata%u(n,i, 1:nh,kt:km) = pdata%u(n,i,jbl,keu)
-          pdata%u(n,i,jt:jm,kt:km) = pdata%u(n,i,jeu,keu)
+          pdata%q(p,i, 1:nh, 1:nh) = pdata%q(p,i,jbl,kbl)
+          pdata%q(p,i,jt:jm, 1:nh) = pdata%q(p,i,jeu,kbl)
+          pdata%q(p,i, 1:nh,kt:km) = pdata%q(p,i,jbl,keu)
+          pdata%q(p,i,jt:jm,kt:km) = pdata%q(p,i,jeu,keu)
 
         end do
 
         do j = 1, jm
 
-          pdata%u(n, 1:nh,j, 1:nh) = pdata%u(n,ibl,j,kbl)
-          pdata%u(n,it:im,j, 1:nh) = pdata%u(n,ieu,j,kbl)
-          pdata%u(n, 1:nh,j,kt:km) = pdata%u(n,ibl,j,keu)
-          pdata%u(n,it:im,j,kt:km) = pdata%u(n,ieu,j,keu)
+          pdata%q(p, 1:nh,j, 1:nh) = pdata%q(p,ibl,j,kbl)
+          pdata%q(p,it:im,j, 1:nh) = pdata%q(p,ieu,j,kbl)
+          pdata%q(p, 1:nh,j,kt:km) = pdata%q(p,ibl,j,keu)
+          pdata%q(p,it:im,j,kt:km) = pdata%q(p,ieu,j,keu)
 
         end do
 #endif /* == 3 */
 
         do k = 1, km
 
-          pdata%u(n, 1:nh, 1:nh,k) = pdata%u(n,ibl,jbl,k)
-          pdata%u(n,it:im, 1:nh,k) = pdata%u(n,ieu,jbl,k)
-          pdata%u(n, 1:nh,jt:jm,k) = pdata%u(n,ibl,jeu,k)
-          pdata%u(n,it:im,jt:jm,k) = pdata%u(n,ieu,jeu,k)
+          pdata%q(p, 1:nh, 1:nh,k) = pdata%q(p,ibl,jbl,k)
+          pdata%q(p,it:im, 1:nh,k) = pdata%q(p,ieu,jbl,k)
+          pdata%q(p, 1:nh,jt:jm,k) = pdata%q(p,ibl,jeu,k)
+          pdata%q(p,it:im,jt:jm,k) = pdata%q(p,ieu,jeu,k)
 
         end do
 
 ! corners
 !
 #if NDIMS == 3
-        pdata%u(n, 1:nh, 1:nh, 1:nh) = pdata%u(n,ibl,jbl,kbl)
-        pdata%u(n,it:im, 1:nh, 1:nh) = pdata%u(n,ieu,jbl,kbl)
-        pdata%u(n, 1:nh,jt:jm, 1:nh) = pdata%u(n,ibl,jeu,kbl)
-        pdata%u(n,it:im,jt:jm, 1:nh) = pdata%u(n,ieu,jeu,kbl)
-        pdata%u(n, 1:nh, 1:nh,kt:km) = pdata%u(n,ibl,jbl,keu)
-        pdata%u(n,it:im, 1:nh,kt:km) = pdata%u(n,ieu,jbl,keu)
-        pdata%u(n, 1:nh,jt:jm,kt:km) = pdata%u(n,ibl,jeu,keu)
-        pdata%u(n,it:im,jt:jm,kt:km) = pdata%u(n,ieu,jeu,keu)
+        pdata%q(p, 1:nh, 1:nh, 1:nh) = pdata%q(p,ibl,jbl,kbl)
+        pdata%q(p,it:im, 1:nh, 1:nh) = pdata%q(p,ieu,jbl,kbl)
+        pdata%q(p, 1:nh,jt:jm, 1:nh) = pdata%q(p,ibl,jeu,kbl)
+        pdata%q(p,it:im,jt:jm, 1:nh) = pdata%q(p,ieu,jeu,kbl)
+        pdata%q(p, 1:nh, 1:nh,kt:km) = pdata%q(p,ibl,jbl,keu)
+        pdata%q(p,it:im, 1:nh,kt:km) = pdata%q(p,ieu,jbl,keu)
+        pdata%q(p, 1:nh,jt:jm,kt:km) = pdata%q(p,ibl,jeu,keu)
+        pdata%q(p,it:im,jt:jm,kt:km) = pdata%q(p,ieu,jeu,keu)
 #endif /* == 3 */
 
       end do
