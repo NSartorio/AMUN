@@ -2423,7 +2423,7 @@ module boundaries
 ! update boundaries of the current block from its neighbor
 !
                         call boundary_prolong(pdata                            &
-                                         , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
+                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
                                                          , idir, iside, nface)
 
 #ifdef MPI
@@ -2557,7 +2557,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
 
 ! associate the pointer with the next block
 !
@@ -2592,7 +2592,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
 
 ! associate the pointer with the next block
 !
@@ -2628,7 +2628,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
 
 ! associate the pointer with the next block
 !
@@ -3254,12 +3254,12 @@ module boundaries
 !   Arguments:
 !
 !     pdata              - the input data block;
-!     u                  - the conserved array;
+!     q                  - the variable array from which boundaries are updated;
 !     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
-  subroutine boundary_prolong(pdata, u, idir, iside, iface)
+  subroutine boundary_prolong(pdata, q, idir, iside, iface)
 
 ! import external procedures and variables
 !
@@ -3277,16 +3277,16 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
+    real   , dimension(:,:,:,:), intent(in)    :: q
     integer                    , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
-    integer :: i, j, k, q
+    integer :: i, j, k, p
     integer :: ic, jc, kc, ip, jp, kp
     integer :: il, jl, kl, iu, ju, ku
     integer :: is, js, ks, it, jt, kt
-    real    :: dul, dur, dux, duy, duz
+    real    :: dql, dqr, dqx, dqy, dqz
 !
 !-------------------------------------------------------------------------------
 !
@@ -3403,37 +3403,37 @@ module boundaries
 
 ! iterate over all variables
 !
-          do q = 1, nv
+          do p = 1, nv
 
-            dul = u(q,i  ,j,k) - u(q,i-1,j,k)
-            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
-            dux = limiter(0.25d+00, dul, dur)
+            dql = q(p,i  ,j,k) - q(p,i-1,j,k)
+            dqr = q(p,i+1,j,k) - q(p,i  ,j,k)
+            dqx = limiter(0.25d+00, dql, dqr)
 
-            dul = u(q,i,j  ,k) - u(q,i,j-1,k)
-            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
-            duy = limiter(0.25d+00, dul, dur)
+            dql = q(p,i,j  ,k) - q(p,i,j-1,k)
+            dqr = q(p,i,j+1,k) - q(p,i,j  ,k)
+            dqy = limiter(0.25d+00, dql, dqr)
 
 #if NDIMS == 3
-            dul = u(q,i,j,k  ) - u(q,i,j,k-1)
-            dur = u(q,i,j,k+1) - u(q,i,j,k  )
-            duz = limiter(0.25d+00, dul, dur)
+            dql = q(p,i,j,k  ) - q(p,i,j,k-1)
+            dqr = q(p,i,j,k+1) - q(p,i,j,k  )
+            dqz = limiter(0.25d+00, dql, dqr)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy)
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy)
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) + (duy - dux)
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy)
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - (dqx + dqy)
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + (dqx - dqy)
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) + (dqy - dqx)
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + (dqx + dqy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy + duz)
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy - duz)
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) - (dux - duy + duz)
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy - duz)
-            pdata%u(q,it,jt,kp) = u(q,i,j,k) - (dux + duy - duz)
-            pdata%u(q,ip,jt,kp) = u(q,i,j,k) + (dux - duy + duz)
-            pdata%u(q,it,jp,kp) = u(q,i,j,k) - (dux - duy - duz)
-            pdata%u(q,ip,jp,kp) = u(q,i,j,k) + (dux + duy + duz)
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - (dqx + dqy + dqz)
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + (dqx - dqy - dqz)
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - (dqx - dqy + dqz)
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + (dqx + dqy - dqz)
+            pdata%q(p,it,jt,kp) = q(p,i,j,k) - (dqx + dqy - dqz)
+            pdata%q(p,ip,jt,kp) = q(p,i,j,k) + (dqx - dqy + dqz)
+            pdata%q(p,it,jp,kp) = q(p,i,j,k) - (dqx - dqy - dqz)
+            pdata%q(p,ip,jp,kp) = q(p,i,j,k) + (dqx + dqy + dqz)
 #endif /* NDIMS == 3 */
 
           end do ! q - 1, nv
