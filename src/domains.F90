@@ -143,8 +143,7 @@ module domains
     use blocks         , only : metablock_set_configuration
     use blocks         , only : metablock_set_coordinates, metablock_set_bounds
     use blocks         , only : nsides, nfaces
-    use boundaries     , only : xlbndry, ylbndry, zlbndry
-    use boundaries     , only : xubndry, yubndry, zubndry
+    use boundaries     , only : bnd_type, bnd_periodic
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : ir, jr, kr
 
@@ -349,7 +348,7 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (xlbndry == 'periodic' .and. xubndry == 'periodic') then
+    if (bnd_type(1,1) == bnd_periodic .and. bnd_type(1,2) == bnd_periodic) then
       do k = 1, kr
         do j = 1, jr
 
@@ -395,7 +394,7 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (ylbndry == 'periodic' .and. yubndry == 'periodic') then
+    if (bnd_type(2,1) == bnd_periodic .and. bnd_type(2,2) == bnd_periodic) then
       do k = 1, kr
         do i = 1, ir
 
@@ -442,7 +441,7 @@ module domains
 
 ! if periodic boundary conditions set edge block neighbors
 !
-    if (zlbndry == 'periodic' .and. zubndry == 'periodic') then
+    if (bnd_type(3,1) == bnd_periodic .and. bnd_type(3,2) == bnd_periodic) then
       do j = 1, jr
         do i = 1, ir
 

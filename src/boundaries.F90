@@ -42,17 +42,18 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imv, imf, ims, imc, imr, imp
+  integer                , save :: imi, imv, imf, ims, imc, imr, imp
 #endif /* PROFILE */
 
-! module parameters for the boundary update order and boundary type
+! parameters corresponding to the boundary type
 !
-  character(len = 32), save     :: xlbndry = "periodic"
-  character(len = 32), save     :: xubndry = "periodic"
-  character(len = 32), save     :: ylbndry = "periodic"
-  character(len = 32), save     :: yubndry = "periodic"
-  character(len = 32), save     :: zlbndry = "periodic"
-  character(len = 32), save     :: zubndry = "periodic"
+  integer, parameter            :: bnd_periodic   = 0
+  integer, parameter            :: bnd_open       = 1
+  integer, parameter            :: bnd_reflective = 2
+
+! variable to store boundary type flags
+!
+  integer, dimension(3,2), save :: bnd_type       = bnd_periodic
 
 ! by default everything is private
 !
@@ -62,7 +63,7 @@ module boundaries
 !
   public :: initialize_boundaries, finalize_boundaries
   public :: boundary_variables, boundary_fluxes
-  public :: xlbndry, ylbndry, zlbndry, xubndry, yubndry, zubndry
+  public :: bnd_type, bnd_periodic
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -105,6 +106,15 @@ module boundaries
 !
     logical, intent(in)    :: verbose
     integer, intent(inout) :: iret
+
+! module parameters for the boundary update order and boundary type
+!
+    character(len = 32)    :: xlbndry = "periodic"
+    character(len = 32)    :: xubndry = "periodic"
+    character(len = 32)    :: ylbndry = "periodic"
+    character(len = 32)    :: yubndry = "periodic"
+    character(len = 32)    :: zlbndry = "periodic"
+    character(len = 32)    :: zubndry = "periodic"
 !
 !-------------------------------------------------------------------------------
 !
@@ -133,6 +143,62 @@ module boundaries
     call get_parameter_string ("zlbndry" , zlbndry)
     call get_parameter_string ("zubndry" , zubndry)
 
+! fill the boundary type flags
+!
+    select case(xlbndry)
+    case("open")
+      bnd_type(1,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(1,1) = bnd_reflective
+    case default
+      bnd_type(1,1) = bnd_periodic
+    end select
+
+    select case(xubndry)
+    case("open")
+      bnd_type(1,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(1,2) = bnd_reflective
+    case default
+      bnd_type(1,2) = bnd_periodic
+    end select
+
+    select case(ylbndry)
+    case("open")
+      bnd_type(2,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(2,1) = bnd_reflective
+    case default
+      bnd_type(2,1) = bnd_periodic
+    end select
+
+    select case(yubndry)
+    case("open")
+      bnd_type(2,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(2,2) = bnd_reflective
+    case default
+      bnd_type(2,2) = bnd_periodic
+    end select
+
+    select case(zlbndry)
+    case("open")
+      bnd_type(3,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(3,1) = bnd_reflective
+    case default
+      bnd_type(3,1) = bnd_periodic
+    end select
+
+    select case(zubndry)
+    case("open")
+      bnd_type(3,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(3,2) = bnd_reflective
+    case default
+      bnd_type(3,2) = bnd_periodic
+    end select
+
 ! print information about the boundary conditions
 !
     if (verbose) then
@@ -147,52 +213,6 @@ module boundaries
 #endif /* NDIMS == 3 */
 
     end if
-
-#ifdef MPI
-! change the internal boundaries to "exchange" type for the MPI update
-!
-    if (pdims(1) > 1) then
-      if (periodic(1)) then
-        xlbndry       = "exchange"
-        xubndry       = "exchange"
-      else
-        if (pcoords(1) > 0         ) then
-          xlbndry       = "exchange"
-        end if
-        if (pcoords(1) < pdims(1)-1) then
-          xubndry       = "exchange"
-        end if
-      end if
-    end if
-
-    if (pdims(2) > 1) then
-      if (periodic(2)) then
-        ylbndry       = "exchange"
-        yubndry       = "exchange"
-      else
-        if (pcoords(2) > 0         ) then
-          ylbndry       = "exchange"
-        end if
-        if (pcoords(2) < pdims(2)-1) then
-          yubndry       = "exchange"
-        end if
-      end if
-    end if
-
-    if (pdims(3) > 1) then
-      if (periodic(3)) then
-        zlbndry       = "exchange"
-        zubndry       = "exchange"
-      else
-        if (pcoords(3) > 0         ) then
-          zlbndry       = "exchange"
-        end if
-        if (pcoords(3) < pdims(3)-1) then
-          zubndry       = "exchange"
-        end if
-      end if
-    end if
-#endif /* MPI */
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -2777,7 +2797,7 @@ module boundaries
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
-    use error          , only : print_warning
+    use error          , only : print_error, print_warning
 
 ! local variables are not implicit by default
 !
@@ -2808,9 +2828,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(xlbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do i = 1, ng
+          pdata%q(  :,i,:,:) = pdata%q(:,ib,:,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do i = 1, ng
 
@@ -2822,11 +2852,12 @@ module boundaries
 
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do i = 1, ng
-          pdata%q(  :,i,:,:) = pdata%q(:,ib,:,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left X boundary type!")
 
       end select
 
@@ -2836,9 +2867,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(xubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do i = ieu, im
+          pdata%q(  :,i ,:,:) =   pdata%q(  :,ie,:,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do i = 1, ng
           it = ie  + i
@@ -2848,11 +2889,12 @@ module boundaries
           pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do i = ieu, im
-          pdata%q(  :,i ,:,:) =   pdata%q(  :,ie,:,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right X boundary type!")
 
       end select
 
@@ -2862,9 +2904,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(ylbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do j = 1, ng
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,jb,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do j = 1, ng
           jt = jb  - j
@@ -2874,11 +2926,12 @@ module boundaries
           pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do j = 1, ng
-          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,jb,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left Y boundary type!")
 
       end select
 
@@ -2888,9 +2941,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(yubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do j = jeu, jm
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,je,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do j = 1, ng
           jt = je  + j
@@ -2900,11 +2963,12 @@ module boundaries
           pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do j = jeu, jm
-          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,je,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right Y boundary type!")
 
       end select
 
@@ -2915,9 +2979,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(zlbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do k = 1, ng
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,kb)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do k = 1, ng
           kt = kb  - k
@@ -2927,11 +3001,12 @@ module boundaries
           pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do k = 1, ng
-          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,kb)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left Z boundary type!")
 
       end select
 
@@ -2941,9 +3016,19 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(zubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do k = keu, km
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,ke)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do k = 1, ng
           kt = ke  + k
@@ -2953,11 +3038,12 @@ module boundaries
           pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do k = keu, km
-          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,ke)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right Z boundary type!")
 
       end select
 #endif /* NDIMS == 3 */
