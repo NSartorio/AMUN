@@ -1588,19 +1588,19 @@ module mesh
 #if NDIMS == 2
             u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy)
             u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy)
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) + (duy - dux)
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - (dux - duy)
             u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy)
 #endif /* NDIMS == 2 */
 
 #if NDIMS == 3
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - dux - duy - duz
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + dux - duy - duz
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - dux + duy - duz
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + dux + duy - duz
-            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - dux - duy + duz
-            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + dux - duy + duz
-            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - dux + duy + duz
-            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + dux + duy + duz
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy + duz)
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy - duz)
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - (dux - duy + duz)
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy - duz)
+            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - (dux + duy - duz)
+            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + (dux - duy + duz)
+            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - (dux - duy - duz)
+            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + (dux + duy + duz)
 #endif /* NDIMS == 3 */
           end do
         end do
