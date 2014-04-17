@@ -3509,7 +3509,7 @@ module boundaries
 #if NDIMS == 2
             pdata%q(p,it,jt,kt) = q(p,i,j,k) - (dqx + dqy)
             pdata%q(p,ip,jt,kt) = q(p,i,j,k) + (dqx - dqy)
-            pdata%q(p,it,jp,kt) = q(p,i,j,k) + (dqy - dqx)
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - (dqx - dqy)
             pdata%q(p,ip,jp,kt) = q(p,i,j,k) + (dqx + dqy)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
