@@ -1502,7 +1502,7 @@ module mesh
     integer :: i, j, k, q, p
     integer :: il, iu, jl, ju, kl, ku
     integer :: ic, jc, kc, ip, jp, kp
-    real    :: dul, dur, dux, duy, duz
+    real    :: dul, dur, dux, duy, duz, du1, du2, du3, du4
 
 ! local pointers
 !
@@ -1586,21 +1586,27 @@ module mesh
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy)
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy)
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - (dux - duy)
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy)
+            du1 = dux + duy
+            du2 = dux - duy
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du2
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + du1
 #endif /* NDIMS == 2 */
 
 #if NDIMS == 3
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy + duz)
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy - duz)
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - (dux - duy + duz)
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy - duz)
-            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - (dux + duy - duz)
-            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + (dux - duy + duz)
-            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - (dux - duy - duz)
-            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + (dux + duy + duz)
+            du1 = dux + duy + duz
+            du2 = dux - duy - duz
+            du3 = dux - duy + duz
+            du4 = dux + duy - duz
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du3
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + du4
+            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - du4
+            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + du3
+            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - du2
+            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + du1
 #endif /* NDIMS == 3 */
           end do
         end do
