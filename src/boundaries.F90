@@ -3373,7 +3373,7 @@ module boundaries
     integer :: ic, jc, kc, ip, jp, kp
     integer :: il, jl, kl, iu, ju, ku
     integer :: is, js, ks, it, jt, kt
-    real    :: dql, dqr, dqx, dqy, dqz
+    real    :: dql, dqr, dqx, dqy, dqz, dq1, dq2, dq3, dq4
 !
 !-------------------------------------------------------------------------------
 !
@@ -3507,20 +3507,26 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            pdata%q(p,it,jt,kt) = q(p,i,j,k) - (dqx + dqy)
-            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + (dqx - dqy)
-            pdata%q(p,it,jp,kt) = q(p,i,j,k) - (dqx - dqy)
-            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + (dqx + dqy)
+            dq1 = dqx + dqy
+            dq2 = dqx - dqy
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq2
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq1
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%q(p,it,jt,kt) = q(p,i,j,k) - (dqx + dqy + dqz)
-            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + (dqx - dqy - dqz)
-            pdata%q(p,it,jp,kt) = q(p,i,j,k) - (dqx - dqy + dqz)
-            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + (dqx + dqy - dqz)
-            pdata%q(p,it,jt,kp) = q(p,i,j,k) - (dqx + dqy - dqz)
-            pdata%q(p,ip,jt,kp) = q(p,i,j,k) + (dqx - dqy + dqz)
-            pdata%q(p,it,jp,kp) = q(p,i,j,k) - (dqx - dqy - dqz)
-            pdata%q(p,ip,jp,kp) = q(p,i,j,k) + (dqx + dqy + dqz)
+            dq1 = dqx + dqy + dqz
+            dq2 = dqx - dqy - dqz
+            dq3 = dqx - dqy + dqz
+            dq4 = dqx + dqy - dqz
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq3
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq4
+            pdata%q(p,it,jt,kp) = q(p,i,j,k) - dq4
+            pdata%q(p,ip,jt,kp) = q(p,i,j,k) + dq3
+            pdata%q(p,it,jp,kp) = q(p,i,j,k) - dq2
+            pdata%q(p,ip,jp,kp) = q(p,i,j,k) + dq1
 #endif /* NDIMS == 3 */
 
           end do ! q - 1, nv
