@@ -58,7 +58,7 @@ module io
 !   irest   - the local counter for the restart snapshots;
 !   isnap   - the local counter for the regular snapshots;
 !   hrest   - the execution time interval for restart snapshot storing
-!             (in hours);
+!             (in hours); the minimum allowed value is 3 minutes;
 !   hsnap   - the problem time interval for regular snapshot storing;
 !
   character(len=255), save :: respath     = "./"
@@ -66,7 +66,7 @@ module io
   integer           , save :: nrest       = -1
   integer(kind=4)   , save :: irest       =  1
   integer(kind=4)   , save :: isnap       = -1
-  real              , save :: hrest       =  6.0d+00
+  real              , save :: hrest       =  6.0e+00
   real              , save :: hsnap       =  1.0d+00
 
 ! flags to determine the way of data writing
@@ -302,14 +302,14 @@ module io
 ! subroutine WRITE_RESTART_SNAPSHOTS:
 ! ----------------------------------
 !
-!   Subroutine stores current snapshot in restart files.
-!   This is a wrapper calling specific format subroutine.
+!   Subroutine stores current restart snapshot files.  This is a wrapper
+!   calling specific format subroutine.
 !
 !   Arguments:
 !
-!     thrs - the interval time in hours for storing the restart snapshots;
-!     nrun - the restart snapshot number;
-!     iret - the return flag to inform if subroutine succeeded or failed;
+!     thrs - the current execution time in hours;
+!     nrun - the run number;
+!     iret - the return flag;
 !
 !===============================================================================
 !
@@ -327,28 +327,25 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! check if the condition for storing the restart snapshot has been met
+!
+    if (hrest < 5.0e-02 .or. thrs < irest * hrest) return
+
 #ifdef PROFILE
 ! start accounting time for the data writing
 !
     call start_timer(iow)
 #endif /* PROFILE */
 
-! store restart snapshots at constant interval or when the job is done only
-! if hrest is a positive number
-!
-    if (hrest > 0.0d+00 .and. thrs >= irest * hrest) then
-
 #ifdef HDF5
 ! store restart file
 !
-      call write_restart_snapshot_h5(nrun, iret)
+    call write_restart_snapshot_h5(nrun, iret)
 #endif /* HDF5 */
 
 ! increase the restart snapshot counter
 !
-      irest = irest + 1
-
-    end if
+    irest = irest + 1
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
