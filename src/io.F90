@@ -1030,46 +1030,49 @@ module io
 !
 !===============================================================================
 !
-! write_attributes_h5: subroutine writes attributes in the HDF5 format
-!                      connected to the provided identificator
+! subroutine WRITE_ATTRIBUTES_H5:
+! ------------------------------
 !
-! info: this subroutine stores only the global attributes
+!   Subroutine stores global attributes in the HDF5 file provided by an
+!   identificator.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identificator;
 !
 !===============================================================================
 !
   subroutine write_attributes_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : get_mblocks, get_dblocks, get_nleafs
-    use blocks   , only : get_last_id
-    use coordinates, only : nn, ng, in, jn, kn, minlev, maxlev, toplev, ir, jr, kr
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error
-    use evolution, only : step, time, dt, dtn
-    use hdf5     , only : hid_t
-    use hdf5     , only : h5gcreate_f, h5gclose_f
-    use mpitools , only : nprocs, nproc
-    use random   , only : nseeds, get_seeds
+    use blocks         , only : get_mblocks, get_dblocks, get_nleafs
+    use blocks         , only : get_last_id
+    use coordinates    , only : minlev, maxlev, toplev
+    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use error          , only : print_error
+    use evolution      , only : step, time, dt, dtn
+    use hdf5           , only : hid_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
+    use mpitools       , only : nprocs, nproc
+    use random         , only : nseeds, get_seeds
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
-    integer(hid_t)  :: gid
-    integer(kind=4) :: dm(3)
-    integer         :: err
+    integer(hid_t)                :: gid
+    integer                       :: err
+    integer(kind=4), dimension(3) :: dm
 
-! allocatable arrays
+! local allocatable arrays
 !
     integer(kind=4), dimension(:), allocatable :: seeds
 !
@@ -1081,85 +1084,83 @@ module io
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
-
-! store the integer attributes
-!
-      call write_attribute_integer_h5(gid, 'ndims'  , NDIMS)
-      call write_attribute_integer_h5(gid, 'last_id', get_last_id())
-      call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
-      call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
-      call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs())
-      call write_attribute_integer_h5(gid, 'ncells' , nn)
-      call write_attribute_integer_h5(gid, 'nghost' , ng)
-      call write_attribute_integer_h5(gid, 'minlev' , minlev)
-      call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
-      call write_attribute_integer_h5(gid, 'toplev' , toplev)
-      call write_attribute_integer_h5(gid, 'nprocs' , nprocs)
-      call write_attribute_integer_h5(gid, 'nproc'  , nproc)
-      call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
-      call write_attribute_integer_h5(gid, 'step'   , step  )
-      call write_attribute_integer_h5(gid, 'isnap'  , isnap )
-
-! store the real attributes
-!
-      call write_attribute_double_h5(gid, 'xmin', xmin)
-      call write_attribute_double_h5(gid, 'xmax', xmax)
-      call write_attribute_double_h5(gid, 'ymin', ymin)
-      call write_attribute_double_h5(gid, 'ymax', ymax)
-      call write_attribute_double_h5(gid, 'zmin', zmin)
-      call write_attribute_double_h5(gid, 'zmax', zmax)
-      call write_attribute_double_h5(gid, 'time', time)
-      call write_attribute_double_h5(gid, 'dt'  , dt  )
-      call write_attribute_double_h5(gid, 'dtn' , dtn )
-
-! store the vector attributes
-!
-      dm(:) = (/ in, jn, kn /)
-      call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
-      call write_attribute_vector_integer_h5(gid, 'rdims', 3, (/ ir, jr, kr /))
-
-! store random number generator seed values
-!
-      if (nseeds .gt. 0) then
-
-! allocate space for seeds
-!
-        allocate(seeds(nseeds))
-
-! get the seed values
-!
-        call get_seeds(seeds)
-
-! store them in the current group
-!
-        call write_attribute_vector_integer_h5(gid, 'seeds', nseeds, seeds(:))
-
-! deallocate seed array
-!
-        deallocate(seeds)
-
-      end if ! nseeds > 0
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::write_attributes_h5", "Cannot close the group!")
-
-      end if
-
-    else
+    if (err < 0) then
 
 ! print error about the problem with creating the group
 !
       call print_error("io::write_attributes_h5", "Cannot create the group!")
+
+    end if
+
+! store the integer attributes
+!
+    call write_attribute_integer_h5(gid, 'ndims'  , NDIMS        )
+    call write_attribute_integer_h5(gid, 'last_id', get_last_id())
+    call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
+    call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
+    call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs() )
+    call write_attribute_integer_h5(gid, 'ncells' , nn           )
+    call write_attribute_integer_h5(gid, 'nghost' , ng           )
+    call write_attribute_integer_h5(gid, 'minlev' , minlev       )
+    call write_attribute_integer_h5(gid, 'maxlev' , maxlev       )
+    call write_attribute_integer_h5(gid, 'toplev' , toplev       )
+    call write_attribute_integer_h5(gid, 'nprocs' , nprocs       )
+    call write_attribute_integer_h5(gid, 'nproc'  , nproc        )
+    call write_attribute_integer_h5(gid, 'nseeds' , nseeds       )
+    call write_attribute_integer_h5(gid, 'step'   , step         )
+    call write_attribute_integer_h5(gid, 'isnap'  , isnap        )
+
+! store the real attributes
+!
+    call write_attribute_double_h5(gid, 'xmin', xmin)
+    call write_attribute_double_h5(gid, 'xmax', xmax)
+    call write_attribute_double_h5(gid, 'ymin', ymin)
+    call write_attribute_double_h5(gid, 'ymax', ymax)
+    call write_attribute_double_h5(gid, 'zmin', zmin)
+    call write_attribute_double_h5(gid, 'zmax', zmax)
+    call write_attribute_double_h5(gid, 'time', time)
+    call write_attribute_double_h5(gid, 'dt'  , dt  )
+    call write_attribute_double_h5(gid, 'dtn' , dtn )
+
+! store the vector attributes
+!
+    dm(:) = (/ in, jn, kn /)
+    call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
+    call write_attribute_vector_integer_h5(gid, 'rdims', 3, (/ ir, jr, kr /))
+
+! store random number generator seed values
+!
+    if (nseeds > 0) then
+
+! allocate space for seeds
+!
+      allocate(seeds(nseeds))
+
+! get the seed values
+!
+      call get_seeds(seeds)
+
+! store them in the current group
+!
+      call write_attribute_vector_integer_h5(gid, 'seeds', nseeds, seeds(:))
+
+! deallocate seed array
+!
+      deallocate(seeds)
+
+    end if ! nseeds > 0
+
+! close the group
+!
+    call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+    if (err < 0) then
+
+! print error about the problem with closing the group
+!
+      call print_error("io::write_attributes_h5", "Cannot close the group!")
 
     end if
 
