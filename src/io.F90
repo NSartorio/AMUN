@@ -1129,8 +1129,8 @@ module io
 ! store the vector attributes
 !
     dm(:) = (/ in, jn, kn /)
-    call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
-    call write_attribute_vector_integer_h5(gid, 'rdims', 3, (/ ir, jr, kr /))
+    call write_attribute_vector_integer_h5(gid, 'dims' , dm(:))
+    call write_attribute_vector_integer_h5(gid, 'rdims', (/ ir, jr, kr /))
 
 ! store random number generator seed values
 !
@@ -1146,7 +1146,7 @@ module io
 
 ! store them in the current group
 !
-      call write_attribute_vector_integer_h5(gid, 'seeds', nseeds, seeds(:))
+      call write_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
 
 ! deallocate seed array
 !
@@ -2114,126 +2114,92 @@ module io
 !
 !===============================================================================
 !
-! write_attribute_vector_integer_h5: subroutine writes an vector intiger
-!                   attribute in a group given by its indentificator
+! subroutine WRITE_ATTRIBUTE_VECTOR_INTEGER_H5:
+! --------------------------------------------
 !
-! arguments:
-!   gid    - the HDF5 group identificator
-!   name   - the string name of the attribute
-!   length - the vector length
-!   data   - the attribute value
+!   Subroutine stores a vector of the integer attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute values;
 !
 !===============================================================================
 !
-  subroutine write_attribute_vector_integer_h5(gid, name, length, data)
+  subroutine write_attribute_vector_integer_h5(gid, aname, avalue)
 
-! references to other modules
+! import external procedures and variables
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5acreate_f, h5awrite_f, h5aclose_f
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! attribute arguments
 !
     integer(hid_t)                , intent(in) :: gid
-    character(len=*)              , intent(in) :: name
-    integer                       , intent(in) :: length
-    integer(kind=4) , dimension(:), intent(in) :: data
+    character(len=*)              , intent(in) :: aname
+    integer         , dimension(:), intent(in) :: avalue
 
 ! local variables
 !
     integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am
-    integer                        :: err
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
 !
 !-------------------------------------------------------------------------------
 !
-! prepare the space dimensions
+! set the proper attribute length
 !
-    am(1) = length
+    am(1) = size(avalue)
 
-! create space for the attribute
+! create space for the attribute value
 !
-    call h5screate_simple_f(1, am, sid, err)
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
 
-! check if the space has been created successfuly
+! create the attribute in the given group
 !
-    if (err .ge. 0) then
-
-! create the attribute
-!
-      call h5acreate_f(gid, name, H5T_NATIVE_INTEGER, sid, aid, err)
-
-! check if the attribute has been created successfuly
-!
-      if (err .ge. 0) then
+    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
+    if (ierr == 0) then
 
 ! write the attribute data
 !
-        call h5awrite_f(aid, H5T_NATIVE_INTEGER, data, am, err)
-
-! check if the attribute data has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with storing the attribute data
-!
-          call print_error("io::write_attribute_vector_integer_h5"  &
-                         , "Cannot write the attribute data in :" // trim(name))
-
-        end if
+      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_vector_integer_h5"               &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
 
 ! close the attribute
 !
-        call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the attribute
-!
-          call print_error("io::write_attribute_vector_integer_h5"  &
-                                     , "Cannot close attribute :" // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the attribute
-!
-        call print_error("io::write_attribute_vector_integer_h5"  &
-                                    , "Cannot create attribute :" // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_attribute_vector_integer_h5"  &
-                           , "Cannot close space for attribute :" // trim(name))
-
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_vector_integer_h5"               &
+                                  , "Cannot close attribute :" // trim(aname))
       end if
 
     else
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                                 , "Cannot create attribute :" // trim(aname))
+    end if
 
-! print error about the problem with creating the space for the attribute
+! release the space
 !
-      call print_error("io::write_attribute_vector_integer_h5"  &
-                          , "Cannot create space for attribute :" // trim(name))
-
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                        , "Cannot close space for attribute :" // trim(aname))
     end if
 
 !-------------------------------------------------------------------------------
