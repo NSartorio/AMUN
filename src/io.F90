@@ -1644,7 +1644,7 @@ module io
 ! subroutine READ_ATTRIBUTES_INTEGER_H5:
 ! -------------------------------------
 !
-!   Subroutine reads a value of the integer value provided by the group
+!   Subroutine reads a value of the integer attribute provided by the group
 !   identifier to which it is linked and its name.
 !
 !   Arguments:
