@@ -1371,8 +1371,7 @@ module io
 
 ! store them in the current group
 !
-                call read_attribute_vector_integer_h5(aid, aname, nseeds       &
-                                                                   , seeds(:))
+                call read_attribute_vector_integer_h5(gid, aname, seeds(:))
 
 ! set the seed values
 !
@@ -1553,7 +1552,7 @@ module io
 
 ! obtain the block dimensions
 !
-                call read_attribute_vector_integer_h5(aid, aname, 3, lm(:))
+                call read_attribute_vector_integer_h5(gid, aname, lm(:))
 
               case('nghost')
 
@@ -1814,6 +1813,124 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_attribute_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_ATTRIBUTE_VECTOR_INTEGER_H5:
+! -------------------------------------------
+!
+!   Subroutine reads a vector of the integer attribute provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_attribute_vector_integer_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: aname
+    integer         , dimension(:), intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid, sid
+    integer(hsize_t), dimension(1)  :: am, bm
+    integer(hsize_t)                :: alen
+    integer                         :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                , "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! get the attribute space
+!
+    call h5aget_space_f(aid, sid, ierr)
+    if (ierr == 0) then
+      call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
+      if (ierr /= 1) then
+        call print_error("io::read_attribute_vector_integer_h5"                &
+                         , "Cannot get attribute dimensions :" // trim(aname))
+      end if
+      call h5sclose_f(sid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_attribute_vector_integer_h5"                &
+                        , "Cannot close the attribute space :" // trim(aname))
+      end if
+    else
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                          , "Cannot get the attribute space :" // trim(aname))
+      return
+    end if
+
+! check if the output array is large enough
+!
+    if (am(1) > size(avalue)) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                 , "Attribute too large for output argument :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                  , "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_vector_integer_h5
 !
 !===============================================================================
 !
@@ -2122,81 +2239,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! read_attribute_vector_integer_h5: subroutine reads a vector of integer values
-!                                   from an attribute given by the identificator
-!
-! arguments:
-!   aid    - the HDF5 attribute identificator
-!   name   - the attribute name
-!   length - the vector length
-!   value  - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_vector_integer_h5(aid, name, length, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)         :: aid
-    character(len=*), intent(in)         :: name
-    integer         , intent(in)         :: length
-    integer, dimension(:), intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! check if the length is larger than 0
-!
-    if (length .gt. 0) then
-
-! prepare dimension array
-!
-      am(1) = length
-
-! read attribute value
-!
-      call h5aread_f(aid, H5T_NATIVE_INTEGER, value(:), am(:), err)
-
-! check if the attribute has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
-        call print_error("io::read_attribute_vector_integer_h5"                &
-                                    , "Cannot read attribute :" // trim(name))
-
-      end if
-
-    else ! length > 0
-
-! print error about the wrong vector size
-!
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                                   , "Wrong length of vector")
-
-    end if ! length > 0
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_vector_integer_h5
 !
 !===============================================================================
 !
