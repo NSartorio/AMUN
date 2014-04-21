@@ -57,17 +57,22 @@ module io
 !   nrest   - for job restarting, this is the number of restart snapshot;
 !   irest   - the local counter for the restart snapshots;
 !   isnap   - the local counter for the regular snapshots;
+!   ishift  - the shift of the snapshot counter for restarting job with
+!             different snapshot interval;
 !   hrest   - the execution time interval for restart snapshot storing
 !             (in hours); the minimum allowed value is 3 minutes;
 !   hsnap   - the problem time interval for regular snapshot storing;
+!   tsnap   - the next snapshot time;
 !
   character(len=255), save :: respath     = "./"
   character         , save :: ftype       = "p"
   integer           , save :: nrest       = -1
   integer(kind=4)   , save :: irest       =  1
-  integer(kind=4)   , save :: isnap       = -1
+  integer(kind=4)   , save :: isnap       =  0
+  integer(kind=4)   , save :: ishift      =  0
   real              , save :: hrest       =  6.0e+00
-  real              , save :: hsnap       =  1.0d+00
+  real              , save :: hsnap       =  1.0e+00
+  real              , save :: tsnap       =  0.0e+00
 
 ! flags to determine the way of data writing
 !
@@ -283,9 +288,10 @@ module io
     call read_restart_snapshot_h5()
 #endif /* HDF5 */
 
-! calculate the next snapshot number
+! calculate the shift of the snapshot counter, and the next snapshot time
 !
-    isnap = int(time / hsnap)
+    ishift = int(time / hsnap) - isnap + 1
+    tsnap  = (ishift + isnap) * hsnap
 
 #ifdef PROFILE
 ! stop accounting time for the data reading
@@ -327,7 +333,7 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! check if the condition for storing the restart snapshot has been met
+! check if conditions for storing the restart snapshot have been met
 !
     if (hrest < 5.0e-02 .or. thrs < irest * hrest) return
 
@@ -381,9 +387,9 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! exit the subroutine, if the time of the next snapshot is not reached
+! check if conditions for storing the regular snapshot have been met
 !
-    if (hsnap <= 0.0d+00 .or. isnap >= (int(time / hsnap))) return
+    if (hsnap <= 0.0e+00 .or. time < tsnap) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -391,15 +397,16 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
-! increase the file counter
-!
-    isnap = isnap + 1
-
 #ifdef HDF5
 ! store variable snapshot file
 !
     call write_snapshot_h5()
 #endif /* HDF5 */
+
+! increase the snapshot counter and calculate the next snapshot time
+!
+    isnap = isnap + 1
+    tsnap = (ishift + isnap) * hsnap
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
@@ -430,7 +437,7 @@ module io
 !-------------------------------------------------------------------------------
 !
     if (hsnap > 0.0d+00) then
-      next_tout = (isnap + 1) * hsnap
+      next_tout = tsnap
     else
       next_tout = huge(hsnap)
     end if
@@ -1092,6 +1099,7 @@ module io
       call write_attribute_integer_h5(gid, 'nproc'  , nproc)
       call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
       call write_attribute_integer_h5(gid, 'step'   , step  )
+      call write_attribute_integer_h5(gid, 'isnap'  , isnap )
 
 ! store the real attributes
 !
@@ -1317,6 +1325,8 @@ module io
               end if
             case('step')
               call read_attribute_integer_h5(aid, aname, step)
+            case('isnap')
+              call read_attribute_integer_h5(aid, aname, isnap)
             case('time')
               call read_attribute_double_h5(aid, aname, time)
             case('dt')
