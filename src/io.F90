@@ -1907,6 +1907,96 @@ module io
 !
 !===============================================================================
 !
+! subroutine WRITE_ATTRIBUTE_DOUBLE_H5:
+! ------------------------------------
+!
+!   Subroutine stores a value of the double precision attribute in the group
+!   provided by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine write_attribute_double_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    real(kind=8)    , intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_double_h5"                         &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_DOUBLE, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_double_h5"                       &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_double_h5"                       &
+                                  , "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error("io::write_attribute_double_h5"                         &
+                                 , "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_double_h5"                         &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_attribute_double_h5
+!
+!===============================================================================
+!
 ! write_attribute_vector_integer_h5: subroutine writes an vector intiger
 !                   attribute in a group given by its indentificator
 !
@@ -2107,128 +2197,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! write_attribute_double_h5: subroutine writes a double precision attribute in
-!                          a group given by its indentificator
-!
-! arguments:
-!   gid   - the HDF5 group identificator
-!   name  - the string name of the attribute
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine write_attribute_double_h5(gid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f, h5acreate_f, h5awrite_f  &
-                    , h5aclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in) :: gid
-    character(len=*), intent(in) :: name
-    real(kind=8)    , intent(in) :: value
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the attribute
-!
-    call h5screate_simple_f(1, am, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-! create the attribute
-!
-      call h5acreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, aid, err)
-
-! check if the attribute has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the attribute data
-!
-        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, value, am, err)
-
-! check if the attribute data has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with storing the attribute data
-!
-          call print_error("io::write_attribute_double_h5"  &
-                         , "Cannot write the attribute data in :" // trim(name))
-
-        end if
-
-! close the attribute
-!
-        call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the attribute
-!
-          call print_error("io::write_attribute_double_h5"  &
-                                     , "Cannot close attribute :" // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the attribute
-!
-        call print_error("io::write_attribute_double_h5"  &
-                                    , "Cannot create attribute :" // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_attribute_double_h5"  &
-                           , "Cannot close space for attribute :" // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_attribute_double_h5"  &
-                          , "Cannot create space for attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_double_h5
 !
 !===============================================================================
 !
