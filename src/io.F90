@@ -1090,6 +1090,10 @@ module io
 !
       call print_error("io::write_attributes_h5", "Cannot create the group!")
 
+! return from the subroutine
+!
+      return
+
     end if
 
 ! store the integer attributes
