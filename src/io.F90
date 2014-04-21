@@ -423,7 +423,7 @@ module io
 ! function NEXT_TOUT:
 ! ------------------
 !
-!   Function returns time of the next data snapshot.
+!   Function returns the next data snapshot time.
 !
 !
 !===============================================================================
