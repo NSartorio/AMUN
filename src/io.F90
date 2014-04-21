@@ -1268,7 +1268,7 @@ module io
 !
             select case(trim(aname))
             case('ndims')
-              call read_attribute_integer_h5(aid, aname, lndims)
+              call read_attribute_integer_h5(gid, aname, lndims)
 
 ! check if the restart file and compiled program have the same number of
 ! dimensions
@@ -1278,7 +1278,7 @@ module io
                               , "File and program dimensions are incompatible!")
               end if
             case('maxlev')
-              call read_attribute_integer_h5(aid, aname, lmaxlev)
+              call read_attribute_integer_h5(gid, aname, lmaxlev)
               if (lmaxlev .gt. toplev) then
 
 ! subtitute the new value of toplev
@@ -1301,17 +1301,17 @@ module io
                 ucor = 2**(maxlev - lmaxlev)
               end if
             case('nprocs')
-              call read_attribute_integer_h5(aid, aname, nfiles)
+              call read_attribute_integer_h5(gid, aname, nfiles)
             case('nproc')
-              call read_attribute_integer_h5(aid, aname, lnproc)
+              call read_attribute_integer_h5(gid, aname, lnproc)
             case('last_id')
-              call read_attribute_integer_h5(aid, aname, llast_id)
+              call read_attribute_integer_h5(gid, aname, llast_id)
             case('mblocks')
-              call read_attribute_integer_h5(aid, aname, lmblocks)
+              call read_attribute_integer_h5(gid, aname, lmblocks)
             case('nleafs')
-              call read_attribute_integer_h5(aid, aname, lnleafs)
+              call read_attribute_integer_h5(gid, aname, lnleafs)
             case('ncells')
-              call read_attribute_integer_h5(aid, aname, lncells)
+              call read_attribute_integer_h5(gid, aname, lncells)
 
 ! check if the block dimensions are compatible
 !
@@ -1320,7 +1320,7 @@ module io
                         , "File and program block dimensions are incompatible!")
               end if
             case('nghost')
-              call read_attribute_integer_h5(aid, aname, lnghost)
+              call read_attribute_integer_h5(gid, aname, lnghost)
 
 ! check if the ghost layers are compatible
 !
@@ -1329,9 +1329,9 @@ module io
                       , "File and program block ghost layers are incompatible!")
               end if
             case('step')
-              call read_attribute_integer_h5(aid, aname, step)
+              call read_attribute_integer_h5(gid, aname, step)
             case('isnap')
-              call read_attribute_integer_h5(aid, aname, isnap)
+              call read_attribute_integer_h5(gid, aname, isnap)
             case('time')
               call read_attribute_double_h5(aid, aname, time)
             case('dt')
@@ -1351,7 +1351,7 @@ module io
             case('zmax')
               call read_attribute_double_h5(aid, aname, zmax)
             case('nseeds')
-              call read_attribute_integer_h5(aid, aname, lnseeds)
+              call read_attribute_integer_h5(gid, aname, lnseeds)
 
 ! ! check if the numbers of seeds are compatible
 ! !
@@ -1547,7 +1547,7 @@ module io
 
 ! obtain the number of data blocks
 !
-                call read_attribute_integer_h5(aid, aname, ldblocks)
+                call read_attribute_integer_h5(gid, aname, ldblocks)
 
               case('dims')
 
@@ -1559,7 +1559,7 @@ module io
 
 ! obtain the number of data blocks
 !
-                call read_attribute_integer_h5(aid, aname, lnghost)
+                call read_attribute_integer_h5(gid, aname, lnghost)
 
               case default
               end select
@@ -1632,6 +1632,100 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_datablock_dims_h5
+!
+!===============================================================================
+!!
+!!---  ATTRIBUTE SUBROUTINES  --------------------------------------------------
+!!
+!===============================================================================
+!
+!===============================================================================
+!
+! subroutine READ_ATTRIBUTES_INTEGER_H5:
+! -------------------------------------
+!
+!   Subroutine reads a value of the integer value provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_attribute_integer_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input variables
+!
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    integer         , intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                , "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                  , "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_integer_h5
 !
 !===============================================================================
 !
@@ -1754,61 +1848,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_attribute_integer_h5
-!
-!===============================================================================
-!
-! read_attribute_integer_h5: subroutine read an integer value from an attribute
-!                            given by the identificator
-!
-! arguments:
-!   aid   - the HDF5 attribute identificator
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_integer_h5(aid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)    :: aid
-    character(len=*), intent(in)    :: name
-    integer         , intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_INTEGER, value, am(:), err)
-
-! check if the attribute has been read successfuly
-!
-    if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
-      call print_error("io::read_attribute_integer_h5"                         &
-                          , "Cannot read attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_integer_h5
 !
 !===============================================================================
 !
