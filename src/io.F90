@@ -1333,23 +1333,23 @@ module io
             case('isnap')
               call read_attribute_integer_h5(gid, aname, isnap)
             case('time')
-              call read_attribute_double_h5(aid, aname, time)
+              call read_attribute_double_h5(gid, aname, time)
             case('dt')
-              call read_attribute_double_h5(aid, aname, dt)
+              call read_attribute_double_h5(gid, aname, dt)
             case('dtn')
-              call read_attribute_double_h5(aid, aname, dtn)
+              call read_attribute_double_h5(gid, aname, dtn)
             case('xmin')
-              call read_attribute_double_h5(aid, aname, xmin)
+              call read_attribute_double_h5(gid, aname, xmin)
             case('xmax')
-              call read_attribute_double_h5(aid, aname, xmax)
+              call read_attribute_double_h5(gid, aname, xmax)
             case('ymin')
-              call read_attribute_double_h5(aid, aname, ymin)
+              call read_attribute_double_h5(gid, aname, ymin)
             case('ymax')
-              call read_attribute_double_h5(aid, aname, ymax)
+              call read_attribute_double_h5(gid, aname, ymax)
             case('zmin')
-              call read_attribute_double_h5(aid, aname, zmin)
+              call read_attribute_double_h5(gid, aname, zmin)
             case('zmax')
-              call read_attribute_double_h5(aid, aname, zmax)
+              call read_attribute_double_h5(gid, aname, zmax)
             case('nseeds')
               call read_attribute_integer_h5(gid, aname, lnseeds)
 
@@ -1726,6 +1726,94 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_attribute_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_ATTRIBUTE_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine reads a value of the double precision attribute provided by
+!   the group identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_attribute_double_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    real(kind=8)    , intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                , "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                  , "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_double_h5
 !
 !===============================================================================
 !
@@ -2141,60 +2229,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_attribute_double_h5
-!
-!===============================================================================
-!
-! read_attribute_double_h5: subroutine reads a double precision attribute
-!
-! arguments:
-!   aid   - the HDF5 attribute identificator
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_double_h5(aid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)    :: aid
-    character(len=*), intent(in)    :: name
-    real(kind=8)    , intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_DOUBLE, value, am(:), err)
-
-! check if the attribute has been read successfuly
-!
-    if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
-      call print_error("io::read_attribute_double_h5"                          &
-                                      , "Cannot read attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_double_h5
 !
 !===============================================================================
 !
