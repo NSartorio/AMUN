@@ -141,7 +141,7 @@ module mpitools
       stop
     end if
 
-! obtain the current process identificator
+! obtain the current process identifier
 !
     call mpi_comm_rank(mpi_comm_world, nproc , iret)
 

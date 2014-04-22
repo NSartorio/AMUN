@@ -369,7 +369,7 @@ module io
 ! -------------------------
 !
 !   Subroutine stores block data in snapshots.  Block variables are grouped
-!   todether and stored in big 4D arrays separately.  This is a wrapper for
+!   together and stored in big 4D arrays separately.  This is a wrapper for
 !   specific format storing.
 !
 !
@@ -544,7 +544,7 @@ module io
       return
     end if
 
-! opent the HDF5 file
+! open the HDF5 file
 !
     call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
 
@@ -1034,11 +1034,11 @@ module io
 ! ------------------------------
 !
 !   Subroutine stores global attributes in the HDF5 file provided by an
-!   identificator.
+!   identifier.
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -1175,12 +1175,12 @@ module io
 !===============================================================================
 !
 ! read_attributes_h5: subroutine restores attributes from an HDF5 file linked
-!                     to the HDF5 file identificator
+!                     to the HDF5 file identifier
 !
 ! info: this subroutine restores only the global attributes
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !
 !===============================================================================
 !
@@ -1457,10 +1457,10 @@ module io
 !
 ! read_datablock_dims_h5: subroutine reads the data block dimensions from the
 !                         attributes group of the file given by the file
-!                         identificator
+!                         identifier
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !   dm  - the data block dimensions
 !
 !===============================================================================
@@ -2209,12 +2209,12 @@ module io
 !===============================================================================
 !
 ! write_metablocks_h5: subroutine writes metablocks in the HDF5 format connected
-!                      to the provided identificator
+!                      to the provided identifier
 !
 ! info: this subroutine stores only the metablocks
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !
 !===============================================================================
 !
@@ -2440,7 +2440,7 @@ module io
 ! info: this subroutine restores metablocks only
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !
 !===============================================================================
 !
@@ -2684,7 +2684,7 @@ module io
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -2754,7 +2754,7 @@ module io
         dm(4) = jm
         dm(5) = km
 
-! allocate arrays to store associated meta block identificators, conserved and
+! allocate arrays to store associated meta block identifiers, conserved and
 ! primitive variables
 !
         allocate(id(am(1)))
@@ -2870,7 +2870,7 @@ module io
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3006,7 +3006,7 @@ module io
 ! info: this subroutine stores coordinates
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3168,11 +3168,11 @@ module io
 !
 !   Subroutine groups each primitive variable from all data blocks and writes
 !   it as an array in the HDF5 dataset connected to the input HDF file
-!   identificator.
+!   identifier.
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3340,11 +3340,11 @@ module io
 !
 !   Subroutine groups each conservative variable from all data blocks and writes
 !   it as an array in the HDF5 dataset connected to the input HDF file
-!   identificator.
+!   identifier.
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3510,7 +3510,7 @@ module io
 ! write_vector_integer_h5: subroutine stores a 1D integer vector in a group
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   length - the vector length
 !   value  - the data
@@ -3637,7 +3637,7 @@ module io
 ! read_vector_integer_h5: subroutine reads a 1D integer vector
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   length - the vector length
 !   value  - the data
@@ -3726,7 +3726,7 @@ module io
 ! write_array2_integer_h5: subroutine stores a 2D integer array in a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -3936,7 +3936,7 @@ module io
 ! read_array2_integer_h5: subroutine reads a 2D integer array
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4025,7 +4025,7 @@ module io
 ! write_array4_integer_h5: subroutine stores a 4D integer array in a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4235,7 +4235,7 @@ module io
 ! read_array4_integer_h5: subroutine reads a 4D integer array
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4325,7 +4325,7 @@ module io
 !                         a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !
 !===============================================================================
 !
@@ -4449,7 +4449,7 @@ module io
 ! read_vector_double_h5: subroutine reads a 1D double precision vector
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   dm     - the vector dimensions
 !   value  - the data
@@ -4538,7 +4538,7 @@ module io
 ! write_array4_float_h5: subroutine stores a 4D single precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator where the dataset should be located
+!   gid   - the HDF5 group identifier where the dataset should be located
 !   name  - the string name representing the dataset
 !   dm    - the dataset dimensions
 !   value - the dataset values
@@ -4692,7 +4692,7 @@ module io
 ! write_array3_double_h5: subroutine stores a 3D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4902,7 +4902,7 @@ module io
 ! write_array4_double_h5: subroutine stores a 4D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5112,7 +5112,7 @@ module io
 ! write_array5_double_h5: subroutine stores a 5D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5322,7 +5322,7 @@ module io
 ! read_array5_double_h5: subroutine reads a 5D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5411,7 +5411,7 @@ module io
 ! write_array6_double_h5: subroutine stores a 6D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
