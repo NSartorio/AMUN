@@ -1174,57 +1174,55 @@ module io
 !
 !===============================================================================
 !
-! read_attributes_h5: subroutine restores attributes from an HDF5 file linked
-!                     to the HDF5 file identifier
+! subroutine READ_ATTRIBUTES_H5:
+! -----------------------------
 !
-! info: this subroutine restores only the global attributes
+!   Subroutine restores global attributes from an HDF5 file provided by its
+!   identifier.
 !
-! arguments:
-!   fid - the HDF5 file identifier
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine read_attributes_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data
-    use blocks   , only : append_metablock
-    use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
-                        , get_nleafs
-    use coordinates, only : nn, ng, in, jn, kn, maxlev, toplev, ir, jr, kr
-    use coordinates, only : initialize_coordinates, finalize_coordinates
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error
-    use evolution, only : step, time, dt, dtn
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
-                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use mpitools , only : nprocs, nproc
-    use random   , only : nseeds, set_seeds
+    use blocks         , only : block_meta
+    use blocks         , only : append_metablock
+    use blocks         , only : set_last_id, get_last_id
+    use blocks         , only : get_mblocks, get_dblocks, get_nleafs
+    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : maxlev, toplev
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : initialize_coordinates, finalize_coordinates
+    use error          , only : print_error
+    use evolution      , only : step, time, dt, dtn
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
+    use mpitools       , only : nprocs, nproc
+    use random         , only : nseeds, set_seeds
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
-    character(len=16) :: aname
-    integer(hid_t)    :: gid, aid
-    integer(hsize_t)  :: alen = 16
-    integer(kind=4)   :: dm(3)
-    integer           :: err, i, l
-    integer           :: nattrs, lndims, llast_id, lmblocks, lnleafs           &
-                       , lncells, lnghost, lnseeds, lmaxlev, lnproc
+    integer(hid_t) :: gid
+    integer        :: ierr, l
+    integer        :: lndims, lmaxlev, lmblocks, lnleafs, llast_id
+    integer        :: lncells, lnghost, lnproc, lnseeds
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
 
 ! allocatable arrays
 !
@@ -1234,219 +1232,140 @@ module io
 !
 ! open the global attributes group
 !
-    call h5gopen_f(fid, 'attributes', gid, err)
+    call h5gopen_f(fid, 'attributes', gid, ierr)
 
 ! check if the group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (ierr < 0) then
+      call print_error("io::read_attributes_h5", "Cannot open the group!")
+      return
+    end if
 
-! read the number of global attributes
+! restore integer attributes
 !
-      call h5aget_num_attrs_f(gid, nattrs, err)
+    call read_attribute_integer_h5(gid, 'ndims'  , lndims  )
+    call read_attribute_integer_h5(gid, 'maxlev' , lmaxlev )
+    call read_attribute_integer_h5(gid, 'nprocs' , nfiles  )
+    call read_attribute_integer_h5(gid, 'nproc'  , lnproc  )
+    call read_attribute_integer_h5(gid, 'mblocks', lmblocks)
+    call read_attribute_integer_h5(gid, 'nleafs' , lnleafs )
+    call read_attribute_integer_h5(gid, 'last_id', llast_id)
+    call read_attribute_integer_h5(gid, 'ncells' , lncells )
+    call read_attribute_integer_h5(gid, 'nghost' , lnghost )
+    call read_attribute_integer_h5(gid, 'nseeds' , lnseeds )
+    call read_attribute_integer_h5(gid, 'step'   , step    )
+    call read_attribute_integer_h5(gid, 'isnap'  , isnap   )
 
-! check if the number of attributes has been read successfuly
+! restore double precision attributes
 !
-      if (err .ge. 0) then
+    call read_attribute_double_h5(gid, 'xmin', xmin)
+    call read_attribute_double_h5(gid, 'xmax', xmax)
+    call read_attribute_double_h5(gid, 'ymin', ymin)
+    call read_attribute_double_h5(gid, 'ymax', ymax)
+    call read_attribute_double_h5(gid, 'zmin', zmin)
+    call read_attribute_double_h5(gid, 'zmax', zmax)
+    call read_attribute_double_h5(gid, 'time', time)
+    call read_attribute_double_h5(gid, 'dt'  , dt  )
+    call read_attribute_double_h5(gid, 'dtn' , dtn )
 
-! iterate over all attributes
+! check the number of dimensions
 !
-        do i = 0, nattrs - 1
+    if (lndims /= NDIMS) then
+      call print_error("io::read_attributes_h5"                                &
+                                 , "The number of dimensions does not match!")
+      return
+    end if
 
-! open the current attribute
+! check the block dimensions
 !
-          call h5aopen_idx_f(gid, i, aid, err)
+    if (lncells /= nn) then
+      call print_error("io::read_attributes_h5"                                &
+                                       , "The block dimensions do not match!")
+    end if
 
-! check if the attribute has been opened successfuly
+! check the number of ghost layers
 !
-          if (err .ge. 0) then
+    if (lnghost /= ng) then
+      call print_error("io::read_attributes_h5"                                &
+                               , "The number of ghost layers does not match!")
+    end if
 
-! obtain the attribute name
+! prepare coordinates and rescaling factors if the maximum level has changed
 !
-            call h5aget_name_f(aid, alen, aname, err)
-
-! depending on the attribute name use proper subroutine to read its value
-!
-            select case(trim(aname))
-            case('ndims')
-              call read_attribute_integer_h5(gid, aname, lndims)
-
-! check if the restart file and compiled program have the same number of
-! dimensions
-!
-              if (lndims .ne. NDIMS) then
-                call print_error("io::read_attributes_h5"                      &
-                              , "File and program dimensions are incompatible!")
-              end if
-            case('maxlev')
-              call read_attribute_integer_h5(gid, aname, lmaxlev)
-              if (lmaxlev .gt. toplev) then
+    if (lmaxlev > toplev) then
 
 ! subtitute the new value of toplev
 !
-                toplev = lmaxlev
+      toplev = lmaxlev
 
 ! regenerate coordinates
 !
-                call finalize_coordinates(err)
-                call initialize_coordinates(.false., err)
+      call finalize_coordinates(ierr)
+      call initialize_coordinates(.false., ierr)
 
 ! calculate a factor to rescale the block coordinates
 !
-                dcor = 2**(toplev - maxlev)
-
-              else
-
-! calculate a factor to rescale the block coordinates
-!
-                ucor = 2**(maxlev - lmaxlev)
-              end if
-            case('nprocs')
-              call read_attribute_integer_h5(gid, aname, nfiles)
-            case('nproc')
-              call read_attribute_integer_h5(gid, aname, lnproc)
-            case('last_id')
-              call read_attribute_integer_h5(gid, aname, llast_id)
-            case('mblocks')
-              call read_attribute_integer_h5(gid, aname, lmblocks)
-            case('nleafs')
-              call read_attribute_integer_h5(gid, aname, lnleafs)
-            case('ncells')
-              call read_attribute_integer_h5(gid, aname, lncells)
-
-! check if the block dimensions are compatible
-!
-              if (lncells .ne. nn) then
-                call print_error("io::read_attributes_h5"                      &
-                        , "File and program block dimensions are incompatible!")
-              end if
-            case('nghost')
-              call read_attribute_integer_h5(gid, aname, lnghost)
-
-! check if the ghost layers are compatible
-!
-              if (lnghost .ne. ng) then
-                call print_error("io::read_attributes_h5"                      &
-                      , "File and program block ghost layers are incompatible!")
-              end if
-            case('step')
-              call read_attribute_integer_h5(gid, aname, step)
-            case('isnap')
-              call read_attribute_integer_h5(gid, aname, isnap)
-            case('time')
-              call read_attribute_double_h5(gid, aname, time)
-            case('dt')
-              call read_attribute_double_h5(gid, aname, dt)
-            case('dtn')
-              call read_attribute_double_h5(gid, aname, dtn)
-            case('xmin')
-              call read_attribute_double_h5(gid, aname, xmin)
-            case('xmax')
-              call read_attribute_double_h5(gid, aname, xmax)
-            case('ymin')
-              call read_attribute_double_h5(gid, aname, ymin)
-            case('ymax')
-              call read_attribute_double_h5(gid, aname, ymax)
-            case('zmin')
-              call read_attribute_double_h5(gid, aname, zmin)
-            case('zmax')
-              call read_attribute_double_h5(gid, aname, zmax)
-            case('nseeds')
-              call read_attribute_integer_h5(gid, aname, lnseeds)
-
-! ! check if the numbers of seeds are compatible
-! !
-!               if (lnseeds .ne. nseeds) then
-!                 call print_error("io::read_attributes_h5"                      &
-!                 , "The number of seeds from file and program are incompatible!")
-!               end if
-            case('seeds')
-
-! check if the numbers of seeds are compatible
-!
-              if (lnseeds .eq. nseeds) then
-
-! allocate space for seeds
-!
-                allocate(seeds(nseeds))
-
-! store them in the current group
-!
-                call read_attribute_vector_integer_h5(gid, aname, seeds(:))
-
-! set the seed values
-!
-                call set_seeds(nseeds, seeds(:))
-
-! deallocate seed array
-!
-                deallocate(seeds)
-
-              end if
-            case default
-            end select
-
-! close the current attribute
-!
-            call h5aclose_f(aid, err)
-
-          else
-
-! print error about the problem with obtaining the number of attributes
-!
-            call print_error("io::read_attributes_h5",                         &
-                                           "Cannot open the current attribute!")
-
-          end if
-
-        end do
-
-! allocate all metablocks
-!
-        do l = 1, lmblocks
-          call append_metablock(pmeta)
-        end do
-
-! check if the number of created metablocks is equal to lbmcloks
-!
-        if (lmblocks .ne. get_mblocks()) then
-          call print_error("io::read_attributes_h5"                            &
-                                        , "Number of metablocks doesn't match!")
-        end if
-
-! allocate an array of pointers with the size llast_id
-!
-        allocate(block_array(llast_id))
-        call set_last_id(llast_id)
-
-      else
-
-! print error about the problem with obtaining the number of attributes
-!
-        call print_error("io::read_attributes_h5",                             &
-                                  "Cannot get the number of global attributes!")
-
-      end if
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_attributes_h5", "Cannot close the group!")
-
-      end if
+      dcor = 2**(toplev - maxlev)
 
     else
 
-! print error about the problem with creating the group
+! calculate a factor to rescale the block coordinates
 !
-      call print_error("io::read_attributes_h5", "Cannot open the group!")
+      ucor = 2**(maxlev - lmaxlev)
 
+    end if
+
+! check if the numbers of seeds are compatible
+!
+    if (lnseeds == nseeds) then
+
+! allocate space for seeds
+!
+      allocate(seeds(nseeds))
+
+! store them in the current group
+!
+      call read_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+
+! set the seed values
+!
+      call set_seeds(nseeds, seeds(:))
+
+! deallocate seed array
+!
+      deallocate(seeds)
+
+    end if
+
+! allocate all metablocks
+!
+    do l = 1, lmblocks
+      call append_metablock(pmeta)
+    end do
+
+! check if the number of created metablocks is equal to lbmcloks
+!
+    if (lmblocks /= get_mblocks()) then
+      call print_error("io::read_attributes_h5"                                &
+                                     , "Number of metablocks does not match!")
+    end if
+
+! allocate an array of pointers with the size llast_id
+!
+    allocate(block_array(llast_id))
+
+! set the last_id
+!
+    call set_last_id(llast_id)
+
+! close the group
+!
+    call h5gclose_f(gid, ierr)
+
+! check if the group has been closed successfuly
+!
+    if (ierr /= 0) then
+      call print_error("io::read_attributes_h5", "Cannot close the group!")
     end if
 
 !-------------------------------------------------------------------------------
