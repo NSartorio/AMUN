@@ -1315,27 +1315,21 @@ module io
 
     end if
 
-! check if the numbers of seeds are compatible
-!
-    if (lnseeds == nseeds) then
-
 ! allocate space for seeds
 !
-      allocate(seeds(nseeds))
+    allocate(seeds(lnseeds))
 
 ! store them in the current group
 !
-      call read_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+    call read_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
 
 ! set the seed values
 !
-      call set_seeds(nseeds, seeds(:))
+    call set_seeds(lnseeds, seeds(:))
 
 ! deallocate seed array
 !
-      deallocate(seeds)
-
-    end if
+    deallocate(seeds)
 
 ! allocate all metablocks
 !
