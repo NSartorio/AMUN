@@ -819,12 +819,6 @@ module mesh
     call start_timer(imu)
 #endif /* PROFILE */
 
-#ifdef DEBUG
-! check the mesh when debugging
-!
-    call check_mesh('before update_mesh')
-#endif /* DEBUG */
-
 !! DETERMINE THE REFINEMENT OF ALL DATA BLOCKS
 !!
 ! set the pointer to the first block on the data block list
@@ -1262,12 +1256,6 @@ module mesh
 !
     call redistribute_blocks()
 #endif /* MPI */
-
-#ifdef DEBUG
-! check mesh
-!
-    call check_mesh('after update_mesh')
-#endif /* DEBUG */
 
 #ifdef PROFILE
 ! stop accounting time for the adaptive mesh refinement update
