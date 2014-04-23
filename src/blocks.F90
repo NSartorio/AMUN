@@ -271,6 +271,7 @@ module blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: set_blocks_update
+  public :: change_blocks_process
   public :: set_neighbors_refine
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
@@ -2149,6 +2150,58 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine set_blocks_update
+!
+!===============================================================================
+!
+! subroutine CHANGE_BLOCKS_PROCESS:
+! --------------------------------
+!
+!   Subroutine switches meta blocks which belong to old process to the new one.
+!
+!   Arguments:
+!
+!     npold - the old process number;
+!     npnew - the new process number;
+!
+!===============================================================================
+!
+  subroutine change_blocks_process(npold, npnew)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(in)       :: npold, npnew
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! associate the pointer with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all blocks in the list
+!
+    do while(associated(pmeta))
+
+! if the meta block belongs to process npold, switch it to process npnew
+!
+      if (pmeta%process == npold) pmeta%process = npnew
+
+! associate the pointer with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine change_blocks_process
 !
 !===============================================================================
 !

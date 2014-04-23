@@ -469,6 +469,7 @@ module io
 
 ! import external procedures and variables
 !
+    use blocks         , only : change_blocks_process
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_RDONLY_F
@@ -668,6 +669,10 @@ module io
 ! iterate over remaining files and read one by one to the last block
 !
       do lfile = nprocs, nfiles - 1
+
+! switch meta blocks from the read file to belong to the reading process
+!
+        call change_blocks_process(lfile, nprocs - 1)
 
 ! read the remaining files by the last process only
 !
@@ -2497,7 +2502,7 @@ module io
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id           (pmeta, id (l))
-        call metablock_set_process      (pmeta, min(lcpu, cpu(l)))
+        call metablock_set_process      (pmeta, cpu(l))
         call metablock_set_refinement   (pmeta, ref(l))
         call metablock_set_configuration(pmeta, cfg(l))
         call metablock_set_level        (pmeta, lev(l))

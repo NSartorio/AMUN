@@ -1347,92 +1347,98 @@ module mesh
 !
     do while (associated(pmeta))
 
+! consider only meta blocks which belong to active processes
+!
+      if (pmeta%process < nprocs) then
+
 ! check if the block belongs to another process
 !
-      if (pmeta%process /= np) then
+        if (pmeta%process /= np) then
 
 ! check if the block is the leaf
 !
-        if (pmeta%leaf) then
+          if (pmeta%leaf) then
 
 ! generate a tag for communication
 !
-          itag = pmeta%process * nprocs + np + nprocs + 1
+            itag = pmeta%process * nprocs + np + nprocs + 1
 
 ! sends the block to the right process
 !
-          if (nproc == pmeta%process) then
+            if (nproc == pmeta%process) then
 
 ! copy data to buffer
 !
-            rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
-            rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
+              rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
+              rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
 
 ! send data
 !
-            call send_real_array(size(rbuf), np, itag, rbuf, iret)
+              call send_real_array(size(rbuf), np, itag, rbuf, iret)
 
 ! remove data block from the current process
 !
-            call remove_datablock(pmeta%data)
+              call remove_datablock(pmeta%data)
 
 ! send data block
 !
-          end if ! nproc == pmeta%process
+            end if ! nproc == pmeta%process
 
 ! receive the block from another process
 !
-          if (nproc == np) then
+            if (nproc == np) then
 
 ! allocate a new data block and link it with the current meta block
 !
-            call append_datablock(pdata)
-            call link_blocks(pmeta, pdata)
+              call append_datablock(pdata)
+              call link_blocks(pmeta, pdata)
 
 ! receive the data
 !
-            call receive_real_array(size(rbuf), pmeta%process, itag, rbuf, iret)
+              call receive_real_array(size(rbuf), pmeta%process, itag, rbuf, iret)
 
 ! coppy the buffer to data block
 !
-            pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
-            pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
+              pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
+              pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
 
-          end if ! nproc == n
+            end if ! nproc == n
 
-        end if ! leaf
+          end if ! leaf
 
 ! set new processor number
 !
-        pmeta%process = np
+          pmeta%process = np
 
-      end if ! pmeta%process /= np
+        end if ! pmeta%process /= np
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
-      if (pmeta%leaf) then
+        if (pmeta%leaf) then
 
 ! increase the number of leafs for the current process
 !
-        nl = nl + 1
+          nl = nl + 1
 
 ! if the number of leafs for the current process exceeds the number of assigned
 ! blocks, reset the counter and increase the process number
 !
-        if (nl >= lb(np)) then
+          if (nl >= lb(np)) then
 
 ! reset the leaf counter for the current process
 !
-          nl = 0
+            nl = 0
 
 ! increase the process number
 !
-          np = min(nprocs - 1, np + 1)
+            np = min(nprocs - 1, np + 1)
 
-        end if ! l >= lb(n)
+          end if ! l >= lb(n)
 
-      end if ! leaf
+        end if ! leaf
+
+      end if ! pmeta%process < nprocs
 
 ! assign the pointer to the next meta block
 !
