@@ -1370,185 +1370,6 @@ module io
   end subroutine read_attributes_h5
 !
 !===============================================================================
-!
-! read_datablock_dims_h5: subroutine reads the data block dimensions from the
-!                         attributes group of the file given by the file
-!                         identifier
-!
-! arguments:
-!   fid - the HDF5 file identifier
-!   dm  - the data block dimensions
-!
-!===============================================================================
-!
-  subroutine read_datablock_dims_h5(fid, dm)
-
-! references to other modules
-!
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
-                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use equations, only : nv
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                , intent(in) :: fid
-    integer(hsize_t), dimension(5), intent(out) :: dm
-
-! local variables
-!
-    character(len=16) :: aname
-    integer(hid_t)    :: gid, aid
-    integer(hsize_t)  :: alen = 16
-    integer           :: err, i
-    integer           :: nattrs, ldblocks, lnghost
-
-! local arrays
-!
-    integer(kind=4), dimension(3) :: lm
-!
-!-------------------------------------------------------------------------------
-!
-! initiate the output vector
-!
-    dm(:) = 0
-    dm(2) = nv
-
-! open the global attributes group
-!
-    call h5gopen_f(fid, 'attributes', gid, err)
-
-! check if the group has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read the number of global attributes
-!
-      call h5aget_num_attrs_f(gid, nattrs, err)
-
-! check if the number of attributes has been read successfuly
-!
-      if (err .ge. 0) then
-
-! iterate over all attributes
-!
-        do i = 0, nattrs - 1
-
-! open the current attribute
-!
-          call h5aopen_idx_f(gid, i, aid, err)
-
-! check if the attribute has been opened successfuly
-!
-          if (err .ge. 0) then
-
-! obtain the attribute name
-!
-            call h5aget_name_f(aid, alen, aname, err)
-
-! check if the attribute name has been read successfuly
-!
-              if (err .ge. 0) then
-
-! depending on the attribute name use proper subroutine to read its value
-!
-              select case(trim(aname))
-              case('dblocks')
-
-! obtain the number of data blocks
-!
-                call read_attribute_integer_h5(gid, aname, ldblocks)
-
-              case('dims')
-
-! obtain the block dimensions
-!
-                call read_attribute_vector_integer_h5(gid, aname, lm(:))
-
-              case('nghost')
-
-! obtain the number of data blocks
-!
-                call read_attribute_integer_h5(gid, aname, lnghost)
-
-              case default
-              end select
-
-            else
-
-! print error about the problem with reading the attribute name
-!
-              call print_error("io::read_datablock_dims_h5",                   &
-                                    "Cannot read the current attribute name!")
-
-            end if
-
-! close the current attribute
-!
-            call h5aclose_f(aid, err)
-
-          else
-
-! print error about the problem with opening the current attribute
-!
-            call print_error("io::read_datablock_dims_h5",                     &
-                                         "Cannot open the current attribute!")
-
-          end if
-
-        end do ! i = 0, nattrs - 1
-
-! prepare the output array
-!
-        dm(1) = ldblocks
-        do i = 1, 3
-          if (lm(i) .gt. 1) lm(i) = lm(i) + 2 * lnghost
-        end do
-        dm(3:5) = lm(1:3)
-
-      else
-
-! print error about the problem with obtaining the number of attributes
-!
-        call print_error("io::read_datablock_dims_h5",                         &
-                                "Cannot get the number of global attributes!")
-
-      end if
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_datablock_dims_h5"                          &
-                                       , "Cannot close the attributes group!")
-
-      end if
-
-    else
-
-! print error about the problem with creating the group
-!
-      call print_error("io::read_datablock_dims_h5"                            &
-                                        , "Cannot open the attributes group!")
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_datablock_dims_h5
-!
-!===============================================================================
 !!
 !!---  ATTRIBUTE SUBROUTINES  --------------------------------------------------
 !!
@@ -2797,6 +2618,7 @@ module io
     use blocks         , only : block_meta, block_data, list_data
     use blocks         , only : append_datablock, link_blocks
     use coordinates    , only : im, jm, km
+    use equations      , only : nv
     use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gopen_f, h5gclose_f
@@ -2817,7 +2639,7 @@ module io
 !
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
-    integer                        :: err
+    integer                        :: dblocks, ierr
 
 ! local arrays
 !
@@ -2830,84 +2652,90 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! get datablock array dimensions
+! read the number of data blocks
 !
-    call read_datablock_dims_h5(fid, dm(:))
-
-! open the group 'datablocks'
-!
-    call h5gopen_f(fid, 'datablocks', gid, err)
-
-! check if the datablock group has been opened successfuly
-!
-    if (err >= 0) then
+    call h5gopen_f(fid, 'attributes', gid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_datablocks_h5"                                &
+                                         , "Cannot open the attribute group!")
+      return
+    end if
+    call read_attribute_integer_h5(gid, 'dblocks', dblocks)
+    call h5gclose_f(gid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_datablocks_h5"                                &
+                                        , "Cannot close the attribute group!")
+      return
+    end if
 
 ! restore data blocks only if there are any
 !
-      if (dm(1) > 0) then
+    if (dblocks > 0) then
+
+! fill out dimensions dm(:)
+!
+      dm(1) = dblocks
+      dm(2) = nv
+      dm(3) = im
+      dm(4) = jm
+      dm(5) = km
 
 ! allocate arrays to read data
 !
-        allocate(id(dm(1)))
-        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+      allocate(id(dm(1)))
+      allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+      allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+
+! open the group 'datablocks'
+!
+      call h5gopen_f(fid, 'datablocks', gid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_datablocks_h5"                              &
+                                        , "Cannot open the data block group!")
+        return
+      end if
 
 ! read array data from the HDF5 file
 !
-        call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
-        call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
-        call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+      call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
+      call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+      call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+
+! close the data block group
+!
+      call h5gclose_f(gid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_datablocks_h5"                              &
+                                       , "Cannot close the data block group!")
+        return
+      end if
 
 ! iterate over data blocks, allocate them and fill out their fields
 !
-        do l = 1, dm(1)
+      do l = 1, dm(1)
 
 ! allocate and append to the end of the list a new datablock
 !
-          call append_datablock(pdata)
+        call append_datablock(pdata)
 
 ! associate the corresponding meta block with the current data block
 !
-          call link_blocks(block_array(id(l))%ptr, pdata)
+        call link_blocks(block_array(id(l))%ptr, pdata)
 
 ! fill out the array of conservative and primitive variables
 !
-          pdata%u(:,:,:,:) = uv(l,:,:,:,:)
-          pdata%q(:,:,:,:) = qv(l,:,:,:,:)
+        pdata%u(:,:,:,:) = uv(l,:,:,:,:)
+        pdata%q(:,:,:,:) = qv(l,:,:,:,:)
 
-        end do ! l = 1, dm(1)
+      end do ! l = 1, dm(1)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(id)) deallocate(id)
-        if (allocated(uv)) deallocate(uv)
-        if (allocated(qv)) deallocate(qv)
+      if (allocated(id)) deallocate(id)
+      if (allocated(uv)) deallocate(uv)
+      if (allocated(qv)) deallocate(qv)
 
-      end if ! dblocks > 0
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err > 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_datablocks_h5"                              &
-                                           , "Cannot close data block group!")
-
-      end if
-
-    else
-
-! print error about the problem with opening the group
-!
-      call print_error("io::read_datablocks_h5"                                &
-                                            , "Cannot open data block group!")
-
-    end if
+    end if ! dblocks > 0
 
 !-------------------------------------------------------------------------------
 !
