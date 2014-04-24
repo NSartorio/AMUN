@@ -1075,7 +1075,6 @@ module io
 !
     integer(hid_t)                :: gid
     integer                       :: err
-    integer(kind=4), dimension(3) :: dm
 
 ! local allocatable arrays
 !
@@ -1133,8 +1132,7 @@ module io
 
 ! store the vector attributes
 !
-    dm(:) = (/ in, jn, kn /)
-    call write_attribute_vector_integer_h5(gid, 'dims' , dm(:))
+    call write_attribute_vector_integer_h5(gid, 'dims' , (/ in, jn, kn /))
     call write_attribute_vector_integer_h5(gid, 'rdims', (/ ir, jr, kr /))
 
 ! store random number generator seed values
