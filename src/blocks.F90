@@ -3521,32 +3521,52 @@ module blocks
       end if
     end if
 
-! (0,0)-(½,0) edge
+! (0,0)-(½,0) edge and (0,0) corner
 !
     pneigh => pmeta%neigh(2,1,1)%ptr
     if (associated(pneigh)) then
       call pprocedure(pmeta, pneigh)
+
+      pneigh => pneigh%neigh(1,1,2)%ptr
+      if (associated(pneigh)) then
+        call pprocedure(pmeta, pneigh)
+      end if
     end if
 
-! (½,0)-(1,0) edge
+! (½,0)-(1,0) edge and (1,0) corner
 !
     pneigh => pmeta%neigh(2,1,2)%ptr
     if (associated(pneigh)) then
       call pprocedure(pmeta, pneigh)
+
+      pneigh => pneigh%neigh(1,2,2)%ptr
+      if (associated(pneigh)) then
+        call pprocedure(pmeta, pneigh)
+      end if
     end if
 
-! (0,1)-(½,1) edge
+! (0,1)-(½,1) edge and (0,1) corner
 !
     pneigh => pmeta%neigh(2,2,1)%ptr
     if (associated(pneigh)) then
       call pprocedure(pmeta, pneigh)
+
+      pneigh => pneigh%neigh(1,1,1)%ptr
+      if (associated(pneigh)) then
+        call pprocedure(pmeta, pneigh)
+      end if
     end if
 
-! (½,1)-(1,1) edge
+! (½,1)-(1,1) edge and (1,1) corner
 !
     pneigh => pmeta%neigh(2,2,2)%ptr
     if (associated(pneigh)) then
       call pprocedure(pmeta, pneigh)
+
+      pneigh => pneigh%neigh(1,2,1)%ptr
+      if (associated(pneigh)) then
+        call pprocedure(pmeta, pneigh)
+      end if
     end if
 #endif /* NDIMS == 3 */
 
