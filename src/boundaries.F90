@@ -3628,8 +3628,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,it,j,k) = 2.5d-01 * (f(:,j1,k1) + f(:,j2,k1)          &
-                                            + f(:,j1,k2) + f(:,j2,k2))
+          pdata%f(idir,:,it,j,k) = 2.5d-01 * ((f(:,j1,k1) + f(:,j2,k2))        &
+                                            + (f(:,j2,k1) + f(:,j1,k2)))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3676,8 +3676,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,i,jt,k) = 2.5d-01 * (f(:,i1,k1) + f(:,i2,k1)          &
-                                            + f(:,i1,k2) + f(:,i2,k2))
+          pdata%f(idir,:,i,jt,k) = 2.5d-01 * ((f(:,i1,k1) + f(:,i2,k2))        &
+                                            + (f(:,i2,k1) + f(:,i1,k2)))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3717,8 +3717,8 @@ module boundaries
           j1 = 2 * (j - jl) + jb
           j2 = j1 + 1
 
-          pdata%f(idir,:,i,j,kt) = 2.5d-01 * (f(:,i1,j1) + f(:,i2,j1)          &
-                                            + f(:,i1,j2) + f(:,i2,j2))
+          pdata%f(idir,:,i,j,kt) = 2.5d-01 * ((f(:,i1,j1) + f(:,i2,j2))        &
+                                            + (f(:,i2,j1) + f(:,i1,j2)))
         end do
       end do
 #endif /* NDIMS == 3 */
