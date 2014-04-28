@@ -277,6 +277,9 @@ module blocks
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
   public :: metablock_set_bounds, metablock_set_leaf, metablock_unset_leaf
+#ifdef DEBUG
+  public :: check_neighbors
+#endif /* DEBUG */
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -2711,6 +2714,52 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine set_neighbors_refine
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! subroutine CHECK_NEIGHBORS:
+! --------------------------
+!
+!   Subroutine iterates over all blocks and checks if the pointers to their
+!   neighbors are consistent.
+!
+!===============================================================================
+!
+  subroutine check_neighbors()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! associate the pointer with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all blocks in the list
+!
+    do while(associated(pmeta))
+
+! check the block neighbors
+!
+      call check_block_neighbors(pmeta)
+
+! associate the pointer with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_neighbors
+#endif /* DEBUG */
 !
 !===============================================================================
 !!
@@ -3573,6 +3622,164 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine iterate_over_neighbors
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! subroutine CHECK_BLOCK_NEIGHBORS:
+! --------------------------------
+!
+!   Subroutine iterates over all neighbor blocks and checks if their pointers
+!   are consistent, i.e. if their corresponding neighbor pointers point to
+!   the current block.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the meta block;
+!
+!===============================================================================
+!
+  subroutine check_block_neighbors(pmeta)
+
+! import external procedures and variables
+!
+    use error          , only : print_warning
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(in) :: pmeta
+
+! local pointers
+!
+    type(block_meta), pointer :: pneigh, pnneigh
+
+! local variables
+!
+    integer :: i, j, k, l, m
+!
+!-------------------------------------------------------------------------------
+!
+! return if the block is not leaf
+!
+    if (.not. pmeta%leaf) return
+
+! iterate over all face neighbors
+!
+    do i = 1, ndims
+      do j = 1, nsides
+        m = 3 - j
+        do k = 1, nfaces
+
+! assign pointer with the neighbor
+!
+          pneigh => pmeta%neigh(i,j,k)%ptr
+
+! check if the neighbor is associated
+!
+          if (associated(pneigh)) then
+
+! check neighbors on the same levels
+!
+            if (pmeta%level == pneigh%level) then
+
+! assign pointer to the neighbor of the neighbor pointing to the current meta
+! block
+!
+              pnneigh => pneigh%neigh(i,m,k)%ptr
+
+! check if it is associated
+!
+              if (associated(pnneigh)) then
+
+! check if the pointer of the neighbor points to the current meta block
+!
+                if (pmeta%id /= pnneigh%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning("blocks::check_block_neighbors"           &
+                                       , "Inconsistent same level neighbors!")
+                  print *, 'metablock: ', pmeta%id, pnneigh%id
+                  print *, 'neighbor : ', pneigh%id
+                  print *, 'index    : ', i, j, k
+
+                end if
+
+              else ! pnneigh associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning("blocks::check_block_neighbors"             &
+                                      , "Same level neighbor not associated!")
+                print *, 'metablock: ', pmeta%id, pnneigh%id
+                print *, 'neighbor : ', pneigh%id
+                print *, 'index    : ', i, j, k
+
+              end if ! pnneigh associated
+
+            end if ! the same levels
+
+! check neighbors on the level higher than the meta block's level; it also
+! covers the other way around, since we iterate over all neighbor faces
+!
+            if (pmeta%level < pneigh%level) then
+
+! iterate over whole face of the corresponding neighbor
+!
+              do l = 1, nfaces
+
+! assign pointer to the corresponding neighbor of the neighbor
+!
+                pnneigh => pneigh%neigh(i,m,l)%ptr
+
+! check if it is associated
+!
+                if (associated(pnneigh)) then
+
+! check if the pointer of the neighbor points to the current meta block
+!
+                  if (pmeta%id /= pnneigh%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning("blocks::check_block_neighbors"         &
+                                  , "Inconsistent different level neighbors!")
+                    print *, 'metablock: ', pmeta%id, pnneigh%id
+                    print *, 'neighbor : ', pneigh%id
+                    print *, 'index    : ', i, j, k, l
+
+                  end if
+
+                else ! pnneigh associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning("blocks::check_block_neighbors"           &
+                                 , "Different level neighbor not associated!")
+                  print *, 'metablock: ', pmeta%id, pnneigh%id
+                  print *, 'neighbor : ', pneigh%id
+                  print *, 'index    : ', i, j, k, l
+
+                end if ! pnneigh associated
+
+              end do ! l = 1, nfaces
+
+            end if ! pmeta's level < pneigh's level
+
+          end if ! pneigh associated
+
+        end do ! nfaces
+      end do ! nsides
+    end do ! ndims
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_block_neighbors
+#endif /* DEBUG */
 
 !===============================================================================
 !

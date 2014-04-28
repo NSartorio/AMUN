@@ -462,6 +462,9 @@ module mesh
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
     use blocks         , only : set_neighbors_refine
+#ifdef DEBUG
+    use blocks         , only : check_neighbors
+#endif /* DEBUG */
     use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
     use error          , only : print_error
@@ -735,6 +738,12 @@ module mesh
 
     end do ! pmeta
 
+#ifdef DEBUG
+! check if neighbors are consistent after mesh generation
+!
+    call check_neighbors()
+#endif /* DEBUG */
+
 #ifdef PROFILE
 ! stop accounting time for the initial mesh generation
 !
@@ -768,6 +777,9 @@ module mesh
     use blocks         , only : refine_block, derefine_block
     use blocks         , only : append_datablock, remove_datablock, link_blocks
     use blocks         , only : set_neighbors_refine
+#ifdef DEBUG
+    use blocks         , only : check_neighbors
+#endif /* DEBUG */
     use coordinates    , only : minlev, maxlev, toplev, im, jm, km
     use equations      , only : nv
     use error          , only : print_error
@@ -1256,6 +1268,12 @@ module mesh
 !
     call redistribute_blocks()
 #endif /* MPI */
+
+#ifdef DEBUG
+! check if neighbors are consistent after mesh refinement
+!
+    call check_neighbors()
+#endif /* DEBUG */
 
 #ifdef PROFILE
 ! stop accounting time for the adaptive mesh refinement update
