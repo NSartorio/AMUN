@@ -214,6 +214,11 @@ module random
 !
     integer                           , intent(in) :: np
     integer(kind=4), dimension(0:np-1), intent(in) :: seed
+
+! local variables
+!
+    integer :: i, l
+    real    :: r
 !
 !-------------------------------------------------------------------------------
 !
@@ -225,9 +230,33 @@ module random
 
 ! set the seeds only if the input array and seeds have the same sizes
 !
-    if (np .eq. nseeds) then
+    if (np == nseeds) then
 
       seeds(0:lseed) = seed(0:lseed)
+
+    else
+
+! if the input array and seeds have different sizes, expand or shrink seeds
+!
+      select case(gentype)
+      case('random')
+        l = min(lseed, np - 1)
+        seeds(0:l) = seed(0:l)
+        if (l < lseed) then
+          do i = l + 1, lseed
+            call random_number(r)
+            seeds(i) = 123456789 * r
+          end do
+        end if
+      case default
+        l = nseeds / 2
+        do i = 0, l - 1
+          seeds(i) = seed(0)
+        end do
+        do i = l, lseed
+          seeds(i) = seed(np-1)
+        end do
+      end select
 
     end if
 

@@ -42,17 +42,18 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imv, imf, ims, imc, imr, imp
+  integer                , save :: imi, imv, imf, ims, imc, imr, imp
 #endif /* PROFILE */
 
-! module parameters for the boundary update order and boundary type
+! parameters corresponding to the boundary type
 !
-  character(len = 32), save     :: xlbndry = "periodic"
-  character(len = 32), save     :: xubndry = "periodic"
-  character(len = 32), save     :: ylbndry = "periodic"
-  character(len = 32), save     :: yubndry = "periodic"
-  character(len = 32), save     :: zlbndry = "periodic"
-  character(len = 32), save     :: zubndry = "periodic"
+  integer, parameter            :: bnd_periodic   = 0
+  integer, parameter            :: bnd_open       = 1
+  integer, parameter            :: bnd_reflective = 2
+
+! variable to store boundary type flags
+!
+  integer, dimension(3,2), save :: bnd_type       = bnd_periodic
 
 ! by default everything is private
 !
@@ -62,7 +63,7 @@ module boundaries
 !
   public :: initialize_boundaries, finalize_boundaries
   public :: boundary_variables, boundary_fluxes
-  public :: xlbndry, ylbndry, zlbndry, xubndry, yubndry, zubndry
+  public :: bnd_type, bnd_periodic
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -105,6 +106,15 @@ module boundaries
 !
     logical, intent(in)    :: verbose
     integer, intent(inout) :: iret
+
+! module parameters for the boundary update order and boundary type
+!
+    character(len = 32)    :: xlbndry = "periodic"
+    character(len = 32)    :: xubndry = "periodic"
+    character(len = 32)    :: ylbndry = "periodic"
+    character(len = 32)    :: yubndry = "periodic"
+    character(len = 32)    :: zlbndry = "periodic"
+    character(len = 32)    :: zubndry = "periodic"
 !
 !-------------------------------------------------------------------------------
 !
@@ -133,6 +143,62 @@ module boundaries
     call get_parameter_string ("zlbndry" , zlbndry)
     call get_parameter_string ("zubndry" , zubndry)
 
+! fill the boundary type flags
+!
+    select case(xlbndry)
+    case("open")
+      bnd_type(1,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(1,1) = bnd_reflective
+    case default
+      bnd_type(1,1) = bnd_periodic
+    end select
+
+    select case(xubndry)
+    case("open")
+      bnd_type(1,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(1,2) = bnd_reflective
+    case default
+      bnd_type(1,2) = bnd_periodic
+    end select
+
+    select case(ylbndry)
+    case("open")
+      bnd_type(2,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(2,1) = bnd_reflective
+    case default
+      bnd_type(2,1) = bnd_periodic
+    end select
+
+    select case(yubndry)
+    case("open")
+      bnd_type(2,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(2,2) = bnd_reflective
+    case default
+      bnd_type(2,2) = bnd_periodic
+    end select
+
+    select case(zlbndry)
+    case("open")
+      bnd_type(3,1) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(3,1) = bnd_reflective
+    case default
+      bnd_type(3,1) = bnd_periodic
+    end select
+
+    select case(zubndry)
+    case("open")
+      bnd_type(3,2) = bnd_open
+    case("reflective", "reflecting", "reflect")
+      bnd_type(3,2) = bnd_reflective
+    case default
+      bnd_type(3,2) = bnd_periodic
+    end select
+
 ! print information about the boundary conditions
 !
     if (verbose) then
@@ -147,52 +213,6 @@ module boundaries
 #endif /* NDIMS == 3 */
 
     end if
-
-#ifdef MPI
-! change the internal boundaries to "exchange" type for the MPI update
-!
-    if (pdims(1) > 1) then
-      if (periodic(1)) then
-        xlbndry       = "exchange"
-        xubndry       = "exchange"
-      else
-        if (pcoords(1) > 0         ) then
-          xlbndry       = "exchange"
-        end if
-        if (pcoords(1) < pdims(1)-1) then
-          xubndry       = "exchange"
-        end if
-      end if
-    end if
-
-    if (pdims(2) > 1) then
-      if (periodic(2)) then
-        ylbndry       = "exchange"
-        yubndry       = "exchange"
-      else
-        if (pcoords(2) > 0         ) then
-          ylbndry       = "exchange"
-        end if
-        if (pcoords(2) < pdims(2)-1) then
-          yubndry       = "exchange"
-        end if
-      end if
-    end if
-
-    if (pdims(3) > 1) then
-      if (periodic(3)) then
-        zlbndry       = "exchange"
-        zubndry       = "exchange"
-      else
-        if (pcoords(3) > 0         ) then
-          zlbndry       = "exchange"
-        end if
-        if (pcoords(3) < pdims(3)-1) then
-          zubndry       = "exchange"
-        end if
-      end if
-    end if
-#endif /* MPI */
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -325,6 +345,10 @@ module boundaries
 ! finally, update the corners
 !
     call update_corners()
+
+! convert updated primitive variables to conservative ones in all ghost cells
+!
+    call update_ghost_cells()
 
 #ifdef PROFILE
 ! stop accounting time for variable boundary update
@@ -943,7 +967,7 @@ module boundaries
 
 ! local variables
 !
-    integer      :: n, i, j, k
+    integer      :: i, j, k, p
 
 ! local pointers
 !
@@ -961,50 +985,50 @@ module boundaries
 
 ! iterate over all variables
 !
-      do n = 1, nv
+      do p = 1, nv
 
 ! edges
 !
 #if NDIMS == 3
         do i = 1, im
 
-          pdata%u(n,i, 1:nh, 1:nh) = pdata%u(n,i,jbl,kbl)
-          pdata%u(n,i,jt:jm, 1:nh) = pdata%u(n,i,jeu,kbl)
-          pdata%u(n,i, 1:nh,kt:km) = pdata%u(n,i,jbl,keu)
-          pdata%u(n,i,jt:jm,kt:km) = pdata%u(n,i,jeu,keu)
+          pdata%q(p,i, 1:nh, 1:nh) = pdata%q(p,i,jbl,kbl)
+          pdata%q(p,i,jt:jm, 1:nh) = pdata%q(p,i,jeu,kbl)
+          pdata%q(p,i, 1:nh,kt:km) = pdata%q(p,i,jbl,keu)
+          pdata%q(p,i,jt:jm,kt:km) = pdata%q(p,i,jeu,keu)
 
         end do
 
         do j = 1, jm
 
-          pdata%u(n, 1:nh,j, 1:nh) = pdata%u(n,ibl,j,kbl)
-          pdata%u(n,it:im,j, 1:nh) = pdata%u(n,ieu,j,kbl)
-          pdata%u(n, 1:nh,j,kt:km) = pdata%u(n,ibl,j,keu)
-          pdata%u(n,it:im,j,kt:km) = pdata%u(n,ieu,j,keu)
+          pdata%q(p, 1:nh,j, 1:nh) = pdata%q(p,ibl,j,kbl)
+          pdata%q(p,it:im,j, 1:nh) = pdata%q(p,ieu,j,kbl)
+          pdata%q(p, 1:nh,j,kt:km) = pdata%q(p,ibl,j,keu)
+          pdata%q(p,it:im,j,kt:km) = pdata%q(p,ieu,j,keu)
 
         end do
 #endif /* == 3 */
 
         do k = 1, km
 
-          pdata%u(n, 1:nh, 1:nh,k) = pdata%u(n,ibl,jbl,k)
-          pdata%u(n,it:im, 1:nh,k) = pdata%u(n,ieu,jbl,k)
-          pdata%u(n, 1:nh,jt:jm,k) = pdata%u(n,ibl,jeu,k)
-          pdata%u(n,it:im,jt:jm,k) = pdata%u(n,ieu,jeu,k)
+          pdata%q(p, 1:nh, 1:nh,k) = pdata%q(p,ibl,jbl,k)
+          pdata%q(p,it:im, 1:nh,k) = pdata%q(p,ieu,jbl,k)
+          pdata%q(p, 1:nh,jt:jm,k) = pdata%q(p,ibl,jeu,k)
+          pdata%q(p,it:im,jt:jm,k) = pdata%q(p,ieu,jeu,k)
 
         end do
 
 ! corners
 !
 #if NDIMS == 3
-        pdata%u(n, 1:nh, 1:nh, 1:nh) = pdata%u(n,ibl,jbl,kbl)
-        pdata%u(n,it:im, 1:nh, 1:nh) = pdata%u(n,ieu,jbl,kbl)
-        pdata%u(n, 1:nh,jt:jm, 1:nh) = pdata%u(n,ibl,jeu,kbl)
-        pdata%u(n,it:im,jt:jm, 1:nh) = pdata%u(n,ieu,jeu,kbl)
-        pdata%u(n, 1:nh, 1:nh,kt:km) = pdata%u(n,ibl,jbl,keu)
-        pdata%u(n,it:im, 1:nh,kt:km) = pdata%u(n,ieu,jbl,keu)
-        pdata%u(n, 1:nh,jt:jm,kt:km) = pdata%u(n,ibl,jeu,keu)
-        pdata%u(n,it:im,jt:jm,kt:km) = pdata%u(n,ieu,jeu,keu)
+        pdata%q(p, 1:nh, 1:nh, 1:nh) = pdata%q(p,ibl,jbl,kbl)
+        pdata%q(p,it:im, 1:nh, 1:nh) = pdata%q(p,ieu,jbl,kbl)
+        pdata%q(p, 1:nh,jt:jm, 1:nh) = pdata%q(p,ibl,jeu,kbl)
+        pdata%q(p,it:im,jt:jm, 1:nh) = pdata%q(p,ieu,jeu,kbl)
+        pdata%q(p, 1:nh, 1:nh,kt:km) = pdata%q(p,ibl,jbl,keu)
+        pdata%q(p,it:im, 1:nh,kt:km) = pdata%q(p,ieu,jbl,keu)
+        pdata%q(p, 1:nh,jt:jm,kt:km) = pdata%q(p,ibl,jeu,keu)
+        pdata%q(p,it:im,jt:jm,kt:km) = pdata%q(p,ieu,jeu,keu)
 #endif /* == 3 */
 
       end do
@@ -1018,6 +1042,110 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine update_corners
+!
+!===============================================================================
+!
+! subroutine UPDATE_GHOST_CELLS:
+! -----------------------------
+!
+!   Subroutine updates conservative variables in all ghost cells from
+!   already updated primitive variables.
+!
+!
+!===============================================================================
+!
+  subroutine update_ghost_cells()
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im , jm , km , in , jn , kn
+    use coordinates   , only : ib , jb , kb , ie , je , ke
+    use coordinates   , only : ibl, jbl, kbl, ieu, jeu, keu
+    use equations     , only : nv
+    use equations     , only : prim2cons
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer                   :: i, j, k
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! assign the pointer to the first block on the list
+!
+    pdata => list_data
+
+! scan all data blocks until the last is reached
+!
+    do while(associated(pdata))
+
+! update the X and Y boundary ghost cells
+!
+      do k = 1, km
+
+! update lower layers of the Y boundary
+!
+        do j = 1, jbl
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = 1, jbl
+
+! update upper layers of the Y boundary
+!
+        do j = jeu, jm
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = jeu, jm
+
+! update remaining left layers of the X boundary
+!
+        do i = 1, ibl
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+! update remaining right layers of the X boundary
+!
+        do i = ieu, im
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+      end do ! k = 1, km
+
+#if NDIMS == 3
+! update the Z boundary ghost cells
+!
+      do j = jb, je
+
+! update the remaining front layers of the Z boundary
+!
+        do k = 1, kbl
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = 1, kbl
+
+! update the remaining back layers of the Z boundary
+!
+        do k = keu, km
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = keu, km
+
+      end do ! j = jb, je
+#endif /* NDIMS == 3 */
+
+! assign the pointer to the next block on the list
+!
+      pdata => pdata%next
+
+    end do ! data blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_ghost_cells
 !
 !===============================================================================
 !
@@ -1282,27 +1410,27 @@ module boundaries
                         case(1)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,iel:ie,:,:), idir, iside)
+                                   , pneigh%data%q(:,iel:ie,:,:), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,ib:ibu,:,:), idir, iside)
+                                   , pneigh%data%q(:,ib:ibu,:,:), idir, iside)
                           end if
                         case(2)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,jel:je,:), idir, iside)
+                                   , pneigh%data%q(:,:,jel:je,:), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,jb:jbu,:), idir, iside)
+                                   , pneigh%data%q(:,:,jb:jbu,:), idir, iside)
                           end if
 #if NDIMS == 3
                         case(3)
                           if (iside == 1) then
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,:,kel:ke), idir, iside)
+                                   , pneigh%data%q(:,:,:,kel:ke), idir, iside)
                           else
                             call boundary_copy(pdata                           &
-                                   , pneigh%data%u(:,:,:,kb:kbu), idir, iside)
+                                   , pneigh%data%q(:,:,:,kb:kbu), idir, iside)
                           end if
 #endif /* NDIMS == 3 */
                         end select
@@ -1431,9 +1559,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,iel:ie,:,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,iel:ie,:,:)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,ib:ibu,:,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,ib:ibu,:,:)
                 end if
 
 ! associate the pointer with the next block
@@ -1459,9 +1587,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jel:je,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jel:je,:)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jb:jbu,:)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jb:jbu,:)
                 end if
 
 ! associate the pointer with the next block
@@ -1488,9 +1616,9 @@ module boundaries
 ! fill the buffer with data from the current block (depending on the side)
 !
                 if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kel:ke)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kel:ke)
                 else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kb:kbu)
+                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kb:kbu)
                 end if
 
 ! associate the pointer with the next block
@@ -1806,7 +1934,7 @@ module boundaries
 ! update boundaries of the current block
 !
                       call boundary_restrict(pdata                             &
-                                         , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
+                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
                                                         , idir, iside, iface)
 
 #ifdef MPI
@@ -1938,7 +2066,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
 
 ! associate the pointer with the next block
 !
@@ -1973,7 +2101,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
 
 ! associate the pointer with the next block
 !
@@ -2009,7 +2137,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
 
 ! associate the pointer with the next block
 !
@@ -2315,7 +2443,7 @@ module boundaries
 ! update boundaries of the current block from its neighbor
 !
                         call boundary_prolong(pdata                            &
-                                         , pneigh%data%u(:,il:iu,jl:ju,kl:ku)  &
+                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
                                                          , idir, iside, nface)
 
 #ifdef MPI
@@ -2449,7 +2577,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,il:iu,:,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
 
 ! associate the pointer with the next block
 !
@@ -2484,7 +2612,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,jl:ju,:)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
 
 ! associate the pointer with the next block
 !
@@ -2520,7 +2648,7 @@ module boundaries
 
 ! fill the data buffer with the current block variable slices
 !
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%u(:,:,:,kl:ku)
+                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
 
 ! associate the pointer with the next block
 !
@@ -2664,11 +2792,12 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : block_data
-    use coordinates    , only : ng, im, jm, km, ib, ibl, ie, ieu, jb    &
-                            , jbl, je, jeu, kb, kbl, ke, keu
+    use coordinates    , only : im , jm , km , ng
+    use coordinates    , only : ib , jb , kb , ie , je , ke
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
     use equations      , only : nv
-    use equations      , only : idn, imx, imy, imz, ibx, iby, ibz, ibp
-    use error          , only : print_warning
+    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use error          , only : print_error, print_warning
 
 ! local variables are not implicit by default
 !
@@ -2699,25 +2828,36 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(xlbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do i = 1, ng
+          pdata%q(  :,i,:,:) = pdata%q(:,ib,:,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do i = 1, ng
 
           it = ib  - i
           is = ibl + i
 
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
+          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
 
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do i = 1, ng
-          pdata%u(  :,i,:,:) = pdata%u(:,ib,:,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left X boundary type!")
 
       end select
 
@@ -2727,23 +2867,34 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(xubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do i = ieu, im
+          pdata%q(  :,i ,:,:) =   pdata%q(  :,ie,:,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do i = 1, ng
           it = ie  + i
           is = ieu - i
 
-          pdata%u(  :,it,:,:) =   pdata%u(  :,is,:,:)
-          pdata%u(imx,it,:,:) = - pdata%u(imx,is,:,:)
+          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
+          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do i = ieu, im
-          pdata%u(  :,i,:,:) = pdata%u(:,ie,:,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right X boundary type!")
 
       end select
 
@@ -2753,23 +2904,34 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(ylbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do j = 1, ng
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,jb,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do j = 1, ng
           jt = jb  - j
           js = jbl + j
 
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
+          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do j = 1, ng
-          pdata%u(  :,:,j,:) = pdata%u(:,:,jb,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left Y boundary type!")
 
       end select
 
@@ -2779,23 +2941,34 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(yubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do j = jeu, jm
+          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,je,:)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do j = 1, ng
           jt = je  + j
           js = jeu - j
 
-          pdata%u(  :,:,jt,:) =   pdata%u(  :,:,js,:)
-          pdata%u(imy,:,jt,:) = - pdata%u(imy,:,js,:)
+          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
+          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do j = jeu, jm
-          pdata%u(  :,:,j,:) = pdata%u(:,:,je,:)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right Y boundary type!")
 
       end select
 
@@ -2806,23 +2979,34 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(zlbndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do k = 1, ng
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,kb)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do k = 1, ng
           kt = kb  - k
           ks = kbl + k
 
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
+          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do k = 1, ng
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,kb)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                              , "Wrong left Z boundary type!")
 
       end select
 
@@ -2832,23 +3016,34 @@ module boundaries
 
 ! apply selected boundary condition
 !
-      select case(zubndry)
+      select case(bnd_type(idir,iside))
 
-      case("reflecting", "reflect")
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        do k = keu, km
+          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,ke)
+        end do
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
 
         do k = 1, ng
           kt = ke  + k
           ks = keu - k
 
-          pdata%u(  :,:,:,kt) =   pdata%u(  :,:,:,ks)
-          pdata%u(imz,:,:,kt) = - pdata%u(imz,:,:,ks)
+          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
+          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
         end do
 
-      case default ! "open" as default boundary conditions
+! wrong boundary conditions
+!
+      case default
 
-        do k = keu, km
-          pdata%u(  :,:,:,k) = pdata%u(:,:,:,ke)
-        end do
+        call print_error("boundaries:boundary_specific()"                      &
+                                             , "Wrong right Z boundary type!")
 
       end select
 #endif /* NDIMS == 3 */
@@ -2876,13 +3071,13 @@ module boundaries
 !   Arguments:
 !
 !     pdata - the pointer to modified data block;
-!     u     - the variable array from which boundaries are updated;
+!     q     - the variable array from which boundaries are updated;
 !     idir  - the direction to be processed;
 !     iside - the side to be processed;
 !
 !===============================================================================
 !
-  subroutine boundary_copy(pdata, u, idir, iside)
+  subroutine boundary_copy(pdata, q, idir, iside)
 
 ! import external procedures and variables
 !
@@ -2897,7 +3092,7 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
+    real   , dimension(:,:,:,:), intent(in)    :: q
     integer                    , intent(in)    :: idir, iside
 !
 !-------------------------------------------------------------------------------
@@ -2909,26 +3104,26 @@ module boundaries
     case(1)
 
       if (iside == 1) then
-        pdata%u(1:nv,  1:ibl,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+        pdata%q(1:nv,  1:ibl,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
       else
-        pdata%u(1:nv,ieu:im ,1:jm,1:km) = u(1:nv,1:ng,1:jm,1:km)
+        pdata%q(1:nv,ieu:im ,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
       end if
 
     case(2)
 
       if (iside == 1) then
-        pdata%u(1:nv,1:im,  1:jbl,1:km) = u(1:nv,1:im,1:ng,1:km)
+        pdata%q(1:nv,1:im,  1:jbl,1:km) = q(1:nv,1:im,1:ng,1:km)
       else
-        pdata%u(1:nv,1:im,jeu:jm ,1:km) = u(1:nv,1:im,1:ng,1:km)
+        pdata%q(1:nv,1:im,jeu:jm ,1:km) = q(1:nv,1:im,1:ng,1:km)
       end if
 
 #if NDIMS == 3
     case(3)
 
       if (iside == 1) then
-        pdata%u(1:nv,1:im,1:jm,  1:kbl) = u(1:nv,1:im,1:jm,1:ng)
+        pdata%q(1:nv,1:im,1:jm,  1:kbl) = q(1:nv,1:im,1:jm,1:ng)
       else
-        pdata%u(1:nv,1:im,1:jm,keu:km ) = u(1:nv,1:im,1:jm,1:ng)
+        pdata%q(1:nv,1:im,1:jm,keu:km ) = q(1:nv,1:im,1:jm,1:ng)
       end if
 #endif /* NDIMS == 3 */
 
@@ -2950,12 +3145,12 @@ module boundaries
 !   Arguments:
 !
 !     pdata              - the input data block;
-!     u                  - the conserved array;
+!     q                  - the variable array from which boundaries are updated;
 !     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
-  subroutine boundary_restrict(pdata, u, idir, iside, iface)
+  subroutine boundary_restrict(pdata, q, idir, iside, iface)
 
 ! import external procedures and variables
 !
@@ -2972,7 +3167,7 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data)           , pointer, intent(inout) :: pdata
-    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: u
+    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: q
     integer                             , intent(in)    :: idir, iside, iface
 
 ! local variables
@@ -3112,22 +3307,22 @@ module boundaries
 ! update boundaries of the conserved variables
 !
 #if NDIMS == 2
-    pdata%u(:,is:it,js:jt, 1   ) =                                             &
-                               2.50d-01 *  ((u(1:nv,il:iu:2,jl:ju:2, 1     )   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
-                                        +   (u(1:nv,il:iu:2,jp:ju:2, 1     )   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2, 1     )))
+    pdata%q(:,is:it,js:jt, 1   ) =                                             &
+                               2.50d-01 *  ((q(1:nv,il:iu:2,jl:ju:2, 1     )   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
+                                        +   (q(1:nv,il:iu:2,jp:ju:2, 1     )   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2, 1     )))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    pdata%u(:,is:it,js:jt,ks:kt) =                                             &
-                               1.25d-01 * (((u(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
-                                        +   (u(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
-                                        +  ((u(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
-                                        +   (u(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
-                                        +    u(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+    pdata%q(:,is:it,js:jt,ks:kt) =                                             &
+                               1.25d-01 * (((q(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
+                                        +   (q(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
+                                        +  ((q(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
+                                        +   (q(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
+                                        +    q(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
 #endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
@@ -3146,12 +3341,12 @@ module boundaries
 !   Arguments:
 !
 !     pdata              - the input data block;
-!     u                  - the conserved array;
+!     q                  - the variable array from which boundaries are updated;
 !     idir, iside, iface - the positions of the neighbor block;
 !
 !===============================================================================
 !
-  subroutine boundary_prolong(pdata, u, idir, iside, iface)
+  subroutine boundary_prolong(pdata, q, idir, iside, iface)
 
 ! import external procedures and variables
 !
@@ -3169,16 +3364,16 @@ module boundaries
 ! subroutine arguments
 !
     type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: u
+    real   , dimension(:,:,:,:), intent(in)    :: q
     integer                    , intent(in)    :: idir, iside, iface
 
 ! local variables
 !
-    integer :: i, j, k, q
+    integer :: i, j, k, p
     integer :: ic, jc, kc, ip, jp, kp
     integer :: il, jl, kl, iu, ju, ku
     integer :: is, js, ks, it, jt, kt
-    real    :: dul, dur, dux, duy, duz
+    real    :: dql, dqr, dqx, dqy, dqz, dq1, dq2, dq3, dq4
 !
 !-------------------------------------------------------------------------------
 !
@@ -3295,37 +3490,43 @@ module boundaries
 
 ! iterate over all variables
 !
-          do q = 1, nv
+          do p = 1, nv
 
-            dul = u(q,i  ,j,k) - u(q,i-1,j,k)
-            dur = u(q,i+1,j,k) - u(q,i  ,j,k)
-            dux = limiter(0.25d+00, dul, dur)
+            dql = q(p,i  ,j,k) - q(p,i-1,j,k)
+            dqr = q(p,i+1,j,k) - q(p,i  ,j,k)
+            dqx = limiter(0.25d+00, dql, dqr)
 
-            dul = u(q,i,j  ,k) - u(q,i,j-1,k)
-            dur = u(q,i,j+1,k) - u(q,i,j  ,k)
-            duy = limiter(0.25d+00, dul, dur)
+            dql = q(p,i,j  ,k) - q(p,i,j-1,k)
+            dqr = q(p,i,j+1,k) - q(p,i,j  ,k)
+            dqy = limiter(0.25d+00, dql, dqr)
 
 #if NDIMS == 3
-            dul = u(q,i,j,k  ) - u(q,i,j,k-1)
-            dur = u(q,i,j,k+1) - u(q,i,j,k  )
-            duz = limiter(0.25d+00, dul, dur)
+            dql = q(p,i,j,k  ) - q(p,i,j,k-1)
+            dqr = q(p,i,j,k+1) - q(p,i,j,k  )
+            dqz = limiter(0.25d+00, dql, dqr)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy)
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy)
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) + (duy - dux)
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy)
+            dq1 = dqx + dqy
+            dq2 = dqx - dqy
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq2
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq1
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            pdata%u(q,it,jt,kt) = u(q,i,j,k) - (dux + duy + duz)
-            pdata%u(q,ip,jt,kt) = u(q,i,j,k) + (dux - duy - duz)
-            pdata%u(q,it,jp,kt) = u(q,i,j,k) - (dux - duy + duz)
-            pdata%u(q,ip,jp,kt) = u(q,i,j,k) + (dux + duy - duz)
-            pdata%u(q,it,jt,kp) = u(q,i,j,k) - (dux + duy - duz)
-            pdata%u(q,ip,jt,kp) = u(q,i,j,k) + (dux - duy + duz)
-            pdata%u(q,it,jp,kp) = u(q,i,j,k) - (dux - duy - duz)
-            pdata%u(q,ip,jp,kp) = u(q,i,j,k) + (dux + duy + duz)
+            dq1 = dqx + dqy + dqz
+            dq2 = dqx - dqy - dqz
+            dq3 = dqx - dqy + dqz
+            dq4 = dqx + dqy - dqz
+            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
+            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
+            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq3
+            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq4
+            pdata%q(p,it,jt,kp) = q(p,i,j,k) - dq4
+            pdata%q(p,ip,jt,kp) = q(p,i,j,k) + dq3
+            pdata%q(p,it,jp,kp) = q(p,i,j,k) - dq2
+            pdata%q(p,ip,jp,kp) = q(p,i,j,k) + dq1
 #endif /* NDIMS == 3 */
 
           end do ! q - 1, nv
@@ -3427,8 +3628,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,it,j,k) = 2.5d-01 * (f(:,j1,k1) + f(:,j2,k1)          &
-                                            + f(:,j1,k2) + f(:,j2,k2))
+          pdata%f(idir,:,it,j,k) = 2.5d-01 * ((f(:,j1,k1) + f(:,j2,k2))        &
+                                            + (f(:,j2,k1) + f(:,j1,k2)))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3475,8 +3676,8 @@ module boundaries
           k1 = 2 * (k - kl) + kb
           k2 = k1 + 1
 
-          pdata%f(idir,:,i,jt,k) = 2.5d-01 * (f(:,i1,k1) + f(:,i2,k1)          &
-                                            + f(:,i1,k2) + f(:,i2,k2))
+          pdata%f(idir,:,i,jt,k) = 2.5d-01 * ((f(:,i1,k1) + f(:,i2,k2))        &
+                                            + (f(:,i2,k1) + f(:,i1,k2)))
         end do
 #endif /* NDIMS == 3 */
       end do
@@ -3516,8 +3717,8 @@ module boundaries
           j1 = 2 * (j - jl) + jb
           j2 = j1 + 1
 
-          pdata%f(idir,:,i,j,kt) = 2.5d-01 * (f(:,i1,j1) + f(:,i2,j1)          &
-                                            + f(:,i1,j2) + f(:,i2,j2))
+          pdata%f(idir,:,i,j,kt) = 2.5d-01 * ((f(:,i1,j1) + f(:,i2,j2))        &
+                                            + (f(:,i2,j1) + f(:,i1,j2)))
         end do
       end do
 #endif /* NDIMS == 3 */

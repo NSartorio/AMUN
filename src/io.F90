@@ -57,17 +57,22 @@ module io
 !   nrest   - for job restarting, this is the number of restart snapshot;
 !   irest   - the local counter for the restart snapshots;
 !   isnap   - the local counter for the regular snapshots;
+!   ishift  - the shift of the snapshot counter for restarting job with
+!             different snapshot interval;
 !   hrest   - the execution time interval for restart snapshot storing
-!             (in hours);
+!             (in hours); the minimum allowed value is 3 minutes;
 !   hsnap   - the problem time interval for regular snapshot storing;
+!   tsnap   - the next snapshot time;
 !
   character(len=255), save :: respath     = "./"
   character         , save :: ftype       = "p"
   integer           , save :: nrest       = -1
   integer(kind=4)   , save :: irest       =  1
-  integer(kind=4)   , save :: isnap       = -1
-  real              , save :: hrest       =  6.0d+00
-  real              , save :: hsnap       =  1.0d+00
+  integer(kind=4)   , save :: isnap       =  0
+  integer(kind=4)   , save :: ishift      =  0
+  real              , save :: hrest       =  6.0e+00
+  real              , save :: hsnap       =  1.0e+00
+  real              , save :: tsnap       =  0.0e+00
 
 ! flags to determine the way of data writing
 !
@@ -283,9 +288,10 @@ module io
     call read_restart_snapshot_h5()
 #endif /* HDF5 */
 
-! calculate the next snapshot number
+! calculate the shift of the snapshot counter, and the next snapshot time
 !
-    isnap = int(time / hsnap)
+    ishift = int(time / hsnap) - isnap + 1
+    tsnap  = (ishift + isnap) * hsnap
 
 #ifdef PROFILE
 ! stop accounting time for the data reading
@@ -302,14 +308,14 @@ module io
 ! subroutine WRITE_RESTART_SNAPSHOTS:
 ! ----------------------------------
 !
-!   Subroutine stores current snapshot in restart files.
-!   This is a wrapper calling specific format subroutine.
+!   Subroutine stores current restart snapshot files.  This is a wrapper
+!   calling specific format subroutine.
 !
 !   Arguments:
 !
-!     thrs - the interval time in hours for storing the restart snapshots;
-!     nrun - the restart snapshot number;
-!     iret - the return flag to inform if subroutine succeeded or failed;
+!     thrs - the current execution time in hours;
+!     nrun - the run number;
+!     iret - the return flag;
 !
 !===============================================================================
 !
@@ -327,28 +333,25 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! check if conditions for storing the restart snapshot have been met
+!
+    if (hrest < 5.0e-02 .or. thrs < irest * hrest) return
+
 #ifdef PROFILE
 ! start accounting time for the data writing
 !
     call start_timer(iow)
 #endif /* PROFILE */
 
-! store restart snapshots at constant interval or when the job is done only
-! if hrest is a positive number
-!
-    if (hrest > 0.0d+00 .and. thrs >= irest * hrest) then
-
 #ifdef HDF5
 ! store restart file
 !
-      call write_restart_snapshot_h5(nrun, iret)
+    call write_restart_snapshot_h5(nrun, iret)
 #endif /* HDF5 */
 
 ! increase the restart snapshot counter
 !
-      irest = irest + 1
-
-    end if
+    irest = irest + 1
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
@@ -366,7 +369,7 @@ module io
 ! -------------------------
 !
 !   Subroutine stores block data in snapshots.  Block variables are grouped
-!   todether and stored in big 4D arrays separately.  This is a wrapper for
+!   together and stored in big 4D arrays separately.  This is a wrapper for
 !   specific format storing.
 !
 !
@@ -384,9 +387,9 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! exit the subroutine, if the time of the next snapshot is not reached
+! check if conditions for storing the regular snapshot have been met
 !
-    if (hsnap <= 0.0d+00 .or. isnap >= (int(time / hsnap))) return
+    if (hsnap <= 0.0e+00 .or. time < tsnap) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
@@ -394,15 +397,16 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
-! increase the file counter
-!
-    isnap = isnap + 1
-
 #ifdef HDF5
 ! store variable snapshot file
 !
     call write_snapshot_h5()
 #endif /* HDF5 */
+
+! increase the snapshot counter and calculate the next snapshot time
+!
+    isnap = isnap + 1
+    tsnap = (ishift + isnap) * hsnap
 
 #ifdef PROFILE
 ! stop accounting time for the data writing
@@ -419,7 +423,7 @@ module io
 ! function NEXT_TOUT:
 ! ------------------
 !
-!   Function returns time of the next data snapshot.
+!   Function returns the next data snapshot time.
 !
 !
 !===============================================================================
@@ -433,7 +437,7 @@ module io
 !-------------------------------------------------------------------------------
 !
     if (hsnap > 0.0d+00) then
-      next_tout = (isnap + 1) * hsnap
+      next_tout = tsnap
     else
       next_tout = huge(hsnap)
     end if
@@ -465,6 +469,7 @@ module io
 
 ! import external procedures and variables
 !
+    use blocks         , only : change_blocks_process
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_RDONLY_F
@@ -540,7 +545,7 @@ module io
       return
     end if
 
-! opent the HDF5 file
+! open the HDF5 file
 !
     call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
 
@@ -664,6 +669,10 @@ module io
 ! iterate over remaining files and read one by one to the last block
 !
       do lfile = nprocs, nfiles - 1
+
+! switch meta blocks from the read file to belong to the reading process
+!
+        call change_blocks_process(lfile, nprocs - 1)
 
 ! read the remaining files by the last process only
 !
@@ -1026,46 +1035,48 @@ module io
 !
 !===============================================================================
 !
-! write_attributes_h5: subroutine writes attributes in the HDF5 format
-!                      connected to the provided identificator
+! subroutine WRITE_ATTRIBUTES_H5:
+! ------------------------------
 !
-! info: this subroutine stores only the global attributes
+!   Subroutine stores global attributes in the HDF5 file provided by an
+!   identifier.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine write_attributes_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : get_mblocks, get_dblocks, get_nleafs
-    use blocks   , only : get_last_id
-    use coordinates, only : nn, ng, in, jn, kn, minlev, maxlev, toplev, ir, jr, kr
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error
-    use evolution, only : step, time, dt, dtn
-    use hdf5     , only : hid_t
-    use hdf5     , only : h5gcreate_f, h5gclose_f
-    use mpitools , only : nprocs, nproc
-    use random   , only : nseeds, get_seeds
+    use blocks         , only : get_mblocks, get_dblocks, get_nleafs
+    use blocks         , only : get_last_id
+    use coordinates    , only : minlev, maxlev, toplev
+    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use error          , only : print_error
+    use evolution      , only : step, time, dt, dtn
+    use hdf5           , only : hid_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
+    use mpitools       , only : nprocs, nproc
+    use random         , only : nseeds, get_seeds
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
-    integer(hid_t)  :: gid
-    integer(kind=4) :: dm(3)
-    integer         :: err
+    integer(hid_t)                :: gid
+    integer                       :: err
 
-! allocatable arrays
+! local allocatable arrays
 !
     integer(kind=4), dimension(:), allocatable :: seeds
 !
@@ -1077,84 +1088,86 @@ module io
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
-
-! store the integer attributes
-!
-      call write_attribute_integer_h5(gid, 'ndims'  , NDIMS)
-      call write_attribute_integer_h5(gid, 'last_id', get_last_id())
-      call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
-      call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
-      call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs())
-      call write_attribute_integer_h5(gid, 'ncells' , nn)
-      call write_attribute_integer_h5(gid, 'nghost' , ng)
-      call write_attribute_integer_h5(gid, 'minlev' , minlev)
-      call write_attribute_integer_h5(gid, 'maxlev' , maxlev)
-      call write_attribute_integer_h5(gid, 'toplev' , toplev)
-      call write_attribute_integer_h5(gid, 'nprocs' , nprocs)
-      call write_attribute_integer_h5(gid, 'nproc'  , nproc)
-      call write_attribute_integer_h5(gid, 'nseeds' , nseeds)
-      call write_attribute_integer_h5(gid, 'step'   , step  )
-
-! store the real attributes
-!
-      call write_attribute_double_h5(gid, 'xmin', xmin)
-      call write_attribute_double_h5(gid, 'xmax', xmax)
-      call write_attribute_double_h5(gid, 'ymin', ymin)
-      call write_attribute_double_h5(gid, 'ymax', ymax)
-      call write_attribute_double_h5(gid, 'zmin', zmin)
-      call write_attribute_double_h5(gid, 'zmax', zmax)
-      call write_attribute_double_h5(gid, 'time', time)
-      call write_attribute_double_h5(gid, 'dt'  , dt  )
-      call write_attribute_double_h5(gid, 'dtn' , dtn )
-
-! store the vector attributes
-!
-      dm(:) = (/ in, jn, kn /)
-      call write_attribute_vector_integer_h5(gid, 'dims' , 3, dm(:))
-      call write_attribute_vector_integer_h5(gid, 'rdims', 3, (/ ir, jr, kr /))
-
-! store random number generator seed values
-!
-      if (nseeds .gt. 0) then
-
-! allocate space for seeds
-!
-        allocate(seeds(nseeds))
-
-! get the seed values
-!
-        call get_seeds(seeds)
-
-! store them in the current group
-!
-        call write_attribute_vector_integer_h5(gid, 'seeds', nseeds, seeds(:))
-
-! deallocate seed array
-!
-        deallocate(seeds)
-
-      end if ! nseeds > 0
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::write_attributes_h5", "Cannot close the group!")
-
-      end if
-
-    else
+    if (err < 0) then
 
 ! print error about the problem with creating the group
 !
       call print_error("io::write_attributes_h5", "Cannot create the group!")
+
+! return from the subroutine
+!
+      return
+
+    end if
+
+! store the integer attributes
+!
+    call write_attribute_integer_h5(gid, 'ndims'  , NDIMS        )
+    call write_attribute_integer_h5(gid, 'last_id', get_last_id())
+    call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
+    call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
+    call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs() )
+    call write_attribute_integer_h5(gid, 'ncells' , nn           )
+    call write_attribute_integer_h5(gid, 'nghost' , ng           )
+    call write_attribute_integer_h5(gid, 'minlev' , minlev       )
+    call write_attribute_integer_h5(gid, 'maxlev' , maxlev       )
+    call write_attribute_integer_h5(gid, 'toplev' , toplev       )
+    call write_attribute_integer_h5(gid, 'nprocs' , nprocs       )
+    call write_attribute_integer_h5(gid, 'nproc'  , nproc        )
+    call write_attribute_integer_h5(gid, 'nseeds' , nseeds       )
+    call write_attribute_integer_h5(gid, 'step'   , step         )
+    call write_attribute_integer_h5(gid, 'isnap'  , isnap        )
+
+! store the real attributes
+!
+    call write_attribute_double_h5(gid, 'xmin', xmin)
+    call write_attribute_double_h5(gid, 'xmax', xmax)
+    call write_attribute_double_h5(gid, 'ymin', ymin)
+    call write_attribute_double_h5(gid, 'ymax', ymax)
+    call write_attribute_double_h5(gid, 'zmin', zmin)
+    call write_attribute_double_h5(gid, 'zmax', zmax)
+    call write_attribute_double_h5(gid, 'time', time)
+    call write_attribute_double_h5(gid, 'dt'  , dt  )
+    call write_attribute_double_h5(gid, 'dtn' , dtn )
+
+! store the vector attributes
+!
+    call write_attribute_vector_integer_h5(gid, 'dims' , (/ in, jn, kn /))
+    call write_attribute_vector_integer_h5(gid, 'rdims', (/ ir, jr, kr /))
+
+! store random number generator seed values
+!
+    if (nseeds > 0) then
+
+! allocate space for seeds
+!
+      allocate(seeds(nseeds))
+
+! get the seed values
+!
+      call get_seeds(seeds)
+
+! store them in the current group
+!
+      call write_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+
+! deallocate seed array
+!
+      deallocate(seeds)
+
+    end if ! nseeds > 0
+
+! close the group
+!
+    call h5gclose_f(gid, err)
+
+! check if the group has been closed successfuly
+!
+    if (err < 0) then
+
+! print error about the problem with closing the group
+!
+      call print_error("io::write_attributes_h5", "Cannot close the group!")
 
     end if
 
@@ -1164,57 +1177,55 @@ module io
 !
 !===============================================================================
 !
-! read_attributes_h5: subroutine restores attributes from an HDF5 file linked
-!                     to the HDF5 file identificator
+! subroutine READ_ATTRIBUTES_H5:
+! -----------------------------
 !
-! info: this subroutine restores only the global attributes
+!   Subroutine restores global attributes from an HDF5 file provided by its
+!   identifier.
 !
-! arguments:
-!   fid - the HDF5 file identificator
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine read_attributes_h5(fid)
 
-! references to other modules
+! import external procedures and variables
 !
-    use blocks   , only : block_meta, block_data
-    use blocks   , only : append_metablock
-    use blocks   , only : set_last_id, get_last_id, get_mblocks, get_dblocks   &
-                        , get_nleafs
-    use coordinates, only : nn, ng, in, jn, kn, maxlev, toplev, ir, jr, kr
-    use coordinates, only : initialize_coordinates, finalize_coordinates
-    use coordinates, only : xmin, xmax, ymin, ymax, zmin, zmax
-    use error    , only : print_error
-    use evolution, only : step, time, dt, dtn
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
-                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use mpitools , only : nprocs, nproc
-    use random   , only : nseeds, set_seeds
+    use blocks         , only : block_meta
+    use blocks         , only : append_metablock
+    use blocks         , only : set_last_id, get_last_id
+    use blocks         , only : get_mblocks, get_dblocks, get_nleafs
+    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : maxlev, toplev
+    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : initialize_coordinates, finalize_coordinates
+    use error          , only : print_error
+    use evolution      , only : step, time, dt, dtn
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
+    use mpitools       , only : nprocs, nproc
+    use random         , only : nseeds, set_seeds
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
-    character(len=16) :: aname
-    integer(hid_t)    :: gid, aid
-    integer(hsize_t)  :: alen = 16
-    integer(kind=4)   :: dm(3)
-    integer           :: err, i, l
-    integer           :: nattrs, lndims, llast_id, lmblocks, lnleafs           &
-                       , lncells, lnghost, lnseeds, lmaxlev, lnproc
+    integer(hid_t) :: gid
+    integer        :: ierr, l
+    integer        :: lndims, lmaxlev, lmblocks, lnleafs, llast_id
+    integer        :: lncells, lnghost, lnproc, lnseeds
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
-    type(block_data), pointer :: pdata
 
 ! allocatable arrays
 !
@@ -1224,218 +1235,134 @@ module io
 !
 ! open the global attributes group
 !
-    call h5gopen_f(fid, 'attributes', gid, err)
+    call h5gopen_f(fid, 'attributes', gid, ierr)
 
 ! check if the group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (ierr < 0) then
+      call print_error("io::read_attributes_h5", "Cannot open the group!")
+      return
+    end if
 
-! read the number of global attributes
+! restore integer attributes
 !
-      call h5aget_num_attrs_f(gid, nattrs, err)
+    call read_attribute_integer_h5(gid, 'ndims'  , lndims  )
+    call read_attribute_integer_h5(gid, 'maxlev' , lmaxlev )
+    call read_attribute_integer_h5(gid, 'nprocs' , nfiles  )
+    call read_attribute_integer_h5(gid, 'nproc'  , lnproc  )
+    call read_attribute_integer_h5(gid, 'mblocks', lmblocks)
+    call read_attribute_integer_h5(gid, 'nleafs' , lnleafs )
+    call read_attribute_integer_h5(gid, 'last_id', llast_id)
+    call read_attribute_integer_h5(gid, 'ncells' , lncells )
+    call read_attribute_integer_h5(gid, 'nghost' , lnghost )
+    call read_attribute_integer_h5(gid, 'nseeds' , lnseeds )
+    call read_attribute_integer_h5(gid, 'step'   , step    )
+    call read_attribute_integer_h5(gid, 'isnap'  , isnap   )
 
-! check if the number of attributes has been read successfuly
+! restore double precision attributes
 !
-      if (err .ge. 0) then
+    call read_attribute_double_h5(gid, 'xmin', xmin)
+    call read_attribute_double_h5(gid, 'xmax', xmax)
+    call read_attribute_double_h5(gid, 'ymin', ymin)
+    call read_attribute_double_h5(gid, 'ymax', ymax)
+    call read_attribute_double_h5(gid, 'zmin', zmin)
+    call read_attribute_double_h5(gid, 'zmax', zmax)
+    call read_attribute_double_h5(gid, 'time', time)
+    call read_attribute_double_h5(gid, 'dt'  , dt  )
+    call read_attribute_double_h5(gid, 'dtn' , dtn )
 
-! iterate over all attributes
+! check the number of dimensions
 !
-        do i = 0, nattrs - 1
+    if (lndims /= NDIMS) then
+      call print_error("io::read_attributes_h5"                                &
+                                 , "The number of dimensions does not match!")
+      return
+    end if
 
-! open the current attribute
+! check the block dimensions
 !
-          call h5aopen_idx_f(gid, i, aid, err)
+    if (lncells /= nn) then
+      call print_error("io::read_attributes_h5"                                &
+                                       , "The block dimensions do not match!")
+    end if
 
-! check if the attribute has been opened successfuly
+! check the number of ghost layers
 !
-          if (err .ge. 0) then
+    if (lnghost /= ng) then
+      call print_error("io::read_attributes_h5"                                &
+                               , "The number of ghost layers does not match!")
+    end if
 
-! obtain the attribute name
+! prepare coordinates and rescaling factors if the maximum level has changed
 !
-            call h5aget_name_f(aid, alen, aname, err)
-
-! depending on the attribute name use proper subroutine to read its value
-!
-            select case(trim(aname))
-            case('ndims')
-              call read_attribute_integer_h5(aid, aname, lndims)
-
-! check if the restart file and compiled program have the same number of
-! dimensions
-!
-              if (lndims .ne. NDIMS) then
-                call print_error("io::read_attributes_h5"                      &
-                              , "File and program dimensions are incompatible!")
-              end if
-            case('maxlev')
-              call read_attribute_integer_h5(aid, aname, lmaxlev)
-              if (lmaxlev .gt. toplev) then
+    if (lmaxlev > toplev) then
 
 ! subtitute the new value of toplev
 !
-                toplev = lmaxlev
+      toplev = lmaxlev
 
 ! regenerate coordinates
 !
-                call finalize_coordinates(err)
-                call initialize_coordinates(.false., err)
+      call finalize_coordinates(ierr)
+      call initialize_coordinates(.false., ierr)
 
 ! calculate a factor to rescale the block coordinates
 !
-                dcor = 2**(toplev - maxlev)
-
-              else
-
-! calculate a factor to rescale the block coordinates
-!
-                ucor = 2**(maxlev - lmaxlev)
-              end if
-            case('nprocs')
-              call read_attribute_integer_h5(aid, aname, nfiles)
-            case('nproc')
-              call read_attribute_integer_h5(aid, aname, lnproc)
-            case('last_id')
-              call read_attribute_integer_h5(aid, aname, llast_id)
-            case('mblocks')
-              call read_attribute_integer_h5(aid, aname, lmblocks)
-            case('nleafs')
-              call read_attribute_integer_h5(aid, aname, lnleafs)
-            case('ncells')
-              call read_attribute_integer_h5(aid, aname, lncells)
-
-! check if the block dimensions are compatible
-!
-              if (lncells .ne. nn) then
-                call print_error("io::read_attributes_h5"                      &
-                        , "File and program block dimensions are incompatible!")
-              end if
-            case('nghost')
-              call read_attribute_integer_h5(aid, aname, lnghost)
-
-! check if the ghost layers are compatible
-!
-              if (lnghost .ne. ng) then
-                call print_error("io::read_attributes_h5"                      &
-                      , "File and program block ghost layers are incompatible!")
-              end if
-            case('step')
-              call read_attribute_integer_h5(aid, aname, step)
-            case('time')
-              call read_attribute_double_h5(aid, aname, time)
-            case('dt')
-              call read_attribute_double_h5(aid, aname, dt)
-            case('dtn')
-              call read_attribute_double_h5(aid, aname, dtn)
-            case('xmin')
-              call read_attribute_double_h5(aid, aname, xmin)
-            case('xmax')
-              call read_attribute_double_h5(aid, aname, xmax)
-            case('ymin')
-              call read_attribute_double_h5(aid, aname, ymin)
-            case('ymax')
-              call read_attribute_double_h5(aid, aname, ymax)
-            case('zmin')
-              call read_attribute_double_h5(aid, aname, zmin)
-            case('zmax')
-              call read_attribute_double_h5(aid, aname, zmax)
-            case('nseeds')
-              call read_attribute_integer_h5(aid, aname, lnseeds)
-
-! ! check if the numbers of seeds are compatible
-! !
-!               if (lnseeds .ne. nseeds) then
-!                 call print_error("io::read_attributes_h5"                      &
-!                 , "The number of seeds from file and program are incompatible!")
-!               end if
-            case('seeds')
-
-! check if the numbers of seeds are compatible
-!
-              if (lnseeds .eq. nseeds) then
-
-! allocate space for seeds
-!
-                allocate(seeds(nseeds))
-
-! store them in the current group
-!
-                call read_attribute_vector_integer_h5(aid, aname, nseeds       &
-                                                                   , seeds(:))
-
-! set the seed values
-!
-                call set_seeds(nseeds, seeds(:))
-
-! deallocate seed array
-!
-                deallocate(seeds)
-
-              end if
-            case default
-            end select
-
-! close the current attribute
-!
-            call h5aclose_f(aid, err)
-
-          else
-
-! print error about the problem with obtaining the number of attributes
-!
-            call print_error("io::read_attributes_h5",                         &
-                                           "Cannot open the current attribute!")
-
-          end if
-
-        end do
-
-! allocate all metablocks
-!
-        do l = 1, lmblocks
-          call append_metablock(pmeta)
-        end do
-
-! check if the number of created metablocks is equal to lbmcloks
-!
-        if (lmblocks .ne. get_mblocks()) then
-          call print_error("io::read_attributes_h5"                            &
-                                        , "Number of metablocks doesn't match!")
-        end if
-
-! allocate an array of pointers with the size llast_id
-!
-        allocate(block_array(llast_id))
-        call set_last_id(llast_id)
-
-      else
-
-! print error about the problem with obtaining the number of attributes
-!
-        call print_error("io::read_attributes_h5",                             &
-                                  "Cannot get the number of global attributes!")
-
-      end if
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_attributes_h5", "Cannot close the group!")
-
-      end if
+      dcor = 2**(toplev - maxlev)
 
     else
 
-! print error about the problem with creating the group
+! calculate a factor to rescale the block coordinates
 !
-      call print_error("io::read_attributes_h5", "Cannot open the group!")
+      ucor = 2**(maxlev - lmaxlev)
 
+    end if
+
+! allocate space for seeds
+!
+    allocate(seeds(lnseeds))
+
+! store them in the current group
+!
+    call read_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+
+! set the seed values
+!
+    call set_seeds(lnseeds, seeds(:))
+
+! deallocate seed array
+!
+    deallocate(seeds)
+
+! allocate all metablocks
+!
+    do l = 1, lmblocks
+      call append_metablock(pmeta)
+    end do
+
+! check if the number of created metablocks is equal to lbmcloks
+!
+    if (lmblocks /= get_mblocks()) then
+      call print_error("io::read_attributes_h5"                                &
+                                     , "Number of metablocks does not match!")
+    end if
+
+! allocate an array of pointers with the size llast_id
+!
+    allocate(block_array(llast_id))
+
+! set the last_id
+!
+    call set_last_id(llast_id)
+
+! close the group
+!
+    call h5gclose_f(gid, ierr)
+
+! check if the group has been closed successfuly
+!
+    if (ierr /= 0) then
+      call print_error("io::read_attributes_h5", "Cannot close the group!")
     end if
 
 !-------------------------------------------------------------------------------
@@ -1443,355 +1370,93 @@ module io
   end subroutine read_attributes_h5
 !
 !===============================================================================
-!
-! read_datablock_dims_h5: subroutine reads the data block dimensions from the
-!                         attributes group of the file given by the file
-!                         identificator
-!
-! arguments:
-!   fid - the HDF5 file identificator
-!   dm  - the data block dimensions
+!!
+!!---  ATTRIBUTE SUBROUTINES  --------------------------------------------------
+!!
+!===============================================================================
 !
 !===============================================================================
 !
-  subroutine read_datablock_dims_h5(fid, dm)
-
-! references to other modules
+! subroutine READ_ATTRIBUTE_INTEGER_H5:
+! ------------------------------------
 !
-    use error    , only : print_error
-    use hdf5     , only : hid_t, hsize_t
-    use hdf5     , only : h5gopen_f, h5gclose_f, h5aget_num_attrs_f            &
-                        , h5aopen_idx_f, h5aclose_f, h5aget_name_f
-    use equations, only : nv
+!   Subroutine reads a value of the integer attribute provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_attribute_integer_h5(gid, aname, avalue)
 
-! declare variables
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! attribute arguments
 !
-    integer(hid_t)                , intent(in) :: fid
-    integer(hsize_t), dimension(5), intent(out) :: dm
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    integer         , intent(inout) :: avalue
 
 ! local variables
 !
-    character(len=16) :: aname
-    integer(hid_t)    :: gid, aid
-    integer(hsize_t)  :: alen = 16
-    integer           :: err, i
-    integer           :: nattrs, ldblocks, lnghost
-
-! local arrays
-!
-    integer(kind=4), dimension(3) :: lm
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
 !
 !-------------------------------------------------------------------------------
 !
-! initiate the output vector
+! check if the attribute exists in the group provided by gid
 !
-    dm(:) = 0
-    dm(2) = nv
-
-! open the global attributes group
-!
-    call h5gopen_f(fid, 'attributes', gid, err)
-
-! check if the group has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read the number of global attributes
-!
-      call h5aget_num_attrs_f(gid, nattrs, err)
-
-! check if the number of attributes has been read successfuly
-!
-      if (err .ge. 0) then
-
-! iterate over all attributes
-!
-        do i = 0, nattrs - 1
-
-! open the current attribute
-!
-          call h5aopen_idx_f(gid, i, aid, err)
-
-! check if the attribute has been opened successfuly
-!
-          if (err .ge. 0) then
-
-! obtain the attribute name
-!
-            call h5aget_name_f(aid, alen, aname, err)
-
-! check if the attribute name has been read successfuly
-!
-              if (err .ge. 0) then
-
-! depending on the attribute name use proper subroutine to read its value
-!
-              select case(trim(aname))
-              case('dblocks')
-
-! obtain the number of data blocks
-!
-                call read_attribute_integer_h5(aid, aname, ldblocks)
-
-              case('dims')
-
-! obtain the block dimensions
-!
-                call read_attribute_vector_integer_h5(aid, aname, 3, lm(:))
-
-              case('nghost')
-
-! obtain the number of data blocks
-!
-                call read_attribute_integer_h5(aid, aname, lnghost)
-
-              case default
-              end select
-
-            else
-
-! print error about the problem with reading the attribute name
-!
-              call print_error("io::read_datablock_dims_h5",                   &
-                                    "Cannot read the current attribute name!")
-
-            end if
-
-! close the current attribute
-!
-            call h5aclose_f(aid, err)
-
-          else
-
-! print error about the problem with opening the current attribute
-!
-            call print_error("io::read_datablock_dims_h5",                     &
-                                         "Cannot open the current attribute!")
-
-          end if
-
-        end do ! i = 0, nattrs - 1
-
-! prepare the output array
-!
-        dm(1) = ldblocks
-        do i = 1, 3
-          if (lm(i) .gt. 1) lm(i) = lm(i) + 2 * lnghost
-        end do
-        dm(3:5) = lm(1:3)
-
-      else
-
-! print error about the problem with obtaining the number of attributes
-!
-        call print_error("io::read_datablock_dims_h5",                         &
-                                "Cannot get the number of global attributes!")
-
-      end if
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_datablock_dims_h5"                          &
-                                       , "Cannot close the attributes group!")
-
-      end if
-
-    else
-
-! print error about the problem with creating the group
-!
-      call print_error("io::read_datablock_dims_h5"                            &
-                                        , "Cannot open the attributes group!")
-
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                , "Attribute does not exist :" // trim(aname))
+      return
     end if
 
-!-------------------------------------------------------------------------------
+! open the attribute
 !
-  end subroutine read_datablock_dims_h5
-!
-!===============================================================================
-!
-! write_attribute_integer_h5: subroutine writes an attribute with the integer
-!                             value in a group given by its indentificator
-!
-! arguments:
-!   gid   - the HDF5 group identificator
-!   name  - the string name of the attribute
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine write_attribute_integer_h5(gid, name, value)
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
 
-! references to other modules
+! read attribute value
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5acreate_f, h5awrite_f, h5aclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in) :: gid
-    character(len=*), intent(in) :: name
-    integer         , intent(in) :: value
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the attribute
-!
-    call h5screate_simple_f(1, am, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-! create the attribute
-!
-      call h5acreate_f(gid, name, H5T_NATIVE_INTEGER, sid, aid, err)
-
-! check if the attribute has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the attribute data
-!
-        call h5awrite_f(aid, H5T_NATIVE_INTEGER, value, am, err)
-
-! check if the attribute data has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with storing the attribute data
-!
-          call print_error("io::write_attribute_integer_h5"  &
-                         , "Cannot write the attribute data in :" // trim(name))
-
-        end if
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_integer_h5"                         &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
 
 ! close the attribute
 !
-        call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the attribute
-!
-          call print_error("io::write_attribute_integer_h5"  &
-                                     , "Cannot close attribute :" // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the attribute
-!
-        call print_error("io::write_attribute_integer_h5"  &
-                                    , "Cannot create attribute :" // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_attribute_integer_h5"  &
-                           , "Cannot close space for attribute :" // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_attribute_integer_h5"  &
-                          , "Cannot create space for attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_integer_h5
-!
-!===============================================================================
-!
-! read_attribute_integer_h5: subroutine read an integer value from an attribute
-!                            given by the identificator
-!
-! arguments:
-!   aid   - the HDF5 attribute identificator
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_integer_h5(aid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)    :: aid
-    character(len=*), intent(in)    :: name
-    integer         , intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_INTEGER, value, am(:), err)
-
-! check if the attribute has been read successfuly
-!
-    if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
       call print_error("io::read_attribute_integer_h5"                         &
-                          , "Cannot read attribute :" // trim(name))
-
+                                  , "Cannot close attribute :" // trim(aname))
+      return
     end if
 
 !-------------------------------------------------------------------------------
@@ -1800,377 +1465,86 @@ module io
 !
 !===============================================================================
 !
-! write_attribute_vector_integer_h5: subroutine writes an vector intiger
-!                   attribute in a group given by its indentificator
+! subroutine READ_ATTRIBUTE_DOUBLE_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid    - the HDF5 group identificator
-!   name   - the string name of the attribute
-!   length - the vector length
-!   data   - the attribute value
+!   Subroutine reads a value of the double precision attribute provided by
+!   the group identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
 !
 !===============================================================================
 !
-  subroutine write_attribute_vector_integer_h5(gid, name, length, data)
+  subroutine read_attribute_double_h5(gid, aname, avalue)
 
-! references to other modules
+! import external procedures and variables
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5acreate_f, h5awrite_f, h5aclose_f
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! attribute arguments
 !
-    integer(hid_t)                , intent(in) :: gid
-    character(len=*)              , intent(in) :: name
-    integer                       , intent(in) :: length
-    integer(kind=4) , dimension(:), intent(in) :: data
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    real(kind=8)    , intent(inout) :: avalue
 
 ! local variables
 !
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am
-    integer                        :: err
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
 !
 !-------------------------------------------------------------------------------
 !
-! prepare the space dimensions
+! check if the attribute exists in the group provided by gid
 !
-    am(1) = length
-
-! create space for the attribute
-!
-    call h5screate_simple_f(1, am, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-! create the attribute
-!
-      call h5acreate_f(gid, name, H5T_NATIVE_INTEGER, sid, aid, err)
-
-! check if the attribute has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the attribute data
-!
-        call h5awrite_f(aid, H5T_NATIVE_INTEGER, data, am, err)
-
-! check if the attribute data has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with storing the attribute data
-!
-          call print_error("io::write_attribute_vector_integer_h5"  &
-                         , "Cannot write the attribute data in :" // trim(name))
-
-        end if
-
-! close the attribute
-!
-        call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the attribute
-!
-          call print_error("io::write_attribute_vector_integer_h5"  &
-                                     , "Cannot close attribute :" // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the attribute
-!
-        call print_error("io::write_attribute_vector_integer_h5"  &
-                                    , "Cannot create attribute :" // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_attribute_vector_integer_h5"  &
-                           , "Cannot close space for attribute :" // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_attribute_vector_integer_h5"  &
-                          , "Cannot create space for attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! read_attribute_vector_integer_h5: subroutine reads a vector of integer values
-!                                   from an attribute given by the identificator
-!
-! arguments:
-!   aid    - the HDF5 attribute identificator
-!   name   - the attribute name
-!   length - the vector length
-!   value  - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_vector_integer_h5(aid, name, length, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)         :: aid
-    character(len=*), intent(in)         :: name
-    integer         , intent(in)         :: length
-    integer, dimension(:), intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! check if the length is larger than 0
-!
-    if (length .gt. 0) then
-
-! prepare dimension array
-!
-      am(1) = length
-
-! read attribute value
-!
-      call h5aread_f(aid, H5T_NATIVE_INTEGER, value(:), am(:), err)
-
-! check if the attribute has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
-        call print_error("io::read_attribute_vector_integer_h5"                &
-                                    , "Cannot read attribute :" // trim(name))
-
-      end if
-
-    else ! length > 0
-
-! print error about the wrong vector size
-!
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                                   , "Wrong length of vector")
-
-    end if ! length > 0
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! write_attribute_double_h5: subroutine writes a double precision attribute in
-!                          a group given by its indentificator
-!
-! arguments:
-!   gid   - the HDF5 group identificator
-!   name  - the string name of the attribute
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine write_attribute_double_h5(gid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f, h5acreate_f, h5awrite_f  &
-                    , h5aclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in) :: gid
-    character(len=*), intent(in) :: name
-    real(kind=8)    , intent(in) :: value
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the attribute
-!
-    call h5screate_simple_f(1, am, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-! create the attribute
-!
-      call h5acreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, aid, err)
-
-! check if the attribute has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the attribute data
-!
-        call h5awrite_f(aid, H5T_NATIVE_DOUBLE, value, am, err)
-
-! check if the attribute data has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with storing the attribute data
-!
-          call print_error("io::write_attribute_double_h5"  &
-                         , "Cannot write the attribute data in :" // trim(name))
-
-        end if
-
-! close the attribute
-!
-        call h5aclose_f(aid, err)
-
-! check if the attribute has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the attribute
-!
-          call print_error("io::write_attribute_double_h5"  &
-                                     , "Cannot close attribute :" // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the attribute
-!
-        call print_error("io::write_attribute_double_h5"  &
-                                    , "Cannot create attribute :" // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_attribute_double_h5"  &
-                           , "Cannot close space for attribute :" // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_attribute_double_h5"  &
-                          , "Cannot create space for attribute :" // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_double_h5
-!
-!===============================================================================
-!
-! read_attribute_double_h5: subroutine reads a double precision attribute
-!
-! arguments:
-!   aid   - the HDF5 attribute identificator
-!   value - the attribute value
-!
-!===============================================================================
-!
-  subroutine read_attribute_double_h5(aid, name, value)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5aread_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)  , intent(in)    :: aid
-    character(len=*), intent(in)    :: name
-    real(kind=8)    , intent(inout) :: value
-
-! local variables
-!
-    integer(hsize_t), dimension(1)  :: am = (/ 1 /)
-    integer                         :: err
-!
-!-------------------------------------------------------------------------------
-!
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_DOUBLE, value, am(:), err)
-
-! check if the attribute has been read successfuly
-!
-    if (err .gt. 0) then
-
-! print error about the problem with reading the attribute
-!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
       call print_error("io::read_attribute_double_h5"                          &
-                                      , "Cannot read attribute :" // trim(name))
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                , "Attribute does not exist :" // trim(aname))
+      return
+    end if
 
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_double_h5"                          &
+                                  , "Cannot close attribute :" // trim(aname))
+      return
     end if
 
 !-------------------------------------------------------------------------------
@@ -2179,13 +1553,405 @@ module io
 !
 !===============================================================================
 !
+! subroutine READ_ATTRIBUTE_VECTOR_INTEGER_H5:
+! -------------------------------------------
+!
+!   Subroutine reads a vector of the integer attribute provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_attribute_vector_integer_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: aname
+    integer         , dimension(:), intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid, sid
+    integer(hsize_t), dimension(1)  :: am, bm
+    integer(hsize_t)                :: alen
+    integer                         :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                , "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                   , "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! get the attribute space
+!
+    call h5aget_space_f(aid, sid, ierr)
+    if (ierr == 0) then
+      call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
+      if (ierr /= 1) then
+        call print_error("io::read_attribute_vector_integer_h5"                &
+                         , "Cannot get attribute dimensions :" // trim(aname))
+      end if
+      call h5sclose_f(sid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_attribute_vector_integer_h5"                &
+                        , "Cannot close the attribute space :" // trim(aname))
+      end if
+    else
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                          , "Cannot get the attribute space :" // trim(aname))
+      return
+    end if
+
+! check if the output array is large enough
+!
+    if (am(1) > size(avalue)) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                 , "Attribute too large for output argument :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                   , "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_attribute_vector_integer_h5"                  &
+                                  , "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_attribute_vector_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_ATTRIBUTE_INTEGER_H5:
+! -------------------------------------
+!
+!   Subroutine stores a value of the integer attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine write_attribute_integer_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    integer         , intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_integer_h5"                        &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_integer_h5"                      &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_integer_h5"                      &
+                                  , "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error("io::write_attribute_integer_h5"                        &
+                                 , "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_integer_h5"                        &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_attribute_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_ATTRIBUTE_DOUBLE_H5:
+! ------------------------------------
+!
+!   Subroutine stores a value of the double precision attribute in the group
+!   provided by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine write_attribute_double_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    real(kind=8)    , intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_double_h5"                         &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_DOUBLE, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_double_h5"                       &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_double_h5"                       &
+                                  , "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error("io::write_attribute_double_h5"                         &
+                                 , "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_double_h5"                         &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_attribute_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_ATTRIBUTE_VECTOR_INTEGER_H5:
+! --------------------------------------------
+!
+!   Subroutine stores a vector of the integer attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute values;
+!
+!===============================================================================
+!
+  subroutine write_attribute_vector_integer_h5(gid, aname, avalue)
+
+! import external procedures and variables
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in) :: gid
+    character(len=*)              , intent(in) :: aname
+    integer         , dimension(:), intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+!
+!-------------------------------------------------------------------------------
+!
+! set the proper attribute length
+!
+    am(1) = size(avalue)
+
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_vector_integer_h5"               &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::write_attribute_vector_integer_h5"               &
+                                  , "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                                 , "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::write_attribute_vector_integer_h5"                 &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_attribute_vector_integer_h5
+!
+!===============================================================================
+!
 ! write_metablocks_h5: subroutine writes metablocks in the HDF5 format connected
-!                      to the provided identificator
+!                      to the provided identifier
 !
 ! info: this subroutine stores only the metablocks
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !
 !===============================================================================
 !
@@ -2411,7 +2177,7 @@ module io
 ! info: this subroutine restores metablocks only
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier
 !
 !===============================================================================
 !
@@ -2555,7 +2321,7 @@ module io
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id           (pmeta, id (l))
-        call metablock_set_process      (pmeta, min(lcpu, cpu(l)))
+        call metablock_set_process      (pmeta, cpu(l))
         call metablock_set_refinement   (pmeta, ref(l))
         call metablock_set_configuration(pmeta, cfg(l))
         call metablock_set_level        (pmeta, lev(l))
@@ -2655,7 +2421,7 @@ module io
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -2725,7 +2491,7 @@ module io
         dm(4) = jm
         dm(5) = km
 
-! allocate arrays to store associated meta block identificators, conserved and
+! allocate arrays to store associated meta block identifiers, conserved and
 ! primitive variables
 !
         allocate(id(am(1)))
@@ -2841,7 +2607,7 @@ module io
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -2852,6 +2618,7 @@ module io
     use blocks         , only : block_meta, block_data, list_data
     use blocks         , only : append_datablock, link_blocks
     use coordinates    , only : im, jm, km
+    use equations      , only : nv
     use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gopen_f, h5gclose_f
@@ -2872,7 +2639,7 @@ module io
 !
     integer(hid_t)                 :: gid
     integer(kind=4)                :: l
-    integer                        :: err
+    integer                        :: dblocks, ierr
 
 ! local arrays
 !
@@ -2885,84 +2652,90 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! get datablock array dimensions
+! read the number of data blocks
 !
-    call read_datablock_dims_h5(fid, dm(:))
-
-! open the group 'datablocks'
-!
-    call h5gopen_f(fid, 'datablocks', gid, err)
-
-! check if the datablock group has been opened successfuly
-!
-    if (err >= 0) then
+    call h5gopen_f(fid, 'attributes', gid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_datablocks_h5"                                &
+                                         , "Cannot open the attribute group!")
+      return
+    end if
+    call read_attribute_integer_h5(gid, 'dblocks', dblocks)
+    call h5gclose_f(gid, ierr)
+    if (ierr /= 0) then
+      call print_error("io::read_datablocks_h5"                                &
+                                        , "Cannot close the attribute group!")
+      return
+    end if
 
 ! restore data blocks only if there are any
 !
-      if (dm(1) > 0) then
+    if (dblocks > 0) then
+
+! fill out dimensions dm(:)
+!
+      dm(1) = dblocks
+      dm(2) = nv
+      dm(3) = im
+      dm(4) = jm
+      dm(5) = km
 
 ! allocate arrays to read data
 !
-        allocate(id(dm(1)))
-        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+      allocate(id(dm(1)))
+      allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+      allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+
+! open the group 'datablocks'
+!
+      call h5gopen_f(fid, 'datablocks', gid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_datablocks_h5"                              &
+                                        , "Cannot open the data block group!")
+        return
+      end if
 
 ! read array data from the HDF5 file
 !
-        call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
-        call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
-        call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+      call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
+      call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+      call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+
+! close the data block group
+!
+      call h5gclose_f(gid, ierr)
+      if (ierr /= 0) then
+        call print_error("io::read_datablocks_h5"                              &
+                                       , "Cannot close the data block group!")
+        return
+      end if
 
 ! iterate over data blocks, allocate them and fill out their fields
 !
-        do l = 1, dm(1)
+      do l = 1, dm(1)
 
 ! allocate and append to the end of the list a new datablock
 !
-          call append_datablock(pdata)
+        call append_datablock(pdata)
 
 ! associate the corresponding meta block with the current data block
 !
-          call link_blocks(block_array(id(l))%ptr, pdata)
+        call link_blocks(block_array(id(l))%ptr, pdata)
 
 ! fill out the array of conservative and primitive variables
 !
-          pdata%u(:,:,:,:) = uv(l,:,:,:,:)
-          pdata%q(:,:,:,:) = qv(l,:,:,:,:)
+        pdata%u(:,:,:,:) = uv(l,:,:,:,:)
+        pdata%q(:,:,:,:) = qv(l,:,:,:,:)
 
-        end do ! l = 1, dm(1)
+      end do ! l = 1, dm(1)
 
 ! deallocate allocatable arrays
 !
-        if (allocated(id)) deallocate(id)
-        if (allocated(uv)) deallocate(uv)
-        if (allocated(qv)) deallocate(qv)
+      if (allocated(id)) deallocate(id)
+      if (allocated(uv)) deallocate(uv)
+      if (allocated(qv)) deallocate(qv)
 
-      end if ! dblocks > 0
-
-! close the group
-!
-      call h5gclose_f(gid, err)
-
-! check if the group has been closed successfuly
-!
-      if (err > 0) then
-
-! print error about the problem with closing the group
-!
-        call print_error("io::read_datablocks_h5"                              &
-                                           , "Cannot close data block group!")
-
-      end if
-
-    else
-
-! print error about the problem with opening the group
-!
-      call print_error("io::read_datablocks_h5"                                &
-                                            , "Cannot open data block group!")
-
-    end if
+    end if ! dblocks > 0
 
 !-------------------------------------------------------------------------------
 !
@@ -2977,7 +2750,7 @@ module io
 ! info: this subroutine stores coordinates
 !
 ! arguments:
-!   fid - the HDF5 file identificator
+!   fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3139,11 +2912,11 @@ module io
 !
 !   Subroutine groups each primitive variable from all data blocks and writes
 !   it as an array in the HDF5 dataset connected to the input HDF file
-!   identificator.
+!   identifier.
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3311,11 +3084,11 @@ module io
 !
 !   Subroutine groups each conservative variable from all data blocks and writes
 !   it as an array in the HDF5 dataset connected to the input HDF file
-!   identificator.
+!   identifier.
 !
 !   Arguments:
 !
-!     fid - the HDF5 file identificator;
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
@@ -3481,7 +3254,7 @@ module io
 ! write_vector_integer_h5: subroutine stores a 1D integer vector in a group
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   length - the vector length
 !   value  - the data
@@ -3608,7 +3381,7 @@ module io
 ! read_vector_integer_h5: subroutine reads a 1D integer vector
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   length - the vector length
 !   value  - the data
@@ -3697,7 +3470,7 @@ module io
 ! write_array2_integer_h5: subroutine stores a 2D integer array in a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -3907,7 +3680,7 @@ module io
 ! read_array2_integer_h5: subroutine reads a 2D integer array
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -3996,7 +3769,7 @@ module io
 ! write_array4_integer_h5: subroutine stores a 4D integer array in a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4206,7 +3979,7 @@ module io
 ! read_array4_integer_h5: subroutine reads a 4D integer array
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4296,7 +4069,7 @@ module io
 !                         a group
 !
 ! arguments:
-!   gid - the HDF5 group identificator
+!   gid - the HDF5 group identifier
 !
 !===============================================================================
 !
@@ -4420,7 +4193,7 @@ module io
 ! read_vector_double_h5: subroutine reads a 1D double precision vector
 !
 ! arguments:
-!   gid    - the HDF5 group identificator
+!   gid    - the HDF5 group identifier
 !   name   - the string name representing the dataset
 !   dm     - the vector dimensions
 !   value  - the data
@@ -4509,7 +4282,7 @@ module io
 ! write_array4_float_h5: subroutine stores a 4D single precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator where the dataset should be located
+!   gid   - the HDF5 group identifier where the dataset should be located
 !   name  - the string name representing the dataset
 !   dm    - the dataset dimensions
 !   value - the dataset values
@@ -4663,7 +4436,7 @@ module io
 ! write_array3_double_h5: subroutine stores a 3D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -4873,7 +4646,7 @@ module io
 ! write_array4_double_h5: subroutine stores a 4D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5083,7 +4856,7 @@ module io
 ! write_array5_double_h5: subroutine stores a 5D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5293,7 +5066,7 @@ module io
 ! read_array5_double_h5: subroutine reads a 5D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data
@@ -5382,7 +5155,7 @@ module io
 ! write_array6_double_h5: subroutine stores a 6D double precision array
 !
 ! arguments:
-!   gid   - the HDF5 group identificator
+!   gid   - the HDF5 group identifier
 !   name  - the string name representing the dataset
 !   dm    - the data dimensions
 !   value - the data

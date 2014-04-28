@@ -249,13 +249,13 @@ module evolution
 !
       call update_mesh()
 
-! update boundaries
-!
-      call boundary_variables()
-
 ! update primitive variables
 !
       call update_variables()
+
+! update boundaries
+!
+      call boundary_variables()
 
 ! set all meta blocks to be updated
 !
@@ -467,13 +467,13 @@ module evolution
 
     end do
 
-! update boundaries
-!
-    call boundary_variables()
-
 ! update primitive variables
 !
     call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
 
 !-------------------------------------------------------------------------------
 !
@@ -552,13 +552,13 @@ module evolution
 
     end do
 
-! update boundaries
-!
-    call boundary_variables()
-
 ! update primitive variables
 !
     call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
 
 ! update fluxes for the second step of the RK2 integration
 !
@@ -598,13 +598,13 @@ module evolution
 
     end do
 
-! update boundaries
-!
-    call boundary_variables()
-
 ! update primitive variables
 !
     call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
 
 !-------------------------------------------------------------------------------
 !

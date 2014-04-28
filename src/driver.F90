@@ -81,7 +81,7 @@ program amun
 !
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
-  integer               :: nmax  = 0, ndat = 1
+  integer               :: nmax  = huge(1), ndat = 1
   real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
   real(kind=8)          :: dtnext = 0.0d+00
 

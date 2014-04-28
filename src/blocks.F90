@@ -45,6 +45,9 @@ module blocks
 ! timer indices
 !
   integer, save              :: imi, ima, imu, imp, imq, imr, imd
+#ifdef DEBUG
+  integer, save              :: imc
+#endif /* DEBUG */
 #endif /* PROFILE */
 
 ! MODULE PARAMETERS:
@@ -54,11 +57,13 @@ module blocks
 !   nsides    - the number of sides along each direction (2);
 !   nfaces    - the number of faces at each side (2 for 2D, 4 for 3D);
 !   nchildren - the number of child blocks for each block (4 for 2D, 8 for 3D);
+!   mfaces    - the number of faces in block (8 for 2D, 24 for 3D);
 !
   integer(kind=4), parameter :: ndims     = NDIMS
   integer(kind=4), parameter :: nsides    = 2
   integer(kind=4), parameter :: nfaces    = 2**(ndims - 1)
   integer(kind=4), parameter :: nchildren = 2**ndims
+  integer(kind=4), parameter :: mfaces    = nsides * nfaces * ndims
 
 ! MODULE VARIABLES:
 ! ================
@@ -271,11 +276,15 @@ module blocks
   public :: refine_block, derefine_block
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: set_blocks_update
+  public :: change_blocks_process
   public :: set_neighbors_refine
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
   public :: metablock_set_bounds, metablock_set_leaf, metablock_unset_leaf
+#ifdef DEBUG
+  public :: check_neighbors
+#endif /* DEBUG */
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -324,6 +333,9 @@ module blocks
     call set_timer('blocks:: data block deallocation', imq)
     call set_timer('blocks:: refine'                 , imr)
     call set_timer('blocks:: derefine'               , imd)
+#ifdef DEBUG
+    call set_timer('blocks:: check neighbors'        , imc)
+#endif /* DEBUG */
 
 ! start accounting time for module initialization/finalization
 !
@@ -2152,6 +2164,58 @@ module blocks
 !
 !===============================================================================
 !
+! subroutine CHANGE_BLOCKS_PROCESS:
+! --------------------------------
+!
+!   Subroutine switches meta blocks which belong to old process to the new one.
+!
+!   Arguments:
+!
+!     npold - the old process number;
+!     npnew - the new process number;
+!
+!===============================================================================
+!
+  subroutine change_blocks_process(npold, npnew)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(in)       :: npold, npnew
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+! associate the pointer with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all blocks in the list
+!
+    do while(associated(pmeta))
+
+! if the meta block belongs to process npold, switch it to process npnew
+!
+      if (pmeta%process == npold) pmeta%process = npnew
+
+! associate the pointer with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine change_blocks_process
+!
+!===============================================================================
+!
 ! subroutine METABLOCK_SET_ID:
 ! ---------------------------
 !
@@ -2658,6 +2722,64 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine set_neighbors_refine
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! subroutine CHECK_NEIGHBORS:
+! --------------------------
+!
+!   Subroutine iterates over all blocks and checks if the pointers to their
+!   neighbors are consistent.
+!
+!===============================================================================
+!
+  subroutine check_neighbors()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the neighbor consistency check
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! associate the pointer with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all blocks in the list
+!
+    do while(associated(pmeta))
+
+! check the block neighbors
+!
+      call check_block_neighbors(pmeta)
+
+! associate the pointer with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+#ifdef PROFILE
+! stop accounting time for the neighbor consistency check
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_neighbors
+#endif /* DEBUG */
 !
 !===============================================================================
 !!
@@ -3064,442 +3186,595 @@ module blocks
     type(block_meta)                 , pointer, intent(inout) :: pmeta
     procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
 
-! local pointers
+! local saved variables
 !
-    type(block_meta), pointer :: pneigh
+    logical, save :: first = .true.
+
+! local saved arrays
+!
+    integer, dimension(mfaces,3)  , save :: fidx
+    integer, dimension(mfaces,2,3), save :: eidx
+    integer, dimension(mfaces,2,3), save :: cidx
+
+! local variables
+!
+    integer :: l
 !
 !-------------------------------------------------------------------------------
 !
-#if NDIMS == 3
-!! 3D CASE: WALK AROUND THE CORNERS
-!!
+! prepare indices
+!
+    if (first) then
+
+! inicialize indices
+!
+      fidx(:  ,:) = 0
+      eidx(:,:,:) = 0
+      cidx(:,:,:) = 0
+
+! prepare indices to get proper face, edge and corner neighbors
+!
+#if NDIMS == 2
 ! around (0,0,0) corner
 !
-! (1,1,1) - X = (1,2,1) - Y = (2,1,2)
+! [1,1,1]:X:(1,2,1) <- Y = [2,1,2]
 !
-    pneigh => pmeta%neigh(1,1,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx( 1,  :) = (/ 1, 1, 1 /)
+      eidx( 1,1,:) = (/ 2, 1, 2 /)
 
-      pneigh => pneigh%neigh(2,1,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,1,1) - Z = (3,2,1) - X = (1,1,3)
+! [2,1,1]:Y:(2,2,1) <- X = [1,1,2]
 !
-    pneigh => pmeta%neigh(3,1,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(1,1,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (2,1,1) - Y = (2,2,1) - Z = (3,1,3) - X = [1,1,4]
-!
-    pneigh => pmeta%neigh(2,1,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(3,1,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(1,1,4)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx( 2,  :) = (/ 2, 1, 1 /)
+      eidx( 2,1,:) = (/ 1, 1, 2 /)
 
 ! around (0,1,0) corner
 !
-! (2,2,1) + Y = (2,1,1) - X = (1,1,1)
+! [1,1,2]:X:(1,2,2) -> Y = [2,2,2]
 !
-    pneigh => pmeta%neigh(2,2,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx( 3,  :) = (/ 1, 1, 2 /)
+      eidx( 3,1,:) = (/ 2, 2, 2 /)
 
-      pneigh => pneigh%neigh(1,1,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,1,3) - Z = (3,2,3) + Y = (2,2,3)
+! [2,2,1]:Y:(2,1,2) <- X = [1,1,1]
 !
-    pneigh => pmeta%neigh(3,1,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,2,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,1,2) - X = (1,2,2) - Z = (3,1,4) + Y = [2,2,4]
-!
-    pneigh => pmeta%neigh(1,1,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(3,1,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(2,2,4)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx( 4,  :) = (/ 2, 2, 1 /)
+      eidx( 4,1,:) = (/ 1, 1, 1 /)
 
 ! around (1,1,0) corner
 !
-! (1,2,2) + X = (1,1,2) + Y = (2,2,1)
+! [1,2,2]:X:(1,1,2) -> Y = [2,2,1]
 !
-    pneigh => pmeta%neigh(1,2,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx( 5,  :) = (/ 1, 2, 2 /)
+      eidx( 5,1,:) = (/ 2, 2, 1 /)
 
-      pneigh => pneigh%neigh(2,2,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,1,4) - Z = (3,2,4) + X = (1,2,4)
+! [2,2,2]:Y:(2,1,2) -> X = [1,2,1]
 !
-    pneigh => pmeta%neigh(3,1,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(1,2,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (2,2,2) + Y = (2,1,2) - Z = (3,1,2) + X = [1,2,3]
-!
-    pneigh => pmeta%neigh(2,2,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(3,1,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(1,2,3)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx( 6,  :) = (/ 2, 2, 2 /)
+      eidx( 6,1,:) = (/ 1, 2, 1 /)
 
 ! around (1,0,0) corner
 !
-! (2,1,2) - Y = (2,2,2) + X = (1,2,2)
+! [1,2,1]:X:(1,1,1) <- Y = [2,1,1]
 !
-    pneigh => pmeta%neigh(2,1,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx( 7,  :) = (/ 1, 2, 1 /)
+      eidx( 7,1,:) = (/ 2, 1, 1 /)
 
-      pneigh => pneigh%neigh(1,2,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,1,2) - Z = (3,2,2) - Y = (2,1,4)
+! [2,1,2]:Y:(2,2,2) -> X = [1,2,2]
 !
-    pneigh => pmeta%neigh(3,1,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,1,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,2,1) + X = (1,1,1) - Z = (3,1,1) - Y = [2,1,3]
+      fidx( 8,  :) = (/ 2, 1, 2 /)
+      eidx( 8,1,:) = (/ 1, 2, 2 /)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! around (0,0,0) corner
 !
-    pneigh => pmeta%neigh(1,2,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+! [1,1,1]:X:(1,2,1) <- Y = [2,1,2] <- Z = [3,1,4]
+! [1,1,1]:X:(1,2,1) <- Z = [3,1,2] <- Y = [2,1,4]
+!
+      fidx( 1,  :) = (/ 1, 1, 1 /)
+      eidx( 1,1,:) = (/ 2, 1, 2 /)
+      eidx( 1,2,:) = (/ 3, 1, 2 /)
+      cidx( 1,1,:) = (/ 3, 1, 4 /)
+      cidx( 1,2,:) = (/ 2, 1, 4 /)
 
-      pneigh => pneigh%neigh(3,1,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
+! [2,1,1]:Y:(2,2,1) <- Z = [3,1,3] <- X = [1,1,4]
+! [2,1,1]:Y:(2,2,1) <- X = [1,1,2] <- Z = [3,1,4]
+!
+      fidx( 2,  :) = (/ 2, 1, 1 /)
+      eidx( 2,1,:) = (/ 3, 1, 3 /)
+      eidx( 2,2,:) = (/ 1, 1, 2 /)
+      cidx( 2,1,:) = (/ 1, 1, 4 /)
+      cidx( 2,2,:) = (/ 3, 1, 4 /)
 
-        pneigh => pneigh%neigh(2,1,3)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+! [3,1,1]:Z:(3,2,1) <- X = [1,1,3] <- Y = [2,1,4]
+! [3,1,1]:Z:(3,2,1) <- Y = [2,1,3] <- X = [1,1,4]
+!
+      fidx( 3,  :) = (/ 3, 1, 1 /)
+      eidx( 3,1,:) = (/ 1, 1, 3 /)
+      eidx( 3,2,:) = (/ 2, 1, 3 /)
+      cidx( 3,1,:) = (/ 2, 1, 4 /)
+      cidx( 3,2,:) = (/ 1, 1, 4 /)
+
+! around (0,1,0) corner
+!
+! [1,1,2]:X:(1,2,2) -> Y = [2,2,2] <- Z = [3,1,2]
+! [1,1,2]:X:(1,2,2) <- Z = [3,1,4] -> Y = [2,2,4]
+!
+      fidx( 4,  :) = (/ 1, 1, 2 /)
+      eidx( 4,1,:) = (/ 2, 2, 2 /)
+      eidx( 4,2,:) = (/ 3, 1, 4 /)
+      cidx( 4,1,:) = (/ 3, 1, 2 /)
+      cidx( 4,2,:) = (/ 2, 2, 4 /)
+
+! [2,2,1]:Y:(2,1,2) <- Z = [3,1,1] <- X = [1,1,3]
+! [2,2,1]:Y:(2,1,2) <- X = [1,1,1] <- Z = [3,1,2]
+!
+      fidx( 5,  :) = (/ 2, 2, 1 /)
+      eidx( 5,1,:) = (/ 3, 1, 1 /)
+      eidx( 5,2,:) = (/ 1, 1, 1 /)
+      cidx( 5,1,:) = (/ 1, 1, 3 /)
+      cidx( 5,2,:) = (/ 3, 1, 2 /)
+
+! [3,1,3]:Z:(3,2,3) <- X = [1,1,4] -> Y = [2,2,4]
+! [3,1,3]:Z:(3,2,3) -> Y = [2,2,3] <- X = [1,1,3]
+!
+      fidx( 6,  :) = (/ 3, 1, 3 /)
+      eidx( 6,1,:) = (/ 1, 1, 4 /)
+      eidx( 6,2,:) = (/ 2, 2, 3 /)
+      cidx( 6,1,:) = (/ 2, 2, 4 /)
+      cidx( 6,2,:) = (/ 1, 1, 3 /)
+
+! around (1,1,0) corner
+!
+! [1,2,2]:X:(1,1,2) -> Y = [2,2,1] <- Z = [3,1,1]
+! [1,2,2]:X:(1,1,2) <- Z = [3,1,3] -> Y = [2,2,3]
+!
+      fidx( 7,  :) = (/ 1, 2, 2 /)
+      eidx( 7,1,:) = (/ 2, 2, 1 /)
+      eidx( 7,2,:) = (/ 3, 1, 3 /)
+      cidx( 7,1,:) = (/ 3, 1, 1 /)
+      cidx( 7,2,:) = (/ 2, 2, 3 /)
+
+! [2,2,2]:Y:(2,1,2) <- Z = [3,1,2] -> X = [1,2,3]
+! [2,2,2]:Y:(2,1,2) -> X = [1,2,1] <- Z = [3,1,1]
+!
+      fidx( 8,  :) = (/ 2, 2, 2 /)
+      eidx( 8,1,:) = (/ 3, 1, 2 /)
+      eidx( 8,2,:) = (/ 1, 2, 1 /)
+      cidx( 8,1,:) = (/ 1, 2, 3 /)
+      cidx( 8,2,:) = (/ 3, 1, 1 /)
+
+! [3,1,4]:Z:(3,2,4) -> X = [1,2,4] -> Y = [2,2,3]
+! [3,1,4]:Z:(3,2,4) -> Y = [2,2,4] -> X = [1,2,3]
+!
+      fidx( 9,  :) = (/ 3, 1, 4 /)
+      eidx( 9,1,:) = (/ 1, 2, 4 /)
+      eidx( 9,2,:) = (/ 2, 2, 4 /)
+      cidx( 9,1,:) = (/ 2, 2, 3 /)
+      cidx( 9,2,:) = (/ 1, 2, 3 /)
+
+! around (1,0,0) corner
+!
+! [1,2,1]:X:(1,1,1) <- Y = [2,1,1] <- Z = [3,1,3]
+! [1,2,1]:X:(1,1,1) <- Z = [3,1,1] <- Y = [2,1,3]
+!
+      fidx(10,  :) = (/ 1, 2, 1 /)
+      eidx(10,1,:) = (/ 2, 1, 1 /)
+      eidx(10,2,:) = (/ 3, 1, 1 /)
+      cidx(10,1,:) = (/ 3, 1, 3 /)
+      cidx(10,2,:) = (/ 2, 1, 3 /)
+
+! [2,1,2]:Y:(2,2,2) <- Z = [3,1,4] -> X = [1,2,4]
+! [2,1,2]:Y:(2,2,2) -> X = [1,2,2] <- Z = [3,1,3]
+!
+      fidx(11,  :) = (/ 2, 1, 2 /)
+      eidx(11,1,:) = (/ 3, 1, 4 /)
+      eidx(11,2,:) = (/ 1, 2, 2 /)
+      cidx(11,1,:) = (/ 1, 2, 4 /)
+      cidx(11,2,:) = (/ 3, 1, 3 /)
+
+! [3,1,2]:Z:(3,2,2) -> X = [1,2,3] <- Y = [2,1,3]
+! [3,1,2]:Z:(3,2,2) <- Y = [2,1,4] -> X = [1,2,4]
+!
+      fidx(12,  :) = (/ 3, 1, 2 /)
+      eidx(12,1,:) = (/ 1, 2, 3 /)
+      eidx(12,2,:) = (/ 2, 1, 4 /)
+      cidx(12,1,:) = (/ 2, 1, 3 /)
+      cidx(12,2,:) = (/ 1, 2, 4 /)
 
 ! around (0,0,1) corner
 !
-! (1,1,3) - X = (1,2,3) + Z = (3,2,2)
+! [1,1,3]:X:(1,2,3) <- Y = [2,1,4] -> Z = [3,2,4]
+! [1,1,3]:X:(1,2,3) -> Z = [3,2,2] <- Y = [2,1,2]
 !
-    pneigh => pmeta%neigh(1,1,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(13,  :) = (/ 1, 1, 3 /)
+      eidx(13,1,:) = (/ 2, 1, 4 /)
+      eidx(13,2,:) = (/ 3, 2, 2 /)
+      cidx(13,1,:) = (/ 3, 2, 4 /)
+      cidx(13,2,:) = (/ 2, 1, 2 /)
 
-      pneigh => pneigh%neigh(3,2,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (2,1,3) - Y = (2,2,3) - X = (1,1,4)
+! [2,1,3]:Y:(2,2,3) -> Z = [3,2,3] <- X = [1,1,2]
+! [2,1,3]:Y:(2,2,3) <- X = [1,1,4] -> Z = [3,2,1]
 !
-    pneigh => pmeta%neigh(2,1,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(14,  :) = (/ 2, 1, 3 /)
+      eidx(14,1,:) = (/ 3, 2, 3 /)
+      eidx(14,2,:) = (/ 1, 1, 4 /)
+      cidx(14,1,:) = (/ 1, 1, 2 /)
+      cidx(14,2,:) = (/ 3, 2, 1 /)
 
-      pneigh => pneigh%neigh(1,1,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,2,1) + Z = (3,1,1) - Y = (2,1,1) - X = [1,1,2]
+! [3,2,1]:Z:(3,1,1) <- X = [1,1,1] <- Y = [2,1,2]
+! [3,2,1]:Z:(3,1,1) <- Y = [2,1,1] <- X = [1,1,2]
 !
-    pneigh => pmeta%neigh(3,2,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,1,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(1,1,2)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx(15,  :) = (/ 3, 2, 1 /)
+      eidx(15,1,:) = (/ 1, 1, 1 /)
+      eidx(15,2,:) = (/ 2, 1, 1 /)
+      cidx(15,1,:) = (/ 2, 1, 2 /)
+      cidx(15,2,:) = (/ 1, 1, 2 /)
 
 ! around (0,1,1) corner
 !
-! (2,2,3) + Y = (2,1,3) + Z = (3,2,1)
+! [1,1,4]:X:(1,2,4) -> Y = [2,2,4] -> Z = [3,2,2]
+! [1,1,4]:X:(1,2,4) -> Z = [3,2,4] -> Y = [2,2,2]
 !
-    pneigh => pmeta%neigh(2,2,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(16,  :) = (/ 1, 1, 4 /)
+      eidx(16,1,:) = (/ 2, 2, 4 /)
+      eidx(16,2,:) = (/ 3, 2, 4 /)
+      cidx(16,1,:) = (/ 3, 2, 2 /)
+      cidx(16,2,:) = (/ 2, 2, 2 /)
 
-      pneigh => pneigh%neigh(3,2,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,1,4) - X = (1,2,4) + Y = (2,2,4)
+! [2,2,3]:Y:(2,1,3) -> Z = [3,2,1] <- X = [1,1,1]
+! [2,2,3]:Y:(2,1,3) <- X = [1,1,3] -> Z = [3,2,2]
 !
-    pneigh => pmeta%neigh(1,1,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(17,  :) = (/ 2, 2, 3 /)
+      eidx(17,1,:) = (/ 3, 2, 1 /)
+      eidx(17,2,:) = (/ 1, 1, 3 /)
+      cidx(17,1,:) = (/ 1, 1, 1 /)
+      cidx(17,2,:) = (/ 3, 2, 2 /)
 
-      pneigh => pneigh%neigh(2,2,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,2,3) + Z = (3,1,3) - X = (1,1,2) + Z = [2,2,2]
+! [3,2,3]:Z:(3,1,3) <- X = [1,1,2] -> Y = [2,2,2]
+! [3,2,3]:Z:(3,1,3) -> Y = [2,2,1] <- X = [1,1,1]
 !
-    pneigh => pmeta%neigh(3,2,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(1,1,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(2,2,2)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx(18,  :) = (/ 3, 2, 3 /)
+      eidx(18,1,:) = (/ 1, 1, 2 /)
+      eidx(18,2,:) = (/ 2, 2, 1 /)
+      cidx(18,1,:) = (/ 2, 2, 2 /)
+      cidx(18,2,:) = (/ 1, 1, 1 /)
 
 ! around (1,1,1) corner
 !
-! (1,2,4) + X = (1,1,4) + Z = (3,2,3)
+! [1,2,4]:X:(1,1,4) -> Y = [2,2,3] -> Z = [3,2,1]
+! [1,2,4]:X:(1,1,4) -> Z = [3,2,3] -> Y = [2,2,1]
 !
-    pneigh => pmeta%neigh(1,2,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(19,  :) = (/ 1, 2, 4 /)
+      eidx(19,1,:) = (/ 2, 2, 3 /)
+      eidx(19,2,:) = (/ 3, 2, 3 /)
+      cidx(19,1,:) = (/ 3, 2, 1 /)
+      cidx(19,2,:) = (/ 2, 2, 1 /)
 
-      pneigh => pneigh%neigh(3,2,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (2,2,4) + Y = (2,1,4) + X = (1,2,3)
+! [2,2,4]:Y:(2,1,4) -> Z = [3,2,2] -> X = [1,2,1]
+! [2,2,4]:Y:(2,1,4) -> X = [1,2,3] -> Z = [3,2,1]
 !
-    pneigh => pmeta%neigh(2,2,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(20,  :) = (/ 2, 2, 4 /)
+      eidx(20,1,:) = (/ 3, 2, 2 /)
+      eidx(20,2,:) = (/ 1, 2, 3 /)
+      cidx(20,1,:) = (/ 1, 2, 1 /)
+      cidx(20,2,:) = (/ 3, 2, 1 /)
 
-      pneigh => pneigh%neigh(1,2,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,2,4) + Z = (3,1,4) + Y = (2,2,2) + X = [1,2,1]
+! [3,2,4]:Z:(3,1,4) -> X = [1,2,2] -> Y = [2,2,1]
+! [3,2,4]:Z:(3,1,4) -> Y = [2,2,2] -> X = [1,2,1]
 !
-    pneigh => pmeta%neigh(3,2,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,2,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(1,2,1)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
+      fidx(21,  :) = (/ 3, 2, 4 /)
+      eidx(21,1,:) = (/ 1, 2, 2 /)
+      eidx(21,2,:) = (/ 2, 2, 2 /)
+      cidx(21,1,:) = (/ 2, 2, 1 /)
+      cidx(21,2,:) = (/ 1, 2, 1 /)
 
 ! around (1,0,1) corner
 !
-! (2,1,4) - Y = (2,2,4) + Z = (3,2,4)
+! [1,2,3]:X:(1,1,3) <- Y = [2,1,3] -> Z = [3,2,3]
+! [1,2,3]:X:(1,1,3) -> Z = [3,2,1] <- Y = [2,1,1]
 !
-    pneigh => pmeta%neigh(2,1,4)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(22,  :) = (/ 1, 2, 3 /)
+      eidx(22,1,:) = (/ 2, 1, 3 /)
+      eidx(22,2,:) = (/ 3, 2, 1 /)
+      cidx(22,1,:) = (/ 3, 2, 3 /)
+      cidx(22,2,:) = (/ 2, 1, 1 /)
 
-      pneigh => pneigh%neigh(3,2,4)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (3,2,2) + Z = (3,1,2) + X = (1,2,1)
+! [2,1,4]:Y:(2,2,4) -> Z = [3,2,4] -> X = [1,2,2]
+! [2,1,4]:Y:(2,2,4) -> X = [1,2,4] -> Z = [3,2,3]
 !
-    pneigh => pmeta%neigh(3,2,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
+      fidx(23,  :) = (/ 2, 1, 4 /)
+      eidx(23,1,:) = (/ 3, 2, 4 /)
+      eidx(23,2,:) = (/ 1, 2, 4 /)
+      cidx(23,1,:) = (/ 1, 2, 2 /)
+      cidx(23,2,:) = (/ 3, 2, 3 /)
 
-      pneigh => pneigh%neigh(1,2,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,2,3) + X = (1,1,3) - Y = (2,1,3) + Z = [3,2,3]
+! [3,2,2]:Z:(3,1,2) -> X = [1,2,1] <- Y = [2,1,3]
+! [3,2,2]:Z:(3,1,2) <- Y = [2,1,2] -> X = [1,2,4]
 !
-    pneigh => pmeta%neigh(1,2,3)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,1,3)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-
-        pneigh => pneigh%neigh(3,2,3)%ptr
-        if (associated(pneigh)) then
-          call pprocedure(pmeta, pneigh)
-        end if
-      end if
-    end if
-
-#else /* NDIMS == 3 */
-!! 2D CASE
-!!
-! (0,0)-(0,½) edge and (0,0) corner
-!
-    pneigh => pmeta%neigh(1,1,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,1,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (0,½)-(0,1) edge and (0,1) corner
-!
-    pneigh => pmeta%neigh(1,1,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,2,2)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,0)-(1,½) edge and (1,0) corner
-!
-    pneigh => pmeta%neigh(1,2,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,1,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (1,½)-(1,1) edge and (1,1) corner
-!
-    pneigh => pmeta%neigh(1,2,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-
-      pneigh => pneigh%neigh(2,2,1)%ptr
-      if (associated(pneigh)) then
-        call pprocedure(pmeta, pneigh)
-      end if
-    end if
-
-! (0,0)-(½,0) edge
-!
-    pneigh => pmeta%neigh(2,1,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-    end if
-
-! (½,0)-(1,0) edge
-!
-    pneigh => pmeta%neigh(2,1,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-    end if
-
-! (0,1)-(½,1) edge
-!
-    pneigh => pmeta%neigh(2,2,1)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-    end if
-
-! (½,1)-(1,1) edge
-!
-    pneigh => pmeta%neigh(2,2,2)%ptr
-    if (associated(pneigh)) then
-      call pprocedure(pmeta, pneigh)
-    end if
+      fidx(24,  :) = (/ 3, 2, 2 /)
+      eidx(24,1,:) = (/ 1, 2, 1 /)
+      eidx(24,2,:) = (/ 2, 1, 2 /)
+      cidx(24,1,:) = (/ 2, 1, 3 /)
+      cidx(24,2,:) = (/ 1, 2, 3 /)
 #endif /* NDIMS == 3 */
+
+! reset the first time execution flag
+!
+      first = .false.
+
+    end if
+
+! iterate over all block faces (or edges in the 2D case)
+!
+    do l = 1, mfaces
+      call iterate_over_face(pmeta, pprocedure                                 &
+                                        , fidx(l,:), eidx(l,:,:), cidx(l,:,:))
+    end do
 
 !-------------------------------------------------------------------------------
 !
   end subroutine iterate_over_neighbors
+!
+!===============================================================================
+!
+! subroutine ITERATE_OVER_FACE:
+! ----------------------------
+!
+!   Subroutine iterates over all neighbors, edges and corners linked to
+!   the input meta block and executes a subroutine provided by the pointer.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the meta block which neighbors are iterated over;
+!     pproc - a pointer to the subroutine called with each pair (pmeta, pneigh);
+!     fidx  - the index of face to process;
+!     eidx  - the indices of faces connected with edges;
+!     cidx  - the indices of faces connected with corners;
+!
+!===============================================================================
+!
+  subroutine iterate_over_face(pmeta, pprocedure, fidx, eidx, cidx)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta)                 , pointer, intent(inout) :: pmeta
+    procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
+    integer, dimension(3)                     , intent(in)    :: fidx
+    integer, dimension(2,3)                   , intent(in)    :: eidx
+    integer, dimension(2,3)                   , intent(in)    :: cidx
+
+! local pointers
+!
+    type(block_meta), pointer :: pneigh, pedge, pcorner
+!
+!-------------------------------------------------------------------------------
+!
+! associate a pointer with the neighbor
+!
+    pneigh => pmeta%neigh(fidx(1),fidx(2),fidx(3))%ptr
+
+! check if the neighbors is associated
+!
+    if (associated(pneigh)) then
+
+! call the procedure for the face neighbor
+!
+      call pprocedure(pmeta, pneigh)
+
+! associate a pointer with the first edge
+!
+      pedge => pneigh%neigh(eidx(1,1),eidx(1,2),eidx(1,3))%ptr
+
+! check if the edge pointer is associated
+!
+      if (associated(pedge)) then
+
+! call the procedure for the edge neighbor
+!
+        call pprocedure(pmeta, pedge)
+
+#if NDIMS == 3
+! associate a pointer with the first corner
+!
+        pcorner => pedge%neigh(cidx(1,1),cidx(1,2),cidx(1,3))%ptr
+
+! call the procedure for the corner neighbor if it is associated
+!
+        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
+#endif /* NDIMS == 3 */
+
+      end if ! pedge associated
+
+#if NDIMS == 3
+! associate a pointer with the second edge
+!
+      pedge => pneigh%neigh(eidx(2,1),eidx(2,2),eidx(2,3))%ptr
+
+! check if the edge pointer is associated
+!
+      if (associated(pedge)) then
+
+! call the procedure for the edge neighbor
+!
+        call pprocedure(pmeta, pedge)
+
+! associate a pointer with the second corner
+!
+        pcorner => pedge%neigh(cidx(2,1),cidx(2,2),cidx(2,3))%ptr
+
+! call the procedure for the corner neighbor if it is associated
+!
+        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
+
+      end if ! pedge associated
+#endif /* NDIMS == 3 */
+
+    end if ! pneigh associated
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine iterate_over_face
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! subroutine CHECK_BLOCK_NEIGHBORS:
+! --------------------------------
+!
+!   Subroutine iterates over all neighbor blocks and checks if their pointers
+!   are consistent, i.e. if their corresponding neighbor pointers point to
+!   the current block.
+!
+!   Arguments:
+!
+!     pmeta - a pointer to the meta block;
+!
+!===============================================================================
+!
+  subroutine check_block_neighbors(pmeta)
+
+! import external procedures and variables
+!
+    use error          , only : print_warning
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(in) :: pmeta
+
+! local pointers
+!
+    type(block_meta), pointer :: pneigh, pnneigh
+
+! local variables
+!
+    integer :: i, j, k, l, m
+!
+!-------------------------------------------------------------------------------
+!
+! return if the block is not leaf
+!
+    if (.not. pmeta%leaf) return
+
+! iterate over all face neighbors
+!
+    do i = 1, ndims
+      do j = 1, nsides
+        m = 3 - j
+        do k = 1, nfaces
+
+! assign pointer with the neighbor
+!
+          pneigh => pmeta%neigh(i,j,k)%ptr
+
+! check if the neighbor is associated
+!
+          if (associated(pneigh)) then
+
+! check neighbors on the same levels
+!
+            if (pmeta%level == pneigh%level) then
+
+! assign pointer to the neighbor of the neighbor pointing to the current meta
+! block
+!
+              pnneigh => pneigh%neigh(i,m,k)%ptr
+
+! check if it is associated
+!
+              if (associated(pnneigh)) then
+
+! check if the pointer of the neighbor points to the current meta block
+!
+                if (pmeta%id /= pnneigh%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning("blocks::check_block_neighbors"           &
+                                       , "Inconsistent same level neighbors!")
+                  print *, 'metablock: ', pmeta%id, pnneigh%id
+                  print *, 'neighbor : ', pneigh%id
+                  print *, 'index    : ', i, j, k
+
+                end if
+
+              else ! pnneigh associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning("blocks::check_block_neighbors"             &
+                                      , "Same level neighbor not associated!")
+                print *, 'metablock: ', pmeta%id, pnneigh%id
+                print *, 'neighbor : ', pneigh%id
+                print *, 'index    : ', i, j, k
+
+              end if ! pnneigh associated
+
+            end if ! the same levels
+
+! check neighbors on the level higher than the meta block's level; it also
+! covers the other way around, since we iterate over all neighbor faces
+!
+            if (pmeta%level < pneigh%level) then
+
+! iterate over whole face of the corresponding neighbor
+!
+              do l = 1, nfaces
+
+! assign pointer to the corresponding neighbor of the neighbor
+!
+                pnneigh => pneigh%neigh(i,m,l)%ptr
+
+! check if it is associated
+!
+                if (associated(pnneigh)) then
+
+! check if the pointer of the neighbor points to the current meta block
+!
+                  if (pmeta%id /= pnneigh%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning("blocks::check_block_neighbors"         &
+                                  , "Inconsistent different level neighbors!")
+                    print *, 'metablock: ', pmeta%id, pnneigh%id
+                    print *, 'neighbor : ', pneigh%id
+                    print *, 'index    : ', i, j, k, l
+
+                  end if
+
+                else ! pnneigh associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning("blocks::check_block_neighbors"           &
+                                 , "Different level neighbor not associated!")
+                  print *, 'metablock: ', pmeta%id, pnneigh%id
+                  print *, 'neighbor : ', pneigh%id
+                  print *, 'index    : ', i, j, k, l
+
+                end if ! pnneigh associated
+
+              end do ! l = 1, nfaces
+
+            end if ! pmeta's level < pneigh's level
+
+          end if ! pneigh associated
+
+        end do ! nfaces
+      end do ! nsides
+    end do ! ndims
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_block_neighbors
+#endif /* DEBUG */
 
 !===============================================================================
 !

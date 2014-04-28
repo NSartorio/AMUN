@@ -462,6 +462,9 @@ module mesh
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
     use blocks         , only : set_neighbors_refine
+#ifdef DEBUG
+    use blocks         , only : check_neighbors
+#endif /* DEBUG */
     use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
     use error          , only : print_error
@@ -735,6 +738,12 @@ module mesh
 
     end do ! pmeta
 
+#ifdef DEBUG
+! check if neighbors are consistent after mesh generation
+!
+    call check_neighbors()
+#endif /* DEBUG */
+
 #ifdef PROFILE
 ! stop accounting time for the initial mesh generation
 !
@@ -768,6 +777,9 @@ module mesh
     use blocks         , only : refine_block, derefine_block
     use blocks         , only : append_datablock, remove_datablock, link_blocks
     use blocks         , only : set_neighbors_refine
+#ifdef DEBUG
+    use blocks         , only : check_neighbors
+#endif /* DEBUG */
     use coordinates    , only : minlev, maxlev, toplev, im, jm, km
     use equations      , only : nv
     use error          , only : print_error
@@ -818,12 +830,6 @@ module mesh
 !
     call start_timer(imu)
 #endif /* PROFILE */
-
-#ifdef DEBUG
-! check the mesh when debugging
-!
-    call check_mesh('before update_mesh')
-#endif /* DEBUG */
 
 !! DETERMINE THE REFINEMENT OF ALL DATA BLOCKS
 !!
@@ -1264,9 +1270,9 @@ module mesh
 #endif /* MPI */
 
 #ifdef DEBUG
-! check mesh
+! check if neighbors are consistent after mesh refinement
 !
-    call check_mesh('after update_mesh')
+    call check_neighbors()
 #endif /* DEBUG */
 
 #ifdef PROFILE
@@ -1359,92 +1365,98 @@ module mesh
 !
     do while (associated(pmeta))
 
+! consider only meta blocks which belong to active processes
+!
+      if (pmeta%process < nprocs) then
+
 ! check if the block belongs to another process
 !
-      if (pmeta%process /= np) then
+        if (pmeta%process /= np) then
 
 ! check if the block is the leaf
 !
-        if (pmeta%leaf) then
+          if (pmeta%leaf) then
 
 ! generate a tag for communication
 !
-          itag = pmeta%process * nprocs + np + nprocs + 1
+            itag = pmeta%process * nprocs + np + nprocs + 1
 
 ! sends the block to the right process
 !
-          if (nproc == pmeta%process) then
+            if (nproc == pmeta%process) then
 
 ! copy data to buffer
 !
-            rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
-            rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
+              rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
+              rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
 
 ! send data
 !
-            call send_real_array(size(rbuf), np, itag, rbuf, iret)
+              call send_real_array(size(rbuf), np, itag, rbuf, iret)
 
 ! remove data block from the current process
 !
-            call remove_datablock(pmeta%data)
+              call remove_datablock(pmeta%data)
 
 ! send data block
 !
-          end if ! nproc == pmeta%process
+            end if ! nproc == pmeta%process
 
 ! receive the block from another process
 !
-          if (nproc == np) then
+            if (nproc == np) then
 
 ! allocate a new data block and link it with the current meta block
 !
-            call append_datablock(pdata)
-            call link_blocks(pmeta, pdata)
+              call append_datablock(pdata)
+              call link_blocks(pmeta, pdata)
 
 ! receive the data
 !
-            call receive_real_array(size(rbuf), pmeta%process, itag, rbuf, iret)
+              call receive_real_array(size(rbuf), pmeta%process, itag, rbuf, iret)
 
 ! coppy the buffer to data block
 !
-            pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
-            pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
+              pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
+              pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
 
-          end if ! nproc == n
+            end if ! nproc == n
 
-        end if ! leaf
+          end if ! leaf
 
 ! set new processor number
 !
-        pmeta%process = np
+          pmeta%process = np
 
-      end if ! pmeta%process /= np
+        end if ! pmeta%process /= np
 
 ! increase the number of blocks on the current process; if it exceeds the
 ! allowed number reset the counter and increase the processor number
 !
-      if (pmeta%leaf) then
+        if (pmeta%leaf) then
 
 ! increase the number of leafs for the current process
 !
-        nl = nl + 1
+          nl = nl + 1
 
 ! if the number of leafs for the current process exceeds the number of assigned
 ! blocks, reset the counter and increase the process number
 !
-        if (nl >= lb(np)) then
+          if (nl >= lb(np)) then
 
 ! reset the leaf counter for the current process
 !
-          nl = 0
+            nl = 0
 
 ! increase the process number
 !
-          np = min(nprocs - 1, np + 1)
+            np = min(nprocs - 1, np + 1)
 
-        end if ! l >= lb(n)
+          end if ! l >= lb(n)
 
-      end if ! leaf
+        end if ! leaf
+
+      end if ! pmeta%process < nprocs
 
 ! assign the pointer to the next meta block
 !
@@ -1502,7 +1514,7 @@ module mesh
     integer :: i, j, k, q, p
     integer :: il, iu, jl, ju, kl, ku
     integer :: ic, jc, kc, ip, jp, kp
-    real    :: dul, dur, dux, duy, duz
+    real    :: dul, dur, dux, duy, duz, du1, du2, du3, du4
 
 ! local pointers
 !
@@ -1586,21 +1598,27 @@ module mesh
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - (dux + duy)
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + (dux - duy)
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) + (duy - dux)
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + (dux + duy)
+            du1 = dux + duy
+            du2 = dux - duy
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du2
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + du1
 #endif /* NDIMS == 2 */
 
 #if NDIMS == 3
-            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - dux - duy - duz
-            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + dux - duy - duz
-            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - dux + duy - duz
-            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + dux + duy - duz
-            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - dux - duy + duz
-            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + dux - duy + duz
-            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - dux + duy + duz
-            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + dux + duy + duz
+            du1 = dux + duy + duz
+            du2 = dux - duy - duz
+            du3 = dux - duy + duz
+            du4 = dux + duy - duz
+            u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
+            u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
+            u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du3
+            u(p,ip,jp,kc) = pdata%u(p,i,j,k) + du4
+            u(p,ic,jc,kp) = pdata%u(p,i,j,k) - du4
+            u(p,ip,jc,kp) = pdata%u(p,i,j,k) + du3
+            u(p,ic,jp,kp) = pdata%u(p,i,j,k) - du2
+            u(p,ip,jp,kp) = pdata%u(p,i,j,k) + du1
 #endif /* NDIMS == 3 */
           end do
         end do
