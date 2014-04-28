@@ -45,6 +45,9 @@ module blocks
 ! timer indices
 !
   integer, save              :: imi, ima, imu, imp, imq, imr, imd
+#ifdef DEBUG
+  integer, save              :: imc
+#endif /* DEBUG */
 #endif /* PROFILE */
 
 ! MODULE PARAMETERS:
@@ -330,6 +333,9 @@ module blocks
     call set_timer('blocks:: data block deallocation', imq)
     call set_timer('blocks:: refine'                 , imr)
     call set_timer('blocks:: derefine'               , imd)
+#ifdef DEBUG
+    call set_timer('blocks:: check neighbors'        , imc)
+#endif /* DEBUG */
 
 ! start accounting time for module initialization/finalization
 !
@@ -2740,6 +2746,12 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the neighbor consistency check
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
 ! associate the pointer with the first block on the meta block list
 !
     pmeta => list_meta
@@ -2757,6 +2769,12 @@ module blocks
       pmeta => pmeta%next
 
     end do ! meta blocks
+
+#ifdef PROFILE
+! stop accounting time for the neighbor consistency check
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
