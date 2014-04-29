@@ -68,6 +68,7 @@ program amun
   use refinement    , only : initialize_refinement, finalize_refinement
   use schemes       , only : initialize_schemes, finalize_schemes
   use shapes        , only : initialize_shapes, finalize_shapes
+  use sources       , only : initialize_sources, finalize_sources
   use timers        , only : initialize_timers, finalize_timers
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
@@ -386,6 +387,17 @@ program amun
 !
   call initialize_shapes(master, iret)
 
+! print header for source term information
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Source terms:"
+  end if
+
+! initialize module SOURCES
+!
+  call initialize_sources(master, iret)
+
 ! initialize boundaries module and print info
 !
   if (master) then
@@ -631,6 +643,10 @@ program amun
 ! finalize module PROBLEMS
 !
   call finalize_problems(iret)
+
+! finalize module SOURCES
+!
+  call finalize_sources(iret)
 
 ! finalize module SHAPES
 !

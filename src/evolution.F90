@@ -407,6 +407,7 @@ module evolution
 !
     use boundaries    , only : boundary_variables
     use schemes       , only : update_increment
+    use sources       , only : update_sources
 
 ! include external variables
 !
@@ -448,6 +449,10 @@ module evolution
 ! calculate variable increment for the current block
 !
       call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
@@ -496,6 +501,7 @@ module evolution
 !
     use boundaries    , only : boundary_variables
     use schemes       , only : update_increment
+    use sources       , only : update_sources
 
 ! include external variables
 !
@@ -538,6 +544,10 @@ module evolution
 !
       call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
 
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
+
 ! update the solution for the fluid variables
 !
       pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + du(1:nv,:,:,:)
@@ -578,6 +588,10 @@ module evolution
 ! calculate variable increment for the current block
 !
       call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
 
 ! update the solution for the fluid variables
 !
