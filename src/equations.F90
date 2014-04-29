@@ -121,6 +121,15 @@ module equations
 !
   real(kind=8)     , save :: cmax    = 0.0d+00, cmax2   = 0.0d+00
 
+! the upper bound for the sonic Mach number
+!
+  real(kind=8)     , save :: msmax   = 1.0d+03
+  real(kind=8)     , save :: msfac   = 3.0d-06 / 5.0d+00
+
+! flags for reconstruction corrections
+!
+  logical          , save :: positivity = .false.
+
 ! by default everything is private
 !
   private
@@ -182,8 +191,9 @@ module equations
 
 ! local variables
 !
-    character(len=255)     :: name_eqsys = ""
-    character(len=255)     :: name_eos   = ""
+    character(len=255)     :: name_eqsys     = ""
+    character(len=255)     :: name_eos       = ""
+    character(len=255)     :: positivity_fix = "off"
 !
 !-------------------------------------------------------------------------------
 !
@@ -452,6 +462,27 @@ module equations
 !
     allocate(evroe(2,nv,nv))
 
+! get the upper bound for the sonic Mach number
+!
+    call get_parameter_real("msmax" , msmax )
+
+! calculate the sonic Mach number factor
+!
+    msfac = 1.0d+00 / (gamma * msmax**2)
+
+! get the positivity fix flag
+!
+    call get_parameter_string("fix_positivity", positivity_fix )
+
+! check additional reconstruction limiting
+!
+    select case(trim(positivity_fix))
+    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+      positivity = .true.
+    case default
+      positivity = .false.
+    end select
+
 ! print information about the equation module
 !
     if (verbose) then
@@ -614,12 +645,13 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: uu
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: uu
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: qq
 
 ! temporary variables
 !
-    integer :: j, k
+    integer      :: i, j, k
+    real(kind=8) :: pmin
 !
 !-------------------------------------------------------------------------------
 !
@@ -634,6 +666,37 @@ module equations
 
       end do ! j = jb, je
     end do ! k = kb, ke
+
+! fix negative pressure is desired
+!
+    if (positivity .and. ipr > 0) then
+
+! iterate over block interior
+!
+      do k = kb, ke
+        do j = jb, je
+          do i = ib, ie
+
+! fix the cells where pressure is negative
+!
+            if (qq(ipr,i,j,k) <= 0.0d+00) then
+
+! calculate pressure from the sonic Mach number limit and local velocity
+!
+              pmin          = msfac * qq(idn,i,j,k) * sum(qq(ivx:ivz,i,j,k)**2)
+
+! update total energy and pressure
+!
+              uu(ien,i,j,k) = uu(ien,i,j,k) + gammam1i * (pmin - qq(ipr,i,j,k))
+              qq(ipr,i,j,k) = pmin
+
+            end if
+
+          end do ! i = ib, ie
+        end do ! j = jb, je
+      end do ! k = kb, ke
+
+    end if
 
 !-------------------------------------------------------------------------------
 !
