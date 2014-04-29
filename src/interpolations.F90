@@ -60,6 +60,7 @@ module interpolations
 ! flags for reconstruction corrections
 !
   logical     , save :: positivity = .false.
+  logical     , save :: clip       = .false.
 
 ! by default everything is private
 !
@@ -106,6 +107,7 @@ module interpolations
     character(len=255) :: sreconstruction = "tvd"
     character(len=255) :: slimiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
+    character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
     character(len=255) :: name_lim        = ""
 !
@@ -128,6 +130,7 @@ module interpolations
     call get_parameter_string("reconstruction", sreconstruction)
     call get_parameter_string("limiter"       , slimiter       )
     call get_parameter_string("fix_positivity", positivity_fix )
+    call get_parameter_string("clip_extrema"  , clip_extrema   )
     call get_parameter_real  ("eps"           , eps            )
     call get_parameter_real  ("limo3_rad"     , rad            )
 
@@ -182,6 +185,12 @@ module interpolations
     case default
       positivity = .false.
     end select
+    select case(trim(clip_extrema))
+    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+      clip = .true.
+    case default
+      clip = .false.
+    end select
 
 ! print informations about the reconstruction methods and parameters
 !
@@ -190,6 +199,7 @@ module interpolations
       write (*,"(4x,a14,9x,'=',1x,a)") "reconstruction", trim(name_rec)
       write (*,"(4x,a14,9x,'=',1x,a)") "limiter       ", trim(name_lim)
       write (*,"(4x,a14,9x,'=',1x,a)") "fix positivity", trim(positivity_fix)
+      write (*,"(4x,a14,9x,'=',1x,a)") "clip extrema  ", trim(clip_extrema)
 
     end if
 
@@ -291,6 +301,11 @@ module interpolations
 ! reconstruct the states using the selected subroutine
 !
     call reconstruct_states(n, h, f(:), fl(:), fr(:))
+
+! correct the reconstruction near extrema by clipping them in order to improve
+! the stability of scheme
+!
+    if (clip) call clip_extrema(n, f(:), fl(:), fr(:))
 
 #ifdef PROFILE
 ! stop accounting time for reconstruction
@@ -927,6 +942,84 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine fix_positivity
+!
+!===============================================================================
+!
+! subroutine CLIP_EXTREMA:
+! -----------------------
+!
+!   Subroutine scans the reconstructed states and check if they didn't leave
+!   the allowed limits.  In the case where the limits where exceeded,
+!   the states are limited using constant reconstruction.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     f      - the cell centered integrals of variable;
+!     fl, fr - the left and right states of variable;
+!
+!===============================================================================
+!
+  subroutine clip_extrema(n, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer           , intent(in)    :: n
+    real, dimension(n), intent(in)    :: f
+    real, dimension(n), intent(inout) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1
+    real(kind=8) :: fmn, fmx
+!
+!------------------------------------------------------------------------------
+!
+! iterate over all points
+!
+    do i = 1, n
+
+! calculate indices
+!
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+! estimate the bounds of the allowed interval for reconstructed states
+!
+      fmn = min(f(i), f(ip1))
+      fmx = max(f(i), f(ip1))
+
+! check if the left state lays in the allowed range
+!
+      if (fl(i) < fmn .or. fl(i) > fmx) then
+
+! calculate new states
+!
+        fl(i  ) = f(i  )
+        fr(im1) = f(i  )
+
+      end if
+
+! check if the right state lays in the allowed range
+!
+      if (fr(i) < fmn .or. fr(i) > fmx) then
+
+! calculate new states
+!
+        fl(ip1) = f(ip1)
+        fr(i  ) = f(ip1)
+
+      end if
+
+    end do ! i = 1, n
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine clip_extrema
 
 !===============================================================================
 !
