@@ -208,7 +208,7 @@ module sources
 ! local variables
 !
     integer       :: i, j, k
-    real(kind=8)  :: r2, gc, gx, gy, gz
+    real(kind=8)  :: r2, r3, gc, gx, gy, gz
 
 ! local arrays
 !
@@ -250,10 +250,11 @@ module sources
 #if NDIMS == 3
             r2 = x(i) * x(i) + y(j) * y(j) + z(k) * z(k)
 #endif /* NDIMS == 3 */
+            r3 = r2 * sqrt(r2)
 
 ! calculate gravitational acceleration factors
 !
-            gc = gpoint * pdata%q(idn,i,j,k) / max(1.0d-16, r2)
+            gc = gpoint * pdata%q(idn,i,j,k) / max(1.0d-16, r3)
             gx = gc * x(i)
             gy = gc * y(j)
 #if NDIMS == 3
