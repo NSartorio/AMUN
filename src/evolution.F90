@@ -406,13 +406,11 @@ module evolution
 ! include external procedures
 !
     use boundaries    , only : boundary_variables
-    use schemes       , only : update_increment
     use sources       , only : update_sources
 
 ! include external variables
 !
     use blocks        , only : block_data, list_data
-    use coordinates   , only : adx, ady, adz
     use coordinates   , only : im, jm, km
     use equations     , only : nv, ibp
 
@@ -426,7 +424,6 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(3)           :: dh
     real, dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
@@ -440,15 +437,9 @@ module evolution
     pblock => list_data
     do while (associated(pblock))
 
-! obtain dx, dy, and dz for the current block
-!
-      dh(1) = dt / adx(pblock%meta%level)
-      dh(2) = dt / ady(pblock%meta%level)
-      dh(3) = dt / adz(pblock%meta%level)
-
 ! calculate variable increment for the current block
 !
-      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+      call update_increment(pblock, du(:,:,:,:))
 
 ! add source terms
 !
@@ -456,7 +447,7 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u0(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + du(1:nv,:,:,:)
+      pblock%u0(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + dt * du(1:nv,:,:,:)
 
 ! update the conservative variable pointer
 !
@@ -500,13 +491,11 @@ module evolution
 ! include external procedures
 !
     use boundaries    , only : boundary_variables
-    use schemes       , only : update_increment
     use sources       , only : update_sources
 
 ! include external variables
 !
     use blocks        , only : block_data, list_data
-    use coordinates   , only : adx, ady, adz
     use coordinates   , only : im, jm, km
     use equations     , only : nv, ibp
 
@@ -520,7 +509,6 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(3)           :: dh
     real, dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
@@ -534,15 +522,9 @@ module evolution
     pblock => list_data
     do while (associated(pblock))
 
-! obtain dx, dy, and dz for the current block
-!
-      dh(1) = dt / adx(pblock%meta%level)
-      dh(2) = dt / ady(pblock%meta%level)
-      dh(3) = dt / adz(pblock%meta%level)
-
 ! calculate variable increment for the current block
 !
-      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+      call update_increment(pblock, du(:,:,:,:))
 
 ! add source terms
 !
@@ -550,7 +532,7 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + du(1:nv,:,:,:)
+      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + dt * du(1:nv,:,:,:)
 
 ! update the conservative variable pointer
 !
@@ -579,15 +561,9 @@ module evolution
     pblock => list_data
     do while (associated(pblock))
 
-! obtain dx, dy, and dz for the current block
-!
-      dh(1) = dt / adx(pblock%meta%level)
-      dh(2) = dt / ady(pblock%meta%level)
-      dh(3) = dt / adz(pblock%meta%level)
-
 ! calculate variable increment for the current block
 !
-      call update_increment(dh(:), pblock%f(:,:,:,:,:), du(:,:,:,:))
+      call update_increment(pblock, du(:,:,:,:))
 
 ! add source terms
 !
@@ -595,8 +571,8 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u0(1:nv,:,:,:) = 0.5d0 * (pblock%u0(1:nv,:,:,:)                 &
-                                   + pblock%u1(1:nv,:,:,:) + du(1:nv,:,:,:))
+      pblock%u0(1:nv,:,:,:) = 0.5d+00 * (pblock%u0(1:nv,:,:,:)                 &
+                                + pblock%u1(1:nv,:,:,:) + dt * du(1:nv,:,:,:))
 
 ! update the conservative variable pointer
 !
@@ -697,6 +673,85 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_fluxes
+!
+!===============================================================================
+!
+! subroutine UPDATE_INCREMENT:
+! ---------------------------
+!
+!   Subroutine calculate the conservative variable increment from the fluxes.
+!
+!   Arguments:
+!
+!     dh   - the ratio of the time step to the spatial step;
+!     f    - the array of numerical fluxes;
+!     du   - the array of variable increment;
+!
+!===============================================================================
+!
+  subroutine update_increment(pdata, du)
+
+! include external variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use coordinates    , only : adxi, adyi, adzi
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer           , intent(inout) :: pdata
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: du
+
+! local variables
+!
+    integer      :: i  , j  , k
+    real(kind=8) :: dxi, dyi, dzi
+!
+!-------------------------------------------------------------------------------
+!
+! reset the increment array du
+!
+    du(:,:,:,:) = 0.0d+00
+
+! prepare coordinate intervals
+!
+    dxi = adxi(pdata%meta%level)
+    dyi = adyi(pdata%meta%level)
+#if NDIMS == 3
+    dzi = adzi(pdata%meta%level)
+#endif /* NDIMS == 3 */
+
+! perform update along the X direction
+!
+    do i = ibl, ieu
+      du(:,i,:,:) = du(:,i,:,:)                                                &
+                           - dxi * (pdata%f(1,:,i,:,:) - pdata%f(1,:,i-1,:,:))
+    end do
+
+! perform update along the Y direction
+!
+    do j = jbl, jeu
+      du(:,:,j,:) = du(:,:,j,:)                                                &
+                           - dyi * (pdata%f(2,:,:,j,:) - pdata%f(2,:,:,j-1,:))
+    end do
+
+#if NDIMS == 3
+! perform update along the Z direction
+!
+    do k = kbl, keu
+      du(:,:,:,k) = du(:,:,:,k)                                                &
+                           - dzi * (pdata%f(3,:,:,:,k) - pdata%f(3,:,:,:,k-1))
+    end do
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_increment
 !
 !===============================================================================
 !
