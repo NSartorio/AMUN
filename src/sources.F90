@@ -47,7 +47,11 @@ module sources
 
 ! gravitational acceleration coefficient
 !
-  real(kind=8), save :: gpoint = 0.0d+00
+  real(kind=8), save :: gpoint    = 0.0d+00
+
+! viscosity coefficient
+!
+  real(kind=8), save :: viscosity = 0.0d+00
 
 ! by default everything is private
 !
@@ -57,6 +61,7 @@ module sources
 !
   public :: initialize_sources, finalize_sources
   public :: update_sources
+  public :: viscosity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -112,13 +117,18 @@ module sources
 
 ! get acceleration coefficient
 !
-      call get_parameter_real("gpoint" , gpoint)
+      call get_parameter_real("gpoint"   , gpoint   )
+
+! get viscosity coefficient
+!
+      call get_parameter_real("viscosity", viscosity)
 
 ! print information about the Riemann solver
 !
     if (verbose) then
 
       write (*,"(4x,a,1x,1e9.2)") "point mass constant    =", gpoint
+      write (*,"(4x,a,1x,1e9.2)") "viscosity coefficient  =", viscosity
 
     end if
 
@@ -193,7 +203,7 @@ module sources
 !
     use blocks         , only : block_data
     use coordinates    , only : im, jm, km
-    use coordinates    , only : ax, ay, az
+    use coordinates    , only : ax, ay, az, adxi, adyi, adzi
     use equations      , only : nv, idn, ivx, ivy, ivz, imx, imy, imz, ien
 
 ! local variables are not implicit by default
@@ -207,8 +217,11 @@ module sources
 
 ! local variables
 !
-    integer       :: i, j, k
+    integer       :: i  , j  , k
+    integer       :: im1, jm1, km1
+    integer       :: ip1, jp1, kp1
     real(kind=8)  :: r2, r3, gc, gx, gy, gz
+    real(kind=8)  :: dxi2, dyi2, dzi2, dvx, dvy, dvz, dvv
 
 ! local arrays
 !
@@ -271,7 +284,7 @@ module sources
 
 ! add source terms to total energy equation
 !
-          if (ien > 0) then
+            if (ien > 0) then
 
 #if NDIMS == 2
               du(ien,i,j,k) = du(ien,i,j,k) + gx * pdata%q(ivx,i,j,k)          &
@@ -290,6 +303,128 @@ module sources
       end do ! k = 1, km
 
     end if ! gpoint is not zero
+
+! proceed only if the viscosity coefficient is not zero
+!
+    if (viscosity > 0.0d+00) then
+
+! prepare coordinate increments
+!
+      dxi2 = viscosity * adxi(pdata%meta%level)**2
+      dyi2 = viscosity * adyi(pdata%meta%level)**2
+#if NDIMS == 3
+      dzi2 = viscosity * adzi(pdata%meta%level)**2
+#endif /* NDIMS == 3 */
+
+! iterate over all positions in the YZ plane
+!
+      do k = 1, km
+#if NDIMS == 3
+        km1 = max( 1, k - 1)
+        kp1 = min(km, k + 1)
+#endif /* NDIMS == 3 */
+        do j = 1, jm
+          jm1 = max( 1, j - 1)
+          jp1 = min(jm, j + 1)
+          do i = 1, jm
+            im1 = max( 1, i - 1)
+            ip1 = min(im, i + 1)
+
+! calculate second order derivatives of Vx
+!
+            dvx = (pdata%q(ivx,ip1,j,k) + pdata%q(ivx,im1,j,k))                &
+                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
+            dvy = (pdata%q(ivx,i,jp1,k) + pdata%q(ivx,i,jm1,k))                &
+                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
+#if NDIMS == 3
+            dvz = (pdata%q(ivx,i,j,kp1) + pdata%q(ivx,i,j,km1))                &
+                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
+#endif /* NDIMS == 3 */
+
+! calculate the source term for Vx
+!
+#if NDIMS == 2
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
+#endif /* NDIMS == 3 */
+
+! add viscous source terms to X-momentum equation
+!
+            du(imx,i,j,k) = du(imx,i,j,k) + dvv
+
+! add viscous source term to total energy equation
+!
+            if (ien > 0) then
+              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivx,i,j,k) * dvv
+            end if
+
+! calculate second order derivatives of Vy
+!
+            dvx = (pdata%q(ivy,ip1,j,k) + pdata%q(ivy,im1,j,k))                &
+                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
+            dvy = (pdata%q(ivy,i,jp1,k) + pdata%q(ivy,i,jm1,k))                &
+                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
+#if NDIMS == 3
+            dvz = (pdata%q(ivy,i,j,kp1) + pdata%q(ivy,i,j,km1))                &
+                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
+#endif /* NDIMS == 3 */
+
+! calculate the source term for Vy
+!
+#if NDIMS == 2
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
+#endif /* NDIMS == 3 */
+
+! add viscous source terms to Y-momentum equation
+!
+            du(imy,i,j,k) = du(imy,i,j,k) + dvv
+
+! add viscous source term to total energy equation
+!
+            if (ien > 0) then
+              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivy,i,j,k) * dvv
+            end if
+
+! calculate second order derivatives of Vz
+!
+            dvx = (pdata%q(ivz,ip1,j,k) + pdata%q(ivz,im1,j,k))                &
+                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
+            dvy = (pdata%q(ivz,i,jp1,k) + pdata%q(ivz,i,jm1,k))                &
+                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
+#if NDIMS == 3
+            dvz = (pdata%q(ivz,i,j,kp1) + pdata%q(ivz,i,j,km1))                &
+                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
+#endif /* NDIMS == 3 */
+
+! calculate the source term for Vz
+!
+#if NDIMS == 2
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
+#endif /* NDIMS == 3 */
+
+! add viscous source terms to Y-momentum equation
+!
+            du(imz,i,j,k) = du(imz,i,j,k) + dvv
+
+! add viscous source term to total energy equation
+!
+            if (ien > 0) then
+              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivz,i,j,k) * dvv
+            end if
+
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+    end if ! viscosity is not zero
 
 #ifdef PROFILE
 ! stop accounting time for source terms
