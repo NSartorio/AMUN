@@ -38,6 +38,82 @@ module operators
 !
   private
 
+! declare public subroutines
+!
+  public :: initialize_operators, finalize_operators
+
+!- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+!
+  contains
+!
+!===============================================================================
+!!
+!!***  PUBLIC SUBROUTINES  *****************************************************
+!!
+!===============================================================================
+!
+!===============================================================================
+!
+! subroutine INITIALIZE_OPERATORS:
+! -------------------------------
+!
+!   Subroutine initializes the module structures, pointers and variables.
+!
+!   Arguments:
+!
+!     verbose - flag determining if the subroutine should be verbose;
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine initialize_operators(verbose, iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    logical, intent(in)    :: verbose
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine initialize_operators
+!
+!===============================================================================
+!
+! subroutine FINALIZE_OPERATORS:
+! -----------------------------
+!
+!   Subroutine releases the memory used by module variables and pointers.
+!
+!   Arguments:
+!
+!     iret    - return flag of the procedure execution status;
+!
+!===============================================================================
+!
+  subroutine finalize_operators(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout)    :: iret
+!
+!-------------------------------------------------------------------------------
+!
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_operators
+
 !===============================================================================
 !
 end module operators

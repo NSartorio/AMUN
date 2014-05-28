@@ -130,7 +130,7 @@ constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    integrals.o interpolations.o io.o mesh.o mpitools.o         \
-                   parameters.o problems.o random.o refinement.o               \
+                   operators.o parameters.o problems.o random.o refinement.o   \
                    schemes.o shapes.o sources.o
 equations.o      : equations.F90 coordinates.o parameters.o timers.o
 error.o          : error.F90

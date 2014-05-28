@@ -57,6 +57,7 @@ program amun
   use mpitools      , only : reduce_maximum_integer, reduce_sum_real_array
 #endif /* MPI */
   use mpitools      , only : master, nprocs, nproc
+  use operators     , only : initialize_operators, finalize_operators
   use parameters    , only : read_parameters, finalize_parameters
 #ifdef MPI
   use parameters    , only : redistribute_parameters
@@ -363,6 +364,10 @@ program amun
 ! initialize module INTERPOLATIONS
 !
   call initialize_interpolations(master, iret)
+
+! initialize module OPERATORS
+!
+  call initialize_operators(master, iret)
 
 ! initialize block module
 !
@@ -735,6 +740,10 @@ program amun
     write (*,tmp) 'EXECUTION TIME', int(tm(1:5))
 
   end if
+
+! finalize module OPERATORS
+!
+  call finalize_operators(iret)
 
 ! finalize module INTERPOLATIONS
 !
