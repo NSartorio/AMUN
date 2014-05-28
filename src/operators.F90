@@ -41,6 +41,7 @@ module operators
 ! declare public subroutines
 !
   public :: initialize_operators, finalize_operators
+  public :: divergence, curl
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
