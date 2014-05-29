@@ -88,6 +88,10 @@ module equations
 !
   integer(kind=4)  , save :: nv  = 0
 
+! direction indices
+!
+  integer(kind=4)  , save :: inx =  1, iny =  2, inz =  3
+
 ! variable indices
 !
   integer(kind=4)  , save :: idn = -1
@@ -146,6 +150,7 @@ module equations
   public :: csnd
   public :: cmax, cmax2
   public :: nv
+  public :: inx, iny, inz
   public :: idn, ivx, ivy, ivz, imx, imy, imz
   public :: ibx, iby, ibz, ibp, ipr, ien
   public :: eqsys, eos
