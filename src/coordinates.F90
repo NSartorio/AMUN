@@ -234,8 +234,10 @@ module coordinates
     call get_parameter_real   ("xmax"  , xmax  )
     call get_parameter_real   ("ymin"  , ymin  )
     call get_parameter_real   ("ymax"  , ymax  )
+#if NDIMS == 3
     call get_parameter_real   ("zmin"  , zmin  )
     call get_parameter_real   ("zmax"  , zmax  )
+#endif /* NDIMS == 3 */
 
 ! allocate space for coordinate variables
 !
