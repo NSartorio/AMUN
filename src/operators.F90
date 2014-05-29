@@ -258,7 +258,7 @@ module operators
 
 ! contribution from the X derivative of Uz
 !
-    call derivative_1st(1, dh(1), a(3,:,:,:), w(:,:,:))
+    call derivative_1st(1, dh(1), u(3,:,:,:), w(:,:,:))
 
 ! update Vy
 !
