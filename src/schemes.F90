@@ -46,7 +46,7 @@ module schemes
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imu, imf, ims, imr
+  integer            , save :: imi, imf, ims, imr
 #endif /* PROFILE */
 
 ! pointer to the flux update procedure
@@ -68,7 +68,7 @@ module schemes
 ! declare public subroutines
 !
   public :: initialize_schemes, finalize_schemes
-  public :: update_flux, update_increment
+  public :: update_flux
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -120,7 +120,6 @@ module schemes
 ! set timer descriptions
 !
     call set_timer('schemes:: initialization'  , imi)
-    call set_timer('schemes:: increment update', imu)
     call set_timer('schemes:: flux update'     , imf)
     call set_timer('schemes:: Riemann states'  , ims)
     call set_timer('schemes:: Riemann solver'  , imr)
@@ -414,85 +413,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_schemes
-!
-!===============================================================================
-!
-! subroutine UPDATE_INCREMENT:
-! ---------------------------
-!
-!   Subroutine calculate the conservative variable increment from the fluxes.
-!
-!   Arguments:
-!
-!     dh   - the ratio of the time step to the spatial step;
-!     f    - the array of numerical fluxes;
-!     du   - the array of variable increment;
-!
-!
-!===============================================================================
-!
-  subroutine update_increment(dh, f, du)
-
-! include external variables
-!
-    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    real(kind=8), dimension(3)                , intent(in)    :: dh
-    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(in)    :: f
-    real(kind=8), dimension(      nv,im,jm,km), intent(inout) :: du
-
-! local variables
-!
-    integer :: i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for increment update
-!
-    call start_timer(imu)
-#endif /* PROFILE */
-
-! reset the increment array du
-!
-    du(:,:,:,:) = 0.0d+00
-
-! perform update along the X direction
-!
-    do i = ibl, ieu
-      du(:,i,:,:) = du(:,i,:,:) - dh(1) * (f(1,:,i,:,:) - f(1,:,i-1,:,:))
-    end do
-
-! perform update along the Y direction
-!
-    do j = jbl, jeu
-      du(:,:,j,:) = du(:,:,j,:) - dh(2) * (f(2,:,:,j,:) - f(2,:,:,j-1,:))
-    end do
-
-#if NDIMS == 3
-! perform update along the Z direction
-!
-    do k = kbl, keu
-      du(:,:,:,k) = du(:,:,:,k) - dh(3) * (f(3,:,:,:,k) - f(3,:,:,:,k-1))
-    end do
-#endif /* NDIMS == 3 */
-
-#ifdef PROFILE
-! stop accounting time for increment update
-!
-    call stop_timer(imu)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_increment
 !
 !===============================================================================
 !!
