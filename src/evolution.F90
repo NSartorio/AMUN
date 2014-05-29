@@ -295,7 +295,7 @@ module evolution
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
     use coordinates   , only : toplev
-    use sources       , only : viscosity
+    use sources       , only : viscosity, resistivity
 
 ! local variables are not implicit by default
 !
@@ -372,7 +372,7 @@ module evolution
 
 ! calcilate the new time step
 !
-    dtn = dx_min / max(cmax, 2.0d+00 * viscosity / dx_min, eps)
+    dtn = dx_min / max(cmax, 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
 
 ! calculate the new time step
 !

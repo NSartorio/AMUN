@@ -47,11 +47,15 @@ module sources
 
 ! gravitational acceleration coefficient
 !
-  real(kind=8), save :: gpoint    = 0.0d+00
+  real(kind=8), save :: gpoint      = 0.0d+00
 
 ! viscosity coefficient
 !
-  real(kind=8), save :: viscosity = 0.0d+00
+  real(kind=8), save :: viscosity   = 0.0d+00
+
+! resistivity coefficient
+!
+  real(kind=8), save :: resistivity = 0.0d+00
 
 ! by default everything is private
 !
@@ -61,7 +65,7 @@ module sources
 !
   public :: initialize_sources, finalize_sources
   public :: update_sources
-  public :: viscosity
+  public :: viscosity, resistivity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -117,18 +121,23 @@ module sources
 
 ! get acceleration coefficient
 !
-      call get_parameter_real("gpoint"   , gpoint   )
+      call get_parameter_real("gpoint"     , gpoint   )
 
 ! get viscosity coefficient
 !
-      call get_parameter_real("viscosity", viscosity)
+      call get_parameter_real("viscosity"  , viscosity)
+
+! get resistivity coefficient
+!
+      call get_parameter_real("resistivity", resistivity)
 
 ! print information about the Riemann solver
 !
     if (verbose) then
 
       write (*,"(4x,a,1x,1e9.2)") "point mass constant    =", gpoint
-      write (*,"(4x,a,1x,1e9.2)") "viscosity coefficient  =", viscosity
+      write (*,"(4x,a,1x,1e9.2)") "viscosity              =", viscosity
+      write (*,"(4x,a,1x,1e9.2)") "resistivity            =", resistivity
 
     end if
 
@@ -203,8 +212,11 @@ module sources
 !
     use blocks         , only : block_data
     use coordinates    , only : im, jm, km
-    use coordinates    , only : ax, ay, az, adxi, adyi, adzi
-    use equations      , only : nv, idn, ivx, ivy, ivz, imx, imy, imz, ien
+    use coordinates    , only : ax, ay, az, adx, ady, adz, adxi, adyi, adzi
+    use equations      , only : nv, inx, iny, inz
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ien
+    use equations      , only : ibx, iby, ibz
+    use operators      , only : divergence, curl
 
 ! local variables are not implicit by default
 !
@@ -221,13 +233,15 @@ module sources
     integer       :: im1, jm1, km1
     integer       :: ip1, jp1, kp1
     real(kind=8)  :: r2, r3, gc, gx, gy, gz
-    real(kind=8)  :: dxi2, dyi2, dzi2, dvx, dvy, dvz, dvv
+    real(kind=8)  :: dxi2, dyi2, dzi2, dvx, dvy, dvz, dbx, dby, dbz, dvv
 
 ! local arrays
 !
+    real(kind=8), dimension(3)  :: dh
     real(kind=8), dimension(im) :: x
     real(kind=8), dimension(jm) :: y
     real(kind=8), dimension(km) :: z
+    real(kind=8), dimension(3,im,jm,km) :: jc, ejc
 !
 !-------------------------------------------------------------------------------
 !
@@ -425,6 +439,60 @@ module sources
       end do ! k = 1, km
 
     end if ! viscosity is not zero
+
+! proceed only if the resistivity coefficient is not zero
+!
+    if (resistivity > 0.0d+00 .and. ibx > 0) then
+
+! prepare coordinate increments
+!
+      dh(1) = adx(pdata%meta%level)
+      dh(2) = ady(pdata%meta%level)
+      dh(3) = adz(pdata%meta%level)
+
+! calculate current density J = ∇xB
+!
+      call curl(dh(:), pdata%q(ibx:ibz,:,:,:), jc(inx:inz,:,:,:))
+
+! calculate (η J)
+!
+      ejc(inx:inz,:,:,:) = resistivity * jc(inx:inz,:,:,:)
+
+! calculate curl of (η J)
+!
+      call curl(dh(:), ejc(inx:inz,:,:,:), jc(inx:inz,:,:,:))
+
+! update magnetic field component increments
+!
+      du(ibx,:,:,:) = du(ibx,:,:,:) - jc(inx,:,:,:)
+      du(iby,:,:,:) = du(iby,:,:,:) - jc(iny,:,:,:)
+      du(ibz,:,:,:) = du(ibz,:,:,:) - jc(inz,:,:,:)
+
+! update energy equation
+!
+      if (ien > 0) then
+
+! calculate B x (η J)
+!
+        jc(inx,:,:,:) = pdata%q(iby,:,:,:) * ejc(inz,:,:,:)                    &
+                                         - pdata%q(ibz,:,:,:) * ejc(iny,:,:,:)
+        jc(iny,:,:,:) = pdata%q(ibz,:,:,:) * ejc(inx,:,:,:)                    &
+                                         - pdata%q(ibx,:,:,:) * ejc(inz,:,:,:)
+        jc(inz,:,:,:) = pdata%q(ibx,:,:,:) * ejc(iny,:,:,:)                    &
+                                         - pdata%q(iby,:,:,:) * ejc(inx,:,:,:)
+
+! calculate the divergence of B x (η J), i.e. ∇.[B x (η J)]
+!
+        call divergence(dh(:), jc(:,:,:,:), ejc(inx,:,:,:))
+
+! add the resistive source term to the energy equation, i.e.
+!     d/dt E + ∇.F = ∇.(B x (η J))
+!
+        du(ien,:,:,:) = du(ien,:,:,:) + ejc(inx,:,:,:)
+
+      end if ! energy equation present
+
+    end if ! resistivity is not zero
 
 #ifdef PROFILE
 ! stop accounting time for source terms
