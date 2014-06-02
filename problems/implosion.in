@@ -1,0 +1,53 @@
+# problem name and parameters
+#
+problem               = "implosion"
+gamma                 =  1.40d+00
+shock_line            =  5.00d-01
+
+# physics
+#
+equation_system       = "hd"
+equation_of_state     = "adi"
+
+# methods
+#
+time_advance          = "rk2"
+riemann_solver        = "hllc"
+reconstruction        = "limo3"
+limiter               = "mc"
+fix_positivity        = "off"
+
+# mesh parameters
+#
+ncells                =  8
+nghosts               =  2
+rdimx                 =  1
+rdimy                 =  1
+xmin                  = -1.00d+00
+xmax                  =  1.00d+00
+ymin                  = -1.00d+00
+ymax                  =  1.00d+00
+
+# refinement control
+#
+maxlev                = 8
+
+# boundary conditions
+#
+#xlbndry               = "reflecting"
+#xubndry               = "reflecting"
+#ylbndry               = "reflecting"
+#yubndry               = "reflecting"
+
+# runtime control parameters
+#
+tmax                  = 1.00d+00
+cfl                   = 4.00d-01
+
+# data output control
+#
+precise_snapshots     = "on"
+snapshot_type         = "p"
+snapshot_interval     = 1.0d-02
+restart_number        = -1
+integrals_interval    = 1
