@@ -372,7 +372,8 @@ module evolution
 
 ! calcilate the new time step
 !
-    dtn = dx_min / max(cmax, 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
+    dtn = dx_min / max(cmax                                                    &
+                        + 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
 
 ! calculate the new time step
 !

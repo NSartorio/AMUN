@@ -137,6 +137,9 @@ module problems
     case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
       setup_problem => setup_problem_kelvin_helmholtz
 
+    case("current_sheet")
+      setup_problem => setup_problem_current_sheet
+
     case("reconnection")
       setup_problem => setup_problem_reconnection
 
@@ -931,6 +934,171 @@ module problems
 !
 !===============================================================================
 !
+! subroutine SETUP_PROBLEM_CURRENT_SHEET:
+! --------------------------------------
+!
+!   Subroutine sets the initial conditions for the current sheet test problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_current_sheet(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use constants  , only : pi2
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, adx
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: xcut  = 2.50d-01
+    real(kind=8), save :: dens  = 1.00d+00
+    real(kind=8), save :: beta  = 1.00d-01
+    real(kind=8), save :: vamp  = 1.00d-01
+    real(kind=8), save :: buni  = 1.00d+00
+    real(kind=8), save :: bgui  = 0.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: xl, xu, dxh
+
+! local arrays
+!
+    real(kind=8), dimension(nv,jm) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("xcut", xcut)
+      call get_parameter_real("dens", dens)
+      call get_parameter_real("beta", beta)
+      call get_parameter_real("vamp", vamp)
+      call get_parameter_real("buni", buni)
+      call get_parameter_real("bgui", bgui)
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+
+! calculate mesh intervals and areas
+!
+    dxh  = 0.5d+00 * adx(pdata%meta%level)
+
+! set the ambient density and pressure
+!
+    q(idn,1:jm) = dens
+    if (ipr > 0) q(ipr,1:jm) = 0.5d+00 * beta
+
+! set initial velocity
+!
+    q(ivx,1:jm) = vamp * sin(pi2 * y(1:jm))
+    q(ivy,1:jm) = 0.0d+00
+    q(ivz,1:jm) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+! set magnetic field components
+!
+      q(ibx,:) = 0.0d+00
+      q(iby,:) = 0.0d+00
+      q(ibz,:) = bgui
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do i = 1, im
+
+! calculate the corner Y coordinates
+!
+        xl = abs(x(i)) - dxh
+        xu = abs(x(i)) + dxh
+
+! set two regions of magnetic field
+!
+        if (xu <= xcut) then
+          if (iby > 0) q(iby,1:jm) =   buni
+        else if (xl >= xcut) then
+          if (iby > 0) q(iby,1:jm) = - buni
+        else
+          if (iby > 0) q(iby,1:jm) = 0.0d+00
+        end if
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(jm, q(1:nv,1:jm), u(1:nv,1:jm))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,i,1:jm,k) = u(1:nv,1:jm)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,i,1:jm,k) = q(1:nv,1:jm)
+
+      end do ! i = 1, im
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_current_sheet
+!
+!===============================================================================
+!
 ! subroutine SETUP_PROBLEM_RECONNECTION:
 ! -------------------------------------
 !
@@ -988,6 +1156,12 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare problem constants during the first subroutine call
 !
     if (first) then
@@ -1027,6 +1201,8 @@ module problems
 !
     if (ibx > 0) then
 
+! set magnetic field components
+!
       q(ibx,:) = 0.0d+00
       q(iby,:) = 0.0d+00
       q(ibz,:) = bgui
@@ -1075,6 +1251,12 @@ module problems
 
       end do ! i = 1, im
     end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

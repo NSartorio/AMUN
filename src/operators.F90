@@ -41,7 +41,7 @@ module operators
 ! declare public subroutines
 !
   public :: initialize_operators, finalize_operators
-  public :: divergence, curl
+  public :: divergence, curl, laplace
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -300,6 +300,79 @@ module operators
   end subroutine curl
 !
 !===============================================================================
+!
+! subroutine LAPLACE:
+! ------------------
+!
+!   Subroutine calculates the Laplace operator of the input scalar field.
+!
+!      laplace(U) = Δ(U) = ∂²x U + ∂²y U + ∂²z U
+!
+!   Arguments:
+!
+!     dh  - the spacial intervals in all direction;
+!     u   - the input scalar field U;
+!     v   - the output field representing the laplacian of u;
+!
+!===============================================================================
+!
+  subroutine laplace(dh, u, v)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input and output variables
+!
+    real(kind=8), dimension(3)    , intent(in)  :: dh
+    real(kind=8), dimension(:,:,:), intent(in)  :: u
+    real(kind=8), dimension(:,:,:), intent(out) :: v
+
+! local arrays
+!
+    real(kind=8), dimension(:,:,:), allocatable :: w
+!
+!-------------------------------------------------------------------------------
+!
+! allocate temporary array
+!
+    allocate(w(size(u,1), size(u,2), size(u,3)))
+
+! calculate the second derivative of U along the X direction
+!
+    call derivative_2nd(1, dh(1), u(:,:,:), w(:,:,:))
+
+! update V
+!
+    v(:,:,:) = w(:,:,:)
+
+! calculate the second derivative of U along the X direction
+!
+    call derivative_2nd(2, dh(2), u(:,:,:), w(:,:,:))
+
+! update V
+!
+    v(:,:,:) = v(:,:,:) + w(:,:,:)
+
+#if NDIMS == 3
+! calculate the second derivative of U along the Z direction
+!
+    call derivative_2nd(3, dh(3), u(:,:,:), w(:,:,:))
+
+! update V
+!
+    v(:,:,:) = v(:,:,:) + w(:,:,:)
+#endif /* NDIMS == 3 */
+
+! deallocate temporary array
+!
+    deallocate(w)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine laplace
+!
+!===============================================================================
 !!
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
@@ -388,6 +461,90 @@ module operators
 !-------------------------------------------------------------------------------
 !
   end subroutine derivative_1st
+!
+!===============================================================================
+!
+! subroutine DERIVATIVE_2ND:
+! -------------------------
+!
+!   Subroutine calculates the second order derivative of the input scalar field
+!   along a given direction.
+!
+!   Arguments:
+!
+!     dir - the direction of derivative;
+!     dh  - the spacial interval;
+!     u   - the input scalar field;
+!     v   - the output scalar field representing the second derivative of u;
+!
+!===============================================================================
+!
+  subroutine derivative_2nd(dir, dh, u, v)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                       , intent(in)  :: dir
+    real(kind=8)                  , intent(in)  :: dh
+    real(kind=8), dimension(:,:,:), intent(in)  :: u
+    real(kind=8), dimension(:,:,:), intent(out) :: v
+
+! local variables
+!
+    integer :: m0, m1, m2
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef DEBUG
+! return if the direction is wrong
+!
+    if (dir < 1 .or. dir > NDIMS .or. dh == 0.0d+00) return
+#endif /* DEBUG */
+
+! prepare index limits
+!
+    m0 = size(u, dir)
+    m1 = m0 - 1
+    m2 = m0 - 2
+
+! select the direction
+!
+    select case(dir)
+
+! derivative along the X direction
+!
+    case(1)
+
+      v(2:m1,:,:) = ((u(3:m0,:,:) + u(1:m2,:,:)) - 2.0d+00 * u(2:m1,:,:)) / dh**2
+      v(1   ,:,:) = 0.0d+00
+      v(  m0,:,:) = 0.0d+00
+
+! derivative along the Y direction
+!
+    case(2)
+
+      v(:,2:m1,:) = ((u(:,3:m0,:) + u(:,1:m2,:)) - 2.0d+00 * u(:,2:m1,:)) / dh**2
+      v(:,1   ,:) = 0.0d+00
+      v(:,  m0,:) = 0.0d+00
+
+#if NDIMS == 3
+! derivative along the Z direction
+!
+    case(3)
+
+      v(:,:,2:m1) = ((u(:,:,3:m0) + u(:,:,1:m2)) - 2.0d+00 * u(:,:,2:m1)) / dh**2
+      v(:,:,1   ) = 0.0d+00
+      v(:,:,  m0) = 0.0d+00
+#endif /* NDIMS == 3 */
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine derivative_2nd
 
 !===============================================================================
 !
