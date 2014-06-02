@@ -1,0 +1,80 @@
+--------------------------------------------------------------------------------
+ ==          The AMUN code v0.9              ==================================
+ ==  Copyright (C) 2008-2014 Grzegorz Kowal  ==================================
+--------------------------------------------------------------------------------
+
+AMUN is a code to perform numerical simulations in a fluid approximation on
+non-uniform (adaptive) meshes with and without magnetic field.  The goal in
+developing this code is to create a solid framework for simulations on uniform
+and adaptive meshes in the Cartesian, cylindrical, or spherical coordinate
+systems with a number of numerical methods which can be selectable in an easy
+manner. The code is completely written in Fortran 2003.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+Developers
+==========
+
+ - Grzegorz Kowal <grzegorz@amuncode.org>
+
+
+Requirements
+============
+
+ - GNU Fortran compiler 4.5 and newer (http://gcc.gnu.org/fortran/)
+ - HDF5 libraries 1.8 and newer (http://www.hdfgroup.org/HDF5/)
+
+
+Supported Compilers
+===================
+
+The code supports and has been tested with the following compilers:
+
+GNU Fortran Version 4.5.x
+Intel Fortran Compiler 11, 12, & 13
+PathScale EKOPath(tm) Compiler Suite: Version 1.0.0
+
+
+Preparation
+===========
+
+1)  Unpack the downloaded source archive or clone it.
+2)  Go to 'src' directory.
+3)  Copy 'make.default' to a new file 'make.config'.
+4)  Modify file 'make.config' in order to change supported physics and methods.
+5)  Go to 'hosts' directory.
+6)  Copy file 'default' to a new file with your host name (has to be exactly
+    the same name as returned by command 'hostname').
+7)  Adjust compiler and compilation options in your new host file.
+8)  Go up to 'src' directory.
+9)  If the HDF5 libraries are not installed in the default location in your
+    system (/usr), make sure that the environment variable 'HDF5DIR' is set
+    in your .bashrc (or .cshrc) and pointing to the location where the HDF5
+    libraries are installed.
+10) Compile sources by typing 'make' in the command line in order to create
+    the executable file 'amun.x'.
+
+
+Usage
+=====
+
+First, prepare the parameter file.  By default this is 'params.in'.
+The executable file supports a command line option '-i' to specify a different
+parameter file name.  Without this option it assumes that parameters are read
+from 'params.in'.  Example parameter files can be found in directory 'problems'.
+
+In order to run serial version, just type 'amun.x' in the command line.
+
+In order to run parallel version, type 'mpirun -n N ./amun.x', where N is the
+number of processors.
