@@ -264,7 +264,11 @@ module problems
 !
     integer       :: i, j, k
     real(kind=8)  :: xl, yl, zl, xu, yu, zu, rl, ru
-    real(kind=8)  :: xb, yb, xt, yt
+#if NDIMS == 3
+#else /* NDIMS == 3 */
+    real(kind=8)  :: rlu, rul, xb, yb, xt, yt
+    real(kind=8)  :: sn, ph
+#endif /* NDIMS == 3 */
     real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, daxy
     real(kind=8)  :: fc_amb, fc_ovr
 
@@ -447,26 +451,92 @@ module problems
 !
             if (ipr > 0) q(ipr,i) = pr_amb
 #else /* NDIMS == 3 */
-! calculate the bounds of area integration
+
+! calculate the distance of remaining corners
 !
-            xb = max(xl, sqrt(max(0.0d+00, r2 - yu * yu)))
-            xt = min(xu, sqrt(max(0.0d+00, r2 - yl * yl)))
-            yb = max(yl, sqrt(max(0.0d+00, r2 - xu * xu)))
-            yt = min(yu, sqrt(max(0.0d+00, r2 - xl * xl)))
+            rlu = xl * xl + yu * yu
+            rul = xu * xu + yl * yl
 
-! integrate the area below the circle within the current cell for both
-! functions, y = f(x) and x = g(y), and then average them to be sure that we
-! are getting the ideal symmetry
+! separate in the cases of which corners lay inside, and which outside
+! the radius
 !
-            fc_ovr = 0.5d+00 * (r2 * (asin(xt / radius) - asin(xb / radius))   &
-                   + (xt * yb - xb * yt)) - yl * (xt - xb)
-            fc_ovr = fc_ovr + (xb - xl) * dy
+            if (min(rlu, rul) >= r2) then
 
-            fc_amb = 0.5d+00 * (r2 * (asin(yt / radius) - asin(yb / radius))   &
-                   + (yt * xb - yb * xt)) - xl * (yt - yb)
-            fc_amb = fc_amb + (yb - yl) * dx
+! only one cell corner inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xb = sqrt(r2 - yl**2) - xl
+              yb = sqrt(r2 - xl**2) - yl
 
-            fc_ovr = 0.5d+00 * (fc_ovr + fc_amb)
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(xb**2 + yb**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * (xb * yb + (ph - sn) * r2)
+
+            else if (rlu >= r2) then
+
+! two lower corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              yb = sqrt(r2 - xl**2) - yl
+              yt = sqrt(r2 - xu**2) - yl
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(dx**2 + (yt - yb)**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * ((yt + yb) * dx + (ph - sn) * r2)
+
+            else if (rul >= r2) then
+
+! two left corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xb = sqrt(r2 - yl**2) - xl
+              xt = sqrt(r2 - yu**2) - xl
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt((xt - xb)**2 + dy**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * ((xt + xb) * dy + (ph - sn) * r2)
+
+            else
+
+! three corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xt = xu - sqrt(r2 - yu**2)
+              yt = yu - sqrt(r2 - xu**2)
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(xt**2 + yt**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = daxy - 0.5d+00 * (xt * yt - (ph - sn) * r2)
+
+            end if
 
 ! normalize coefficients
 !
