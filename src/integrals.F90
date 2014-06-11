@@ -93,7 +93,6 @@ module integrals
 
 ! import external variables and subroutines
 !
-    use error          , only : print_error
     use mpitools       , only : master
     use parameters     , only : get_parameter_integer
 
@@ -109,7 +108,6 @@ module integrals
 ! local variables
 !
     character(len=32)      :: fname
-    logical                :: lex, lop
 !
 !-------------------------------------------------------------------------------
 !
@@ -136,35 +134,18 @@ module integrals
 !
     if (master) then
 
-! find the first available file handler to use
-!
-      funit = 6
-      lex   = .false.
-      lop   = .true.
-      do while(.not. lex .or. lop .and. funit < 100)
-        funit = funit + 1
-        inquire(unit = funit, exist = lex, opened = lop)
-      end do
-
-! check if the file handler could be found
-!
-      if (funit >= 100) then
-        call print_error('integrals::initialize_integrals'                     &
-                              , 'Could not find any available file handlers!')
-        iret = 300
-      end if
-
 ! generate the integrals file name
 !
       write(fname, "('integrals_',i2.2,'.dat')") irun
 
-! create a new file
+! create a new integrals file
 !
 #ifdef INTEL
-      open (unit = funit, file = fname, form = 'formatted', status = 'replace' &
-                                                           , buffered = 'yes')
+      open (newunit = funit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace', buffered = 'yes')
 #else /* INTEL */
-      open (unit = funit, file = fname, form = 'formatted', status = 'replace')
+      open (newunit = funit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace')
 #endif /* INTEL */
 
 ! write the integral file header
