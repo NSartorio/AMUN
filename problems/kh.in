@@ -14,16 +14,13 @@ equation_of_state    = "adi"
 # methods
 #
 time_advance         = "rk2"
-riemann_solver       = "hllc"
+riemann_solver       = "hlld"
 reconstruction       = "limo3"
 limiter              = "mc"
 fix_positivity       = "off"
 
 # mesh parameters
 #
-rdimx                =  1
-rdimy                =  1
-rdimz                =  1
 xmin                 = -5.0d-01
 xmax                 =  5.0d-01
 ymin                 = -5.0d-01
@@ -49,7 +46,6 @@ zubndry              = "periodic"
 
 # runtime control parameters
 #
-nmax                 = 1000000
 tmax                 = 1.0d+00
 cfl                  = 4.0d-01
 
