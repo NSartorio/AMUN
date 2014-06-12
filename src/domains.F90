@@ -144,7 +144,7 @@ module domains
     use blocks         , only : metablock_set_coordinates, metablock_set_bounds
     use blocks         , only : nsides, nfaces
     use boundaries     , only : bnd_type, bnd_periodic
-    use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : xmin, ymin, zmin, xlen, ylen, zlen
     use coordinates    , only : ir, jr, kr
 
 ! local variables are not implicit by default
@@ -257,9 +257,9 @@ module domains
 !!
 ! calculate block sizes
 !
-    xl = (xmax - xmin) / ir
-    yl = (ymax - ymin) / jr
-    zl = (zmax - zmin) / kr
+    xl = xlen / ir
+    yl = ylen / jr
+    zl = zlen / kr
 
 ! fill out block structure fields
 !
