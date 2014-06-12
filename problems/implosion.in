@@ -23,31 +23,31 @@ ncells                =  8
 nghosts               =  2
 rdimx                 =  1
 rdimy                 =  1
-xmin                  = -1.00d+00
+xmin                  =  0.00d+00
 xmax                  =  1.00d+00
-ymin                  = -1.00d+00
+ymin                  =  0.00d+00
 ymax                  =  1.00d+00
 
 # refinement control
 #
-maxlev                = 8
+maxlev                = 7
 
 # boundary conditions
 #
-#xlbndry               = "reflecting"
-#xubndry               = "reflecting"
-#ylbndry               = "reflecting"
-#yubndry               = "reflecting"
+xlbndry               = "reflecting"
+xubndry               = "reflecting"
+ylbndry               = "reflecting"
+yubndry               = "reflecting"
 
 # runtime control parameters
 #
-tmax                  = 1.00d+00
+tmax                  = 4.00d+00
 cfl                   = 4.00d-01
 
 # data output control
 #
 precise_snapshots     = "on"
 snapshot_type         = "p"
-snapshot_interval     = 1.0d-02
+snapshot_interval     = 1.0d-01
 restart_number        = -1
-integrals_interval    = 1
+integrals_interval    = 10
