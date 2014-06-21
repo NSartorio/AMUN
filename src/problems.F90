@@ -229,12 +229,12 @@ module problems
     use blocks     , only : block_data
     use constants  , only : d2r
     use coordinates, only : im, jm, km
-    use coordinates, only : ax, ay, az, adx, ady, adz
+    use coordinates, only : ax, ay, az, adx, ady, adz, advol
     use equations  , only : prim2cons
     use equations  , only : gamma
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
-    use parameters , only : get_parameter_real
+    use parameters , only : get_parameter_real, get_parameter_integer
 
 ! local variables are not implicit by default
 !
@@ -246,12 +246,15 @@ module problems
 
 ! default parameter values
 !
-    real(kind=8), save :: dens   = 1.00d+00
-    real(kind=8), save :: ratio  = 1.00d+02
-    real(kind=8), save :: radius = 1.00d-01
-    real(kind=8), save :: csnd   = 4.0824829046386301635d-01
-    real(kind=8), save :: buni   = 1.00d+00
-    real(kind=8), save :: angle  = 4.50d+01
+    real(kind=8), save :: dens     = 1.00d+00
+    real(kind=8), save :: ratio    = 1.00d+02
+    real(kind=8), save :: radius   = 1.00d-01
+    real(kind=8), save :: csnd     = 4.0824829046386301635d-01
+    real(kind=8), save :: buni     = 1.00d+00
+    real(kind=8), save :: angle    = 4.50d+01
+#if NDIMS == 3
+    integer     , save :: nsubgrid = 10
+#endif /* NDIMS == 3 */
 
 ! local saved parameters
 !
@@ -262,14 +265,18 @@ module problems
 
 ! local variables
 !
-    integer       :: i, j, k
+    integer       :: i, j, k, ic, jc, kc
     real(kind=8)  :: xl, yl, zl, xu, yu, zu, rl, ru
 #if NDIMS == 3
+    real(kind=8)  :: xb, yb, zb
+    real(kind=8)  :: xt, yt, zt
+    real(kind=8)  :: fc_inc
 #else /* NDIMS == 3 */
-    real(kind=8)  :: rlu, rul, xb, yb, xt, yt
+    real(kind=8)  :: xb, yb
+    real(kind=8)  :: xt, yt
     real(kind=8)  :: sn, ph
 #endif /* NDIMS == 3 */
-    real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, daxy
+    real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, dvol
     real(kind=8)  :: fc_amb, fc_ovr
 
 ! local arrays
@@ -278,6 +285,13 @@ module problems
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
+
+#if NDIMS == 3
+! allocatable arrays
+!
+    real(kind=8), dimension(:), allocatable :: xm, ym, zm
+    real(kind=8), dimension(:), allocatable :: xp, yp, zp
+#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -299,6 +313,16 @@ module problems
       call get_parameter_real("csnd"  , csnd  )
       call get_parameter_real("buni"  , buni  )
       call get_parameter_real("angle" , angle )
+
+#if NDIMS == 3
+! get the fine grid resolution
+!
+      call get_parameter_integer("nsubgrid", nsubgrid)
+
+! correct subgrid resolution if necessary
+!
+      nsubgrid = max(1, nsubgrid)
+#endif /* NDIMS == 3 */
 
 ! calculate the overdense and ambient region densities
 !
@@ -347,7 +371,33 @@ module problems
 #else /* NDIMS == 3 */
     dzh  = 1.0d+00
 #endif /* NDIMS == 3 */
-    daxy = dx * dy
+    dvol = advol(pdata%meta%level)
+
+#if NDIMS == 3
+! allocate subgrid coordinates
+!
+    allocate(xm(nsubgrid), ym(nsubgrid), zm(nsubgrid))
+    allocate(xp(nsubgrid), yp(nsubgrid), zp(nsubgrid))
+
+! and generate them
+!
+    xm(:) = (1.0d+00 * (/(i, i = 0, nsubgrid - 1)/)) / nsubgrid
+    ym(:) = xm(:)
+    zm(:) = xm(:)
+    xm(:) = xm(:) * dx
+    ym(:) = ym(:) * dy
+    zm(:) = zm(:) * dz
+    xp(:) = (1.0d+00 * (/(i, i = 1, nsubgrid    )/)) / nsubgrid
+    yp(:) = xp(:)
+    zp(:) = xp(:)
+    xp(:) = xp(:) * dx
+    yp(:) = yp(:) * dy
+    zp(:) = zp(:) * dz
+
+! calculate the factor increment for the given subgrid
+!
+    fc_inc = dvol / nsubgrid**3
+#endif /* NDIMS == 3 */
 
 ! set the ambient density and pressure
 !
@@ -440,16 +490,30 @@ module problems
           else
 
 #if NDIMS == 3
-! in 3D simply set the ambient values since the integration is more complex
+! interpolate the factor using subgrid
 !
+            fc_ovr = 0.0d+00
+            do kc = 1, nsubgrid
+              zb = (zl + zm(kc))**2
+              zt = (zl + zp(kc))**2
+              do jc = 1, nsubgrid
+                yb = (yl + ym(jc))**2
+                yt = (yl + yp(jc))**2
+                do ic = 1, nsubgrid
+                  xb = (xl + xm(ic))**2
+                  xt = (xl + xp(ic))**2
 
-! set the ambient region density
+! update the integration factor depending on the subcell position
 !
-            q(idn,i) = dn_amb
+                  if ((xt + yt + zt) <= r2) then
+                    fc_ovr = fc_ovr + fc_inc
+                  else if ((xb + yb + zb) < r2) then
+                    fc_ovr = fc_ovr + 0.5d+00 * fc_inc
+                  end if
 
-! set the ambient medium pressure
-!
-            if (ipr > 0) q(ipr,i) = pr_amb
+                end do ! ic = 1, nsubgrid
+              end do ! jc = 1, nsubgrid
+            end do ! kc = 1, nsubgrid
 #else /* NDIMS == 3 */
 
 ! calculate the distance of remaining corners
@@ -534,13 +598,14 @@ module problems
 
 ! calculate the area of cell intersection with the radius
 !
-              fc_ovr = daxy - 0.5d+00 * (xt * yt - (ph - sn) * r2)
+              fc_ovr = dvol - 0.5d+00 * (xt * yt - (ph - sn) * r2)
 
             end if
+#endif /* NDIMS == 3 */
 
 ! normalize coefficients
 !
-            fc_ovr = fc_ovr / daxy
+            fc_ovr = fc_ovr / dvol
             fc_amb = 1.0d+00 - fc_ovr
 
 ! integrate the density over the edge cells
@@ -550,7 +615,6 @@ module problems
 ! integrate the pressure over the edge cells
 !
             if (ipr > 0) q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
-#endif /* NDIMS == 3 */
 
           end if
 
@@ -570,6 +634,13 @@ module problems
 
       end do ! j = 1, jm
     end do ! k = 1, km
+
+#if NDIMS == 3
+! deallocate subgrid coordinates
+!
+    deallocate(xm, ym, zm)
+    deallocate(xp, yp, zp)
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for the problems setup
