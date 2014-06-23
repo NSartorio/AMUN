@@ -458,7 +458,7 @@ module mesh
     use blocks         , only : block_meta, block_data, list_meta, list_data
     use blocks         , only : ndims, nchildren, nsides, nfaces
     use blocks         , only : allocate_datablock, deallocate_datablock
-    use blocks         , only : append_datablock, remove_datablock
+    use blocks         , only : append_datablock
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
     use blocks         , only : set_neighbors_refine
