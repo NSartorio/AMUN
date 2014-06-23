@@ -771,57 +771,13 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, block_data, list_meta, list_data
-    use blocks         , only : nchildren, ndims, nsides, nfaces
-    use blocks         , only : get_nleafs
-    use blocks         , only : refine_block, derefine_block
-    use blocks         , only : append_datablock, remove_datablock, link_blocks
-    use blocks         , only : set_neighbors_refine
 #ifdef DEBUG
     use blocks         , only : check_neighbors
 #endif /* DEBUG */
-    use coordinates    , only : minlev, maxlev, toplev, im, jm, km
-    use equations      , only : nv
-    use error          , only : print_error
-#ifdef MPI
-    use mpitools       , only : master, nprocs, nproc
-    use mpitools       , only : reduce_sum_integer_array
-    use mpitools       , only : send_real_array, receive_real_array
-#endif /* MPI */
-    use refinement     , only : check_refinement_criterion
 
 ! local variables are not implicit by default
 !
     implicit none
-
-! local variables
-!
-    logical         :: flag
-    integer(kind=4) :: nl, i, j, k, l, n, p
-    integer         :: iret
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh, pchild, pparent
-    type(block_data), pointer :: pdata
-
-#ifdef MPI
-! tag for the MPI data exchange
-!
-    integer(kind=4)                            :: itag
-
-! array for storing the refinement flags
-!
-    integer(kind=4), dimension(:), allocatable :: ibuf
-
-! array for number of data block for autobalancing
-!
-    integer(kind=4), dimension(0:nprocs-1)     :: lb
-
-! local buffer for data block exchange
-!
-    real(kind=8)   , dimension(nv,im,jm,km)    :: rbuf
-#endif /* MPI */
 
 !-------------------------------------------------------------------------------
 !
