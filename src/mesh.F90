@@ -848,36 +848,9 @@ module mesh
 !
     call derefine_selected_blocks()
 
-!! REFINE SELECTED BLOCKS
-!!
-! perform the actual refinement starting from the lowest level
+! prolong selected blocks
 !
-    do l = 1, toplev - 1
-
-      pmeta => list_meta
-      do while (associated(pmeta))
-        if (pmeta%leaf) then
-          if (pmeta%level .eq. l) then
-            if (pmeta%refine .eq. 1) then
-              pparent => pmeta
-#ifdef MPI
-              if (pmeta%process .eq. nproc) then
-#endif /* MPI */
-                call refine_block(pmeta, .true.)
-                call prolong_block(pparent)
-                call remove_datablock(pparent%data)
-#ifdef MPI
-              else
-                call refine_block(pmeta, .false.)
-              end if
-#endif /* MPI */
-            end if
-          end if
-        end if
-        pmeta => pmeta%next
-      end do
-
-    end do ! l = 1, toplev - 1
+    call refine_selected_blocks()
 
 #ifdef MPI
 ! redistribute blocks equally among all processors
@@ -2161,6 +2134,104 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine derefine_selected_blocks
+!
+!===============================================================================
+!
+! subroutine REFINE_SELECTED_BLOCKS:
+! ---------------------------------
+!
+!   Subroutine scans over all blocks and prolongates those selected for
+!   refinement.
+!
+!
+!===============================================================================
+!
+  subroutine refine_selected_blocks()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : refine_block, remove_datablock
+    use coordinates    , only : toplev
+#ifdef MPI
+    use mpitools       , only : nproc
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pparent
+
+! local variables
+!
+    integer(kind=4) :: l
+
+!-------------------------------------------------------------------------------
+!
+! iterate over all levels and prolong those selected for prolongation
+!
+    do l = 1, toplev - 1
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! process leafs at the current level selected for prolongation
+!
+        if (pmeta%leaf .and. pmeta%level == l .and. pmeta%refine == 1) then
+
+! assign pparent with the new parent block
+!
+          pparent => pmeta
+
+#ifdef MPI
+! check if pmeta belongs to the current process
+!
+          if (pmeta%process == nproc) then
+#endif /* MPI */
+
+! prepare child blocks with allocating the data blocks
+!
+            call refine_block(pmeta, .true.)
+
+! perform the data prolongation
+!
+            call prolong_block(pparent)
+
+! remove the data block associated with the new parent
+!
+            call remove_datablock(pparent%data)
+
+#ifdef MPI
+          else ! pmeta belongs to the current process
+
+! prepare child blocks without actually allocating the data blocks
+!
+            call refine_block(pmeta, .false.)
+
+          end if ! pmeta belongs to the current process
+#endif /* MPI */
+
+        end if ! leaf at current level selected for refinement
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+    end do ! levels
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine refine_selected_blocks
 
 !===============================================================================
 !
