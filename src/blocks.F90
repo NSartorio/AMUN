@@ -606,6 +606,10 @@ module blocks
       if (associated(pmeta%prev)) pmeta%prev%next => pmeta%next
       if (associated(pmeta%next)) pmeta%next%prev => pmeta%prev
 
+! set this block to be not a leaf
+!
+      call metablock_unset_leaf(pmeta)
+
 ! decrease the number of allocated meta blocks stored in the meta block list
 !
       mblocks = mblocks - 1
@@ -920,10 +924,6 @@ module blocks
 ! check if the pointer is actually associated with any block
 !
     if (associated(pmeta)) then
-
-! decrease the number of leafs
-!
-      if (pmeta%leaf) nleafs = nleafs - 1
 
 ! nullify fields pointing to previous and next block on the meta block list
 !
