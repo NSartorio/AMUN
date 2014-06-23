@@ -844,47 +844,9 @@ module mesh
 !
     call prepare_sibling_derefinement()
 
-!! DEREFINE SELECTED BLOCKS
-!!
-! perform the actual derefinement
+! restrict selected blocks
 !
-    do l = toplev, 2, -1
-
-      pmeta => list_meta
-      do while (associated(pmeta))
-
-        if (pmeta%leaf) then
-          if (pmeta%level .eq. l) then
-            if (pmeta%refine .eq. -1) then
-              pparent => pmeta%parent
-
-              if (associated(pparent)) then
-#ifdef MPI
-                if (pmeta%process .eq. nproc) then
-#endif /* MPI */
-                  if (.not. associated(pparent%data)) then
-                    call append_datablock(pdata)
-                    call link_blocks(pparent, pdata)
-                  end if
-                  call restrict_block(pparent)
-#ifdef MPI
-                end if
-#endif /* MPI */
-
-                call derefine_block(pparent)
-                pmeta => pparent
-              else
-                call print_error("mesh::update_mesh"                           &
-                               , "Parent of derefined block is not associated!")
-              end if
-            end if
-          end if
-        end if
-
-        pmeta => pmeta%next
-      end do
-
-    end do
+    call derefine_selected_blocks()
 
 !! REFINE SELECTED BLOCKS
 !!
@@ -1801,6 +1763,10 @@ module mesh
 !   used, the subroutine brings back all siblings together to lay on
 !   the same process.
 !
+!   Note: This subroutine sets %refine flag of the parent to -1 to let the next
+!         executed subroutine derefine_selected_blocks() which parent block
+!         has to be derefined. That subroutine resets %refine flag of the
+!         parent after performing full restriction.
 !
 !===============================================================================
 !
@@ -2074,10 +2040,6 @@ module mesh
 
           end do ! children
 
-! reset the parent %refine flag
-!
-          pmeta%refine = 0
-
         end if ! pmeta children are selected for derefinement
 
       end if ! the block is parent
@@ -2092,6 +2054,113 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine prepare_sibling_derefinement
+!
+!===============================================================================
+!
+! subroutine DEREFINE_SELECTED_BLOCKS:
+! -----------------------------------
+!
+!   Subroutine scans over all blocks and actually restrict those selected
+!   for derefinement.
+!
+!   Note: This subroutine resets %refine flag set in subroutine
+!         prepare_sibling_derefinement().
+!
+!===============================================================================
+!
+  subroutine derefine_selected_blocks()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, block_data, list_meta
+    use blocks         , only : append_datablock, link_blocks, derefine_block
+    use coordinates    , only : toplev
+#ifdef MPI
+    use mpitools       , only : nproc
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
+
+! local variables
+!
+    integer(kind=4) :: l
+
+!-------------------------------------------------------------------------------
+!
+! start from the top level and iterating down restrict the blocks selected
+! for derefinement
+!
+    do l = toplev - 1, 1, -1
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! process non-leafs at the current level selected for restriction
+!
+        if (.not. pmeta%leaf .and. pmeta%level == l                            &
+                                                .and. pmeta%refine == -1) then
+
+#ifdef MPI
+! check if pmeta belongs to the current process
+!
+          if (pmeta%process == nproc) then
+#endif /* MPI */
+
+! check if a data block is associated with pmeta, if not create one
+!
+            if (.not. associated(pmeta%data)) then
+
+! append new data block
+!
+              call append_datablock(pdata)
+
+! link it with the current pmeta
+!
+              call link_blocks(pmeta, pdata)
+
+            end if ! no data block associated
+
+! perform the block restriction
+!
+            call restrict_block(pmeta)
+
+#ifdef MPI
+          end if ! pmeta belongs to the current process
+#endif /* MPI */
+
+! perform block derefinement
+!
+          call derefine_block(pmeta)
+
+! reset the refinement flag of the current block
+!
+          pmeta%refine = 0
+
+        end if ! leaf at current level selected for derefinement
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+    end do ! levels
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine derefine_selected_blocks
 
 !===============================================================================
 !
