@@ -831,137 +831,9 @@ module mesh
     call start_timer(imu)
 #endif /* PROFILE */
 
-!! DETERMINE THE REFINEMENT OF ALL DATA BLOCKS
-!!
-! set the pointer to the first block on the data block list
+! check the refinement criterion of all data blocks at the current process
 !
-    pdata => list_data
-
-! iterate over all blocks in the data block list
-!
-    do while (associated(pdata))
-
-! assign a pointer to the meta block associated with the current data block
-!
-      pmeta => pdata%meta
-
-! continue if the current data block has a meta block associated
-!
-      if (associated(pmeta)) then
-
-! if the associated meta block is a leaf
-!
-        if (pmeta%leaf) then
-
-! check the refinement criterion for the current data block
-!
-          pmeta%refine = check_refinement_criterion(pdata)
-
-! correct the refinement of the block for the base and top levels
-!
-          if (pmeta%level <  minlev) pmeta%refine =  1
-          if (pmeta%level == minlev) pmeta%refine = max(0, pmeta%refine)
-          if (pmeta%level == maxlev) pmeta%refine = min(0, pmeta%refine)
-          if (pmeta%level >  maxlev) pmeta%refine = -1
-
-        end if ! pmeta is a leaf
-
-      end if ! pmeta associated
-
-! assign a pointer to the next data block
-!
-      pdata => pdata%next
-
-   end do ! pdata
-
-#ifdef MPI
-!! EXCHANGE REFINEMENT FLAGS BETWEEN ALL PROCESSES
-!!
-! get the number of leafs
-!
-    nl = get_nleafs()
-
-! allocate a buffer for the refinement field values
-!
-    allocate(ibuf(nl))
-
-! reset the buffer
-!
-    ibuf(:) = 0
-
-! reset the leaf block counter
-!
-    l = 0
-
-! set the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while (associated(pmeta))
-
-! process only leafs
-!
-      if (pmeta%leaf) then
-
-! increase the leaf block counter
-!
-        l = l + 1
-
-! store the refinement flag for all blocks at the current process for
-! exchange with other processors
-!
-        ibuf(l) = pmeta%refine
-
-      end if ! pmeta is the leaf
-
-! assign a pointer to the next meta block
-!
-      pmeta => pmeta%next
-
-    end do ! pmeta
-
-! update refinement flags across all processors
-!
-    call reduce_sum_integer_array(nl, ibuf(1:nl), iret)
-
-! reset the leaf block counter
-!
-    l = 0
-
-! set the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while (associated(pmeta))
-
-! process only leafs
-!
-      if (pmeta%leaf) then
-
-! increase the leaf block counter
-!
-        l = l + 1
-
-! update non-local block refinement flags
-!
-        pmeta%refine = ibuf(l)
-
-      end if ! pmeta is the leaf
-
-! assign a pointer to the next meta block
-!
-      pmeta => pmeta%next
-
-    end do ! pmeta
-
-! deallocate the buffer
-!
-    if (allocated(ibuf)) deallocate(ibuf)
-#endif /* MPI */
+    call check_data_block_refinement()
 
 !! SELECT NEIGHBORS OF REFINED BLOCKS TO BE REFINED IF NECESSARY
 !!
@@ -1826,6 +1698,247 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine restrict_block
+!
+!===============================================================================
+!!
+!!***  PRIVATE SUBROUTINES  ****************************************************
+!!
+!===============================================================================
+!
+!===============================================================================
+!
+! subroutine CHECK_DATA_BLOCK_REFINEMENT:
+! --------------------------------------
+!
+!   Subroutine scans over all data blocks, gets and corrects their refinement
+!   flags. If the MPI is used, the refinement flags are syncronized among all
+!   processes.
+!
+!
+!===============================================================================
+!
+  subroutine check_data_block_refinement()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, block_data, list_meta, list_data
+#ifdef MPI
+    use blocks         , only : get_nleafs
+#endif /* MPI */
+    use coordinates    , only : minlev, maxlev
+    use error          , only : print_error
+#ifdef MPI
+#ifdef DEBUG
+    use mpitools       , only : nproc
+#endif /* DEBUG */
+    use mpitools       , only : reduce_sum_integer_array
+#endif /* MPI */
+    use refinement     , only : check_refinement_criterion
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
+
+#ifdef MPI
+! local variables
+!
+    integer(kind=4) :: nl, l
+    integer         :: iret
+
+! array for storing the refinement flags
+!
+    integer(kind=4), dimension(:), allocatable :: ibuf
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+! 1) reset the refinement flag for all meta blocks
+!
+! assign pmeta to the first meta block on the list
+!
+    pmeta => list_meta
+
+! iterate over all meta blocks
+!
+    do while (associated(pmeta))
+
+! reset the refinement flag of pmeta
+!
+      pmeta%refine = 0
+
+! assign pmeta to the next meta block
+!
+      pmeta => pmeta%next
+
+    end do ! iterate over meta blocks
+
+! 2) determine the refinement of data block from the current process
+!
+! assign pdata to the first data block on the list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! assign pmeta to the meta block associated with pdata
+!
+      pmeta => pdata%meta
+
+#ifdef DEBUG
+! check if pmeta is associated
+!
+      if (associated(pmeta)) then
+
+! check if pmeta is a leaf
+!
+        if (pmeta%leaf) then
+#endif /* DEBUG */
+
+! check the refinement criterion for the current data block
+!
+          pmeta%refine = check_refinement_criterion(pdata)
+
+! correct the refinement flag for the minimum and maximum levels
+!
+          if (pmeta%level <  minlev) pmeta%refine =  1
+          if (pmeta%level == minlev) pmeta%refine = max(0, pmeta%refine)
+          if (pmeta%level == maxlev) pmeta%refine = min(0, pmeta%refine)
+          if (pmeta%level >  maxlev) pmeta%refine = -1
+
+#ifdef DEBUG
+        else ! pmeta is a leaf
+          call print_error("mesh::check_data_block_refinement"                 &
+                                     , "Associated meta block is not a leaf!")
+        end if ! pmeta is a leaf
+
+      else ! pmeta associated
+        call print_error("mesh::check_data_block_refinement"                   &
+                    , "No meta block associated with the current data block!")
+      end if ! pmeta associated
+#endif /* DEBUG */
+
+! assign pdata to the next data block
+!
+      pdata => pdata%next
+
+   end do ! iterate over data blocks
+
+#ifdef MPI
+! 3) synchronize the refinement flags between all processes
+!
+! get the number of leafs
+!
+    nl = get_nleafs()
+
+! allocate a buffer for the refinement flags
+!
+    allocate(ibuf(nl))
+
+! check if the buffer was allocated successfully
+!
+    if (allocated(ibuf)) then
+
+! reset the buffer
+!
+      ibuf(1:nl) = 0
+
+! reset the leaf block counter
+!
+      l = 0
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! process only leafs
+!
+        if (pmeta%leaf) then
+
+! increase the leaf block counter
+!
+          l = l + 1
+
+! store the refinement flag in the buffer
+!
+          ibuf(l) = pmeta%refine
+
+        end if ! pmeta is a leaf
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+! update refinement flags across all processes
+!
+      call reduce_sum_integer_array(nl, ibuf(1:nl), iret)
+
+! reset the leaf block counter
+!
+      l = 0
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! process only leafs
+!
+        if (pmeta%leaf) then
+
+! increase the leaf block counter
+!
+          l = l + 1
+
+#ifdef DEBUG
+! check if the MPI update process does not change the local refinement flags
+!
+          if (pmeta%process == nproc .and. pmeta%refine /= ibuf(l)) then
+            call print_error("mesh::check_data_block_refinement"               &
+                      , "Refinement flag does not match after MPI reduction!")
+          end if
+#endif /* DEBUG */
+
+! restore the refinement flags
+!
+          pmeta%refine = ibuf(l)
+
+        end if ! pmeta is a leaf
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+! deallocate the refinement flag buffer
+!
+      deallocate(ibuf)
+
+    else ! buffer couldn't be allocated
+      call print_error("mesh::check_data_block_refinement"                     &
+                           , "Refinement flag buffer could not be allocated!")
+    end if ! buffer couldn't be allocated
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_data_block_refinement
 
 !===============================================================================
 !
