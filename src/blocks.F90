@@ -2565,6 +2565,10 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+! return, if it is a leaf already
+!
+    if (pmeta%leaf) return
+
 ! set the block's leaf flag
 !
     pmeta%leaf = .true.
@@ -2602,6 +2606,10 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+! return, if is not a leaf
+!
+    if (.not. pmeta%leaf) return
+
 ! unset the block's leaf flag
 !
     pmeta%leaf = .false.
