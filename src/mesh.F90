@@ -839,206 +839,10 @@ module mesh
 !
     call update_neighbor_refinement()
 
-!! CHECK IF BLOCK CHILDREN CAN BE DEREFINED
-!!
-! iterate over all levels starting from top and correct the refinement
-! of neighbor blocks
+! check if all siblings of blocks marked to be derefined can be derefined as
+! well, if not cancel their deferinement flags
 !
-    do l = toplev, 1, -1
-
-! now check all derefined block if their siblings are set for derefinement too
-! and are at the same level; check only levels > 1
-!
-      if (l > 1) then
-
-! set the pointer to the first block on the meta block list
-!
-        pmeta => list_meta
-
-! iterate over all blocks
-!
-        do while (associated(pmeta))
-
-! check only leafs at the current level
-!
-          if (pmeta%leaf .and. pmeta%level == l) then
-
-! check blocks which are selected to be derefined
-!
-            if (pmeta%refine == -1) then
-
-! assign a pointer to the parent of the current block
-!
-              pparent => pmeta%parent
-
-! check if parent is associated with any block
-!
-              if (associated(pparent)) then
-
-! reset derefinement flag
-!
-                flag = .true.
-
-! iterate over all children
-!
-                do p = 1, nchildren
-
-! assign a pointer to the current child
-!
-                  pchild => pparent%child(p)%ptr
-
-! check if the current child is the leaf
-!
-                  flag = flag .and. (pchild%leaf)
-
-! check if the current child is set to be derefined
-!
-                  flag = flag .and. (pchild%refine == -1)
-
-                end do ! over all children
-
-! if not all children can be derefined, cancel the derefinement
-!
-                if (.not. flag) then
-
-! iterate over all children
-!
-                  do p = 1, nchildren
-
-! assign a pointer to the current child
-!
-                    pchild => pparent%child(p)%ptr
-
-! reset derefinement of the current child
-!
-                    pchild%refine = max(0, pchild%refine)
-
-                  end do ! children
-
-                end if ! ~flag
-
-              end if ! pparent is associated
-
-            end if ! refine = -1
-
-          end if ! leafs at level l
-
-! assign a pointer to the next block
-!
-          pmeta => pmeta%next
-
-        end do ! meta blocks
-
-      end if ! l > 1
-
-    end do ! levels
-
-#ifdef MPI
-!! BRING BACK ALL CHILDREN SELECTED FOR DEREFINEMENT TO THE SAME PROCESS
-!!
-! set the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while (associated(pmeta))
-
-! process only parent blocks (not leafs)
-!
-      if (.not. pmeta%leaf) then
-
-! check if the first child is selected for derefinement
-!
-        if (pmeta%child(1)%ptr%refine == -1) then
-
-! check if the parent blocks is on the same processor as the next block, if not
-! move it to the same processor
-!
-          if (pmeta%process /= pmeta%next%process)                             &
-                                            pmeta%process = pmeta%next%process
-
-! find the case when child blocks are spread across at least 2 processors
-!
-          flag = .false.
-          do p = 1, nchildren
-            flag = flag .or. (pmeta%child(p)%ptr%process /= pmeta%process)
-          end do
-
-          if (flag) then
-
-! iterate over all children
-!
-            do p = 1, nchildren
-
-! generate the tag for communication
-!
-              itag = pmeta%child(p)%ptr%process * nprocs + pmeta%process       &
-                                                              + nprocs + p + 1
-
-! if the current children is not on the same processor, then ...
-!
-              if (pmeta%child(p)%ptr%process /= pmeta%process) then
-
-! if the meta block is on the same process
-!
-                if (pmeta%process == nproc) then
-
-! allocate data blocks for children on the processor which will receive data
-!
-                  call append_datablock(pdata)
-                  call link_blocks(pmeta%child(p)%ptr, pdata)
-
-! receive the data
-!
-                  call receive_real_array(size(rbuf)                           &
-                               , pmeta%child(p)%ptr%process, itag, rbuf, iret)
-
-! coppy buffer to data
-!
-                  pmeta%child(p)%ptr%data%u(:,:,:,:) = rbuf(:,:,:,:)
-
-                end if
-
-! send data to the right processor and deallocate data block
-!
-                if (pmeta%child(p)%ptr%process == nproc) then
-
-! copy data to buffer
-!
-                  rbuf(:,:,:,:) = pmeta%child(p)%ptr%data%u(:,:,:,:)
-
-! send data
-!
-                  call send_real_array(size(rbuf), pmeta%process               &
-                                                           , itag, rbuf, iret)
-
-! deallocate data block
-!
-                  call remove_datablock(pmeta%child(p)%ptr%data)
-
-                end if
-
-! set the current processor of the block
-!
-                pmeta%child(p)%ptr%process = pmeta%process
-
-              end if ! if child is are on different processes
-
-            end do ! nchildren
-
-          end if ! children spread over different processes
-
-        end if ! children selected for derefinement
-
-      end if ! the block is parent
-
-! assign a pointer to the next block
-!
-      pmeta => pmeta%next
-
-    end do ! over meta blocks
-#endif /* MPI */
+    call prepare_sibling_derefinement()
 
 !! DEREFINE SELECTED BLOCKS
 !!
@@ -1985,6 +1789,309 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine update_neighbor_refinement
+!
+!===============================================================================
+!
+! subroutine PREPARE_SIBLING_DEREFINEMENT:
+! ---------------------------------------
+!
+!   Subroutine scans over all blocks selected for derefinement and checks if
+!   their siblings can be derefined as well. If any of them cannot be
+!   derefined, the derefinement of all siblings is canceled. Then, if MPI is
+!   used, the subroutine brings back all siblings together to lay on
+!   the same process.
+!
+!
+!===============================================================================
+!
+  subroutine prepare_sibling_derefinement()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, list_meta
+#ifdef MPI
+    use blocks         , only : block_data
+#endif /* MPI */
+    use blocks         , only : nchildren
+    use blocks         , only : set_neighbors_refine
+#ifdef MPI
+    use blocks         , only : append_datablock, remove_datablock, link_blocks
+#endif /* MPI */
+    use coordinates    , only : toplev
+#ifdef MPI
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+#endif /* MPI */
+    use error          , only : print_error
+#ifdef MPI
+    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : send_real_array, receive_real_array
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pparent, pchild
+#ifdef MPI
+    type(block_data), pointer :: pdata
+#endif /* MPI */
+
+! local variables
+!
+    logical         :: flag
+    integer(kind=4) :: l, p
+
+#ifdef MPI
+! tag for the MPI data exchange
+!
+    integer(kind=4) :: itag
+    integer         :: iret
+
+! local buffer for data block exchange
+!
+    real(kind=8), dimension(nv,im,jm,km) :: rbuf
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+! 1) check if the siblings of the block selected for derefinement, can be
+!    derefined as well, if not cancel the derefinement of all siblings
+!
+! iterate over levels and check sibling derefinement
+!
+    do l = 2, toplev
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! check only leafs at the current level
+!
+        if (pmeta%leaf .and. pmeta%level == l) then
+
+! check if block is selected for derefinement
+!
+          if (pmeta%refine == -1) then
+
+! assign pparent to the parent block of pmeta
+!
+            pparent => pmeta%parent
+
+#ifdef DEBUG
+! check if pparent is associated
+!
+            if (associated(pparent)) then
+#endif /* DEBUG */
+
+! reset derefinement flag
+!
+              flag = .true.
+
+! iterate over all children
+!
+              do p = 1, nchildren
+
+! assign pchild to the current child
+!
+                pchild => pparent%child(p)%ptr
+
+#ifdef DEBUG
+! check if pchild is associated
+!
+                if (associated(pchild)) then
+#endif /* DEBUG */
+
+! check if the current child is a leaf and selected for derefinement as well
+!
+                  flag = flag .and. (pchild%leaf .and. pchild%refine == -1)
+
+#ifdef DEBUG
+                else ! pchild is associated
+                  call print_error("mesh::check_children_derefinement"         &
+                                                 , "Children does not exist!")
+                end if ! pparent is associated
+#endif /* DEBUG */
+
+              end do ! over all children
+
+! if children can be derefined, set the refine flag of the parent to -1,
+! otherwise, cancel the derefinement of all siblings
+!
+              if (flag) then
+                pparent%refine = -1
+              else
+
+! iterate over all children
+!
+                do p = 1, nchildren
+
+! assign pchild to the current child
+!
+                  pchild => pparent%child(p)%ptr
+
+! reset its derefinement
+!
+                  pchild%refine = max(0, pchild%refine)
+
+                end do ! children
+
+              end if ! ~flag
+
+#ifdef DEBUG
+            else ! pparent is associated
+              call print_error("mesh::check_children_derefinement"             &
+                                        , "Current meta block has no parent!")
+            end if ! pparent is associated
+#endif /* DEBUG */
+
+          end if ! %refine = -1
+
+        end if ! only leafs at level l
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+    end do ! levels
+
+#ifdef MPI
+! 2) bring all siblings together to the same process
+!
+! assign pmeta to the first meta block on the list
+!
+    pmeta => list_meta
+
+! iterate over all meta blocks
+!
+    do while (associated(pmeta))
+
+! process only parent blocks (not leafs)
+!
+      if (.not. pmeta%leaf) then
+
+! check if the first child is selected for derefinement
+!
+        if (pmeta%refine == -1) then
+
+! assign pchild with the first child
+!
+          pchild => pmeta%child(1)%ptr
+
+! set the parent process to be the same as the first child
+!
+          pmeta%process = pchild%process
+
+! iterate over remaining children and if they are not on the same process,
+! bring them to the parent's one
+!
+          do p = 2, nchildren
+
+! assign pchild to the current child
+!
+            pchild => pmeta%child(p)%ptr
+
+! if pchild belongs to a different process move its data block to the process
+! of its parent
+!
+            if (pchild%process /= pmeta%process) then
+
+! generate the tag for communication
+!
+              itag = pchild%process * nprocs + pmeta%process + nprocs + p + 1
+
+! send data block from the current child to the parent process and deallocate it
+!
+              if (pchild%process == nproc) then
+
+! assign pdata to the daba block of the current child
+!
+                pdata => pchild%data
+
+#ifdef DEBUG
+! check if pdata is associated
+!
+                if (associated(pdata)) then
+#endif /* DEBUG */
+
+! copy data to the local buffer
+!
+                  rbuf(:,:,:,:) = pdata%u(:,:,:,:)
+
+#ifdef DEBUG
+                else ! pdata associated
+                  call print_error("mesh::check_children_derefinement"         &
+                              , "Current child has no data block associated!")
+                end if ! pdata associated
+#endif /* DEBUG */
+
+! send data
+!
+                call send_real_array(size(rbuf), pmeta%process                 &
+                                                  , itag, rbuf(:,:,:,:), iret)
+
+! deallocate the associated data block (it has to be pchild%data, and not pdata,
+! otherwise, pchild%data won't be nullified)
+!
+                call remove_datablock(pchild%data)
+
+              end if ! pchild%process == nproc
+
+! allocate data block at the curent child, and receive its data from
+! a different process
+!
+              if (pmeta%process == nproc) then
+
+! allocate data block for the current child
+!
+                call append_datablock(pdata)
+                call link_blocks(pchild, pdata)
+
+! receive the data
+!
+                call receive_real_array(size(rbuf)                             &
+                                  , pchild%process, itag, rbuf(:,:,:,:), iret)
+
+! copy buffer to data block
+!
+                pdata%u(:,:,:,:) = rbuf(:,:,:,:)
+
+              end if ! pmeta%process == nproc
+
+! set the current processor of the block
+!
+              pchild%process = pmeta%process
+
+            end if ! pchild belongs to a different process
+
+          end do ! children
+
+! reset the parent %refine flag
+!
+          pmeta%refine = 0
+
+        end if ! pmeta children are selected for derefinement
+
+      end if ! the block is parent
+
+! assign pmeta to the next meta block
+!
+      pmeta => pmeta%next
+
+    end do ! iterate over meta blocks
+#endif /* MPI */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prepare_sibling_derefinement
 
 !===============================================================================
 !
