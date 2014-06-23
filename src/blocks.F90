@@ -72,7 +72,8 @@ module blocks
 !
   integer(kind=4), save      :: last_id
 
-! the number of allocated meta and data blocks, and the number of leafs
+! the number of allocated meta and data blocks (inserted in the lists),
+! and the number of leafs
 !
   integer(kind=4), save      :: mblocks, dblocks, nleafs
 
@@ -668,6 +669,10 @@ module blocks
 !
     last_data => pdata
 
+! increase the number of data blocks in the list
+!
+    dblocks = dblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_datablock
@@ -732,6 +737,10 @@ module blocks
                             , "No meta block associated with the data block!")
 
       end if ! %meta associated
+
+! decrease the number of allocated data blocks in the list
+!
+      dblocks = dblocks - 1
 
 ! deallocate the associated data block
 !
@@ -1036,10 +1045,6 @@ module blocks
 !
     pdata%u => pdata%u0
 
-! increase the number of allocated data blocks
-!
-    dblocks = dblocks + 1
-
 #ifdef PROFILE
 ! stop accounting time for the data block allocation
 !
@@ -1090,10 +1095,6 @@ module blocks
 ! check if the pointer is actually associated with any block
 !
     if (associated(pdata)) then
-
-! decrease the number of allocated data blocks
-!
-      dblocks = dblocks - 1
 
 ! nullify field pointing to the previous and next blocks on the data block list
 !
