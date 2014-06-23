@@ -835,39 +835,17 @@ module mesh
 !
     call check_data_block_refinement()
 
-!! SELECT NEIGHBORS OF REFINED BLOCKS TO BE REFINED IF NECESSARY
+! update neighbor refinement flags, if they need to be refined as well
+!
+    call update_neighbor_refinement()
+
+!! CHECK IF BLOCK CHILDREN CAN BE DEREFINED
 !!
 ! iterate over all levels starting from top and correct the refinement
 ! of neighbor blocks
 !
     do l = toplev, 1, -1
 
-! set the pointer to the first block on the meta block list
-!
-      pmeta => list_meta
-
-! iterate over all meta blocks
-!
-      do while (associated(pmeta))
-
-! check only leafs at the current level
-!
-        if (pmeta%leaf .and. pmeta%level == l) then
-
-! select all neighbors which lay on lower levels to be refined as well
-!
-          call set_neighbors_refine(pmeta)
-
-        end if ! the leaf at level l
-
-! assign a pointer to the next block
-!
-        pmeta => pmeta%next
-
-      end do ! meta blocks
-
-!! CHECK IF BLOCK CHILDREN CAN BE DEREFINED
-!!
 ! now check all derefined block if their siblings are set for derefinement too
 ! and are at the same level; check only levels > 1
 !
@@ -1939,6 +1917,74 @@ module mesh
 !-------------------------------------------------------------------------------
 !
   end subroutine check_data_block_refinement
+!
+!===============================================================================
+!
+! subroutine UPDATE_NEIGHBOR_REFINEMENT:
+! -------------------------------------
+!
+!   Subroutine scans over all neighbors of blocks selected for refinement or
+!   derefinement, and if necessary selects them to be refined as well, or
+!   cancels their derefinement.
+!
+!
+!===============================================================================
+!
+  subroutine update_neighbor_refinement()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : set_neighbors_refine
+    use coordinates    , only : toplev
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+
+! local variables
+!
+    integer(kind=4) :: l
+
+!-------------------------------------------------------------------------------
+!
+! iterate down over all levels and correct the refinement of neighbor blocks
+!
+    do l = toplev, 1, -1
+
+! assign pmeta to the first meta block on the list
+!
+      pmeta => list_meta
+
+! iterate over all meta blocks
+!
+      do while (associated(pmeta))
+
+! check only leafs at the current level
+!
+        if (pmeta%leaf .and. pmeta%level == l) then
+
+! correct neighbor refinement flags
+!
+          call set_neighbors_refine(pmeta)
+
+        end if ! the leaf at level l
+
+! assign pmeta to the next meta block
+!
+        pmeta => pmeta%next
+
+      end do ! iterate over meta blocks
+
+    end do ! levels
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_neighbor_refinement
 
 !===============================================================================
 !
