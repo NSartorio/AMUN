@@ -272,6 +272,7 @@ module problems
     real(kind=8)  :: xt, yt, zt
     real(kind=8)  :: fc_inc
 #else /* NDIMS == 3 */
+    real(kind=8)  :: rlu, rul
     real(kind=8)  :: xb, yb
     real(kind=8)  :: xt, yt
     real(kind=8)  :: sn, ph
