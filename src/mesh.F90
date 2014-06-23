@@ -759,10 +759,10 @@ module mesh
 ! subroutine UPDATE_MESH:
 ! ----------------------
 !
-!   Subroutine checks the refinement criterion for each data block, and
-!   refines or derefines it if necessary by restricting or prolongating
-!   the block data.  In the MPI version the data blocks are redistributed
-!   among all processes after the mesh update.
+!   Subroutine checks the refinement criterion for each block, and refines
+!   or restricts it if necessary by prolongating or restricting its data.
+!   In the MPI version the data blocks are redistributed among all processes
+!   after the mesh update.
 !
 !
 !===============================================================================
@@ -795,8 +795,7 @@ module mesh
 !
     call update_neighbor_refinement()
 
-! check if all siblings of blocks marked to be derefined can be derefined as
-! well, if not cancel their deferinement flags
+! prepare siblings of blocks marked for restriction
 !
     call prepare_sibling_derefinement()
 
