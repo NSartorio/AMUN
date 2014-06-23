@@ -1988,10 +1988,9 @@ module mesh
 ! subroutine DEREFINE_SELECTED_BLOCKS:
 ! -----------------------------------
 !
-!   Subroutine scans over all blocks and actually restrict those selected
-!   for derefinement.
+!   Subroutine scans over all blocks and restrict those selected.
 !
-!   Note: This subroutine resets %refine flag set in subroutine
+!   Note: This subroutine resets the flag %refine set in subroutine
 !         prepare_sibling_derefinement().
 !
 !===============================================================================
@@ -2022,8 +2021,7 @@ module mesh
 
 !-------------------------------------------------------------------------------
 !
-! start from the top level and iterating down restrict the blocks selected
-! for derefinement
+! iterate over levels and restrict the blocks selected for restriction
 !
     do l = toplev - 1, 1, -1
 
@@ -2068,7 +2066,7 @@ module mesh
           end if ! pmeta belongs to the current process
 #endif /* MPI */
 
-! perform block derefinement
+! perform the mesh derefinement
 !
           call derefine_block(pmeta)
 
@@ -2076,7 +2074,7 @@ module mesh
 !
           pmeta%refine = 0
 
-        end if ! leaf at current level selected for derefinement
+        end if ! non-leaf at current level selected for derefinement
 
 ! assign pmeta to the next meta block
 !
@@ -2095,8 +2093,7 @@ module mesh
 ! subroutine REFINE_SELECTED_BLOCKS:
 ! ---------------------------------
 !
-!   Subroutine scans over all blocks and prolongates those selected for
-!   refinement.
+!   Subroutine scans over all blocks and prolongates those selected.
 !
 !
 !===============================================================================
