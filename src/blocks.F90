@@ -550,6 +550,10 @@ module blocks
 !
     last_meta => pmeta
 
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_metablock
@@ -601,6 +605,10 @@ module blocks
 !
       if (associated(pmeta%prev)) pmeta%prev%next => pmeta%next
       if (associated(pmeta%next)) pmeta%next%prev => pmeta%prev
+
+! decrease the number of allocated meta blocks stored in the meta block list
+!
+      mblocks = mblocks - 1
 
 ! deallocate memory used by the meta block
 !
@@ -858,10 +866,6 @@ module blocks
     pmeta%zmin      = 0.0d+00
     pmeta%zmax      = 1.0d+00
 
-! increase the number of allocated meta blocks
-!
-    mblocks         = mblocks + 1
-
 #ifdef PROFILE
 ! stop accounting time for the meta block allocation
 !
@@ -920,10 +924,6 @@ module blocks
 ! decrease the number of leafs
 !
       if (pmeta%leaf) nleafs = nleafs - 1
-
-! decrease the number of allocated meta blocks
-!
-      mblocks = mblocks - 1
 
 ! nullify fields pointing to previous and next block on the meta block list
 !
@@ -2879,6 +2879,10 @@ module blocks
 
     end if
 
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine insert_metablock_after
@@ -2973,6 +2977,10 @@ module blocks
       end if
 
     end if
+
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
 
 !-------------------------------------------------------------------------------
 !
