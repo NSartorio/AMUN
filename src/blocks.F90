@@ -986,7 +986,7 @@ module blocks
 
 ! local variables
 !
-    integer :: i, j, k
+    integer :: n, i, j, k
 !
 !-------------------------------------------------------------------------------
 !
@@ -1014,6 +1014,32 @@ module blocks
       do i = 1, nchildren
         nullify(pmeta%child(i)%ptr)
       end do
+
+! nullify fields pointing to face, edge, and corner neighbors
+!
+#if NDIMS == 2
+      do i = 1, nsides
+        do j = 1, nsides
+          do n = 1, ndims
+            nullify(pmeta%edges(n,i,j)%ptr)
+          end do ! ndims
+          nullify(pmeta%corners(i,j)%ptr)
+        end do ! nsides
+      end do ! nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do i = 1, nsides
+        do j = 1, nsides
+          do k = 1, nsides
+            do n = 1, ndims
+              nullify(pmeta%faces(n,i,j,k)%ptr)
+              nullify(pmeta%edges(n,i,j,k)%ptr)
+            end do ! ndims
+            nullify(pmeta%corners(i,j,k)%ptr)
+          end do ! nsides
+        end do ! nsides
+      end do ! nsides
+#endif /* NDIMS == 3 */
 
 ! nullify fields pointing to neighbors
 !
