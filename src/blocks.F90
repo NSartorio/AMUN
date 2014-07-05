@@ -123,6 +123,55 @@ module blocks
                                  !
     type(pointer_meta)          :: child(nchildren)
 
+#if NDIMS == 2
+                                 ! pointers to edge neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the direction of the edge normal vector
+                                 ! 2 - the side of the cube
+                                 ! 3 - the half of the edge
+                                 ! and dimensions [1:2,1:2,1:2]
+                                 !
+    type(pointer_meta)          :: edges(ndims,nsides,nsides)
+
+                                 ! pointers to corner neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the first coordinate
+                                 ! 2 - the second coordinate
+                                 ! and dimensions [1:2,1:2]
+                                 !
+    type(pointer_meta)          :: corners(nsides,nsides)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                                 ! pointers to face neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the direction of the face normal vector
+                                 ! 2 - the side of the cube
+                                 ! 3 - the first perpendicular coordinate
+                                 ! 4 - the second perpendicular coordinate
+                                 ! and dimensions [1:3,1:2,1:2,1:2]
+                                 !
+    type(pointer_meta)          :: faces(ndims,nsides,nsides,nsides)
+
+                                 ! pointers to edge neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the direction of the edge
+                                 ! 2 - the first perpendicular coordinate
+                                 ! 3 - the second perpendicular coordinate
+                                 ! 4 - the half of the edge
+                                 ! and dimensions [1:3,1:2,1:2,1:2]
+                                 !
+    type(pointer_meta)          :: edges(ndims,nsides,nsides,nsides)
+
+                                 ! pointers to corner neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the first coordinate (1 or 2)
+                                 ! 2 - the second coordinate (1 or 2)
+                                 ! 3 - the third coordinate (1 or 2)
+                                 ! and dimensions [1:2,1:2,1:2]
+                                 !
+    type(pointer_meta)          :: corners(nsides,nsides,nsides)
+#endif /* NDIMS == 3 */
+
                                  ! pointers to neighbor meta blocks
                                  !
     type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
