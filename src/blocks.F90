@@ -126,17 +126,18 @@ module blocks
 #if NDIMS == 2
                                  ! pointers to edge neighbor meta blocks with
                                  ! indices:
-                                 ! 1 - the direction of the edge normal vector
-                                 ! 2 - the side of the cube
-                                 ! 3 - the half of the edge
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the direction of the edge from the corner
+                                 !     with above coordinates
                                  ! and dimensions [1:2,1:2,1:2]
                                  !
-    type(pointer_meta)          :: edges(ndims,nsides,nsides)
+    type(pointer_meta)          :: edges(nsides,nsides,ndims)
 
                                  ! pointers to corner neighbor meta blocks with
                                  ! indices:
-                                 ! 1 - the first coordinate
-                                 ! 2 - the second coordinate
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
                                  ! and dimensions [1:2,1:2]
                                  !
     type(pointer_meta)          :: corners(nsides,nsides)
@@ -144,29 +145,31 @@ module blocks
 #if NDIMS == 3
                                  ! pointers to face neighbor meta blocks with
                                  ! indices:
-                                 ! 1 - the direction of the face normal vector
-                                 ! 2 - the side of the cube
-                                 ! 3 - the first perpendicular coordinate
-                                 ! 4 - the second perpendicular coordinate
-                                 ! and dimensions [1:3,1:2,1:2,1:2]
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
+                                 ! 4 - the direction of the face normal vector
+                                 !     from the corner with above coordinates
+                                 ! and dimensions [1:2,1:2,1:2,1:3]
                                  !
-    type(pointer_meta)          :: faces(ndims,nsides,nsides,nsides)
+    type(pointer_meta)          :: faces(nsides,nsides,nsides,ndims)
 
                                  ! pointers to edge neighbor meta blocks with
                                  ! indices:
-                                 ! 1 - the direction of the edge
-                                 ! 2 - the first perpendicular coordinate
-                                 ! 3 - the second perpendicular coordinate
-                                 ! 4 - the half of the edge
-                                 ! and dimensions [1:3,1:2,1:2,1:2]
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
+                                 ! 4 - the direction of the edge from the corner
+                                 !     with above coordinates
+                                 ! and dimensions [1:2,1:2,1:2,1:3]
                                  !
-    type(pointer_meta)          :: edges(ndims,nsides,nsides,nsides)
+    type(pointer_meta)          :: edges(nsides,nsides,nsides,ndims)
 
                                  ! pointers to corner neighbor meta blocks with
                                  ! indices:
-                                 ! 1 - the first coordinate (1 or 2)
-                                 ! 2 - the second coordinate (1 or 2)
-                                 ! 3 - the third coordinate (1 or 2)
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
                                  ! and dimensions [1:2,1:2,1:2]
                                  !
     type(pointer_meta)          :: corners(nsides,nsides,nsides)
@@ -880,7 +883,7 @@ module blocks
     do i = 1, nsides
       do j = 1, nsides
         do n = 1, ndims
-          nullify(pmeta%edges(n,i,j)%ptr)
+          nullify(pmeta%edges(i,j,n)%ptr)
         end do ! ndims
         nullify(pmeta%corners(i,j)%ptr)
       end do ! nsides
@@ -891,8 +894,8 @@ module blocks
       do j = 1, nsides
         do k = 1, nsides
           do n = 1, ndims
-            nullify(pmeta%faces(n,i,j,k)%ptr)
-            nullify(pmeta%edges(n,i,j,k)%ptr)
+            nullify(pmeta%faces(i,j,k,n)%ptr)
+            nullify(pmeta%edges(i,j,k,n)%ptr)
           end do ! ndims
           nullify(pmeta%corners(i,j,k)%ptr)
         end do ! nsides
@@ -1021,7 +1024,7 @@ module blocks
       do i = 1, nsides
         do j = 1, nsides
           do n = 1, ndims
-            nullify(pmeta%edges(n,i,j)%ptr)
+            nullify(pmeta%edges(i,j,n)%ptr)
           end do ! ndims
           nullify(pmeta%corners(i,j)%ptr)
         end do ! nsides
@@ -1032,8 +1035,8 @@ module blocks
         do j = 1, nsides
           do k = 1, nsides
             do n = 1, ndims
-              nullify(pmeta%faces(n,i,j,k)%ptr)
-              nullify(pmeta%edges(n,i,j,k)%ptr)
+              nullify(pmeta%faces(i,j,k,n)%ptr)
+              nullify(pmeta%edges(i,j,k,n)%ptr)
             end do ! ndims
             nullify(pmeta%corners(i,j,k)%ptr)
           end do ! nsides
