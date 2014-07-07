@@ -1575,6 +1575,168 @@ module blocks
 
       end do ! nchildren
 
+! update edge neighbor pointers of children, and the corresponding edge
+! pointers of neighbors
+!
+#if NDIMS == 2
+      pchild => pmeta%child(1)%ptr
+      if (associated(pmeta%edges(1,1,1)%ptr)) then
+        pneigh => pmeta%edges(1,1,1)%ptr
+        pchild%edges(1,1,1)%ptr => pmeta%edges(1,1,1)%ptr
+        pchild%edges(2,1,1)%ptr => pmeta%edges(1,1,1)%ptr
+        pneigh%edges(1,2,1)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(2,2,1)%ptr => pchild
+      end if
+      pchild%edges(1,2,1)%ptr => pmeta%child(3)%ptr
+      pchild%edges(2,2,1)%ptr => pmeta%child(3)%ptr
+      if (associated(pmeta%edges(1,1,2)%ptr)) then
+        pneigh => pmeta%edges(1,1,2)%ptr
+        pchild%edges(1,1,2)%ptr => pmeta%edges(1,1,2)%ptr
+        pchild%edges(1,2,2)%ptr => pmeta%edges(1,1,2)%ptr
+        pneigh%edges(2,1,2)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(2,2,2)%ptr => pchild
+      end if
+      pchild%edges(2,1,2)%ptr => pmeta%child(2)%ptr
+      pchild%edges(2,2,2)%ptr => pmeta%child(2)%ptr
+
+      pchild => pmeta%child(2)%ptr
+      if (associated(pmeta%edges(2,1,1)%ptr)) then
+        pneigh => pmeta%edges(2,1,1)%ptr
+        pchild%edges(1,1,1)%ptr => pmeta%edges(2,1,1)%ptr
+        pchild%edges(2,1,1)%ptr => pmeta%edges(2,1,1)%ptr
+        pneigh%edges(2,2,1)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(1,2,1)%ptr => pchild
+      end if
+      pchild%edges(1,2,1)%ptr => pmeta%child(4)%ptr
+      pchild%edges(2,2,1)%ptr => pmeta%child(4)%ptr
+      pchild%edges(1,1,2)%ptr => pmeta%child(1)%ptr
+      pchild%edges(1,2,2)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%edges(2,1,2)%ptr)) then
+        pneigh => pmeta%edges(2,1,2)%ptr
+        pchild%edges(2,1,2)%ptr => pmeta%edges(2,1,2)%ptr
+        pchild%edges(2,2,2)%ptr => pmeta%edges(2,1,2)%ptr
+        pneigh%edges(1,1,2)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(1,2,2)%ptr => pchild
+      end if
+
+      pchild => pmeta%child(3)%ptr
+      pchild%edges(1,1,1)%ptr => pmeta%child(1)%ptr
+      pchild%edges(2,1,1)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%edges(1,2,1)%ptr)) then
+        pneigh => pmeta%edges(1,2,1)%ptr
+        pchild%edges(1,2,1)%ptr => pmeta%edges(1,2,1)%ptr
+        pchild%edges(2,2,1)%ptr => pmeta%edges(1,2,1)%ptr
+        pneigh%edges(1,1,1)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(2,1,1)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(1,2,2)%ptr)) then
+        pneigh => pmeta%edges(1,2,2)%ptr
+        pchild%edges(1,1,2)%ptr => pmeta%edges(1,2,2)%ptr
+        pchild%edges(1,2,2)%ptr => pmeta%edges(1,2,2)%ptr
+        pneigh%edges(2,2,2)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(2,1,2)%ptr => pchild
+      end if
+      pchild%edges(2,1,2)%ptr => pmeta%child(4)%ptr
+      pchild%edges(2,2,2)%ptr => pmeta%child(4)%ptr
+
+      pchild => pmeta%child(4)%ptr
+      pchild%edges(1,1,1)%ptr => pmeta%child(2)%ptr
+      pchild%edges(2,1,1)%ptr => pmeta%child(2)%ptr
+      if (associated(pmeta%edges(2,2,1)%ptr)) then
+        pneigh => pmeta%edges(2,2,1)%ptr
+        pchild%edges(1,2,1)%ptr => pmeta%edges(2,2,1)%ptr
+        pchild%edges(2,2,1)%ptr => pmeta%edges(2,2,1)%ptr
+        pneigh%edges(2,1,1)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(1,1,1)%ptr => pchild
+      end if
+      pchild%edges(1,1,2)%ptr => pmeta%child(3)%ptr
+      pchild%edges(1,2,2)%ptr => pmeta%child(3)%ptr
+      if (associated(pmeta%edges(2,2,2)%ptr)) then
+        pneigh => pmeta%edges(2,2,2)%ptr
+        pchild%edges(2,1,2)%ptr => pmeta%edges(2,2,2)%ptr
+        pchild%edges(2,2,2)%ptr => pmeta%edges(2,2,2)%ptr
+        pneigh%edges(1,2,2)%ptr => pchild
+        if (pneigh%level > pmeta%level) pneigh%edges(1,1,2)%ptr => pchild
+      end if
+#endif /* NDIMS == 2 */
+
+! update corner neighbor pointers of children, and corresponding neighbor
+! corners if they lay at larger level
+!
+#if NDIMS == 2
+      pchild => pmeta%child(1)%ptr
+      if (associated(pmeta%corners(1,1)%ptr)) then
+        pneigh => pmeta%corners(1,1)%ptr
+        pchild%corners(1,1)%ptr => pmeta%corners(1,1)%ptr
+        pneigh%corners(2,2)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(2,1,1)%ptr)) then
+        pneigh => pmeta%edges(2,1,1)%ptr
+        pchild%corners(2,1)%ptr => pmeta%edges(2,1,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
+      endif
+      if (associated(pmeta%edges(1,2,2)%ptr)) then
+        pneigh => pmeta%edges(1,2,2)%ptr
+        pchild%corners(1,2)%ptr => pmeta%edges(1,2,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
+      end if
+      pchild%corners(2,2)%ptr => pmeta%child(4)%ptr
+
+      pchild => pmeta%child(2)%ptr
+      if (associated(pmeta%edges(1,1,1)%ptr)) then
+        pneigh => pmeta%edges(1,1,1)%ptr
+        pchild%corners(1,1)%ptr => pmeta%edges(1,1,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
+      end if
+      if (associated(pmeta%corners(2,1)%ptr)) then
+        pneigh => pmeta%corners(2,1)%ptr
+        pchild%corners(2,1)%ptr => pmeta%corners(2,1)%ptr
+        pneigh%corners(1,2)%ptr => pchild
+      end if
+      pchild%corners(1,2)%ptr => pmeta%child(3)%ptr
+      if (associated(pmeta%edges(2,2,2)%ptr)) then
+        pneigh => pmeta%edges(2,2,2)%ptr
+        pchild%corners(2,2)%ptr => pmeta%edges(2,2,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
+      end if
+
+      pchild => pmeta%child(3)%ptr
+      if (associated(pmeta%edges(1,1,2)%ptr)) then
+        pneigh => pmeta%edges(1,1,2)%ptr
+        pchild%corners(1,1)%ptr => pmeta%edges(1,1,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
+      end if
+      pchild%corners(2,1)%ptr => pmeta%child(2)%ptr
+      if (associated(pmeta%corners(1,2)%ptr)) then
+        pneigh => pmeta%corners(1,2)%ptr
+        pchild%corners(1,2)%ptr => pmeta%corners(1,2)%ptr
+        pneigh%corners(2,1)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(2,2,1)%ptr)) then
+        pneigh => pmeta%edges(2,2,1)%ptr
+        pchild%corners(2,2)%ptr => pmeta%edges(2,2,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
+      end if
+
+      pchild => pmeta%child(4)%ptr
+      pchild%corners(1,1)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%edges(2,1,2)%ptr)) then
+        pneigh => pmeta%edges(2,1,2)%ptr
+        pchild%corners(2,1)%ptr => pmeta%edges(2,1,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(1,2,1)%ptr)) then
+        pneigh => pmeta%edges(1,2,1)%ptr
+        pchild%corners(1,2)%ptr => pmeta%edges(1,2,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
+      end if
+      if (associated(pmeta%corners(2,2)%ptr)) then
+        pneigh => pmeta%corners(2,2)%ptr
+        pchild%corners(2,2)%ptr => pmeta%corners(2,2)%ptr
+        pneigh%corners(1,1)%ptr => pchild
+      end if
+#endif /* NDIMS == 2 */
+
 !! ASSIGN PROPER NEIGHBORS FOR THE CHILDREN IN THE INTERIOR OF THE PARENT BLOCK
 !!
 ! iterate over faces and update the interior of the block
