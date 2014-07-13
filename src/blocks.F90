@@ -1575,6 +1575,635 @@ module blocks
 
       end do ! nchildren
 
+#if NDIMS == 3
+! update face neighbor pointers (only in 3D) and the corresponding neighbor
+! face pointers
+!
+! child (1,1,1)
+      pchild => pmeta%child(1)%ptr
+! X
+      if (associated(pmeta%faces(1,1,1,1)%ptr)) then
+        pneigh => pmeta%faces(1,1,1,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,1)%ptr => pmeta%child(2)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%child(2)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%child(2)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%child(2)%ptr
+        else
+          pchild%faces(1,1,1,1)%ptr => pmeta%faces(1,1,1,1)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%faces(1,1,1,1)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%faces(1,1,1,1)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%faces(1,1,1,1)%ptr
+          pneigh%faces(2,1,1,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,2,1,1)%ptr => pchild
+            pneigh%faces(2,1,2,1)%ptr => pchild
+            pneigh%faces(2,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(2,1,1,1)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,2,1,1)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,1,2,1)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,2,2,1)%ptr => pmeta%child(2)%ptr
+! Y
+      if (associated(pmeta%faces(1,1,1,2)%ptr)) then
+        pneigh => pmeta%faces(1,1,1,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,2)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%child(3)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%child(3)%ptr
+        else
+          pchild%faces(1,1,1,2)%ptr => pmeta%faces(1,1,1,2)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%faces(1,1,1,2)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%faces(1,1,1,2)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%faces(1,1,1,2)%ptr
+          pneigh%faces(1,2,1,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,2,1,2)%ptr => pchild
+            pneigh%faces(1,2,2,2)%ptr => pchild
+            pneigh%faces(2,2,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,2,1,2)%ptr => pmeta%child(3)%ptr
+      pchild%faces(2,2,1,2)%ptr => pmeta%child(3)%ptr
+      pchild%faces(1,2,2,2)%ptr => pmeta%child(3)%ptr
+      pchild%faces(2,2,2,2)%ptr => pmeta%child(3)%ptr
+! Z
+      if (associated(pmeta%faces(1,1,1,3)%ptr)) then
+        pneigh => pmeta%faces(1,1,1,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,3)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%child(5)%ptr
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(5)%ptr
+        else
+          pchild%faces(1,1,1,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(1,2,1,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(2,2,1,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pneigh%faces(1,1,2,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,2,3)%ptr => pchild
+            pneigh%faces(1,2,2,3)%ptr => pchild
+            pneigh%faces(2,2,2,3)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,1,2,3)%ptr => pmeta%child(5)%ptr
+      pchild%faces(2,1,2,3)%ptr => pmeta%child(5)%ptr
+      pchild%faces(1,2,2,3)%ptr => pmeta%child(5)%ptr
+      pchild%faces(2,2,2,3)%ptr => pmeta%child(5)%ptr
+
+! child (2,1,1)
+      pchild => pmeta%child(2)%ptr
+! X
+      pchild%faces(1,1,1,1)%ptr => pmeta%child(1)%ptr
+      pchild%faces(1,2,1,1)%ptr => pmeta%child(1)%ptr
+      pchild%faces(1,1,2,1)%ptr => pmeta%child(1)%ptr
+      pchild%faces(1,2,2,1)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%faces(2,1,1,1)%ptr)) then
+        pneigh => pmeta%faces(2,1,1,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(2,1,1,1)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%child(1)%ptr
+        else
+          pchild%faces(2,1,1,1)%ptr => pmeta%faces(2,1,1,1)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%faces(2,1,1,1)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%faces(2,1,1,1)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%faces(2,1,1,1)%ptr
+          pneigh%faces(1,1,1,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,2,1,1)%ptr => pchild
+            pneigh%faces(1,1,2,1)%ptr => pchild
+            pneigh%faces(1,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+! Y
+      if (associated(pmeta%faces(2,1,1,2)%ptr)) then
+        pneigh => pmeta%faces(2,1,1,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,2)%ptr => pmeta%child(4)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%child(4)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%child(4)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%child(4)%ptr
+        else
+          pchild%faces(1,1,1,2)%ptr => pmeta%faces(2,1,1,2)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%faces(2,1,1,2)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%faces(2,1,1,2)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%faces(2,1,1,2)%ptr
+          pneigh%faces(2,2,1,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,2,1,2)%ptr => pchild
+            pneigh%faces(1,2,2,2)%ptr => pchild
+            pneigh%faces(2,2,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,2,1,2)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,2,1,2)%ptr => pmeta%child(4)%ptr
+      pchild%faces(1,2,2,2)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,2,2,2)%ptr => pmeta%child(4)%ptr
+! Z
+      if (associated(pmeta%faces(2,1,1,3)%ptr)) then
+        pneigh => pmeta%faces(2,1,1,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,3)%ptr => pmeta%child(6)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%child(6)%ptr
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(6)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(6)%ptr
+        else
+          pchild%faces(1,1,1,3)%ptr => pmeta%faces(2,1,1,3)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%faces(2,1,1,3)%ptr
+          pchild%faces(1,2,1,3)%ptr => pmeta%faces(2,1,1,3)%ptr
+          pchild%faces(2,2,1,3)%ptr => pmeta%faces(2,1,1,3)%ptr
+          pneigh%faces(2,1,2,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,2,3)%ptr => pchild
+            pneigh%faces(1,2,2,3)%ptr => pchild
+            pneigh%faces(2,2,2,3)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,1,2,3)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,1,2,3)%ptr => pmeta%child(6)%ptr
+      pchild%faces(1,2,2,3)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,2,2,3)%ptr => pmeta%child(6)%ptr
+
+! child (1,2,1)
+      pchild => pmeta%child(3)%ptr
+! X
+      if (associated(pmeta%faces(1,2,1,1)%ptr)) then
+        pneigh => pmeta%faces(1,2,1,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,1)%ptr => pmeta%child(4)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%child(4)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%child(4)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%child(4)%ptr
+        else
+          pchild%faces(1,1,1,1)%ptr => pmeta%faces(1,2,1,1)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%faces(1,2,1,1)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%faces(1,2,1,1)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%faces(1,2,1,1)%ptr
+          pneigh%faces(2,2,1,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,1,1)%ptr => pchild
+            pneigh%faces(2,1,2,1)%ptr => pchild
+            pneigh%faces(2,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(2,1,1,1)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,2,1,1)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,1,2,1)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,2,2,1)%ptr => pmeta%child(4)%ptr
+! Y
+      pchild%faces(1,1,1,2)%ptr => pmeta%child(1)%ptr
+      pchild%faces(2,1,1,2)%ptr => pmeta%child(1)%ptr
+      pchild%faces(1,1,2,2)%ptr => pmeta%child(1)%ptr
+      pchild%faces(2,1,2,2)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%faces(1,2,1,2)%ptr)) then
+        pneigh => pmeta%faces(1,2,1,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,2,1,2)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%child(1)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%child(1)%ptr
+        else
+          pchild%faces(1,2,1,2)%ptr => pmeta%faces(1,2,1,2)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%faces(1,2,1,2)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%faces(1,2,1,2)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%faces(1,2,1,2)%ptr
+          pneigh%faces(1,1,1,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,1,2)%ptr => pchild
+            pneigh%faces(1,1,2,2)%ptr => pchild
+            pneigh%faces(2,1,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+! Z
+      if (associated(pmeta%faces(1,2,1,3)%ptr)) then
+        pneigh => pmeta%faces(1,2,1,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,3)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%child(7)%ptr
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(7)%ptr
+        else
+          pchild%faces(1,1,1,3)%ptr => pmeta%faces(1,2,1,3)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%faces(1,2,1,3)%ptr
+          pchild%faces(1,2,1,3)%ptr => pmeta%faces(1,2,1,3)%ptr
+          pchild%faces(2,2,1,3)%ptr => pmeta%faces(1,2,1,3)%ptr
+          pneigh%faces(1,2,2,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,2,3)%ptr => pchild
+            pneigh%faces(2,1,2,3)%ptr => pchild
+            pneigh%faces(2,2,2,3)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,1,2,3)%ptr => pmeta%child(7)%ptr
+      pchild%faces(2,1,2,3)%ptr => pmeta%child(7)%ptr
+      pchild%faces(1,2,2,3)%ptr => pmeta%child(7)%ptr
+      pchild%faces(2,2,2,3)%ptr => pmeta%child(7)%ptr
+
+! child (2,2,1)
+      pchild => pmeta%child(4)%ptr
+! X
+      pchild%faces(1,1,1,1)%ptr => pmeta%child(3)%ptr
+      pchild%faces(1,2,1,1)%ptr => pmeta%child(3)%ptr
+      pchild%faces(1,1,2,1)%ptr => pmeta%child(3)%ptr
+      pchild%faces(1,2,2,1)%ptr => pmeta%child(3)%ptr
+      if (associated(pmeta%faces(2,2,1,1)%ptr)) then
+        pneigh => pmeta%faces(2,2,1,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(2,1,1,1)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%child(3)%ptr
+        else
+          pchild%faces(2,1,1,1)%ptr => pmeta%faces(2,2,1,1)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%faces(2,2,1,1)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%faces(2,2,1,1)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%faces(2,2,1,1)%ptr
+          pneigh%faces(1,2,1,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,1)%ptr => pchild
+            pneigh%faces(1,1,2,1)%ptr => pchild
+            pneigh%faces(1,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+! Y
+      pchild%faces(1,1,1,2)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,1,1,2)%ptr => pmeta%child(2)%ptr
+      pchild%faces(1,1,2,2)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,1,2,2)%ptr => pmeta%child(2)%ptr
+      if (associated(pmeta%faces(2,2,1,2)%ptr)) then
+        pneigh => pmeta%faces(2,2,1,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,2,1,2)%ptr => pmeta%child(2)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%child(2)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%child(2)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%child(2)%ptr
+        else
+          pchild%faces(1,2,1,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pneigh%faces(2,1,1,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,2)%ptr => pchild
+            pneigh%faces(1,1,2,2)%ptr => pchild
+            pneigh%faces(2,1,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+! Z
+      if (associated(pmeta%faces(2,2,1,3)%ptr)) then
+        pneigh => pmeta%faces(2,2,1,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,3)%ptr => pmeta%child(8)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%child(8)%ptr
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(8)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(8)%ptr
+        else
+          pchild%faces(1,1,1,3)%ptr => pmeta%faces(2,2,1,3)%ptr
+          pchild%faces(2,1,1,3)%ptr => pmeta%faces(2,2,1,3)%ptr
+          pchild%faces(1,2,1,3)%ptr => pmeta%faces(2,2,1,3)%ptr
+          pchild%faces(2,2,1,3)%ptr => pmeta%faces(2,2,1,3)%ptr
+          pneigh%faces(2,2,2,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,2,3)%ptr => pchild
+            pneigh%faces(2,1,2,3)%ptr => pchild
+            pneigh%faces(1,2,2,3)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,1,2,3)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,1,2,3)%ptr => pmeta%child(8)%ptr
+      pchild%faces(1,2,2,3)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,2,2,3)%ptr => pmeta%child(8)%ptr
+
+! child (1,1,2)
+      pchild => pmeta%child(5)%ptr
+! X
+      if (associated(pmeta%faces(1,1,2,1)%ptr)) then
+        pneigh => pmeta%faces(1,1,2,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,1)%ptr => pmeta%child(6)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%child(6)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%child(6)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%child(6)%ptr
+        else
+          pchild%faces(1,1,1,1)%ptr => pmeta%faces(1,1,2,1)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%faces(1,1,2,1)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%faces(1,1,2,1)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%faces(1,1,2,1)%ptr
+          pneigh%faces(2,1,2,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,1,1)%ptr => pchild
+            pneigh%faces(2,2,1,1)%ptr => pchild
+            pneigh%faces(2,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(2,1,1,1)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,2,1,1)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,1,2,1)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,2,2,1)%ptr => pmeta%child(6)%ptr
+! Y
+      if (associated(pmeta%faces(1,1,2,2)%ptr)) then
+        pneigh => pmeta%faces(1,1,2,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,2)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%child(7)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%child(7)%ptr
+        else
+          pchild%faces(1,1,1,2)%ptr => pmeta%faces(1,1,2,2)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%faces(1,1,2,2)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%faces(1,1,2,2)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%faces(1,1,2,2)%ptr
+          pneigh%faces(1,2,2,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,2,1,2)%ptr => pchild
+            pneigh%faces(2,2,1,2)%ptr => pchild
+            pneigh%faces(2,2,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,2,1,2)%ptr => pmeta%child(7)%ptr
+      pchild%faces(2,2,1,2)%ptr => pmeta%child(7)%ptr
+      pchild%faces(1,2,2,2)%ptr => pmeta%child(7)%ptr
+      pchild%faces(2,2,2,2)%ptr => pmeta%child(7)%ptr
+! Z
+      pchild%faces(1,1,1,3)%ptr => pmeta%child(1)%ptr
+      pchild%faces(2,1,1,3)%ptr => pmeta%child(1)%ptr
+      pchild%faces(1,2,1,3)%ptr => pmeta%child(1)%ptr
+      pchild%faces(2,2,1,3)%ptr => pmeta%child(1)%ptr
+      if (associated(pmeta%faces(1,1,2,3)%ptr)) then
+        pneigh => pmeta%faces(1,1,2,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(1)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%child(1)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%child(1)%ptr
+        else
+          pchild%faces(1,1,2,3)%ptr => pmeta%faces(1,1,2,3)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%faces(1,1,2,3)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%faces(1,1,2,3)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%faces(1,1,2,3)%ptr
+          pneigh%faces(1,1,1,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,1,3)%ptr => pchild
+            pneigh%faces(1,2,1,3)%ptr => pchild
+            pneigh%faces(2,2,1,3)%ptr => pchild
+          end if
+        end if
+      end if
+
+! child (2,1,2)
+      pchild => pmeta%child(6)%ptr
+! X
+      pchild%faces(1,1,1,1)%ptr => pmeta%child(5)%ptr
+      pchild%faces(1,2,1,1)%ptr => pmeta%child(5)%ptr
+      pchild%faces(1,1,2,1)%ptr => pmeta%child(5)%ptr
+      pchild%faces(1,2,2,1)%ptr => pmeta%child(5)%ptr
+      if (associated(pmeta%faces(2,1,2,1)%ptr)) then
+        pneigh => pmeta%faces(2,1,2,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(2,1,1,1)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%child(5)%ptr
+        else
+          pchild%faces(2,1,1,1)%ptr => pmeta%faces(2,1,2,1)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%faces(2,1,2,1)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%faces(2,1,2,1)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%faces(2,1,2,1)%ptr
+          pneigh%faces(1,1,2,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,1)%ptr => pchild
+            pneigh%faces(1,2,1,1)%ptr => pchild
+            pneigh%faces(1,2,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+! Y
+      if (associated(pmeta%faces(2,2,1,2)%ptr)) then
+        pneigh => pmeta%faces(2,2,1,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,2)%ptr => pmeta%child(8)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%child(8)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%child(8)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%child(8)%ptr
+        else
+          pchild%faces(1,1,1,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(2,1,1,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(1,1,2,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pchild%faces(2,1,2,2)%ptr => pmeta%faces(2,2,1,2)%ptr
+          pneigh%faces(2,2,2,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,2,1,2)%ptr => pchild
+            pneigh%faces(2,2,1,2)%ptr => pchild
+            pneigh%faces(1,2,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(1,2,1,2)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,2,1,2)%ptr => pmeta%child(8)%ptr
+      pchild%faces(1,2,2,2)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,2,2,2)%ptr => pmeta%child(8)%ptr
+! Z
+      pchild%faces(1,1,1,3)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,1,1,3)%ptr => pmeta%child(2)%ptr
+      pchild%faces(1,2,1,3)%ptr => pmeta%child(2)%ptr
+      pchild%faces(2,2,1,3)%ptr => pmeta%child(2)%ptr
+      if (associated(pmeta%faces(2,1,2,3)%ptr)) then
+        pneigh => pmeta%faces(2,1,2,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(2)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(2)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%child(2)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%child(2)%ptr
+        else
+          pchild%faces(1,1,2,3)%ptr => pmeta%faces(2,1,2,3)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%faces(2,1,2,3)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%faces(2,1,2,3)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%faces(2,1,2,3)%ptr
+          pneigh%faces(2,1,1,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,3)%ptr => pchild
+            pneigh%faces(1,2,1,3)%ptr => pchild
+            pneigh%faces(2,2,1,3)%ptr => pchild
+          end if
+        end if
+      end if
+
+! child (1,2,2)
+      pchild => pmeta%child(7)%ptr
+! X
+      if (associated(pmeta%faces(1,2,2,1)%ptr)) then
+        pneigh => pmeta%faces(1,2,2,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,1,1)%ptr => pmeta%child(8)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%child(8)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%child(8)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%child(8)%ptr
+        else
+          pchild%faces(1,1,1,1)%ptr => pmeta%faces(1,2,2,1)%ptr
+          pchild%faces(1,2,1,1)%ptr => pmeta%faces(1,2,2,1)%ptr
+          pchild%faces(1,1,2,1)%ptr => pmeta%faces(1,2,2,1)%ptr
+          pchild%faces(1,2,2,1)%ptr => pmeta%faces(1,2,2,1)%ptr
+          pneigh%faces(2,2,2,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(2,1,1,1)%ptr => pchild
+            pneigh%faces(2,2,1,1)%ptr => pchild
+            pneigh%faces(2,1,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+      pchild%faces(2,1,1,1)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,2,1,1)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,1,2,1)%ptr => pmeta%child(8)%ptr
+      pchild%faces(2,2,2,1)%ptr => pmeta%child(8)%ptr
+! Y
+      pchild%faces(1,1,1,2)%ptr => pmeta%child(5)%ptr
+      pchild%faces(2,1,1,2)%ptr => pmeta%child(5)%ptr
+      pchild%faces(1,1,2,2)%ptr => pmeta%child(5)%ptr
+      pchild%faces(2,1,2,2)%ptr => pmeta%child(5)%ptr
+      if (associated(pmeta%faces(1,2,2,2)%ptr)) then
+        pneigh => pmeta%faces(1,2,2,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,2,1,2)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%child(5)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%child(5)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%child(5)%ptr
+        else
+          pchild%faces(1,2,1,2)%ptr => pmeta%faces(1,2,2,2)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%faces(1,2,2,2)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%faces(1,2,2,2)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%faces(1,2,2,2)%ptr
+          pneigh%faces(1,1,2,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,2)%ptr => pchild
+            pneigh%faces(2,1,1,2)%ptr => pchild
+            pneigh%faces(2,1,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+! Z
+      pchild%faces(1,1,1,3)%ptr => pmeta%child(3)%ptr
+      pchild%faces(2,1,1,3)%ptr => pmeta%child(3)%ptr
+      pchild%faces(1,2,1,3)%ptr => pmeta%child(3)%ptr
+      pchild%faces(2,2,1,3)%ptr => pmeta%child(3)%ptr
+      if (associated(pmeta%faces(1,1,1,3)%ptr)) then
+        pneigh => pmeta%faces(1,1,1,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(3)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%child(3)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%child(3)%ptr
+        else
+          pchild%faces(1,1,2,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%faces(1,1,1,3)%ptr
+          pneigh%faces(1,2,1,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,3)%ptr => pchild
+            pneigh%faces(2,1,1,3)%ptr => pchild
+            pneigh%faces(2,2,1,3)%ptr => pchild
+          end if
+        end if
+      end if
+
+! child (2,2,2)
+      pchild => pmeta%child(8)%ptr
+! X
+      pchild%faces(1,1,1,1)%ptr => pmeta%child(7)%ptr
+      pchild%faces(1,2,1,1)%ptr => pmeta%child(7)%ptr
+      pchild%faces(1,1,2,1)%ptr => pmeta%child(7)%ptr
+      pchild%faces(1,2,2,1)%ptr => pmeta%child(7)%ptr
+      if (associated(pmeta%faces(2,2,2,1)%ptr)) then
+        pneigh => pmeta%faces(2,2,2,1)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(2,1,1,1)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%child(7)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%child(7)%ptr
+        else
+          pchild%faces(2,1,1,1)%ptr => pmeta%faces(2,2,2,1)%ptr
+          pchild%faces(2,2,1,1)%ptr => pmeta%faces(2,2,2,1)%ptr
+          pchild%faces(2,1,2,1)%ptr => pmeta%faces(2,2,2,1)%ptr
+          pchild%faces(2,2,2,1)%ptr => pmeta%faces(2,2,2,1)%ptr
+          pneigh%faces(1,2,2,1)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,1)%ptr => pchild
+            pneigh%faces(1,2,1,1)%ptr => pchild
+            pneigh%faces(1,1,2,1)%ptr => pchild
+          end if
+        end if
+      end if
+! Y
+      pchild%faces(1,1,1,2)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,1,1,2)%ptr => pmeta%child(6)%ptr
+      pchild%faces(1,1,2,2)%ptr => pmeta%child(6)%ptr
+      pchild%faces(2,1,2,2)%ptr => pmeta%child(6)%ptr
+      if (associated(pmeta%faces(2,2,2,2)%ptr)) then
+        pneigh => pmeta%faces(2,2,2,2)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,2,1,2)%ptr => pmeta%child(6)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%child(6)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%child(6)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%child(6)%ptr
+        else
+          pchild%faces(1,2,1,2)%ptr => pmeta%faces(2,2,2,2)%ptr
+          pchild%faces(2,2,1,2)%ptr => pmeta%faces(2,2,2,2)%ptr
+          pchild%faces(1,2,2,2)%ptr => pmeta%faces(2,2,2,2)%ptr
+          pchild%faces(2,2,2,2)%ptr => pmeta%faces(2,2,2,2)%ptr
+          pneigh%faces(2,1,2,2)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,2)%ptr => pchild
+            pneigh%faces(2,1,1,2)%ptr => pchild
+            pneigh%faces(1,1,2,2)%ptr => pchild
+          end if
+        end if
+      end if
+! Z
+      pchild%faces(1,1,1,3)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,1,1,3)%ptr => pmeta%child(4)%ptr
+      pchild%faces(1,2,1,3)%ptr => pmeta%child(4)%ptr
+      pchild%faces(2,2,1,3)%ptr => pmeta%child(4)%ptr
+      if (associated(pmeta%faces(2,2,2,3)%ptr)) then
+        pneigh => pmeta%faces(2,2,2,3)%ptr
+        if (pneigh%id == pmeta%id) then
+          pchild%faces(1,1,2,3)%ptr => pmeta%child(4)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%child(4)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%child(4)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%child(4)%ptr
+        else
+          pchild%faces(1,1,2,3)%ptr => pmeta%faces(2,2,2,3)%ptr
+          pchild%faces(2,1,2,3)%ptr => pmeta%faces(2,2,2,3)%ptr
+          pchild%faces(1,2,2,3)%ptr => pmeta%faces(2,2,2,3)%ptr
+          pchild%faces(2,2,2,3)%ptr => pmeta%faces(2,2,2,3)%ptr
+          pneigh%faces(2,2,1,3)%ptr => pchild
+          if (pneigh%level > pmeta%level) then
+            pneigh%faces(1,1,1,3)%ptr => pchild
+            pneigh%faces(2,1,1,3)%ptr => pchild
+            pneigh%faces(1,2,1,3)%ptr => pchild
+          end if
+        end if
+      end if
+#endif /* NDIMS == 3 */
+
 ! update edge neighbor pointers of children, and the corresponding edge
 ! pointers of neighbors
 !
