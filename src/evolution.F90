@@ -257,6 +257,12 @@ module evolution
 !
       call boundary_variables()
 
+#ifdef DEBUG
+! check variables for NaNs
+!
+      call check_variables()
+#endif /* DEBUG */
+
 ! set all meta blocks to be updated
 !
       call set_blocks_update(.true.)
@@ -818,6 +824,85 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine update_variables
+#ifdef DEBUG
+!
+!===============================================================================
+!
+! subroutine CHECK_VARIABLES:
+! --------------------------
+!
+!   Subroutine iterates over all data blocks and converts the conservative
+!   variables to their primitive representation.
+!
+!
+!===============================================================================
+!
+  subroutine check_variables()
+
+! include external procedures
+!
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv, pvars, cvars
+
+! include external variables
+!
+    use blocks        , only : block_meta, list_meta
+    use blocks        , only : block_data, list_data
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer :: i, j, k, p
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! associate the pointer with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! associate pmeta with the corresponding meta block
+!
+      pmeta => pdata%meta
+
+! check if there are NaNs in primitive variables
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+            do p = 1, nv
+              if (isnan(pdata%u(p,i,j,k))) then
+                print *, 'U NaN:', cvars(p), pdata%meta%id, i, j, k
+              end if
+              if (isnan(pdata%q(p,i,j,k))) then
+                print *, 'Q NaN:', pvars(p), pdata%meta%id, i, j, k
+              end if
+            end do ! p = 1, nv
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine check_variables
+#endif /* DEBUG */
 
 !===============================================================================
 !
