@@ -5606,15 +5606,6 @@ module boundaries
 !
                   if (pmeta%update .and. pneigh%update) then
 
-! process only external corners
-!
-#if NDIMS == 2
-                    if (pneigh%corners(3-i,3-j)%ptr%id == pmeta%id) then
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-                    if (pneigh%corners(3-i,3-j,3-k)%ptr%id == pmeta%id) then
-#endif /* NDIMS == 3 */
-
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
@@ -5707,8 +5698,6 @@ module boundaries
 
                     end if ! block and neighbor on different processors
 #endif /* MPI */
-                    end if ! only external corners
-
                   end if ! pmeta and pneigh marked for update
 
                 end if ! neighbor at lower level

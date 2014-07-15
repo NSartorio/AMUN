@@ -2350,7 +2350,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(2,1)%ptr => pmeta%child(4)%ptr
         else
-          pchild%corners(2,1)%ptr => pmeta%edges(2,1,1)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(2,1)%ptr => pmeta%edges(2,1,1)%ptr
         end if
       endif
       if (associated(pmeta%edges(1,2,2)%ptr)) then
@@ -2358,7 +2359,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(1,2)%ptr => pmeta%child(4)%ptr
         else
-          pchild%corners(1,2)%ptr => pmeta%edges(1,2,2)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(1,2)%ptr => pmeta%edges(1,2,2)%ptr
         end if
       end if
       pchild%corners(2,2)%ptr => pmeta%child(4)%ptr
@@ -2371,7 +2373,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(1,1)%ptr => pmeta%child(3)%ptr
         else
-          pchild%corners(1,1)%ptr => pmeta%edges(1,1,1)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(1,1)%ptr => pmeta%edges(1,1,1)%ptr
         end if
       end if
       if (associated(pmeta%corners(2,1)%ptr)) then
@@ -2388,7 +2391,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(2,2)%ptr => pmeta%child(3)%ptr
         else
-          pchild%corners(2,2)%ptr => pmeta%edges(2,2,2)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(2,2)%ptr => pmeta%edges(2,2,2)%ptr
         end if
       end if
 
@@ -2400,7 +2404,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(1,1)%ptr => pmeta%child(2)%ptr
         else
-          pchild%corners(1,1)%ptr => pmeta%edges(1,1,2)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(1,1)%ptr => pmeta%edges(1,1,2)%ptr
         end if
       end if
       pchild%corners(2,1)%ptr => pmeta%child(2)%ptr
@@ -2417,7 +2422,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(2,2)%ptr => pmeta%child(2)%ptr
         else
-          pchild%corners(2,2)%ptr => pmeta%edges(2,2,1)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(2,2)%ptr => pmeta%edges(2,2,1)%ptr
         end if
       end if
 
@@ -2430,7 +2436,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(2,1)%ptr => pmeta%child(1)%ptr
         else
-          pchild%corners(2,1)%ptr => pmeta%edges(2,1,2)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(2,1)%ptr => pmeta%edges(2,1,2)%ptr
         end if
       end if
       if (associated(pmeta%edges(1,2,1)%ptr)) then
@@ -2438,7 +2445,8 @@ module blocks
         if (pneigh%id == pmeta%id) then
           pchild%corners(1,2)%ptr => pmeta%child(1)%ptr
         else
-          pchild%corners(1,2)%ptr => pmeta%edges(1,2,1)%ptr
+          if (pneigh%level > pmeta%level)                                      &
+                             pchild%corners(1,2)%ptr => pmeta%edges(1,2,1)%ptr
         end if
       end if
       if (associated(pmeta%corners(2,2)%ptr)) then
