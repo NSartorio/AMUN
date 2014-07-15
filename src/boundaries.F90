@@ -4997,6 +4997,7 @@ module boundaries
 
 ! local indices
 !
+    integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
 !
@@ -5007,8 +5008,19 @@ module boundaries
     select case(nc)
     case(1)
 
+! calculate half size
+!
+      ih = in / 2
+
 ! prepare source corner region indices
 !
+      if (ic == 1) then
+        il = ib
+        iu = ib + ih - 1
+      else
+        il = ie - ih + 1
+        iu = ie
+      end if
       if (jc == 1) then
         jl = jel
         ju = je
@@ -5029,13 +5041,17 @@ module boundaries
 ! return corner region in the output array
 !
 #if NDIMS == 2
-      qb(1:nv,1:in,1:ng,1:km) = qn(1:nv,ib:ie,jl:ju, 1:km)
+      qb(1:nv,1:ih,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      qb(1:nv,1:in,1:ng,1:ng) = qn(1:nv,ib:ie,jl:ju,kl:ku)
+      qb(1:nv,1:ih,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
     case(2)
+
+! calculate half size
+!
+      jh = jn / 2
 
 ! prepare source corner region indices
 !
@@ -5045,6 +5061,13 @@ module boundaries
       else
         il = ib
         iu = ibu
+      end if
+      if (jc == 1) then
+        jl = jb
+        ju = jb + jh - 1
+      else
+        jl = je - jh + 1
+        ju = je
       end if
 #if NDIMS == 3
       if (kc == 1) then
@@ -5059,15 +5082,19 @@ module boundaries
 ! return corner region in the output array
 !
 #if NDIMS == 2
-      qb(1:nv,1:ng,1:jn,1:km) = qn(1:nv,il:iu,jb:je, 1:km)
+      qb(1:nv,1:ng,1:jh,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-      qb(1:nv,1:ng,1:jn,1:ng) = qn(1:nv,il:iu,jb:je,kl:ku)
+      qb(1:nv,1:ng,1:jh,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 3
     case(3)
 
+! calculate half size
+!
+      kh = kn / 2
+
 ! prepare source corner region indices
 !
       if (ic == 1) then
@@ -5084,10 +5111,17 @@ module boundaries
         jl = jb
         ju = jbu
       end if
+      if (kc == 1) then
+        kl = kb
+        ku = kb + kh - 1
+      else
+        kl = ke - kh + 1
+        ku = ke
+      end if
 
 ! return corner region in the output array
 !
-      qb(1:nv,1:ng,1:ng,1:kn) = qn(1:nv,il:iu,jl:ju,kb:ke)
+      qb(1:nv,1:ng,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
 
     end select
