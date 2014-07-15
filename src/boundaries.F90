@@ -354,6 +354,10 @@ module boundaries
 !
     call boundaries_corner_restrict()
 
+! prolong corner boundaries from blocks at lower levels
+!
+    call boundaries_corner_prolong()
+
 ! convert updated primitive variables to conservative ones in all ghost cells
 !
     call update_ghost_cells()
