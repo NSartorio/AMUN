@@ -346,6 +346,10 @@ module boundaries
 !
     call update_corners()
 
+! update corner boundaries between blocks at the same levels
+!
+    call boundaries_corner_copy()
+
 ! convert updated primitive variables to conservative ones in all ghost cells
 !
     call update_ghost_cells()
