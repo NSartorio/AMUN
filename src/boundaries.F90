@@ -5553,7 +5553,7 @@ module boundaries
 !     nc         - the edge direction;
 !     ic, jc, kc - the corner position;
 !     qn         - the input neighbor variable array;
-!     qb         - the output corner boundary array;
+!     qb         - the output edge boundary array;
 !
 !===============================================================================
 !
@@ -5597,7 +5597,7 @@ module boundaries
 !
       ih = in / 2
 
-! prepare source corner region indices
+! prepare source edge region indices
 !
       if (ic == 1) then
         il = ib
@@ -5623,7 +5623,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return corner region in the output array
+! return edge region in the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ih,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
@@ -5638,7 +5638,7 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare source corner region indices
+! prepare source edge region indices
 !
       if (ic == 1) then
         il = iel
@@ -5664,7 +5664,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return corner region in the output array
+! return edge region in the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ng,1:jh,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
@@ -5680,7 +5680,7 @@ module boundaries
 !
       kh = kn / 2
 
-! prepare source corner region indices
+! prepare source edge region indices
 !
       if (ic == 1) then
         il = iel
@@ -5704,7 +5704,7 @@ module boundaries
         ku = ke
       end if
 
-! return corner region in the output array
+! return edge region in the output array
 !
       qb(1:nv,1:ng,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
@@ -5714,6 +5714,213 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine block_edge_copy
+!
+!===============================================================================
+!
+! subroutine BLOCK_EDGE_RESTRICT:
+! ------------------------------
+!
+!   Subroutine returns the edge boundary region by restricting the corresponding
+!   region from the provided input variable array.
+!
+!   Arguments:
+!
+!     nc         - the edge direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output edge boundary array;
+!
+!===============================================================================
+!
+  subroutine block_edge_restrict(nc, ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng, nd
+    use coordinates    , only : in
+    use coordinates    , only : in , jn , kn
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: nc, ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
+
+! local variables
+!
+    integer :: ih, jh, kh
+    integer :: il, jl, kl
+    integer :: ip, jp, kp
+    integer :: iu, ju, ku
+!
+!-------------------------------------------------------------------------------
+!
+! depending on the direction
+!
+    select case(nc)
+    case(1)
+
+! calculate half size
+!
+      ih = in / 2
+
+! prepare source edge region indices
+!
+      il = ib
+      ip = il + 1
+      iu = ie
+      if (jc == 1) then
+        jl = je - nd + 1
+        jp = jl + 1
+        ju = je
+      else
+        jl = jb
+        jp = jl + 1
+        ju = jb + nd - 1
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = ke - nd + 1
+        kp = kl + 1
+        ku = ke
+      else
+        kl = kb
+        kp = kl + 1
+        ku = kb + nd - 1
+      end if
+#endif /* NDIMS == 3 */
+
+! return edge region in the output array
+!
+#if NDIMS == 2
+      qb(1:nv,1:ih,1:ng,1:km) =                                                &
+                           2.50d-01 *  ((qn(1:nv,il:iu:2,jl:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2, 1:km  ))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2, 1:km  )))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      qb(1:nv,1:ih,1:ng,1:ng) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! calculate half size
+!
+      jh = jn / 2
+
+! prepare source edge region indices
+!
+      if (ic == 1) then
+        il = ie - nd + 1
+        ip = il + 1
+        iu = ie
+      else
+        il = ib
+        ip = il + 1
+        iu = ib + nd - 1
+      end if
+      jl = jb
+      jp = jl + 1
+      ju = je
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = ke - nd + 1
+        kp = kl + 1
+        ku = ke
+      else
+        kl = kb
+        kp = kl + 1
+        ku = kb + nd - 1
+      end if
+#endif /* NDIMS == 3 */
+
+! return edge region in the output array
+!
+#if NDIMS == 2
+      qb(1:nv,1:ng,1:jh,1:km) =                                                &
+                           2.50d-01 *  ((qn(1:nv,il:iu:2,jl:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2, 1:km  ))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2, 1:km  )))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      qb(1:nv,1:ng,1:jh,1:ng) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! calculate half size
+!
+      kh = kn / 2
+
+! prepare source edge region indices
+!
+      if (ic == 1) then
+        il = ie - nd + 1
+        ip = il + 1
+        iu = ie
+      else
+        il = ib
+        ip = il + 1
+        iu = ib + nd - 1
+      end if
+      if (jc == 1) then
+        jl = je - nd + 1
+        jp = jl + 1
+        ju = je
+      else
+        jl = jb
+        jp = jl + 1
+        ju = jb + nd - 1
+      end if
+      kl = kb
+      kp = kl + 1
+      ku = ke
+
+! return edge region in the output array
+!
+      qb(1:nv,1:ng,1:ng,1:kh) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+#endif /* NDIMS == 3 */
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_edge_restrict
 !
 !===============================================================================
 !
