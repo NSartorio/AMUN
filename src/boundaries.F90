@@ -6509,6 +6509,238 @@ module boundaries
 !
 !===============================================================================
 !
+! subroutine BLOCK_EDGE_PROLONG:
+! -----------------------------
+!
+!   Subroutine returns the edge boundary region by prolongating
+!   the corresponding region from the provided input variable array.
+!
+!   Arguments:
+!
+!     nc         - the edge direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output edge boundary array;
+!
+!===============================================================================
+!
+  subroutine block_edge_prolong(nc, ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng, nh
+    use coordinates    , only : in
+    use coordinates    , only : in , jn , kn
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use equations      , only : nv
+    use interpolations , only : limiter
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: nc, ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
+
+! local variables
+!
+    integer      :: i, j, k, p
+    integer      :: ih, jh, kh
+    integer      :: il, jl, kl
+    integer      :: iu, ju, ku
+    integer      :: is, js, ks
+    integer      :: it, jt, kt
+    integer      :: im1, jm1, km1
+    integer      :: ip1, jp1, kp1
+    real(kind=8) :: dql, dqr
+    real(kind=8) :: dqx, dqy, dqz
+    real(kind=8) :: dq1, dq2, dq3, dq4
+!
+!-------------------------------------------------------------------------------
+!
+! depending on the direction
+!
+    select case(nc)
+    case(1)
+
+! calculate half size
+!
+      ih = in / 2
+
+! prepare source edge region indices
+!
+      if (ic == 0) then
+        il = ib
+        iu = ib + ih + nh - 1
+      else
+        il = ie - ih - nh + 1
+        iu = ie
+      end if
+      if (jc == 1) then
+        jl = je - nh + 1
+        ju = je
+      else
+        jl = jb
+        ju = jb + nh - 1
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = ke - nh + 1
+        ku = ke
+      else
+        kl = kb
+        ku = kb + nh - 1
+      end if
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! calculate half size
+!
+      jh = jn / 2
+
+! prepare source edge region indices
+!
+      if (ic == 1) then
+        il = ie - nh + 1
+        iu = ie
+      else
+        il = ib
+        iu = ib + nh - 1
+      end if
+      if (jc == 0) then
+        jl = jb
+        ju = jb + jh + nh - 1
+      else
+        jl = je - jh - nh + 1
+        ju = je
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = ke - nh + 1
+        ku = ke
+      else
+        kl = kb
+        ku = kb + nh - 1
+      end if
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! calculate half size
+!
+      kh = kn / 2
+
+! prepare source edge region indices
+!
+      if (ic == 1) then
+        il = ie - nh + 1
+        iu = ie
+      else
+        il = ib
+        iu = ib + nh - 1
+      end if
+      if (jc == 1) then
+        jl = je - nh + 1
+        ju = je
+      else
+        jl = jb
+        ju = jb + nh - 1
+      end if
+      if (kc == 0) then
+        kl = kb
+        ku = kb + kh + nh - 1
+      else
+        kl = ke - kh - nh + 1
+        ku = ke
+      end if
+#endif /* NDIMS == 3 */
+
+    end select
+
+! return edge region in the output array
+!
+#if NDIMS == 2
+    do k = 1, km
+      kt = 1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = kl, ku
+      km1 = k - 1
+      kp1 = k + 1
+      ks = 2 * (k - kl) + 1
+      kt = ks + 1
+#endif /* NDIMS == 3 */
+      do j = jl, ju
+        jm1 = j - 1
+        jp1 = j + 1
+        js = 2 * (j - jl) + 1
+        jt = js + 1
+        do i = il, iu
+          im1 = i - 1
+          ip1 = i + 1
+          is = 2 * (i - il) + 1
+          it = is + 1
+
+! iterate over all variables
+!
+          do p = 1, nv
+
+            dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
+            dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
+            dqx = limiter(0.25d+00, dql, dqr)
+
+            dql = qn(p,i,j  ,k) - qn(p,i,jm1,k)
+            dqr = qn(p,i,jp1,k) - qn(p,i,j  ,k)
+            dqy = limiter(0.25d+00, dql, dqr)
+
+#if NDIMS == 3
+            dql = qn(p,i,j,k  ) - qn(p,i,j,km1)
+            dqr = qn(p,i,j,kp1) - qn(p,i,j,k  )
+            dqz = limiter(0.25d+00, dql, dqr)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 2
+            dq1 = dqx + dqy
+            dq2 = dqx - dqy
+            qb(p,is,js,k ) = qn(p,i,j,k) - dq1
+            qb(p,it,js,k ) = qn(p,i,j,k) + dq2
+            qb(p,is,jt,k ) = qn(p,i,j,k) - dq2
+            qb(p,it,jt,k ) = qn(p,i,j,k) + dq1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            dq1 = dqx + dqy + dqz
+            dq2 = dqx - dqy - dqz
+            dq3 = dqx - dqy + dqz
+            dq4 = dqx + dqy - dqz
+            qb(p,is,js,ks) = qn(p,i,j,k) - dq1
+            qb(p,it,js,ks) = qn(p,i,j,k) + dq2
+            qb(p,is,jt,ks) = qn(p,i,j,k) - dq3
+            qb(p,it,jt,ks) = qn(p,i,j,k) + dq4
+            qb(p,is,js,kt) = qn(p,i,j,k) - dq4
+            qb(p,it,js,kt) = qn(p,i,j,k) + dq3
+            qb(p,is,jt,kt) = qn(p,i,j,k) - dq2
+            qb(p,it,jt,kt) = qn(p,i,j,k) + dq1
+#endif /* NDIMS == 3 */
+
+          end do ! q = 1, nv
+
+        end do ! i = il, iu
+      end do ! j = jl, ju
+    end do ! k = kl, ku
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_edge_prolong
+!
+!===============================================================================
+!
 !  BLOCK CORNER UPDATE SUBROUTINES
 !
 !===============================================================================
