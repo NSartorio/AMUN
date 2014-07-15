@@ -366,6 +366,12 @@ module boundaries
 !
     call boundaries_corner_restrict()
 
+! prolongs edge boundaries from block at lower level
+!
+    do idir = 1, ndims
+      call boundaries_edge_prolong(idir)
+    end do ! idir
+
 ! prolong corner boundaries from blocks at lower levels
 !
     call boundaries_corner_prolong()
