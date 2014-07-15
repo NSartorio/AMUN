@@ -167,6 +167,8 @@ module domains
 ! allocatable arrays
 !
     integer, dimension(:,:,:), allocatable :: cfg
+    integer, dimension(:)    , allocatable :: im, jm, km
+    integer, dimension(:)    , allocatable :: ip, jp, kp
 
 ! local pointer array
 !
@@ -459,6 +461,210 @@ module domains
         end do
       end do
     end if
+#endif /* NDIMS == 3 */
+
+! allocate indices
+!
+   allocate(im(ir), ip(ir))
+   allocate(jm(jr), jp(jr))
+#if NDIMS == 3
+   allocate(km(kr), kp(kr))
+#endif /* NDIMS == 3 */
+
+! generate indices
+!
+   im(:) = cshift((/(i, i = 1, ir)/),-1)
+   ip(:) = cshift((/(i, i = 1, ir)/), 1)
+   jm(:) = cshift((/(j, j = 1, jr)/),-1)
+   jp(:) = cshift((/(j, j = 1, jr)/), 1)
+#if NDIMS == 3
+   km(:) = cshift((/(k, k = 1, kr)/),-1)
+   kp(:) = cshift((/(k, k = 1, kr)/), 1)
+#endif /* NDIMS == 3 */
+
+! check periodicity and reset the edge indices if box is not periodic
+!
+   if (bnd_type(1,1) /= bnd_periodic .or. bnd_type(1,2) /= bnd_periodic) then
+     im( 1) = 0
+     ip(ir) = 0
+   end if
+   if (bnd_type(2,1) /= bnd_periodic .or. bnd_type(2,2) /= bnd_periodic) then
+     jm( 1) = 0
+     jp(jr) = 0
+   end if
+#if NDIMS == 3
+   if (bnd_type(3,1) /= bnd_periodic .or. bnd_type(3,2) /= bnd_periodic) then
+     km( 1) = 0
+     kp(kr) = 0
+   end if
+#endif /* NDIMS == 3 */
+
+! iterate over all initial blocks
+!
+    do k = 1, kr
+      do j = 1, jr
+        do i = 1, ir
+
+! assign pmeta with the current block
+!
+          pmeta => block_array(i,j,k)%ptr
+
+#if NDIMS == 3
+! assign face neighbor pointers
+!
+          if (im(i) > 0) then
+            pmeta%faces(1,1,1,1)%ptr => block_array(im(i),j,k)%ptr
+            pmeta%faces(1,2,1,1)%ptr => block_array(im(i),j,k)%ptr
+            pmeta%faces(1,1,2,1)%ptr => block_array(im(i),j,k)%ptr
+            pmeta%faces(1,2,2,1)%ptr => block_array(im(i),j,k)%ptr
+          end if
+          if (ip(i) > 0) then
+            pmeta%faces(2,1,1,1)%ptr => block_array(ip(i),j,k)%ptr
+            pmeta%faces(2,2,1,1)%ptr => block_array(ip(i),j,k)%ptr
+            pmeta%faces(2,1,2,1)%ptr => block_array(ip(i),j,k)%ptr
+            pmeta%faces(2,2,2,1)%ptr => block_array(ip(i),j,k)%ptr
+          end if
+
+          if (jm(j) > 0) then
+            pmeta%faces(1,1,1,2)%ptr => block_array(i,jm(j),k)%ptr
+            pmeta%faces(2,1,1,2)%ptr => block_array(i,jm(j),k)%ptr
+            pmeta%faces(1,1,2,2)%ptr => block_array(i,jm(j),k)%ptr
+            pmeta%faces(2,1,2,2)%ptr => block_array(i,jm(j),k)%ptr
+          end if
+          if (jp(j) > 0) then
+            pmeta%faces(1,2,1,2)%ptr => block_array(i,jp(j),k)%ptr
+            pmeta%faces(2,2,1,2)%ptr => block_array(i,jp(j),k)%ptr
+            pmeta%faces(1,2,2,2)%ptr => block_array(i,jp(j),k)%ptr
+            pmeta%faces(2,2,2,2)%ptr => block_array(i,jp(j),k)%ptr
+          end if
+
+          if (km(k) > 0) then
+            pmeta%faces(1,1,1,3)%ptr => block_array(i,j,km(k))%ptr
+            pmeta%faces(2,1,1,3)%ptr => block_array(i,j,km(k))%ptr
+            pmeta%faces(1,2,1,3)%ptr => block_array(i,j,km(k))%ptr
+            pmeta%faces(2,2,1,3)%ptr => block_array(i,j,km(k))%ptr
+          end if
+          if (kp(k) > 0) then
+            pmeta%faces(1,1,2,3)%ptr => block_array(i,j,kp(k))%ptr
+            pmeta%faces(2,1,2,3)%ptr => block_array(i,j,kp(k))%ptr
+            pmeta%faces(1,2,2,3)%ptr => block_array(i,j,kp(k))%ptr
+            pmeta%faces(2,2,2,3)%ptr => block_array(i,j,kp(k))%ptr
+          end if
+#endif /* NDIMS == 3 */
+
+! assign edge neighbor pointers
+!
+#if NDIMS == 2
+          if (im(i) > 0) then
+            pmeta%edges(1,1,2)%ptr => block_array(im(i),j,k)%ptr
+            pmeta%edges(1,2,2)%ptr => block_array(im(i),j,k)%ptr
+          end if
+          if (ip(i) > 0) then
+            pmeta%edges(2,1,2)%ptr => block_array(ip(i),j,k)%ptr
+            pmeta%edges(2,2,2)%ptr => block_array(ip(i),j,k)%ptr
+          end if
+          if (jm(j) > 0) then
+            pmeta%edges(1,1,1)%ptr => block_array(i,jm(j),k)%ptr
+            pmeta%edges(2,1,1)%ptr => block_array(i,jm(j),k)%ptr
+          end if
+          if (jp(j) > 0) then
+            pmeta%edges(1,2,1)%ptr => block_array(i,jp(j),k)%ptr
+            pmeta%edges(2,2,1)%ptr => block_array(i,jp(j),k)%ptr
+          end if
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+          if (jm(j) > 0 .and. km(k) > 0) then
+            pmeta%edges(1,1,1,1)%ptr => block_array(i,jm(j),km(k))%ptr
+            pmeta%edges(2,1,1,1)%ptr => block_array(i,jm(j),km(k))%ptr
+          end if
+          if (jp(j) > 0 .and. km(k) > 0) then
+            pmeta%edges(1,2,1,1)%ptr => block_array(i,jp(j),km(k))%ptr
+            pmeta%edges(2,2,1,1)%ptr => block_array(i,jp(j),km(k))%ptr
+          end if
+          if (jm(j) > 0 .and. kp(k) > 0) then
+            pmeta%edges(1,1,2,1)%ptr => block_array(i,jm(j),kp(k))%ptr
+            pmeta%edges(2,1,2,1)%ptr => block_array(i,jm(j),kp(k))%ptr
+          end if
+          if (jp(j) > 0 .and. kp(k) > 0) then
+            pmeta%edges(1,2,2,1)%ptr => block_array(i,jp(j),kp(k))%ptr
+            pmeta%edges(2,2,2,1)%ptr => block_array(i,jp(j),kp(k))%ptr
+          end if
+
+          if (im(i) > 0 .and. km(k) > 0) then
+            pmeta%edges(1,1,1,2)%ptr => block_array(im(i),j,km(k))%ptr
+            pmeta%edges(1,2,1,2)%ptr => block_array(im(i),j,km(k))%ptr
+          end if
+          if (ip(i) > 0 .and. km(k) > 0) then
+            pmeta%edges(2,1,1,2)%ptr => block_array(ip(i),j,km(k))%ptr
+            pmeta%edges(2,2,1,2)%ptr => block_array(ip(i),j,km(k))%ptr
+          end if
+          if (im(i) > 0 .and. kp(k) > 0) then
+            pmeta%edges(1,1,2,2)%ptr => block_array(im(i),j,kp(k))%ptr
+            pmeta%edges(1,2,2,2)%ptr => block_array(im(i),j,kp(k))%ptr
+          end if
+          if (ip(i) > 0 .and. kp(k) > 0) then
+            pmeta%edges(2,1,2,2)%ptr => block_array(ip(i),j,kp(k))%ptr
+            pmeta%edges(2,2,2,2)%ptr => block_array(ip(i),j,kp(k))%ptr
+          end if
+
+          if (im(i) > 0 .and. jm(j) > 0) then
+            pmeta%edges(1,1,1,3)%ptr => block_array(im(i),jm(j),k)%ptr
+            pmeta%edges(1,1,2,3)%ptr => block_array(im(i),jm(j),k)%ptr
+          end if
+          if (ip(i) > 0 .and. jm(j) > 0) then
+            pmeta%edges(2,1,1,3)%ptr => block_array(ip(i),jm(j),k)%ptr
+            pmeta%edges(2,1,2,3)%ptr => block_array(ip(i),jm(j),k)%ptr
+          end if
+          if (im(i) > 0 .and. jp(j) > 0) then
+            pmeta%edges(1,2,1,3)%ptr => block_array(im(i),jp(j),k)%ptr
+            pmeta%edges(1,2,2,3)%ptr => block_array(im(i),jp(j),k)%ptr
+          end if
+          if (ip(i) > 0 .and. jp(j) > 0) then
+            pmeta%edges(2,2,1,3)%ptr => block_array(ip(i),jp(j),k)%ptr
+            pmeta%edges(2,2,2,3)%ptr => block_array(ip(i),jp(j),k)%ptr
+          end if
+#endif /* NDIMS == 3 */
+
+! assign corner neighbor pointers
+!
+#if NDIMS == 2
+          if (im(i) > 0 .and. jm(j) > 0)                                       &
+                      pmeta%corners(1,1)%ptr => block_array(im(i),jm(j),k)%ptr
+          if (ip(i) > 0 .and. jm(j) > 0)                                       &
+                      pmeta%corners(2,1)%ptr => block_array(ip(i),jm(j),k)%ptr
+          if (im(i) > 0 .and. jp(j) > 0)                                       &
+                      pmeta%corners(1,2)%ptr => block_array(im(i),jp(j),k)%ptr
+          if (ip(i) > 0 .and. jp(j) > 0)                                       &
+                      pmeta%corners(2,2)%ptr => block_array(ip(i),jp(j),k)%ptr
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+          if (im(i) > 0 .and. jm(j) > 0 .and. km(k) > 0)                       &
+                pmeta%corners(1,1,1)%ptr => block_array(im(i),jm(j),km(k))%ptr
+          if (ip(i) > 0 .and. jm(j) > 0 .and. km(k) > 0)                       &
+                pmeta%corners(2,1,1)%ptr => block_array(ip(i),jm(j),km(k))%ptr
+          if (im(i) > 0 .and. jp(j) > 0 .and. km(k) > 0)                       &
+                pmeta%corners(1,2,1)%ptr => block_array(im(i),jp(j),km(k))%ptr
+          if (ip(i) > 0 .and. jp(j) > 0 .and. km(k) > 0)                       &
+                pmeta%corners(2,2,1)%ptr => block_array(ip(i),jp(j),km(k))%ptr
+          if (im(i) > 0 .and. jm(j) > 0 .and. kp(k) > 0)                       &
+                pmeta%corners(1,1,2)%ptr => block_array(im(i),jm(j),kp(k))%ptr
+          if (ip(i) > 0 .and. jm(j) > 0 .and. kp(k) > 0)                       &
+                pmeta%corners(2,1,2)%ptr => block_array(ip(i),jm(j),kp(k))%ptr
+          if (im(i) > 0 .and. jp(j) > 0 .and. kp(k) > 0)                       &
+                pmeta%corners(1,2,2)%ptr => block_array(im(i),jp(j),kp(k))%ptr
+          if (ip(i) > 0 .and. jp(j) > 0 .and. kp(k) > 0)                       &
+                pmeta%corners(2,2,2)%ptr => block_array(ip(i),jp(j),kp(k))%ptr
+#endif /* NDIMS == 3 */
+        end do ! over i
+      end do ! over j
+    end do ! over k
+
+! deallocate indices
+!
+    deallocate(im, ip)
+    deallocate(jm, jp)
+#if NDIMS == 3
+    deallocate(km, kp)
 #endif /* NDIMS == 3 */
 
 ! deallocate the block pointer array
