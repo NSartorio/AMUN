@@ -4953,6 +4953,151 @@ module boundaries
 !
 !===============================================================================
 !
+!  BLOCK EDGE UPDATE SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine BLOCK_EDGE_COPY:
+! --------------------------
+!
+!   Subroutine returns the edge boundary region by copying the corresponding
+!   region from the provided input variable array.
+!
+!   Arguments:
+!
+!     nc         - the edge direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output corner boundary array;
+!
+!===============================================================================
+!
+  subroutine block_edge_copy(nc, ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng
+    use coordinates    , only : in , jn , kn
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use coordinates    , only : ibu, jbu, kbu
+    use coordinates    , only : iel, jel, kel
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: nc, ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
+
+! local indices
+!
+    integer :: il, jl, kl
+    integer :: iu, ju, ku
+!
+!-------------------------------------------------------------------------------
+!
+! depending on the direction
+!
+    select case(nc)
+    case(1)
+
+! prepare source corner region indices
+!
+      if (jc == 1) then
+        jl = jel
+        ju = je
+      else
+        jl = jb
+        ju = jbu
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = kel
+        ku = ke
+      else
+        kl = kb
+        ku = kbu
+      end if
+#endif /* NDIMS == 3 */
+
+! return corner region in the output array
+!
+#if NDIMS == 2
+      qb(1:nv,1:in,1:ng,1:km) = qn(1:nv,ib:ie,jl:ju, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      qb(1:nv,1:in,1:ng,1:ng) = qn(1:nv,ib:ie,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
+
+    case(2)
+
+! prepare source corner region indices
+!
+      if (ic == 1) then
+        il = iel
+        iu = ie
+      else
+        il = ib
+        iu = ibu
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = kb
+        ku = kbu
+      else
+        kl = kel
+        ku = ke
+      end if
+#endif /* NDIMS == 3 */
+
+! return corner region in the output array
+!
+#if NDIMS == 2
+      qb(1:nv,1:ng,1:jn,1:km) = qn(1:nv,il:iu,jb:je, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      qb(1:nv,1:ng,1:jn,1:ng) = qn(1:nv,il:iu,jb:je,kl:ku)
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+    case(3)
+
+! prepare source corner region indices
+!
+      if (ic == 1) then
+        il = iel
+        iu = ie
+      else
+        il = ib
+        iu = ibu
+      end if
+      if (jc == 1) then
+        jl = jel
+        ju = je
+      else
+        jl = jb
+        ju = jbu
+      end if
+
+! return corner region in the output array
+!
+      qb(1:nv,1:ng,1:ng,1:kn) = qn(1:nv,il:iu,jl:ju,kb:ke)
+#endif /* NDIMS == 3 */
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_edge_copy
+!
+!===============================================================================
+!
 !  BLOCK CORNER UPDATE SUBROUTINES
 !
 !===============================================================================
