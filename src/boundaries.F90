@@ -3541,6 +3541,103 @@ module boundaries
 !
 !===============================================================================
 !
+!  CORNER UPDATE SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine BLOCK_CORNER_COPY:
+! ----------------------------
+!
+!   Subroutine returns the corner boundary region by copying the corresponding
+!   region from the provided input variable array.
+!
+!   Arguments:
+!
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output corner boundary array;
+!
+!===============================================================================
+!
+  subroutine block_corner_copy(ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use coordinates    , only : ibu, jbu, kbu
+    use coordinates    , only : iel, jel, kel
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+#if NDIMS == 2
+    real(kind=8), dimension(1:nv,1:ng,1:ng,1:km), intent(out) :: qb
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    real(kind=8), dimension(1:nv,1:ng,1:ng,1:ng), intent(out) :: qb
+#endif /* NDIMS == 3 */
+
+! local indices
+!
+    integer :: il, jl, kl
+    integer :: iu, ju, ku
+!
+!-------------------------------------------------------------------------------
+!
+! prepare source corner region indices
+!
+    if (ic == 1) then
+      il = iel
+      iu = ie
+    else
+      il = ib
+      iu = ibu
+    end if
+    if (jc == 1) then
+      jl = jel
+      ju = je
+    else
+      jl = jb
+      ju = jbu
+    end if
+#if NDIMS == 3
+    if (kc == 1) then
+      kl = kel
+      ku = ke
+    else
+      kl = kb
+      ku = kbu
+    end if
+#endif /* NDIMS == 3 */
+
+! return corner region in the output array
+!
+#if NDIMS == 2
+    qb(1:nv,1:ng,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    qb(1:nv,1:ng,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_corner_copy
+!
+!===============================================================================
+!
+!  FLUX UPDATE SUBROUTINES
+!
+!===============================================================================
+!
 ! subroutine CORRECT_FLUX:
 ! -----------------------
 !
