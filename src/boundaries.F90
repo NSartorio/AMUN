@@ -356,6 +356,12 @@ module boundaries
 !
     call boundaries_corner_copy()
 
+! restricts edge boundaries from block at higher level
+!
+    do idir = 1, ndims
+      call boundaries_edge_restrict(idir)
+    end do ! idir
+
 ! restricts corner boundaries from blocks at higher levels
 !
     call boundaries_corner_restrict()
