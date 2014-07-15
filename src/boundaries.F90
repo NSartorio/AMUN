@@ -4107,6 +4107,112 @@ module boundaries
 !
 !===============================================================================
 !
+! subroutine BLOCK_CORNER_RESTRICT:
+! --------------------------------
+!
+!   Subroutine returns the corner boundary region by restricting
+!   the corresponding region from the provided input variable array.
+!
+!   Arguments:
+!
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output corner boundary array;
+!
+!===============================================================================
+!
+  subroutine block_corner_restrict(ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng, nd
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+#if NDIMS == 2
+    real(kind=8), dimension(1:nv,1:ng,1:ng,1:km), intent(out) :: qb
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    real(kind=8), dimension(1:nv,1:ng,1:ng,1:ng), intent(out) :: qb
+#endif /* NDIMS == 3 */
+
+! local variables
+!
+    integer :: il, jl, kl
+    integer :: ip, jp, kp
+    integer :: iu, ju, ku
+!
+!-------------------------------------------------------------------------------
+!
+! prepare source corner region indices
+!
+    if (ic == 1) then
+      il = ie - nd + 1
+      ip = il + 1
+      iu = ie
+    else
+      il = ib
+      ip = il + 1
+      iu = ib + nd - 1
+    end if
+    if (jc == 1) then
+      jl = je - nd + 1
+      jp = jl + 1
+      ju = je
+    else
+      jl = jb
+      jp = jl + 1
+      ju = jb + nd - 1
+    end if
+#if NDIMS == 3
+    if (kc == 1) then
+      kl = ke - nd + 1
+      kp = kl + 1
+      ku = ke
+    else
+      kl = kb
+      kp = kl + 1
+      ku = kb + nd - 1
+    end if
+#endif /* NDIMS == 3 */
+
+! return corner region in the output array
+!
+#if NDIMS == 2
+    qb(1:nv,1:ng,1:ng,1:km) =                                                  &
+                           2.50d-01 *  ((qn(1:nv,il:iu:2,jl:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2, 1:km  ))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2, 1:km  )      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2, 1:km  )))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    qb(1:nv,1:ng,1:ng,1:ng) =                                                  &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+#endif /* NDIMS == 3 */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_corner_restrict
+!
+!===============================================================================
+!
 !  BLOCK FLUX UPDATE SUBROUTINES
 !
 !===============================================================================
