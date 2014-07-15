@@ -346,6 +346,12 @@ module boundaries
 !
     call update_corners()
 
+! update edge boundaries between blocks at the same levels
+!
+    do idir = 1, ndims
+      call boundaries_edge_copy(idir)
+    end do ! idir
+
 ! update corner boundaries between blocks at the same levels
 !
     call boundaries_corner_copy()
