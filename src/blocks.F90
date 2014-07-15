@@ -2204,8 +2204,7 @@ module blocks
       end if
 #endif /* NDIMS == 3 */
 
-! update edge neighbor pointers of children, and the corresponding edge
-! pointers of neighbors
+! update edge neighbor pointers of children
 !
 #if NDIMS == 2
 ! child (1,1)
@@ -2219,8 +2218,6 @@ module blocks
         else
           pchild%edges(1,1,1)%ptr => pmeta%edges(1,1,1)%ptr
           pchild%edges(2,1,1)%ptr => pmeta%edges(1,1,1)%ptr
-          pneigh%edges(1,2,1)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(2,2,1)%ptr => pchild
         end if
       end if
       pchild%edges(1,2,1)%ptr => pmeta%child(3)%ptr
@@ -2234,8 +2231,6 @@ module blocks
         else
           pchild%edges(1,1,2)%ptr => pmeta%edges(1,1,2)%ptr
           pchild%edges(1,2,2)%ptr => pmeta%edges(1,1,2)%ptr
-          pneigh%edges(2,1,2)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(2,2,2)%ptr => pchild
         end if
       end if
       pchild%edges(2,1,2)%ptr => pmeta%child(2)%ptr
@@ -2252,8 +2247,6 @@ module blocks
         else
           pchild%edges(1,1,1)%ptr => pmeta%edges(2,1,1)%ptr
           pchild%edges(2,1,1)%ptr => pmeta%edges(2,1,1)%ptr
-          pneigh%edges(2,2,1)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(1,2,1)%ptr => pchild
         end if
       end if
       pchild%edges(1,2,1)%ptr => pmeta%child(4)%ptr
@@ -2269,8 +2262,6 @@ module blocks
         else
           pchild%edges(2,1,2)%ptr => pmeta%edges(2,1,2)%ptr
           pchild%edges(2,2,2)%ptr => pmeta%edges(2,1,2)%ptr
-          pneigh%edges(1,1,2)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(1,2,2)%ptr => pchild
         end if
       end if
 
@@ -2287,8 +2278,6 @@ module blocks
         else
           pchild%edges(1,2,1)%ptr => pmeta%edges(1,2,1)%ptr
           pchild%edges(2,2,1)%ptr => pmeta%edges(1,2,1)%ptr
-          pneigh%edges(1,1,1)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(2,1,1)%ptr => pchild
         end if
       end if
 ! Y
@@ -2300,8 +2289,6 @@ module blocks
         else
           pchild%edges(1,1,2)%ptr => pmeta%edges(1,2,2)%ptr
           pchild%edges(1,2,2)%ptr => pmeta%edges(1,2,2)%ptr
-          pneigh%edges(2,2,2)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(2,1,2)%ptr => pchild
         end if
       end if
       pchild%edges(2,1,2)%ptr => pmeta%child(4)%ptr
@@ -2315,13 +2302,11 @@ module blocks
       if (associated(pmeta%edges(2,2,1)%ptr)) then
         pneigh => pmeta%edges(2,2,1)%ptr
         if (pneigh%id == pmeta%id) then
-          pchild%edges(1,1,1)%ptr => pmeta%child(2)%ptr
-          pchild%edges(2,1,1)%ptr => pmeta%child(2)%ptr
+          pchild%edges(1,2,1)%ptr => pmeta%child(2)%ptr
+          pchild%edges(2,2,1)%ptr => pmeta%child(2)%ptr
         else
           pchild%edges(1,2,1)%ptr => pmeta%edges(2,2,1)%ptr
           pchild%edges(2,2,1)%ptr => pmeta%edges(2,2,1)%ptr
-          pneigh%edges(2,1,1)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(1,1,1)%ptr => pchild
         end if
       end if
 ! Y
@@ -2335,8 +2320,6 @@ module blocks
         else
           pchild%edges(2,1,2)%ptr => pmeta%edges(2,2,2)%ptr
           pchild%edges(2,2,2)%ptr => pmeta%edges(2,2,2)%ptr
-          pneigh%edges(1,2,2)%ptr => pchild
-          if (pneigh%level > pmeta%level) pneigh%edges(1,1,2)%ptr => pchild
         end if
       end if
 #endif /* NDIMS == 2 */
@@ -2354,7 +2337,6 @@ module blocks
           pchild%corners(1,1)%ptr => pmeta%child(4)%ptr
         else
           pchild%corners(1,1)%ptr => pmeta%corners(1,1)%ptr
-          pneigh%corners(2,2)%ptr => pchild
         end if
       end if
       if (associated(pmeta%edges(2,1,1)%ptr)) then
@@ -2363,16 +2345,14 @@ module blocks
           pchild%corners(2,1)%ptr => pmeta%child(4)%ptr
         else
           pchild%corners(2,1)%ptr => pmeta%edges(2,1,1)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
         end if
       endif
       if (associated(pmeta%edges(1,2,2)%ptr)) then
         pneigh => pmeta%edges(1,2,2)%ptr
         if (pneigh%id == pmeta%id) then
-          pchild%corners(2,1)%ptr => pmeta%child(4)%ptr
+          pchild%corners(1,2)%ptr => pmeta%child(4)%ptr
         else
           pchild%corners(1,2)%ptr => pmeta%edges(1,2,2)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
         end if
       end if
       pchild%corners(2,2)%ptr => pmeta%child(4)%ptr
@@ -2386,7 +2366,6 @@ module blocks
           pchild%corners(1,1)%ptr => pmeta%child(3)%ptr
         else
           pchild%corners(1,1)%ptr => pmeta%edges(1,1,1)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
         end if
       end if
       if (associated(pmeta%corners(2,1)%ptr)) then
@@ -2395,7 +2374,6 @@ module blocks
           pchild%corners(2,1)%ptr => pmeta%child(3)%ptr
         else
           pchild%corners(2,1)%ptr => pmeta%corners(2,1)%ptr
-          pneigh%corners(1,2)%ptr => pchild
         end if
       end if
       pchild%corners(1,2)%ptr => pmeta%child(3)%ptr
@@ -2405,7 +2383,6 @@ module blocks
           pchild%corners(2,2)%ptr => pmeta%child(3)%ptr
         else
           pchild%corners(2,2)%ptr => pmeta%edges(2,2,2)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
         end if
       end if
 
@@ -2418,7 +2395,6 @@ module blocks
           pchild%corners(1,1)%ptr => pmeta%child(2)%ptr
         else
           pchild%corners(1,1)%ptr => pmeta%edges(1,1,2)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
         end if
       end if
       pchild%corners(2,1)%ptr => pmeta%child(2)%ptr
@@ -2428,7 +2404,6 @@ module blocks
           pchild%corners(1,2)%ptr => pmeta%child(2)%ptr
         else
           pchild%corners(1,2)%ptr => pmeta%corners(1,2)%ptr
-          pneigh%corners(2,1)%ptr => pchild
         end if
       end if
       if (associated(pmeta%edges(2,2,1)%ptr)) then
@@ -2437,7 +2412,6 @@ module blocks
           pchild%corners(2,2)%ptr => pmeta%child(2)%ptr
         else
           pchild%corners(2,2)%ptr => pmeta%edges(2,2,1)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
         end if
       end if
 
@@ -2451,7 +2425,6 @@ module blocks
           pchild%corners(2,1)%ptr => pmeta%child(1)%ptr
         else
           pchild%corners(2,1)%ptr => pmeta%edges(2,1,2)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
         end if
       end if
       if (associated(pmeta%edges(1,2,1)%ptr)) then
@@ -2460,7 +2433,6 @@ module blocks
           pchild%corners(1,2)%ptr => pmeta%child(1)%ptr
         else
           pchild%corners(1,2)%ptr => pmeta%edges(1,2,1)%ptr
-          if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
         end if
       end if
       if (associated(pmeta%corners(2,2)%ptr)) then
@@ -2469,8 +2441,139 @@ module blocks
           pchild%corners(2,2)%ptr => pmeta%child(1)%ptr
         else
           pchild%corners(2,2)%ptr => pmeta%corners(2,2)%ptr
-          pneigh%corners(1,1)%ptr => pchild
         end if
+      end if
+#endif /* NDIMS == 2 */
+
+! update neighbor's edge pointers
+!
+#if NDIMS == 2
+! child (1,1)
+      pchild => pmeta%child(1)%ptr
+! X
+      if (associated(pchild%edges(1,1,1)%ptr)) then
+        pneigh => pchild%edges(1,1,1)%ptr
+        pneigh%edges(1,2,1)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(2,2,1)%ptr => pchild
+      end if
+! Y
+      if (associated(pchild%edges(1,1,2)%ptr)) then
+        pneigh => pchild%edges(1,1,2)%ptr
+        pneigh%edges(2,1,2)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(2,2,2)%ptr => pchild
+      end if
+
+! child (2,1)
+      pchild => pmeta%child(2)%ptr
+! X
+      if (associated(pchild%edges(2,1,1)%ptr)) then
+        pneigh => pchild%edges(2,1,1)%ptr
+        pneigh%edges(2,2,1)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(1,2,1)%ptr => pchild
+      end if
+! Y
+      if (associated(pchild%edges(2,1,2)%ptr)) then
+        pneigh => pchild%edges(2,1,2)%ptr
+        pneigh%edges(1,1,2)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(1,2,2)%ptr => pchild
+      end if
+
+! child (1,2)
+      pchild => pmeta%child(3)%ptr
+! X
+      if (associated(pchild%edges(1,2,1)%ptr)) then
+        pneigh => pchild%edges(1,2,1)%ptr
+        pneigh%edges(1,1,1)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(2,1,1)%ptr => pchild
+      end if
+! Y
+      if (associated(pchild%edges(1,2,2)%ptr)) then
+        pneigh => pchild%edges(1,2,2)%ptr
+        pneigh%edges(2,2,2)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(2,1,2)%ptr => pchild
+      end if
+
+! child (2,2)
+      pchild => pmeta%child(4)%ptr
+! X
+      if (associated(pchild%edges(2,2,1)%ptr)) then
+        pneigh => pchild%edges(2,2,1)%ptr
+        pneigh%edges(2,1,1)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(1,1,1)%ptr => pchild
+      end if
+! Y
+      if (associated(pchild%edges(2,2,2)%ptr)) then
+        pneigh => pchild%edges(2,2,2)%ptr
+        pneigh%edges(1,2,2)%ptr => pchild
+        if (pneigh%level == pchild%level) pneigh%edges(1,1,2)%ptr => pchild
+      end if
+#endif /* NDIMS == 2 */
+
+! update neighbor's corner pointers
+!
+#if NDIMS == 2
+! child (1,1)
+      pchild => pmeta%child(1)%ptr
+
+      if (associated(pmeta%corners(1,1)%ptr)) then
+        pneigh => pmeta%corners(1,1)%ptr
+        pneigh%corners(2,2)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(2,1,1)%ptr)) then
+        pneigh => pmeta%edges(2,1,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
+      endif
+      if (associated(pmeta%edges(1,2,2)%ptr)) then
+        pneigh => pmeta%edges(1,2,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
+      end if
+
+! child (2,1)
+      pchild => pmeta%child(2)%ptr
+
+      if (associated(pmeta%edges(1,1,1)%ptr)) then
+        pneigh => pmeta%edges(1,1,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
+      end if
+      if (associated(pmeta%corners(2,1)%ptr)) then
+        pneigh => pmeta%corners(2,1)%ptr
+        pneigh%corners(1,2)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(2,2,2)%ptr)) then
+        pneigh => pmeta%edges(2,2,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
+      end if
+
+! child (1,2)
+      pchild => pmeta%child(3)%ptr
+
+      if (associated(pmeta%edges(1,1,2)%ptr)) then
+        pneigh => pmeta%edges(1,1,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,2)%ptr => pchild
+      end if
+      if (associated(pmeta%corners(1,2)%ptr)) then
+        pneigh => pmeta%corners(1,2)%ptr
+        pneigh%corners(2,1)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(2,2,1)%ptr)) then
+        pneigh => pmeta%edges(2,2,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,1)%ptr => pchild
+      end if
+
+! child (2,2)
+      pchild => pmeta%child(4)%ptr
+
+      if (associated(pmeta%edges(2,1,2)%ptr)) then
+        pneigh => pmeta%edges(2,1,2)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(1,2)%ptr => pchild
+      end if
+      if (associated(pmeta%edges(1,2,1)%ptr)) then
+        pneigh => pmeta%edges(1,2,1)%ptr
+        if (pneigh%level > pmeta%level) pneigh%corners(2,1)%ptr => pchild
+      end if
+      if (associated(pmeta%corners(2,2)%ptr)) then
+        pneigh => pmeta%corners(2,2)%ptr
+        pneigh%corners(1,1)%ptr => pchild
       end if
 #endif /* NDIMS == 2 */
 
