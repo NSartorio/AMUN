@@ -291,6 +291,12 @@ module blocks
                                  !
     integer(kind=4)             :: direction, side, face
 
+                                 ! the corner index determining the position of
+                                 ! the corner boundary and when direction is
+                                 ! specified also the face or edge boundaries
+                                 !
+    integer(kind=4)             :: corner(NDIMS)
+
                                  ! the level difference between the block and
                                  ! its neighbor
                                  !
