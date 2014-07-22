@@ -3914,7 +3914,7 @@ module boundaries
 !
 !   Subroutine scans over all leaf blocks in order to find face neighbors which
 !   are on different levels, and perform the update of face boundaries of
-!   higher blocks by prolongating them from higher level neighbors.
+!   higher blocks by prolongating them from lower level neighbors.
 !
 !   Arguments:
 !
@@ -4480,15 +4480,15 @@ module boundaries
 !
 !===============================================================================
 !
-!  DOMAIN BOUNDARY UPDATE SUBROUTINES
+!  DOMAIN EDGE BOUNDARY UPDATE SUBROUTINES
 !
 !===============================================================================
 !
 ! subroutine BOUNDARIES_EDGE_COPY:
 ! -------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors at
-!   the same level, and perform the update of the corner boundaries between
+!   Subroutine scans over all leaf blocks in order to find edge neighbors which
+!   are the same level, and perform the update of the edge boundaries between
 !   them.
 !
 !   Arguments:
@@ -4587,15 +4587,15 @@ module boundaries
     end do
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE CORNER BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
+!! 2. UPDATE VARIABLE EDGE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -4611,7 +4611,7 @@ module boundaries
           do j = 1, nsides
             do i = 1, nsides
 
-! assign pneigh to the current neighbor
+! associate pneigh with the current neighbor
 !
 #if NDIMS == 2
               pneigh => pmeta%edges(i,j,idir)%ptr
@@ -4628,7 +4628,7 @@ module boundaries
 !
                 if (pneigh%level == pmeta%level) then
 
-! skip if the block and its neighbor are not marked for update
+! process only blocks and neighbors which are marked for update
 !
                   if (pmeta%update .and. pneigh%update) then
 
@@ -5066,9 +5066,9 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_RESTRICT:
 ! -----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors at
-!   the different levels, and perform the update of the edge boundaries between
-!   them.
+!   Subroutine scans over all leaf blocks in order to find edge neighbors which
+!   are on different levels, and perform the update of edge boundaries of
+!   lower blocks by restricting them from higher level neighbors.
 !
 !   Arguments:
 !
@@ -5170,11 +5170,11 @@ module boundaries
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -5207,7 +5207,7 @@ module boundaries
 !
                 if (pneigh%level > pmeta%level) then
 
-! skip if the block and its neighbor are not marked for update
+! process only blocks and neighbors which are marked for update
 !
                   if (pmeta%update .and. pneigh%update) then
 
@@ -5645,9 +5645,9 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_PROLONG:
 ! ----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors at
-!   the different levels, and perform the update of the edge boundaries between
-!   them.
+!   Subroutine scans over all leaf blocks in order to find edge neighbors which
+!   are on different levels, and perform the update of edge boundaries of
+!   higher blocks by prolongating them from lower level neighbors.
 !
 !   Arguments:
 !
@@ -5750,11 +5750,11 @@ module boundaries
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -5790,7 +5790,7 @@ module boundaries
 !
                 if (pneigh%level < pmeta%level) then
 
-! skip if the block and its neighbor are not marked for update
+! process only blocks and neighbors which are marked for update
 !
                   if (pmeta%update .and. pneigh%update) then
 
@@ -5957,7 +5957,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 22
+          itag = 100 * (irecv * nprocs + isend + 1) + 23
 
 ! allocate data buffer for variables to exchange
 !
@@ -6232,6 +6232,10 @@ module boundaries
 !
 !===============================================================================
 !
+!  DOMAIN CORNER BOUNDARY UPDATE SUBROUTINES
+!
+!===============================================================================
+!
 ! subroutine BOUNDARIES_CORNER_COPY:
 ! ---------------------------------
 !
@@ -6320,11 +6324,11 @@ module boundaries
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -6492,7 +6496,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 11
+          itag = 100 * (irecv * nprocs + isend + 1) + 31
 
 ! allocate data buffer for variables to exchange
 !
@@ -6696,9 +6700,9 @@ module boundaries
 ! subroutine BOUNDARIES_CORNER_RESTRICT:
 ! -------------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors at
-!   different levels, and update the corner boundaries of blocks at lower levels
-!   by restricting variables from higher level blocks.
+!   Subroutine scans over all leaf blocks in order to find corner neighbors
+!   which are on different levels, and perform the update of corner boundaries
+!   of lower blocks by restricting them from higher level neighbors.
 !
 !
 !===============================================================================
@@ -6781,11 +6785,11 @@ module boundaries
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -6952,7 +6956,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 12
+          itag = 100 * (irecv * nprocs + isend + 1) + 32
 
 ! allocate data buffer for variables to exchange
 !
@@ -7241,11 +7245,11 @@ module boundaries
 !!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
 !!    DIFFERENT PROCESSES
 !!
-! assign the pointer to the first block on the meta block list
+! associate pmeta with the first block on the meta block list
 !
     pmeta => list_meta
 
-! scan all meta blocks and process blocks at the current level
+! scan all meta blocks
 !
     do while(associated(pmeta))
 
@@ -7412,7 +7416,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 13
+          itag = 100 * (irecv * nprocs + isend + 1) + 33
 
 ! allocate data buffer for variables to exchange
 !
@@ -7460,12 +7464,12 @@ module boundaries
 !
 #if NDIMS == 2
               call block_corner_prolong(i, j, k                                &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
+                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        rbuf(l,1:nv,1:ng,1:ng,1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
               call block_corner_prolong(i, j, k                                &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
+                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        rbuf(l,1:nv,1:ng,1:ng,1:ng))
 #endif /* NDIMS == 3 */
 
@@ -8914,7 +8918,7 @@ module boundaries
             dq3 = dqx - dqy + dqz
             dq4 = dqx + dqy - dqz
 
-! prolongate the face region to the output array
+! prolong the face region to the output array
 !
             qb(p,is,js,ks) = qn(p,i,j,k) - dq1
             qb(p,it,js,ks) = qn(p,i,j,k) + dq2
@@ -8988,7 +8992,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! depending on the direction
+! process depending on the direction
 !
     select case(nc)
     case(1)
@@ -8997,7 +9001,7 @@ module boundaries
 !
       ih = in / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = ib
@@ -9023,7 +9027,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return edge region in the output array
+! copy the edge region to the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ih,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
@@ -9038,7 +9042,7 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = iel
@@ -9064,7 +9068,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return edge region in the output array
+! copy the edge region to the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ng,1:jh,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
@@ -9104,7 +9108,7 @@ module boundaries
         ku = ke
       end if
 
-! return edge region in the output array
+! copy the edge region to the output array
 !
       qb(1:nv,1:ng,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
 #endif /* NDIMS == 3 */
@@ -9163,7 +9167,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! depending on the direction
+! process depending on the direction
 !
     select case(nc)
     case(1)
@@ -9172,7 +9176,7 @@ module boundaries
 !
       ih = in / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       il = ib
       ip = il + 1
@@ -9198,7 +9202,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return edge region in the output array
+! restrict the edge region to the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ih,1:ng,1:km) =                                                &
@@ -9225,7 +9229,7 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = ie - nd + 1
@@ -9251,7 +9255,7 @@ module boundaries
       end if
 #endif /* NDIMS == 3 */
 
-! return edge region in the output array
+! restrict the edge region to the output array
 !
 #if NDIMS == 2
       qb(1:nv,1:ng,1:jh,1:km) =                                                &
@@ -9279,7 +9283,7 @@ module boundaries
 !
       kh = kn / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = ie - nd + 1
@@ -9303,7 +9307,7 @@ module boundaries
       kp = kl + 1
       ku = ke
 
-! return edge region in the output array
+! restrict the edge region to the output array
 !
       qb(1:nv,1:ng,1:ng,1:kh) =                                                &
                            1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
@@ -9378,7 +9382,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! depending on the direction
+! process depending on the direction
 !
     select case(nc)
     case(1)
@@ -9387,7 +9391,7 @@ module boundaries
 !
       ih = in / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 0) then
         il = ib
@@ -9419,7 +9423,7 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = ie - nh + 1
@@ -9452,7 +9456,7 @@ module boundaries
 !
       kh = kn / 2
 
-! prepare source edge region indices
+! prepare indices for the edge region
 !
       if (ic == 1) then
         il = ie - nh + 1
@@ -9479,7 +9483,7 @@ module boundaries
 
     end select
 
-! return edge region in the output array
+! iterate over all edge region cells
 !
 #if NDIMS == 2
     do k = 1, km
@@ -9507,6 +9511,8 @@ module boundaries
 !
           do p = 1, nv
 
+! calculate limited derivatives in all directions
+!
             dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
             dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
             dqx = limiter(0.25d+00, dql, dqr)
@@ -9522,18 +9528,28 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
+! calculate the derivative terms
+!
             dq1 = dqx + dqy
             dq2 = dqx - dqy
+
+! prolong the edge region to the output array
+!
             qb(p,is,js,k ) = qn(p,i,j,k) - dq1
             qb(p,it,js,k ) = qn(p,i,j,k) + dq2
             qb(p,is,jt,k ) = qn(p,i,j,k) - dq2
             qb(p,it,jt,k ) = qn(p,i,j,k) + dq1
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
+! calculate the derivative terms
+!
             dq1 = dqx + dqy + dqz
             dq2 = dqx - dqy - dqz
             dq3 = dqx - dqy + dqz
             dq4 = dqx + dqy - dqz
+
+! prolong the edge region to the output array
+!
             qb(p,is,js,ks) = qn(p,i,j,k) - dq1
             qb(p,it,js,ks) = qn(p,i,j,k) + dq2
             qb(p,is,jt,ks) = qn(p,i,j,k) - dq3
@@ -9608,7 +9624,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! prepare source corner region indices
+! prepare indices for the corner region
 !
     if (ic == 1) then
       il = iel
@@ -9634,7 +9650,7 @@ module boundaries
     end if
 #endif /* NDIMS == 3 */
 
-! return corner region in the output array
+! copy the corner region to the output array
 !
 #if NDIMS == 2
     qb(1:nv,1:ng,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
@@ -9696,7 +9712,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! prepare source corner region indices
+! prepare indices for the corner region
 !
     if (ic == 1) then
       il = ie - nd + 1
@@ -9728,7 +9744,7 @@ module boundaries
     end if
 #endif /* NDIMS == 3 */
 
-! return corner region in the output array
+! restrict the corner region to the output array
 !
 #if NDIMS == 2
     qb(1:nv,1:ng,1:ng,1:km) =                                                  &
@@ -9810,7 +9826,7 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! prepare source corner region indices
+! prepare indices for the corner region
 !
     if (ic == 1) then
       il = ie - nh + 1
@@ -9836,7 +9852,7 @@ module boundaries
     end if
 #endif /* NDIMS == 3 */
 
-! interpolate and return corner region in the output array
+! iterate over all corner region cells
 !
 #if NDIMS == 2
     do k = 1, km
@@ -9864,6 +9880,8 @@ module boundaries
 !
           do p = 1, nv
 
+! calculate limited derivatives in all directions
+!
             dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
             dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
             dqx = limiter(0.25d+00, dql, dqr)
@@ -9879,18 +9897,28 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
+! calculate the derivative terms
+!
             dq1 = dqx + dqy
             dq2 = dqx - dqy
+
+! prolong the corner region to the output array
+!
             qb(p,is,js,k ) = qn(p,i,j,k) - dq1
             qb(p,it,js,k ) = qn(p,i,j,k) + dq2
             qb(p,is,jt,k ) = qn(p,i,j,k) - dq2
             qb(p,it,jt,k ) = qn(p,i,j,k) + dq1
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
+! calculate the derivative terms
+!
             dq1 = dqx + dqy + dqz
             dq2 = dqx - dqy - dqz
             dq3 = dqx - dqy + dqz
             dq4 = dqx + dqy - dqz
+
+! prolong the corner region to the output array
+!
             qb(p,is,js,ks) = qn(p,i,j,k) - dq1
             qb(p,it,js,ks) = qn(p,i,j,k) + dq2
             qb(p,is,jt,ks) = qn(p,i,j,k) - dq3
