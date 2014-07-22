@@ -2841,6 +2841,141 @@ module blocks
       end do ! ip = 1, nsides
     end do ! jp = 1, nsides
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+! calculate the child index
+!
+          p  = 4 * (kp - 1) + 2 * (jp - 1) + ip
+
+! associate pchild with the proper child
+!
+          pchild => pmeta%child(p)%ptr
+
+!--- update face neighbor pointers ---
+!
+! assign pneigh to the X-face neighbor
+!
+          pneigh => pchild%faces(ip,jp,kp,1)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            q  = 4 * (kp - 1) + 2 * (jp - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,1)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,1)%ptr => pneigh
+            end if
+          end if
+
+! assign pneigh to the Y-face neighbor
+!
+          pneigh => pchild%faces(ip,jp,kp,2)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            q  = 4 * (kp - 1) + 2 * (jr - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,2)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,2)%ptr => pneigh
+            end if
+          end if
+
+! assign pneigh to the Z-face neighbor
+!
+          pneigh => pchild%faces(ip,jp,kp,3)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            q  = 4 * (kr - 1) + 2 * (jp - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,3)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,3)%ptr => pneigh
+            end if
+          end if
+
+!--- update edge neighbor pointers ---
+!
+! associate pneigh with the X edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,1)%ptr
+
+! process edge along X-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,1)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,1)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! associate pneigh with the Y edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,2)%ptr
+
+! process edge along Y-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,2)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,2)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! associate pneigh with the Z edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,3)%ptr
+
+! process edge along Y-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,3)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,3)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+!--- update corner neighbor pointers ---
+!
+! associate pneigh with the corner neighbor
+!
+          pneigh => pchild%corners(ip,jp,kp)%ptr
+
+! update the corner neighbor pointer
+!
+          if (associated(pneigh)) then
+
+! calculate the index of the opposite child
+!
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ir
+
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%corners(ip,jp,kp)%ptr => pmeta
+            else
+              pmeta%corners(ip,jp,kp)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 ! update neighbor pointers of the neighbor blocks
 !
