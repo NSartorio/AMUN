@@ -57,6 +57,20 @@ module io
     module procedure write_5d_array_double_h5
 #endif /* HDF5 */
   end interface
+  interface read_array
+#ifdef HDF5
+    module procedure read_1d_array_integer_h5
+    module procedure read_2d_array_integer_h5
+    module procedure read_3d_array_integer_h5
+    module procedure read_4d_array_integer_h5
+    module procedure read_5d_array_integer_h5
+    module procedure read_1d_array_double_h5
+    module procedure read_2d_array_double_h5
+    module procedure read_3d_array_double_h5
+    module procedure read_4d_array_double_h5
+    module procedure read_5d_array_double_h5
+#endif /* HDF5 */
+  end interface
 
 #ifdef PROFILE
 ! timer indices
@@ -2302,23 +2316,23 @@ module io
 
 ! read metablock fields from the HDF5 file
 !
-      call read_vector_integer_h5(gid, 'id'     , am(:), id (:))
-      call read_vector_integer_h5(gid, 'cpu'    , am(:), cpu(:))
-      call read_vector_integer_h5(gid, 'level'  , am(:), lev(:))
-      call read_vector_integer_h5(gid, 'config' , am(:), cfg(:))
-      call read_vector_integer_h5(gid, 'refine' , am(:), ref(:))
-      call read_vector_integer_h5(gid, 'leaf'   , am(:), lea(:))
-      call read_vector_integer_h5(gid, 'parent' , am(:), par(:))
-      call read_vector_double_h5 (gid, 'xmin'   , am(:), xmn(:))
-      call read_vector_double_h5 (gid, 'xmax'   , am(:), xmx(:))
-      call read_vector_double_h5 (gid, 'ymin'   , am(:), ymn(:))
-      call read_vector_double_h5 (gid, 'ymax'   , am(:), ymx(:))
-      call read_vector_double_h5 (gid, 'zmin'   , am(:), zmn(:))
-      call read_vector_double_h5 (gid, 'zmax'   , am(:), zmx(:))
-      call read_array2_integer_h5(gid, 'pos'    , pm(:), pos(:,:))
-      call read_array2_integer_h5(gid, 'coord'  , pm(:), cor(:,:))
-      call read_array2_integer_h5(gid, 'child'  , dm(:), chl(:,:))
-      call read_array4_integer_h5(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+      call read_array(gid, 'id'     , am(:), id (:))
+      call read_array(gid, 'cpu'    , am(:), cpu(:))
+      call read_array(gid, 'level'  , am(:), lev(:))
+      call read_array(gid, 'config' , am(:), cfg(:))
+      call read_array(gid, 'refine' , am(:), ref(:))
+      call read_array(gid, 'leaf'   , am(:), lea(:))
+      call read_array(gid, 'parent' , am(:), par(:))
+      call read_array(gid, 'xmin'   , am(:), xmn(:))
+      call read_array(gid, 'xmax'   , am(:), xmx(:))
+      call read_array(gid, 'ymin'   , am(:), ymn(:))
+      call read_array(gid, 'ymax'   , am(:), ymx(:))
+      call read_array(gid, 'zmin'   , am(:), zmn(:))
+      call read_array(gid, 'zmax'   , am(:), zmx(:))
+      call read_array(gid, 'pos'    , pm(:), pos(:,:))
+      call read_array(gid, 'coord'  , pm(:), cor(:,:))
+      call read_array(gid, 'child'  , dm(:), chl(:,:))
+      call read_array(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
 
 ! check if the maximum level has been changed, is so, rescale block coordinates
 !
@@ -2714,9 +2728,9 @@ module io
 
 ! read array data from the HDF5 file
 !
-      call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
-      call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
-      call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+      call read_array(gid, 'meta', dm(1:1), id(:)        )
+      call read_array(gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+      call read_array(gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
 
 ! close the data block group
 !
@@ -3265,451 +3279,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_conservative_variables_h5
-!
-!===============================================================================
-!
-! read_vector_integer_h5: subroutine reads a 1D integer vector
-!
-! arguments:
-!   gid    - the HDF5 group identifier
-!   name   - the string name representing the dataset
-!   length - the vector length
-!   value  - the data
-!
-!===============================================================================
-!
-  subroutine read_vector_integer_h5(gid, name, dm, data)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                , intent(in)    :: gid
-    character(len=*)              , intent(in)    :: name
-    integer(hsize_t), dimension(1), intent(inout) :: dm
-    integer(kind=4) , dimension(:), intent(inout) :: data
-
-! local variables
-!
-    integer(hid_t)                 :: did
-    integer                        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! open the dataset
-!
-    call h5dopen_f(gid, name, did, err)
-
-! check if the dataset has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read the dataset data
-!
-      call h5dread_f(did, H5T_NATIVE_INTEGER, data(:), dm(:), err)
-
-! check if the dataset has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the dataset
-!
-        call print_error("io::read_vector_integer_h5"                          &
-                                        , "Cannot read dataset: " // trim(name))
-
-      end if
-
-! close the dataset
-!
-      call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-        call print_error("io::read_vector_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_vector_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_vector_integer_h5
-!
-!===============================================================================
-!
-! read_array2_integer_h5: subroutine reads a 2D integer array
-!
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
-!
-!===============================================================================
-!
-  subroutine read_array2_integer_h5(gid, name, dm, var)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                  , intent(in)    :: gid
-    character(len=*)                , intent(in)    :: name
-    integer(hsize_t), dimension(2)  , intent(inout) :: dm
-    integer(kind=4) , dimension(:,:), intent(inout) :: var
-
-! local variables
-!
-    integer(hid_t) :: did
-    integer        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! open the dataset
-!
-    call h5dopen_f(gid, name, did, err)
-
-! check if the dataset has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read dataset data
-!
-      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(:), err)
-
-! check if the dataset has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the dataset
-!
-        call print_error("io::read_array2_integer_h5"                          &
-                                       , "Cannot read dataset: " // trim(name))
-
-      end if
-
-! close the dataset
-!
-      call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-        call print_error("io::read_array2_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array2_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_array2_integer_h5
-!
-!===============================================================================
-!
-! read_array4_integer_h5: subroutine reads a 4D integer array
-!
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
-!
-!===============================================================================
-!
-  subroutine read_array4_integer_h5(gid, name, dm, var)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                      , intent(in)    :: gid
-    character(len=*)                    , intent(in)    :: name
-    integer(hsize_t), dimension(4)      , intent(inout) :: dm
-    integer(kind=4) , dimension(:,:,:,:), intent(inout) :: var
-
-! local variables
-!
-    integer(hid_t) :: did
-    integer        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! open the dataset
-!
-    call h5dopen_f(gid, name, did, err)
-
-! check if the dataset has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read dataset data
-!
-      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(:), err)
-
-! check if the dataset has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the dataset
-!
-        call print_error("io::read_array4_integer_h5"                          &
-                                       , "Cannot read dataset: " // trim(name))
-
-      end if
-
-! close the dataset
-!
-      call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-        call print_error("io::read_array4_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array4_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_array4_integer_h5
-!
-!===============================================================================
-!
-! read_vector_double_h5: subroutine reads a 1D double precision vector
-!
-! arguments:
-!   gid    - the HDF5 group identifier
-!   name   - the string name representing the dataset
-!   dm     - the vector dimensions
-!   value  - the data
-!
-!===============================================================================
-!
-  subroutine read_vector_double_h5(gid, name, dm, data)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                , intent(in)    :: gid
-    character(len=*)              , intent(in)    :: name
-    integer(hsize_t), dimension(1), intent(inout) :: dm
-    real(kind=8)    , dimension(:), intent(inout) :: data
-
-! local variables
-!
-    integer(hid_t)                 :: did
-    integer                        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! open the dataset
-!
-    call h5dopen_f(gid, name, did, err)
-
-! check if the dataset has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read the dataset data
-!
-      call h5dread_f(did, H5T_NATIVE_DOUBLE, data(:), dm(:), err)
-
-! check if the dataset has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the dataset
-!
-        call print_error("io::read_vector_double_h5"                           &
-                                        , "Cannot read dataset: " // trim(name))
-
-      end if
-
-! close the dataset
-!
-      call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-        call print_error("io::read_vector_double_h5"                           &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_vector_double_h5"                             &
-                                        , "Cannot open dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_vector_double_h5
-!
-!===============================================================================
-!
-! read_array5_double_h5: subroutine reads a 5D double precision array
-!
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
-!
-!===============================================================================
-!
-  subroutine read_array5_double_h5(gid, name, dm, var)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                        , intent(in)    :: gid
-    character(len=*)                      , intent(in)    :: name
-    integer(hsize_t), dimension(5)        , intent(inout) :: dm
-    real(kind=8)    , dimension(:,:,:,:,:), intent(inout) :: var
-
-! local variables
-!
-    integer(hid_t) :: did
-    integer        :: err
-!
-!-------------------------------------------------------------------------------
-!
-! open the dataset
-!
-    call h5dopen_f(gid, name, did, err)
-
-! check if the dataset has been opened successfuly
-!
-    if (err .ge. 0) then
-
-! read dataset
-!
-      call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(:), err)
-
-! check if the dataset has been read successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with reading the dataset
-!
-        call print_error("io::read_array5_double_h5"                           &
-                                        , "Cannot read dataset: " // trim(name))
-
-      end if
-
-! close the dataset
-!
-      call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-        call print_error("io::read_array5_double_h5"                           &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array5_double_h5"                             &
-                                        , "Cannot open dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_array5_double_h5
 
 !===============================================================================
 !
@@ -6090,6 +5659,990 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_5d_array_double_h5
+
+!===============================================================================
+!
+! READ_ARRAY SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine READ_1D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a one-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_1d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: name
+    integer(hsize_t), dimension(1), intent(inout) :: dm
+    integer(kind=4) , dimension(:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_1d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:), dm(1:1), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_1d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_2D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a two-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_2d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                  , intent(in)    :: gid
+    character(len=*)                , intent(in)    :: name
+    integer(hsize_t), dimension(2)  , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_2d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(1:2), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_2d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_3D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a three-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_3d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                    , intent(in)    :: gid
+    character(len=*)                  , intent(in)    :: name
+    integer(hsize_t), dimension(3)    , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_3d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:), dm(1:3), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_3d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_4D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a four-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_4d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                      , intent(in)    :: gid
+    character(len=*)                    , intent(in)    :: name
+    integer(hsize_t), dimension(4)      , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_4d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(1:4), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_4d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_5D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a five-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_5d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                        , intent(in)    :: gid
+    character(len=*)                      , intent(in)    :: name
+    integer(hsize_t), dimension(5)        , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_5d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:,:), dm(1:5), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_5d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_1D_ARRAY_DOUBLE_H5:
+! ----------------------------------
+!
+!   Subroutine restores a one-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_1d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: name
+    integer(hsize_t), dimension(1), intent(inout) :: dm
+    real(kind=8)    , dimension(:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_1d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:), dm(1:1), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_1d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_2D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine restores a two-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_2d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                  , intent(in)    :: gid
+    character(len=*)                , intent(in)    :: name
+    integer(hsize_t), dimension(2)  , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_2d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:), dm(1:2), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_2d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_3D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine restores a three-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_3d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                    , intent(in)    :: gid
+    character(len=*)                  , intent(in)    :: name
+    integer(hsize_t), dimension(3)    , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_3d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:), dm(1:3), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_3d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_4D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine restores a four-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_4d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                      , intent(in)    :: gid
+    character(len=*)                    , intent(in)    :: name
+    integer(hsize_t), dimension(4)      , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_4d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:), dm(1:4), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_4d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_5D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine restores a five-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_5d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                        , intent(in)    :: gid
+    character(len=*)                      , intent(in)    :: name
+    integer(hsize_t), dimension(5)        , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:,:,:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_5d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(1:5), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_5d_array_double_h5
 #endif /* HDF5 */
 
 !===============================================================================
