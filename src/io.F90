@@ -2311,49 +2311,58 @@ module io
 !
 !===============================================================================
 !
-! read_metablocks_h5: subroutine reads metablocks from the restart HDF5 file
-!                     and restores all their structure fields
+! subroutine READ_METABLOCKS_H5:
+! -----------------------------
 !
-! info: this subroutine restores metablocks only
+!   Subroutine restores all meta blocks with their complete fields from
+!   'metablock' group in a provided restart file identifier.
 !
-! arguments:
-!   fid - the HDF5 file identifier
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine read_metablocks_h5(fid)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : nchildren, nsides, nfaces
-    use blocks  , only : get_mblocks
-    use blocks  , only : metablock_set_id, metablock_set_process               &
-                       , metablock_set_refinement, metablock_set_configuration &
-                       , metablock_set_level, metablock_set_position           &
-                       , metablock_set_coordinates, metablock_set_bounds       &
-                       , metablock_set_leaf
-    use error   , only : print_error
-    use hdf5    , only : hid_t, hsize_t
-    use hdf5    , only : h5gopen_f, h5gclose_f
-    use mpitools, only : nprocs
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : get_mblocks
+    use blocks         , only : metablock_set_id, metablock_set_process
+    use blocks         , only : metablock_set_refinement
+    use blocks         , only : metablock_set_configuration
+    use blocks         , only : metablock_set_level, metablock_set_position
+    use blocks         , only : metablock_set_coordinates, metablock_set_bounds
+    use blocks         , only : metablock_set_leaf
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
+    use mpitools       , only : nprocs
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: l, p, i, j, k, lcpu
+    integer(kind=4)                :: i, j, k, l, p, n, ip, lcpu
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
     integer(hsize_t), dimension(4) :: qm
+#if NDIMS == 2
+    integer(hsize_t), dimension(4) :: nm
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(hsize_t), dimension(5) :: nm
+#endif /* NDIMS == 3 */
 
 ! local allocatable arrays
 !
@@ -2363,10 +2372,23 @@ module io
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
     integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
+#if NDIMS == 2
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
+    integer(kind=4), dimension(:,:,:)    , allocatable :: corners
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: faces
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: edges
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: corners
+#endif /* NDIMS == 3 */
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_metablocks_h5"
 !
 !-------------------------------------------------------------------------------
 !
@@ -2380,7 +2402,7 @@ module io
 
 ! check if the group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
 ! prepate dimensions
 !
@@ -2393,8 +2415,18 @@ module io
       qm(2) = NDIMS
       qm(3) = nsides
       qm(4) = nfaces
+      nm(1) = get_mblocks()
+      nm(2) = nsides
+      nm(3) = nsides
+#if NDIMS == 2
+      nm(4) = ndims
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      nm(4) = nsides
+      nm(5) = ndims
+#endif /* NDIMS == 3 */
 
-! allocate arrays to store metablocks data
+! allocate arrays to restore metablocks data
 !
       allocate(id (am(1)))
       allocate(cpu(am(1)))
@@ -2414,14 +2446,32 @@ module io
       allocate(pos(pm(1),pm(2)))
       allocate(cor(pm(1),pm(2)))
       allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+#if NDIMS == 2
+      allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
+      allocate(corners(nm(1),nm(2),nm(3)))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      allocate(faces  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+      allocate(edges  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+      allocate(corners(nm(1),nm(2),nm(3),nm(4)))
+#endif /* NDIMS == 3 */
 
 ! reset vectors
 !
-      par(:)       = -1
-      dat(:)       = -1
-      lea(:)       = -1
-      chl(:,:)     = -1
-      ngh(:,:,:,:) = -1
+      par(:)           = -1
+      dat(:)           = -1
+      lea(:)           = -1
+      chl(:,:)         = -1
+      ngh(:,:,:,:)     = -1
+#if NDIMS == 2
+      edges(:,:,:,:)   = -1
+      corners(:,:,:)   = -1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      faces(:,:,:,:,:) = -1
+      edges(:,:,:,:,:) = -1
+      corners(:,:,:,:) = -1
+#endif /* NDIMS == 3 */
 
 ! read metablock fields from the HDF5 file
 !
@@ -2442,6 +2492,15 @@ module io
       call read_array(gid, 'coord'  , pm(:), cor(:,:))
       call read_array(gid, 'child'  , dm(:), chl(:,:))
       call read_array(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+#if NDIMS == 2
+      call read_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
+      call read_array(gid, 'corners', nm(1:3), corners(:,:,:))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      call read_array(gid, 'faces'  , nm(1:5), faces(:,:,:,:,:))
+      call read_array(gid, 'edges'  , nm(1:5), edges(:,:,:,:,:))
+      call read_array(gid, 'corners', nm(1:4), corners(:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! check if the maximum level has been changed, is so, rescale block coordinates
 !
@@ -2452,12 +2511,24 @@ module io
         cor(:,:) = cor(:,:) * ucor
       end if
 
-! prepare the array of pointers to metablocks
+! reset the block counter
 !
-      l = 1
+      l = 0
+
+! associate pmeta with the first block on the meta block list
+!
       pmeta => list_meta
+
+! iterate over all meta blocks and restore their fields
+!
       do while(associated(pmeta))
 
+! increase the block counter
+!
+        l = l + 1
+
+! restore meta block fields
+!
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id           (pmeta, id (l))
@@ -2468,61 +2539,116 @@ module io
         call metablock_set_position     (pmeta, pos(l,1), pos(l,2), pos(l,3))
         call metablock_set_coordinates  (pmeta, cor(l,1), cor(l,2), cor(l,3))
         call metablock_set_bounds       (pmeta, xmn(l), xmx(l), ymn(l), ymx(l) &
-                                                             , zmn(l), zmx(l))
+                                                              , zmn(l), zmx(l))
 
-        if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
+        if (lea(l) == 1) call metablock_set_leaf(pmeta)
 
-        l = l + 1
-        pmeta => pmeta%next
-      end do
-
-! iterate over all metablocks and restore pointers
+! associate pmeta with the next block on the list
 !
-      l = 1
+        pmeta => pmeta%next
+
+      end do ! over all meta blocks
+
+! reset the block counter
+!
+      l = 0
+
+! associate pmeta with the first block on the meta block list
+!
       pmeta => list_meta
+
+! iterate over all meta blocks and restore their pointers
+!
       do while(associated(pmeta))
 
-        if (par(l) .gt. 0) pmeta%parent => block_array(par(l))%ptr
+! increase the block counter
+!
+        l = l + 1
 
+! restore %parent pointer
+!
+        if (par(l) > 0) pmeta%parent => block_array(par(l))%ptr
+
+! restore %child pointers
+!
         do p = 1, nchildren
-          if (chl(l,p) .gt. 0) then
+          if (chl(l,p) > 0) then
             pmeta%child(p)%ptr => block_array(chl(l,p))%ptr
           end if
-        end do
+        end do ! p = 1, nchildren
 
-        do i = 1, NDIMS
+! restore %neigh pointers
+!
+        do i = 1, ndims
           do j = 1, nsides
             do k = 1, nfaces
-              if (ngh(l,i,j,k) .gt. 0) then
-                pmeta%neigh(i,j,k)%ptr => block_array(ngh(l,i,j,k))%ptr
-              end if
-            end do
-          end do
-        end do
+              if (ngh(l,i,j,k) > 0)                                            &
+                       pmeta%neigh(i,j,k)%ptr => block_array(ngh(l,i,j,k))%ptr
+            end do ! k = 1, nfaces
+          end do ! j = 1, nsides
+        end do ! i = 1, ndims
 
-        l = l + 1
+! restore %faces, %edges and %corners neighbor pointers
+!
+#if NDIMS == 2
+        do i = 1, nsides
+          do j = 1, nsides
+            do n = 1, ndims
+              ip = edges(l,i,j,n)
+              if (ip > 0) pmeta%edges(i,j,n)%ptr => block_array(ip)%ptr
+            end do ! n = 1, ndims
+            ip = corners(l,i,j)
+            if (ip > 0) pmeta%corners(i,j)%ptr => block_array(ip)%ptr
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        do i = 1, nsides
+          do j = 1, nsides
+            do k = 1, nsides
+              do n = 1, ndims
+                ip = faces(l,i,j,k,n)
+                if (ip > 0) pmeta%faces(i,j,k,n)%ptr => block_array(ip)%ptr
+                ip = edges(l,i,j,k,n)
+                if (ip > 0) pmeta%edges(i,j,k,n)%ptr => block_array(ip)%ptr
+              end do ! n = 1, ndims
+              ip = corners(l,i,j,k)
+              if (ip > 0) pmeta%corners(i,j,k)%ptr => block_array(ip)%ptr
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
+        end do ! k = 1, nsides
+#endif /* NDIMS == 3 */
+
+! associate pmeta with the next block on the list
+!
         pmeta => pmeta%next
-      end do
+
+      end do ! over all meta blocks
 
 ! deallocate allocatable arrays
 !
-      if (allocated(id) ) deallocate(id )
-      if (allocated(par)) deallocate(par)
-      if (allocated(dat)) deallocate(dat)
-      if (allocated(cpu)) deallocate(cpu)
-      if (allocated(lev)) deallocate(lev)
-      if (allocated(cfg)) deallocate(cfg)
-      if (allocated(ref)) deallocate(ref)
-      if (allocated(lea)) deallocate(lea)
-      if (allocated(xmn)) deallocate(xmn)
-      if (allocated(xmx)) deallocate(xmx)
-      if (allocated(ymn)) deallocate(ymn)
-      if (allocated(ymx)) deallocate(ymx)
-      if (allocated(zmn)) deallocate(zmn)
-      if (allocated(zmx)) deallocate(zmx)
-      if (allocated(chl)) deallocate(chl)
-      if (allocated(cor)) deallocate(cor)
-      if (allocated(ngh)) deallocate(ngh)
+      if (allocated(id) )     deallocate(id )
+      if (allocated(par))     deallocate(par)
+      if (allocated(dat))     deallocate(dat)
+      if (allocated(cpu))     deallocate(cpu)
+      if (allocated(lev))     deallocate(lev)
+      if (allocated(cfg))     deallocate(cfg)
+      if (allocated(ref))     deallocate(ref)
+      if (allocated(lea))     deallocate(lea)
+      if (allocated(xmn))     deallocate(xmn)
+      if (allocated(xmx))     deallocate(xmx)
+      if (allocated(ymn))     deallocate(ymn)
+      if (allocated(ymx))     deallocate(ymx)
+      if (allocated(zmn))     deallocate(zmn)
+      if (allocated(zmx))     deallocate(zmx)
+      if (allocated(chl))     deallocate(chl)
+      if (allocated(cor))     deallocate(cor)
+      if (allocated(ngh))     deallocate(ngh)
+#if NDIMS == 3
+      if (allocated(faces))   deallocate(faces)
+#endif /* NDIMS == 3 */
+      if (allocated(edges))   deallocate(edges)
+      if (allocated(corners)) deallocate(corners)
 
 ! close the group
 !
@@ -2530,12 +2656,11 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::read_metablocks_h5"                              &
-                                              , "Cannot close metablock group!")
+        call print_error(fname, "Cannot close metablock group!")
 
       end if
 
@@ -2543,7 +2668,7 @@ module io
 
 ! print error about the problem with opening the group
 !
-      call print_error("io::read_metablocks_h5", "Cannot open metablock group!")
+      call print_error(fname, "Cannot open metablock group!")
 
     end if
 
