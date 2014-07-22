@@ -2117,7 +2117,10 @@ module blocks
 
 ! local variables
 !
-    integer       :: i, j, k, l, p
+    integer       :: l , p , q
+    integer       :: i , j , k
+    integer       :: ip, jp, kp
+    integer       :: ir, jr, kr
 
 ! local saved variables
 !
@@ -2161,144 +2164,62 @@ module blocks
 
     end if
 
-! update edge neighbor pointers of the parent
+! update neighbor pointers of the parent block
 !
 #if NDIMS == 2
-! child (1,1)
-    pchild => pmeta%child(1)%ptr
-! X
-    if (associated(pchild%edges(1,1,1)%ptr)) then
-      pneigh => pchild%edges(1,1,1)%ptr
-      if (pneigh%id == pmeta%child(3)%ptr%id) then
-        pmeta%edges(1,1,1)%ptr => pmeta
-      else
-        pmeta%edges(1,1,1)%ptr => pchild%edges(1,1,1)%ptr
-      end if
-    end if
-! Y
-    if (associated(pchild%edges(1,1,2)%ptr)) then
-      pneigh => pchild%edges(1,1,2)%ptr
-      if (pneigh%id == pmeta%child(2)%ptr%id) then
-        pmeta%edges(1,1,2)%ptr => pmeta
-      else
-        pmeta%edges(1,1,2)%ptr => pchild%edges(1,1,2)%ptr
-      end if
-    end if
+    do jp = 1, nsides
+      jr = 3 - jp
+      do ip = 1, nsides
+        ir = 3 - ip
 
-! child (2,1)
-    pchild => pmeta%child(2)%ptr
-! X
-    if (associated(pchild%edges(2,1,1)%ptr)) then
-      pneigh => pchild%edges(2,1,1)%ptr
-      if (pneigh%id == pmeta%child(4)%ptr%id) then
-        pmeta%edges(2,1,1)%ptr => pmeta
-      else
-        pmeta%edges(2,1,1)%ptr => pchild%edges(2,1,1)%ptr
-      end if
-    end if
-! Y
-    if (associated(pchild%edges(2,1,2)%ptr)) then
-      pneigh => pchild%edges(2,1,2)%ptr
-      if (pneigh%id == pmeta%child(1)%ptr%id) then
-        pmeta%edges(2,1,2)%ptr => pmeta
-      else
-        pmeta%edges(2,1,2)%ptr => pchild%edges(2,1,2)%ptr
-      end if
-    end if
-
-! child (1,2)
-    pchild => pmeta%child(3)%ptr
-! X
-    if (associated(pchild%edges(1,2,1)%ptr)) then
-      pneigh => pchild%edges(1,2,1)%ptr
-      if (pneigh%id == pmeta%child(1)%ptr%id) then
-        pmeta%edges(1,2,1)%ptr => pmeta
-      else
-        pmeta%edges(1,2,1)%ptr => pchild%edges(1,2,1)%ptr
-      end if
-    end if
-! Y
-    if (associated(pchild%edges(1,2,2)%ptr)) then
-      pneigh => pchild%edges(1,2,2)%ptr
-      if (pneigh%id == pmeta%child(4)%ptr%id) then
-        pmeta%edges(1,2,2)%ptr => pmeta
-      else
-        pmeta%edges(1,2,2)%ptr => pchild%edges(1,2,2)%ptr
-      end if
-    end if
-
-! child (2,2)
-    pchild => pmeta%child(4)%ptr
-! X
-    if (associated(pchild%edges(2,2,1)%ptr)) then
-      pneigh => pchild%edges(2,2,1)%ptr
-      if (pneigh%id == pmeta%child(2)%ptr%id) then
-        pmeta%edges(2,2,1)%ptr => pmeta
-      else
-        pmeta%edges(2,2,1)%ptr => pchild%edges(2,2,1)%ptr
-      end if
-    end if
-! Y
-    if (associated(pchild%edges(2,2,2)%ptr)) then
-      pneigh => pchild%edges(2,2,2)%ptr
-      if (pneigh%id == pmeta%child(3)%ptr%id) then
-        pmeta%edges(2,2,2)%ptr => pmeta
-      else
-        pmeta%edges(2,2,2)%ptr => pchild%edges(2,2,2)%ptr
-      end if
-    end if
-#endif /* NDIMS == 2 */
-
-! update corner neighbor pointers of the parent
+! calculate the child index
 !
-#if NDIMS == 2
-! corner (1,1)
-    pchild => pmeta%child(1)%ptr
+        p  = 2 * (jp - 1) + ip
 
-    if (associated(pchild%corners(1,1)%ptr)) then
-      pneigh => pchild%corners(1,1)%ptr
-      if (pneigh%id == pmeta%child(4)%ptr%id) then
-        pmeta%corners(1,1)%ptr => pmeta
-      else
-        pmeta%corners(1,1)%ptr => pchild%corners(1,1)%ptr
-      end if
-    end if
+! associate pchild with the proper child
+!
+        pchild => pmeta%child(p)%ptr
 
-! corner (2,1)
-    pchild => pmeta%child(2)%ptr
+!--- update edge neighbor pointers ---
+!
+! along X-direction
+!
+        pneigh => pchild%edges(ip,jp,1)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jr - 1) + ip
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%edges(ip,jp,1)%ptr => pmeta
+          else
+            pmeta%edges(ip,jp,1)%ptr => pneigh
+          end if
+        end if ! pneigh associated
 
-    if (associated(pchild%corners(2,1)%ptr)) then
-      pneigh => pchild%corners(2,1)%ptr
-      if (pneigh%id == pmeta%child(3)%ptr%id) then
-        pmeta%corners(2,1)%ptr => pmeta
-      else
-        pmeta%corners(2,1)%ptr => pchild%corners(2,1)%ptr
-      end if
-    end if
+! along Y-direction
+!
+        pneigh => pchild%edges(ip,jp,2)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jp - 1) + ir
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%edges(ip,jp,2)%ptr => pmeta
+          else
+            pmeta%edges(ip,jp,2)%ptr => pneigh
+          end if
+        end if ! pneigh associated
 
-! corner (1,2)
-    pchild => pmeta%child(3)%ptr
+!--- update corner neighbor pointers ---
+!
+        pneigh => pchild%corners(ip,jp)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jr - 1) + ir
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%corners(ip,jp)%ptr => pmeta
+          else
+            pmeta%corners(ip,jp)%ptr => pneigh
+          end if
+        end if ! pneigh associated
 
-    if (associated(pchild%corners(1,2)%ptr)) then
-      pneigh => pchild%corners(1,2)%ptr
-      if (pneigh%id == pmeta%child(2)%ptr%id) then
-        pmeta%corners(1,2)%ptr => pmeta
-      else
-        pmeta%corners(1,2)%ptr => pchild%corners(1,2)%ptr
-      end if
-    end if
-
-! corner (2,2)
-    pchild => pmeta%child(4)%ptr
-
-    if (associated(pchild%corners(2,2)%ptr)) then
-      pneigh => pchild%corners(2,2)%ptr
-      if (pneigh%id == pmeta%child(1)%ptr%id) then
-        pmeta%corners(2,2)%ptr => pmeta
-      else
-        pmeta%corners(2,2)%ptr => pchild%corners(2,2)%ptr
-      end if
-    end if
+      end do ! ip = 1, nsides
+    end do ! jp = 1, nsides
 #endif /* NDIMS == 2 */
 
 ! update neighbor's edge pointers
