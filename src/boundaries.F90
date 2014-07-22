@@ -346,6 +346,14 @@ module boundaries
 !
     call update_corners()
 
+#if NDIMS == 3
+! update face boundaries between blocks at the same levels
+!
+    do idir = 1, ndims
+      call boundaries_face_copy(idir)
+    end do ! idir
+#endif /* NDIMS == 3 */
+
 ! update edge boundaries between blocks at the same levels
 !
     do idir = 1, ndims
@@ -356,6 +364,14 @@ module boundaries
 !
     call boundaries_corner_copy()
 
+#if NDIMS == 3
+! restrict face boundaries from higher level blocks
+!
+    do idir = 1, ndims
+      call boundaries_face_restrict(idir)
+    end do ! idir
+#endif /* NDIMS == 3 */
+
 ! restricts edge boundaries from block at higher level
 !
     do idir = 1, ndims
@@ -365,6 +381,14 @@ module boundaries
 ! restricts corner boundaries from blocks at higher levels
 !
     call boundaries_corner_restrict()
+
+#if NDIMS == 3
+! prolong face boundaries from lower level blocks
+!
+    do idir = 1, ndims
+      call boundaries_face_prolong(idir)
+    end do ! idir
+#endif /* NDIMS == 3 */
 
 ! prolongs edge boundaries from block at lower level
 !
