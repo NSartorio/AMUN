@@ -1370,6 +1370,8 @@ module blocks
 !
     logical, save :: first = .true.
     integer       :: p, q, i, j, k, ic, jc, kc, cf
+    integer       :: ip, jp, kp
+    integer       :: ir, jr, kr
     real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
 ! local arrays
