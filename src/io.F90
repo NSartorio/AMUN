@@ -1976,42 +1976,51 @@ module io
 !
 !===============================================================================
 !
-! write_metablocks_h5: subroutine writes metablocks in the HDF5 format connected
-!                      to the provided identifier
+! subroutine WRITE_METABLOCKS_H5:
+! ------------------------------
 !
-! info: this subroutine stores only the metablocks
+!   Subroutine stores all meta blocks with their complete fields in 'metablock'
+!   group in a provided file identifier.
 !
-! arguments:
-!   fid - the HDF5 file identifier
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine write_metablocks_h5(fid)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_last_id, get_mblocks, nchildren, nsides, nfaces
-    use error   , only : print_error
-    use hdf5    , only : hid_t, hsize_t
-    use hdf5    , only : h5gcreate_f, h5gclose_f
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : get_last_id, get_mblocks
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: l, p, i, j, k
-    integer                        :: err
+    integer(kind=4)                :: i, j, k, l, n, p
+    integer                        :: iret
     integer(hsize_t), dimension(1) :: am, cm
     integer(hsize_t), dimension(2) :: dm, pm
     integer(hsize_t), dimension(4) :: qm
+#if NDIMS == 2
+    integer(hsize_t), dimension(4) :: nm
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(hsize_t), dimension(5) :: nm
+#endif /* NDIMS == 3 */
 
 ! local allocatable arrays
 !
@@ -2021,20 +2030,33 @@ module io
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
     integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
+#if NDIMS == 2
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
+    integer(kind=4), dimension(:,:,:)    , allocatable :: corners
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: faces
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: edges
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: corners
+#endif /* NDIMS == 3 */
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_metablocks_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! create the group for metadata
 !
-    call h5gcreate_f(fid, 'metablocks', gid, err)
+    call h5gcreate_f(fid, 'metablocks', gid, iret)
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
+    if (iret >= 0) then
 
 ! prepate dimensions
 !
@@ -2048,12 +2070,22 @@ module io
       qm(2) = NDIMS
       qm(3) = nsides
       qm(4) = nfaces
+      nm(1) = get_mblocks()
+      nm(2) = nsides
+      nm(3) = nsides
+#if NDIMS == 2
+      nm(4) = ndims
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      nm(4) = nsides
+      nm(5) = ndims
+#endif /* NDIMS == 3 */
 
-! only process if there are some metablocks
+! only store data from processes that have any meta blocks
 !
       if (am(1) > 0) then
 
-! allocate arrays to store metablocks data
+! allocate arrays to store meta block fields
 !
         allocate(idx(cm(1)))
         allocate(par(am(1)))
@@ -2074,22 +2106,52 @@ module io
         allocate(pos(pm(1),pm(2)))
         allocate(cor(pm(1),pm(2)))
         allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+#if NDIMS == 2
+        allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
+        allocate(corners(nm(1),nm(2),nm(3)))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        allocate(faces  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+        allocate(edges  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+        allocate(corners(nm(1),nm(2),nm(3),nm(4)))
+#endif /* NDIMS == 3 */
 
-! reset vectors
+! reset stored arrays
 !
-        idx(:)       = -1
-        par(:)       = -1
-        dat(:)       = -1
-        lea(:)       = -1
-        chl(:,:)     = -1
-        ngh(:,:,:,:) = -1
+        idx(:)           = -1
+        par(:)           = -1
+        dat(:)           = -1
+        lea(:)           = -1
+        chl(:,:)         = -1
+        ngh(:,:,:,:)     = -1
+#if NDIMS == 2
+        edges(:,:,:,:)   = -1
+        corners(:,:,:)   = -1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        faces(:,:,:,:,:) = -1
+        edges(:,:,:,:,:) = -1
+        corners(:,:,:,:) = -1
+#endif /* NDIMS == 3 */
 
-! iterate over all metablocks and fill in the arrays for storage
+! reset the block counter
 !
-        l = 1
+        l = 0
+
+! associate pmeta with the first block on the meta block list
+!
         pmeta => list_meta
+
+! iterate over all meta blocks and fill in the arrays for storage
+!
         do while(associated(pmeta))
 
+! increase the block counter
+!
+          l = l + 1
+
+! store meta block fields
+!
           idx(pmeta%id) = l
 
           if (associated(pmeta%parent)) par(l) = pmeta%parent%id
@@ -2125,66 +2187,113 @@ module io
             end do
           end do
 
-          l = l + 1
+! store face, edge and corner neighbor pointers
+!
+#if NDIMS == 2
+          do i = 1, nsides
+            do j = 1, nsides
+              do n = 1, ndims
+                if (associated(pmeta%edges(i,j,n)%ptr))                        &
+                                    edges(l,i,j,n) = pmeta%edges(i,j,n)%ptr%id
+              end do ! ndims
+              if (associated(pmeta%corners(i,j)%ptr))                          &
+                                    corners(l,i,j) = pmeta%corners(i,j)%ptr%id
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+          do i = 1, nsides
+            do j = 1, nsides
+              do k = 1, nsides
+                do n = 1, ndims
+                  if (associated(pmeta%faces(i,j,k,n)%ptr))                    &
+                                faces(l,i,j,k,n) = pmeta%faces(i,j,k,n)%ptr%id
+                  if (associated(pmeta%edges(i,j,k,n)%ptr))                    &
+                                edges(l,i,j,k,n) = pmeta%edges(i,j,k,n)%ptr%id
+                end do ! ndims
+                if (associated(pmeta%corners(i,j,k)%ptr))                      &
+                                corners(l,i,j,k) = pmeta%corners(i,j,k)%ptr%id
+              end do ! i = 1, nsides
+            end do ! j = 1, nsides
+          end do ! k = 1, nsides
+#endif /* NDIMS == 3 */
+
+! associate pmeta with the next block on the list
+!
           pmeta => pmeta%next
-        end do
 
-! store metadata in the HDF5 file
-!
-        call write_array(gid, 'indices', cm(1), idx)
-        call write_array(gid, 'parent' , am(1), par)
-        call write_array(gid, 'data'   , am(1), dat)
-        call write_array(gid, 'id'     , am(1), id)
-        call write_array(gid, 'cpu'    , am(1), cpu)
-        call write_array(gid, 'level'  , am(1), lev)
-        call write_array(gid, 'config' , am(1), cfg)
-        call write_array(gid, 'refine' , am(1), ref)
-        call write_array(gid, 'leaf'   , am(1), lea)
-        call write_array(gid, 'xmin'   , am(1), xmn)
-        call write_array(gid, 'xmax'   , am(1), xmx)
-        call write_array(gid, 'ymin'   , am(1), ymn)
-        call write_array(gid, 'ymax'   , am(1), ymx)
-        call write_array(gid, 'zmin'   , am(1), zmn)
-        call write_array(gid, 'zmax'   , am(1), zmx)
-        call write_array(gid, 'child'  , dm(:), chl(:,:))
-        call write_array(gid, 'pos'    , pm(:), pos(:,:))
-        call write_array(gid, 'coord'  , pm(:), cor(:,:))
-        call write_array(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+        end do ! over all meta blocks
 
-! deallocate allocatable arrays
+! store meta block data in the HDF5 file
 !
-        if (allocated(idx)) deallocate(idx)
-        if (allocated(par)) deallocate(par)
-        if (allocated(dat)) deallocate(dat)
-        if (allocated(id) ) deallocate(id)
-        if (allocated(cpu)) deallocate(cpu)
-        if (allocated(lev)) deallocate(lev)
-        if (allocated(cfg)) deallocate(cfg)
-        if (allocated(ref)) deallocate(ref)
-        if (allocated(lea)) deallocate(lea)
-        if (allocated(xmn)) deallocate(xmn)
-        if (allocated(xmx)) deallocate(xmx)
-        if (allocated(ymn)) deallocate(ymn)
-        if (allocated(ymx)) deallocate(ymx)
-        if (allocated(zmn)) deallocate(zmn)
-        if (allocated(zmx)) deallocate(zmx)
-        if (allocated(chl)) deallocate(chl)
-        if (allocated(cor)) deallocate(cor)
-        if (allocated(ngh)) deallocate(ngh)
+        call write_array(gid, 'indices', cm(1)  , idx)
+        call write_array(gid, 'parent' , am(1)  , par)
+        call write_array(gid, 'data'   , am(1)  , dat)
+        call write_array(gid, 'id'     , am(1)  , id )
+        call write_array(gid, 'cpu'    , am(1)  , cpu)
+        call write_array(gid, 'level'  , am(1)  , lev)
+        call write_array(gid, 'config' , am(1)  , cfg)
+        call write_array(gid, 'refine' , am(1)  , ref)
+        call write_array(gid, 'leaf'   , am(1)  , lea)
+        call write_array(gid, 'xmin'   , am(1)  , xmn)
+        call write_array(gid, 'xmax'   , am(1)  , xmx)
+        call write_array(gid, 'ymin'   , am(1)  , ymn)
+        call write_array(gid, 'ymax'   , am(1)  , ymx)
+        call write_array(gid, 'zmin'   , am(1)  , zmn)
+        call write_array(gid, 'zmax'   , am(1)  , zmx)
+        call write_array(gid, 'child'  , dm(:)  , chl(:,:))
+        call write_array(gid, 'pos'    , pm(:)  , pos(:,:))
+        call write_array(gid, 'coord'  , pm(:)  , cor(:,:))
+        call write_array(gid, 'neigh'  , qm(:)  , ngh(:,:,:,:))
+#if NDIMS == 2
+        call write_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
+        call write_array(gid, 'corners', nm(1:3), corners(:,:,:))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        call write_array(gid, 'faces'  , nm(1:5), faces(:,:,:,:,:))
+        call write_array(gid, 'edges'  , nm(1:5), edges(:,:,:,:,:))
+        call write_array(gid, 'corners', nm(1:4), corners(:,:,:,:))
+#endif /* NDIMS == 3 */
+
+! deallocate allocated arrays
+!
+        if (allocated(idx))     deallocate(idx)
+        if (allocated(par))     deallocate(par)
+        if (allocated(dat))     deallocate(dat)
+        if (allocated(id) )     deallocate(id)
+        if (allocated(cpu))     deallocate(cpu)
+        if (allocated(lev))     deallocate(lev)
+        if (allocated(cfg))     deallocate(cfg)
+        if (allocated(ref))     deallocate(ref)
+        if (allocated(lea))     deallocate(lea)
+        if (allocated(xmn))     deallocate(xmn)
+        if (allocated(xmx))     deallocate(xmx)
+        if (allocated(ymn))     deallocate(ymn)
+        if (allocated(ymx))     deallocate(ymx)
+        if (allocated(zmn))     deallocate(zmn)
+        if (allocated(zmx))     deallocate(zmx)
+        if (allocated(chl))     deallocate(chl)
+        if (allocated(cor))     deallocate(cor)
+        if (allocated(ngh))     deallocate(ngh)
+#if NDIMS == 3
+        if (allocated(faces))   deallocate(faces)
+#endif /* NDIMS == 3 */
+        if (allocated(edges))   deallocate(edges)
+        if (allocated(corners)) deallocate(corners)
 
       end if ! meta blocks > 0
 
 ! close the group
 !
-      call h5gclose_f(gid, err)
+      call h5gclose_f(gid, iret)
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (iret > 0) then
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_metablocks_h5", "Cannot close the group!")
+        call print_error(fname, "Cannot close the group!")
 
       end if
 
@@ -2192,7 +2301,7 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_metablocks_h5", "Cannot create the group!")
+      call print_error(fname, "Cannot create the group!")
 
     end if
 
