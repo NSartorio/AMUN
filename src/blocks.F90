@@ -1369,7 +1369,8 @@ module blocks
 ! local variables
 !
     logical, save :: first = .true.
-    integer       :: p, q, i, j, k, ic, jc, kc, cf
+    integer       :: p , q
+    integer       :: i , j , k
     integer       :: ip, jp, kp
     integer       :: ir, jr, kr
     real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
@@ -1481,7 +1482,7 @@ module blocks
 !!
 ! set corresponding configuration of the new blocks
 !
-      cf  = pmeta%conf
+      q   = pmeta%conf
 
 ! calculate sizes of the child blocks
 !
@@ -1507,12 +1508,12 @@ module blocks
 
 ! set the child configuration number
 !
-        call metablock_set_configuration(pchild, config(cf,p))
+        call metablock_set_configuration(pchild, config(q,p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
 !
-        pmeta%child(order(cf,p))%ptr => pchild
+        pmeta%child(order(q,p))%ptr => pchild
 
       end do ! nchildren
 
@@ -1553,10 +1554,10 @@ module blocks
 
 ! calculate the block coordinates in effective resolution units
 !
-        ic  = 2 * pmeta%coords(1) + i
-        jc  = 2 * pmeta%coords(2) + j
+        ip  = 2 * pmeta%coords(1) + i
+        jp  = 2 * pmeta%coords(2) + j
 #if NDIMS == 3
-        kc  = 2 * pmeta%coords(3) + k
+        kp  = 2 * pmeta%coords(3) + k
 #endif /* NDIMS == 3 */
 
 ! calculate block bounds
@@ -1575,7 +1576,7 @@ module blocks
 
 ! set the effective resolution coordinates
 !
-        call metablock_set_coordinates(pchild, ic, jc, kc)
+        call metablock_set_coordinates(pchild, ip, jp, kp)
 
 ! set the child block bounds
 !
