@@ -6716,7 +6716,7 @@ module boundaries
 ! subroutine BLOCK_FACE_COPY:
 ! --------------------------
 !
-!   Subroutine returns the face boundary region copied it from the provided
+!   Subroutine returns the face boundary region copied from the provided
 !   input variable array.
 !
 !   Arguments:
@@ -6872,6 +6872,174 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine block_face_copy
+!
+!===============================================================================
+!
+! subroutine BLOCK_FACE_RESTRICT:
+! ------------------------------
+!
+!   Subroutine returns the face boundary region restricted from the provided
+!   input variable array.
+!
+!   Arguments:
+!
+!     nc         - the face direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the input neighbor variable array;
+!     qb         - the output face boundary array;
+!
+!===============================================================================
+!
+  subroutine block_face_restrict(nc, ic, jc, kc, qn, qb)
+
+! import external procedures and variables
+!
+    use coordinates    , only : ng, nd
+    use coordinates    , only : in
+    use coordinates    , only : in , jn , kn
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb
+    use coordinates    , only : ie , je , ke
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)  :: nc, ic, jc, kc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
+    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
+
+! local variables
+!
+    integer :: ih, jh, kh
+    integer :: il, jl, kl
+    integer :: ip, jp, kp
+    integer :: iu, ju, ku
+!
+!-------------------------------------------------------------------------------
+!
+! process depending on the direction
+!
+    select case(nc)
+    case(1)
+
+! calculate half sizes
+!
+      jh = jn / 2
+      kh = kn / 2
+
+! prepare indices for the face region
+!
+      if (ic == 1) then
+        il = ie - nd + 1
+        ip = il + 1
+        iu = ie
+      else
+        il = ib
+        ip = il + 1
+        iu = ib + nd - 1
+      end if
+      jl = jb
+      jp = jl + 1
+      ju = je
+      kl = kb
+      kp = kl + 1
+      ku = ke
+
+! restrict the face region to the output array
+!
+      qb(1:nv,1:ng,1:jh,1:kh) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+
+    case(2)
+
+! calculate half sizes
+!
+      ih = in / 2
+      kh = kn / 2
+
+! prepare indices for the face region
+!
+      il = ib
+      ip = il + 1
+      iu = ie
+      if (jc == 1) then
+        jl = je - nd + 1
+        jp = jl + 1
+        ju = je
+      else
+        jl = jb
+        jp = jl + 1
+        ju = jb + nd - 1
+      end if
+      kl = kb
+      kp = kl + 1
+      ku = ke
+
+! restrict the face region to the output array
+!
+      qb(1:nv,1:ih,1:ng,1:kh) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+
+    case(3)
+
+! calculate half sizes
+!
+      ih = in / 2
+      jh = jn / 2
+
+! prepare indices for the face region
+!
+      il = ib
+      ip = il + 1
+      iu = ie
+      jl = jb
+      jp = jl + 1
+      ju = je
+      if (kc == 1) then
+        kl = ke - nd + 1
+        kp = kl + 1
+        ku = ke
+      else
+        kl = kb
+        kp = kl + 1
+        ku = kb + nd - 1
+      end if
+
+! restrict the face region to the output array
+!
+      qb(1:nv,1:ih,1:jh,1:ng) =                                                &
+                           1.25d-01 * (((qn(1:nv,il:iu:2,jl:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jl:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jp:ju:2,kl:ku:2)))    &
+                                    +  ((qn(1:nv,il:iu:2,jp:ju:2,kp:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))     &
+                                    +   (qn(1:nv,il:iu:2,jp:ju:2,kl:ku:2)      &
+                                    +    qn(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
+
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_face_restrict
 #endif /* NDIMS == 3 */
 !
 !===============================================================================
