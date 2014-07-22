@@ -3029,6 +3029,201 @@ module blocks
       end do ! ip = 1, nsides
     end do ! jp = 1, nsides
 #endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+!--- update neighbor's face pointers ---
+!
+! assign pneigh to the X-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,1)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do k = 1, nsides
+                do j = 1, nsides
+                  pneigh%faces(ir,j,k,1)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ir,jp,kp,1)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+! assign pneigh to the Y-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,2)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do k = 1, nsides
+                do i = 1, nsides
+                  pneigh%faces(i,jr,k,2)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ip,jr,kp,2)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+! assign pneigh to the Z-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do j = 1, nsides
+                do i = 1, nsides
+                  pneigh%faces(i,j,kr,3)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ip,jp,kr,3)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+!--- update neighbor's edge pointers ---
+!
+! process the edges in all directions which lay on the parent's edges
+!
+! X-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ip,jr,kr,1)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,1)%ptr => pmeta
+          end if ! pneigh associated
+
+! Y-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ir,jp,kr,2)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,2)%ptr => pmeta
+          end if ! pneigh associated
+
+! Z-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ir,jr,kp,3)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,3)%ptr => pmeta
+          end if ! pneigh associated
+
+! nullify neighbors edge pointers if they are on higher levels
+!
+! X-face
+!
+          pneigh => pmeta%faces(ip,jr,kp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ir,jp,kp,3)%ptr)
+              nullify(pneigh%edges(ir,jp,kr,3)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jp,kr,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ir,jp,kp,2)%ptr)
+              nullify(pneigh%edges(ir,jr,kp,2)%ptr)
+            end if
+          end if ! pneigh associated
+
+! Y-face
+!
+          pneigh => pmeta%faces(ir,jp,kp,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jr,kp,3)%ptr)
+              nullify(pneigh%edges(ip,jr,kr,3)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jp,kr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jr,kp,1)%ptr)
+              nullify(pneigh%edges(ir,jr,kp,1)%ptr)
+            end if
+          end if ! pneigh associated
+
+! Z-face
+!
+          pneigh => pmeta%faces(ir,jp,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jp,kr,2)%ptr)
+              nullify(pneigh%edges(ip,jr,kr,2)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jr,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jp,kr,1)%ptr)
+              nullify(pneigh%edges(ir,jp,kr,1)%ptr)
+            end if
+          end if ! pneigh associated
+
+!--- update neighbor's corner pointers ---
+!
+! associate pneigh with the corner pointer
+!
+          pneigh => pmeta%corners(ip,jp,kp)%ptr
+          if (associated(pneigh)) pneigh%corners(ir,jr,kr)%ptr => pmeta
+
+! nullify neighbor corners pointing to pmeta edges
+!
+          pneigh => pmeta%edges(ir,jp,kp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jr,kr)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%edges(ip,jr,kp,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jp,kr)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%edges(ip,jp,kr,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jr,kp)%ptr)
+          end if ! pneigh associated
+
+! nullify neighbor corners pointing to pmeta faces
+!
+          pneigh => pmeta%faces(ip,jr,kr,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jp,kp)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ir,jp,kr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jr,kp)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ir,jr,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jp,kr)%ptr)
+          end if ! pneigh associated
+
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 ! iterate over dimensions, sides, and faces
 !
