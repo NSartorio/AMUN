@@ -2837,7 +2837,7 @@ module boundaries
 !===============================================================================
 !
 ! subroutine BOUNDARIES_SPECIFIC:
-! -----------------------------------
+! ------------------------------
 !
 !   Subroutine scans over all leaf blocks in order to find blocks without
 !   neighbors, then updates its boundaries for selected type.
@@ -10127,9 +10127,9 @@ module boundaries
 !
 !   Arguments:
 !
-!     pdata - the pointer to modified data block;
-!     idir  - the direction to be processed;
-!     iside - the side to be processed;
+!     nc         - the edge direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the variable array;
 !
 !===============================================================================
 !
