@@ -346,6 +346,10 @@ module boundaries
 !
     call update_corners()
 
+! update specific boundaries
+!
+    call boundaries_specific()
+
 #if NDIMS == 3
 ! update face boundaries between blocks at the same levels
 !
@@ -399,6 +403,10 @@ module boundaries
 ! prolong corner boundaries from blocks at lower levels
 !
     call boundaries_corner_prolong()
+
+! update specific boundaries
+!
+    call boundaries_specific()
 
 ! convert updated primitive variables to conservative ones in all ghost cells
 !
@@ -2825,6 +2833,132 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine prolong_boundaries
+!
+!===============================================================================
+!
+! subroutine BOUNDARIES_SPECIFIC:
+! -----------------------------------
+!
+!   Subroutine scans over all leaf blocks in order to find blocks without
+!   neighbors, then updates its boundaries for selected type.
+!
+!
+!===============================================================================
+!
+  subroutine boundaries_specific()
+
+! import external procedures and variables
+!
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : ndims, nsides
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+#ifdef MPI
+    use mpitools       , only : nproc
+#endif /* MPI */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer :: pmeta, pneigh
+
+! local variables
+!
+    integer                   :: i, j, k, n
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for specific boundary update
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! associate pmeta with the first block on the meta list
+!
+    pmeta => list_meta
+
+! scan all blocks on meta block list
+!
+    do while(associated(pmeta))
+
+! check if the current meta block is a leaf
+!
+      if (pmeta%leaf) then
+
+! process only if this block is marked for update
+!
+        if (pmeta%update) then
+
+#ifdef MPI
+! check if the current block belongs to the local process
+!
+          if (pmeta%process == nproc) then
+#endif /* MPI */
+
+#if NDIMS == 2
+! iterate over all edge neighbors
+!
+            do j = 1, nsides
+              do i = 1, nsides
+                do n = 1, ndims
+
+! if the face neighbor is not associated, apply specific boundaries
+!
+                  if (.not. associated(pmeta%edges(i,j,n)%ptr))                &
+                            call block_boundary_specific(i, j, k, 3 - n        &
+                                          , pmeta%data%q(1:nv,1:im,1:jm,1:km))
+
+                end do ! n = 1, ndims
+              end do ! i = 1, sides
+            end do ! j = 1, sides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! iterate over all face neighbors
+!
+            do k = 1, nsides
+              do j = 1, nsides
+                do i = 1, nsides
+                  do n = 1, ndims
+
+! if the face neighbor is not associated, apply specific boundaries
+!
+                    if (.not. associated(pmeta%faces(i,j,k,n)%ptr))            &
+                            call block_boundary_specific(i, j, k, n            &
+                                          , pmeta%data%q(1:nv,1:im,1:jm,1:km))
+
+                  end do ! n = 1, ndims
+                end do ! i = 1, sides
+              end do ! j = 1, sides
+            end do ! k = 1, sides
+#endif /* NDIMS == 3 */
+
+#ifdef MPI
+          end if ! block belong to the local process
+#endif /* MPI */
+
+        end if ! pmeta is marked for update
+
+      end if ! leaf
+
+! associate pmeta with the next block on the list
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+#ifdef PROFILE
+! stop accounting time for specific boundary update
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundaries_specific
 #if NDIMS == 3
 !
 !===============================================================================
@@ -9962,6 +10096,292 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine block_corner_prolong
+!
+!===============================================================================
+!
+! subroutine BLOCK_BOUNDARY_SPECIFIC:
+! ----------------------------------
+!
+!   Subroutine applies specific boundary conditions to the pointed data block.
+!
+!   Arguments:
+!
+!     pdata - the pointer to modified data block;
+!     idir  - the direction to be processed;
+!     iside - the side to be processed;
+!
+!===============================================================================
+!
+  subroutine block_boundary_specific(ic, jc, kc, nc, qn)
+
+! import external procedures and variables
+!
+    use coordinates    , only : im , jm , km , ng
+    use coordinates    , only : ib , jb , kb , ie , je , ke
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use error          , only : print_error, print_warning
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)    :: ic, jc, kc
+    integer                                     , intent(in)    :: nc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+
+! local variables
+!
+    integer :: i , j , k
+    integer :: il, jl, kl
+    integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
+!
+!-------------------------------------------------------------------------------
+!
+! apply specific boundaries depending on the direction
+!
+    select case(nc)
+    case(1)
+
+! prepare indices for the boundaries
+!
+      if (jc == 1) then
+        jl = 1
+        ju = jm / 2 - 1
+      else
+        jl = jm / 2
+        ju = jm
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = 1
+        ku = km / 2 - 1
+      else
+        kl = km / 2
+        ku = km
+      end if
+#else /* NDIMS == 3 */
+        kl = 1
+        ku = km
+#endif /* NDIMS == 3 */
+
+! apply selected boundary condition
+!
+      select case(bnd_type(nc,ic))
+
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        if (ic == 1) then
+          do i = ibl, 1, -1
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+          end do
+        else
+          do i = ieu, im
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+          end do
+        end if
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
+
+        if (ic == 1) then
+          do i = 1, ng
+            it = ib  - i
+            is = ibl + i
+
+            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
+            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+          end do
+        else
+          do i = 1, ng
+            it = ie  + i
+            is = ieu - i
+
+            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
+            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+          end do
+        end if
+
+! wrong boundary conditions
+!
+      case default
+
+        if (ic == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong left X boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right X boundary type!")
+        end if
+
+      end select
+
+    case(2)
+
+! prepare indices for the boundaries
+!
+      if (ic == 1) then
+        il = 1
+        iu = im / 2 - 1
+      else
+        il = im / 2
+        iu = im
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = 1
+        ku = km / 2 - 1
+      else
+        kl = km / 2
+        ku = km
+      end if
+#else /* NDIMS == 3 */
+        kl = 1
+        ku = km
+#endif /* NDIMS == 3 */
+
+! apply selected boundary condition
+!
+      select case(bnd_type(nc,jc))
+
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        if (jc == 1) then
+          do j = jbl, 1, -1
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+          end do
+        else
+          do j = jeu, jm
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+          end do
+        end if
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
+
+        if (jc == 1) then
+          do j = 1, ng
+            jt = jb  - j
+            js = jbl + j
+
+            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
+            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+          end do
+        else
+          do j = 1, ng
+            jt = je  + j
+            js = jeu - j
+
+            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
+            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+          end do
+        end if
+
+! wrong boundary conditions
+!
+      case default
+
+        if (jc == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong left Y boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right Y boundary type!")
+        end if
+
+      end select
+
+#if NDIMS == 3
+    case(3)
+
+! prepare indices for the boundaries
+!
+      if (ic == 1) then
+        il = 1
+        iu = im / 2 - 1
+      else
+        il = im / 2
+        iu = im
+      end if
+      if (jc == 1) then
+        jl = 1
+        ju = jm / 2 - 1
+      else
+        jl = jm / 2
+        ju = jm
+      end if
+
+! apply selected boundary condition
+!
+      select case(bnd_type(nc,kc))
+
+! "open" boundary conditions
+!
+      case(bnd_open)
+
+        if (kc == 1) then
+          do k = kbl, 1, -1
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
+          end do
+        else
+          do k = keu, km
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
+          end do
+        end if
+
+! "reflective" boundary conditions
+!
+      case(bnd_reflective)
+
+        if (kc == 1) then
+          do k = 1, ng
+            kt = kb  - k
+            ks = kbl + k
+
+            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
+            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+          end do
+        else
+          do k = 1, ng
+            kt = ke  + k
+            ks = keu - k
+
+            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
+            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+          end do
+        end if
+
+! wrong boundary conditions
+!
+      case default
+
+        if (kc == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong left Z boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right Z boundary type!")
+        end if
+
+      end select
+
+#endif /* NDIMS == 3 */
+    end select
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine block_boundary_specific
 !
 !===============================================================================
 !
