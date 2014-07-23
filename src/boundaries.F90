@@ -2856,6 +2856,7 @@ module boundaries
 #ifdef MPI
     use mpitools       , only : nproc
 #endif /* MPI */
+    use mpitools       , only : periodic
 
 ! local variables are not implicit by default
 !
@@ -2900,11 +2901,18 @@ module boundaries
 #endif /* MPI */
 
 #if NDIMS == 2
-! iterate over all edge neighbors
+! iterate over all directions
 !
-            do j = 1, nsides
-              do i = 1, nsides
-                do n = 1, ndims
+            do n = 1, ndims
+
+! process boundaries only if they are not periodic in a given direction
+!
+              if (.not. periodic(n)) then
+
+! iterate over all corners
+!
+                do j = 1, nsides
+                  do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -2912,17 +2920,27 @@ module boundaries
                             call block_boundary_specific(i, j, k, 3 - n        &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                end do ! n = 1, ndims
-              end do ! i = 1, sides
-            end do ! j = 1, sides
+                  end do ! i = 1, sides
+                end do ! j = 1, sides
+
+              end if ! not periodic
+
+            end do ! n = 1, ndims
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-! iterate over all face neighbors
+! iterate over all directions
 !
-            do k = 1, nsides
-              do j = 1, nsides
-                do i = 1, nsides
-                  do n = 1, ndims
+            do n = 1, ndims
+
+! process boundaries only if they are not periodic in a given direction
+!
+              if (.not. periodic(n)) then
+
+! iterate over all corners
+!
+                do k = 1, nsides
+                  do j = 1, nsides
+                    do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -2930,10 +2948,13 @@ module boundaries
                             call block_boundary_specific(i, j, k, n            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                  end do ! n = 1, ndims
-                end do ! i = 1, sides
-              end do ! j = 1, sides
-            end do ! k = 1, sides
+                    end do ! i = 1, sides
+                  end do ! j = 1, sides
+                end do ! k = 1, sides
+
+              end if ! not periodic
+
+            end do ! n = 1, ndims
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
