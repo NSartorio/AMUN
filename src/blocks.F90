@@ -55,15 +55,11 @@ module blocks
 !
 !   ndims     - the number of dimensions (2 or 3);
 !   nsides    - the number of sides along each direction (2);
-!   nfaces    - the number of faces at each side (2 for 2D, 4 for 3D);
 !   nchildren - the number of child blocks for each block (4 for 2D, 8 for 3D);
-!   mfaces    - the number of faces in block (8 for 2D, 24 for 3D);
 !
   integer(kind=4), parameter :: ndims     = NDIMS
   integer(kind=4), parameter :: nsides    = 2
-  integer(kind=4), parameter :: nfaces    = 2**(ndims - 1)
   integer(kind=4), parameter :: nchildren = 2**ndims
-  integer(kind=4), parameter :: mfaces    = nsides * nfaces * ndims
 
 ! MODULE VARIABLES:
 ! ================
@@ -72,7 +68,8 @@ module blocks
 !
   integer(kind=4), save      :: last_id
 
-! the number of allocated meta and data blocks, and the number of leafs
+! the number of allocated meta and data blocks (inserted in the lists),
+! and the number of leafs
 !
   integer(kind=4), save      :: mblocks, dblocks, nleafs
 
@@ -122,9 +119,57 @@ module blocks
                                  !
     type(pointer_meta)          :: child(nchildren)
 
-                                 ! pointers to neighbor meta blocks
+#if NDIMS == 2
+                                 ! pointers to edge neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the direction of the edge from the corner
+                                 !     with above coordinates
+                                 ! and dimensions [1:2,1:2,1:2]
                                  !
-    type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
+    type(pointer_meta)          :: edges(nsides,nsides,ndims)
+
+                                 ! pointers to corner neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! and dimensions [1:2,1:2]
+                                 !
+    type(pointer_meta)          :: corners(nsides,nsides)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                                 ! pointers to face neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
+                                 ! 4 - the direction of the face normal vector
+                                 !     from the corner with above coordinates
+                                 ! and dimensions [1:2,1:2,1:2,1:3]
+                                 !
+    type(pointer_meta)          :: faces(nsides,nsides,nsides,ndims)
+
+                                 ! pointers to edge neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
+                                 ! 4 - the direction of the edge from the corner
+                                 !     with above coordinates
+                                 ! and dimensions [1:2,1:2,1:2,1:3]
+                                 !
+    type(pointer_meta)          :: edges(nsides,nsides,nsides,ndims)
+
+                                 ! pointers to corner neighbor meta blocks with
+                                 ! indices:
+                                 ! 1 - the X corner coordinate
+                                 ! 2 - the Y corner coordinate
+                                 ! 3 - the Z corner coordinate
+                                 ! and dimensions [1:2,1:2,1:2]
+                                 !
+    type(pointer_meta)          :: corners(nsides,nsides,nsides)
+#endif /* NDIMS == 3 */
 
                                  ! a pointer to the associated data block
                                  !
@@ -238,6 +283,12 @@ module blocks
                                  !
     integer(kind=4)             :: direction, side, face
 
+                                 ! the corner index determining the position of
+                                 ! the corner boundary and when direction is
+                                 ! specified also the face or edge boundaries
+                                 !
+    integer(kind=4)             :: corner(NDIMS)
+
                                  ! the level difference between the block and
                                  ! its neighbor
                                  !
@@ -262,7 +313,7 @@ module blocks
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
   public :: list_meta, list_data
-  public :: ndims, nsides, nfaces, nchildren
+  public :: ndims, nsides, nchildren
 
 ! declare public subroutines
 !
@@ -549,6 +600,10 @@ module blocks
 !
     last_meta => pmeta
 
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_metablock
@@ -600,6 +655,14 @@ module blocks
 !
       if (associated(pmeta%prev)) pmeta%prev%next => pmeta%next
       if (associated(pmeta%next)) pmeta%next%prev => pmeta%prev
+
+! set this block to be not a leaf
+!
+      call metablock_unset_leaf(pmeta)
+
+! decrease the number of allocated meta blocks stored in the meta block list
+!
+      mblocks = mblocks - 1
 
 ! deallocate memory used by the meta block
 !
@@ -668,6 +731,10 @@ module blocks
 !
     last_data => pdata
 
+! increase the number of data blocks in the list
+!
+    dblocks = dblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine append_datablock
@@ -733,6 +800,10 @@ module blocks
 
       end if ! %meta associated
 
+! decrease the number of allocated data blocks in the list
+!
+      dblocks = dblocks - 1
+
 ! deallocate the associated data block
 !
       call deallocate_datablock(pdata)
@@ -775,7 +846,7 @@ module blocks
 
 ! local variables
 !
-    integer :: i, j, k
+    integer :: n, i, j, k
 !
 !-------------------------------------------------------------------------------
 !
@@ -804,15 +875,31 @@ module blocks
       nullify(pmeta%child(i)%ptr)
     end do
 
-! nullify fields pointing to neighbors
+! nullify fields pointing to face, edge, and corner neighbors
 !
-    do i = 1, ndims
+#if NDIMS == 2
+    do i = 1, nsides
       do j = 1, nsides
-        do k = 1, nfaces
-          nullify(pmeta%neigh(i,j,k)%ptr)
-        end do
-      end do
-    end do
+        do n = 1, ndims
+          nullify(pmeta%edges(i,j,n)%ptr)
+        end do ! ndims
+        nullify(pmeta%corners(i,j)%ptr)
+      end do ! nsides
+    end do ! nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do i = 1, nsides
+      do j = 1, nsides
+        do k = 1, nsides
+          do n = 1, ndims
+            nullify(pmeta%faces(i,j,k,n)%ptr)
+            nullify(pmeta%edges(i,j,k,n)%ptr)
+          end do ! ndims
+          nullify(pmeta%corners(i,j,k)%ptr)
+        end do ! nsides
+      end do ! nsides
+    end do ! nsides
+#endif /* NDIMS == 3 */
 
 ! nullify the field pointing to the associated data block
 !
@@ -848,10 +935,6 @@ module blocks
     pmeta%ymax      = 1.0d+00
     pmeta%zmin      = 0.0d+00
     pmeta%zmax      = 1.0d+00
-
-! increase the number of allocated meta blocks
-!
-    mblocks         = mblocks + 1
 
 #ifdef PROFILE
 ! stop accounting time for the meta block allocation
@@ -894,7 +977,7 @@ module blocks
 
 ! local variables
 !
-    integer :: i, j, k
+    integer :: n, i, j, k
 !
 !-------------------------------------------------------------------------------
 !
@@ -907,14 +990,6 @@ module blocks
 ! check if the pointer is actually associated with any block
 !
     if (associated(pmeta)) then
-
-! decrease the number of leafs
-!
-      if (pmeta%leaf) nleafs = nleafs - 1
-
-! decrease the number of allocated meta blocks
-!
-      mblocks = mblocks - 1
 
 ! nullify fields pointing to previous and next block on the meta block list
 !
@@ -931,15 +1006,31 @@ module blocks
         nullify(pmeta%child(i)%ptr)
       end do
 
-! nullify fields pointing to neighbors
+! nullify fields pointing to face, edge, and corner neighbors
 !
-      do i = 1, ndims
+#if NDIMS == 2
+      do i = 1, nsides
         do j = 1, nsides
-          do k = 1, nfaces
-            nullify(pmeta%neigh(i,j,k)%ptr)
-          end do
-        end do
-      end do
+          do n = 1, ndims
+            nullify(pmeta%edges(i,j,n)%ptr)
+          end do ! ndims
+          nullify(pmeta%corners(i,j)%ptr)
+        end do ! nsides
+      end do ! nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      do i = 1, nsides
+        do j = 1, nsides
+          do k = 1, nsides
+            do n = 1, ndims
+              nullify(pmeta%faces(i,j,k,n)%ptr)
+              nullify(pmeta%edges(i,j,k,n)%ptr)
+            end do ! ndims
+            nullify(pmeta%corners(i,j,k)%ptr)
+          end do ! nsides
+        end do ! nsides
+      end do ! nsides
+#endif /* NDIMS == 3 */
 
 ! if there is a data block is associated, remove it
 !
@@ -1036,10 +1127,6 @@ module blocks
 !
     pdata%u => pdata%u0
 
-! increase the number of allocated data blocks
-!
-    dblocks = dblocks + 1
-
 #ifdef PROFILE
 ! stop accounting time for the data block allocation
 !
@@ -1090,10 +1177,6 @@ module blocks
 ! check if the pointer is actually associated with any block
 !
     if (associated(pdata)) then
-
-! decrease the number of allocated data blocks
-!
-      dblocks = dblocks - 1
 
 ! nullify field pointing to the previous and next blocks on the data block list
 !
@@ -1258,14 +1341,16 @@ module blocks
 ! local variables
 !
     logical, save :: first = .true.
-    integer       :: p, q, i, j, k, ic, jc, kc, cf
+    integer       :: p , q
+    integer       :: i , j , k
+    integer       :: ip, jp, kp
+    integer       :: ir, jr, kr
     real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
 ! local arrays
 !
     integer, dimension(0:79,nchildren)     , save :: order
     integer, dimension(0:79,nchildren)     , save :: config
-    integer, dimension(ndims,nsides,nfaces), save :: set
 !
 !-------------------------------------------------------------------------------
 !
@@ -1333,23 +1418,6 @@ module blocks
       config(78,:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
 #endif /* NDIMS == 3 */
 
-! prepare set array
-!
-#if NDIMS == 2
-      set(1,1,:) = (/ 1, 3 /)
-      set(1,2,:) = (/ 2, 4 /)
-      set(2,1,:) = (/ 1, 2 /)
-      set(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      set(1,1,:) = (/ 1, 3, 5, 7 /)
-      set(1,2,:) = (/ 2, 4, 6, 8 /)
-      set(2,1,:) = (/ 1, 2, 5, 6 /)
-      set(2,2,:) = (/ 3, 4, 7, 8 /)
-      set(3,1,:) = (/ 1, 2, 3, 4 /)
-      set(3,2,:) = (/ 5, 6, 7, 8 /)
-#endif /* NDIMS == 3 */
-
 ! reset the first execution flag
 !
       first = .false.
@@ -1368,7 +1436,7 @@ module blocks
 !!
 ! set corresponding configuration of the new blocks
 !
-      cf  = pmeta%conf
+      q   = pmeta%conf
 
 ! calculate sizes of the child blocks
 !
@@ -1394,12 +1462,12 @@ module blocks
 
 ! set the child configuration number
 !
-        call metablock_set_configuration(pchild, config(cf,p))
+        call metablock_set_configuration(pchild, config(q,p))
 
 ! associate the parent's children array element with the freshly created
 ! meta block
 !
-        pmeta%child(order(cf,p))%ptr => pchild
+        pmeta%child(order(q,p))%ptr => pchild
 
       end do ! nchildren
 
@@ -1440,10 +1508,10 @@ module blocks
 
 ! calculate the block coordinates in effective resolution units
 !
-        ic  = 2 * pmeta%coords(1) + i
-        jc  = 2 * pmeta%coords(2) + j
+        ip  = 2 * pmeta%coords(1) + i
+        jp  = 2 * pmeta%coords(2) + j
 #if NDIMS == 3
-        kc  = 2 * pmeta%coords(3) + k
+        kp  = 2 * pmeta%coords(3) + k
 #endif /* NDIMS == 3 */
 
 ! calculate block bounds
@@ -1462,7 +1530,7 @@ module blocks
 
 ! set the effective resolution coordinates
 !
-        call metablock_set_coordinates(pchild, ic, jc, kc)
+        call metablock_set_coordinates(pchild, ip, jp, kp)
 
 ! set the child block bounds
 !
@@ -1470,257 +1538,798 @@ module blocks
 
       end do ! nchildren
 
-!! ASSIGN PROPER NEIGHBORS FOR THE CHILDREN IN THE INTERIOR OF THE PARENT BLOCK
-!!
-! iterate over faces and update the interior of the block
+! update neighbor pointers of the parent block
 !
-      do p = 1, nfaces
+#if NDIMS == 2
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
 
-! X direction (left side)
+! calculate the child index
 !
-        pmeta%child(2)%ptr%neigh(1,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(4)%ptr%neigh(1,1,p)%ptr => pmeta%child(3)%ptr
+          p  = 2 * (jp - 1) + ip
+
+! associate pchild with the proper child
+!
+          pchild => pmeta%child(p)%ptr
+
+!--- update edge neighbor pointers ---
+!
+! update external edges
+!
+! along X-direction
+!
+          pneigh => pmeta%edges(ip,jp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%id == pmeta%id) then
+              q  = 2 * (jr - 1) + ip
+              pchild%edges(ip,jp,1)%ptr => pmeta%child(q)%ptr
+              pchild%edges(ir,jp,1)%ptr => pmeta%child(q)%ptr
+            else
+              pchild%edges(ip,jp,1)%ptr => pneigh
+              pchild%edges(ir,jp,1)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! along Y-direction
+!
+          pneigh => pmeta%edges(ip,jp,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%id == pmeta%id) then
+              q = 2 * (jp - 1) + ir
+              pchild%edges(ip,jp,2)%ptr => pmeta%child(q)%ptr
+              pchild%edges(ip,jr,2)%ptr => pmeta%child(q)%ptr
+            else
+              pchild%edges(ip,jp,2)%ptr => pneigh
+              pchild%edges(ip,jr,2)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! update internal edges
+!
+! along X-direction
+!
+          q = 2 * (jr - 1) + ip
+          pchild%edges(ip,jr,1)%ptr => pmeta%child(q)%ptr
+          pchild%edges(ir,jr,1)%ptr => pmeta%child(q)%ptr
+
+! along Y-direction
+!
+          q = 2 * (jp - 1) + ir
+          pchild%edges(ir,jp,2)%ptr => pmeta%child(q)%ptr
+          pchild%edges(ir,jr,2)%ptr => pmeta%child(q)%ptr
+
+!--- update corner neighbor pointers ---
+!
+! calculate the index of opposite child
+!
+          q = 2 * (jr - 1) + ir
+
+! update corner located at the parent's one
+!
+          pneigh => pmeta%corners(ip,jp)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%id == pmeta%id) then
+              pchild%corners(ip,jp)%ptr => pmeta%child(q)%ptr
+            else
+              pchild%corners(ip,jp)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! update corner touching another child
+!
+          pchild%corners(ir,jr)%ptr => pmeta%child(q)%ptr
+
+! update corners laying on parent's edges
+!
+! along X-direction
+!
+          pneigh => pmeta%edges(ir,jp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%id == pmeta%id) then
+              pchild%corners(ir,jp)%ptr => pmeta%child(q)%ptr
+            else
+              if (pneigh%level > pmeta%level)                                  &
+                                           pchild%corners(ir,jp)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! along Y-direction
+!
+          pneigh => pmeta%edges(ip,jr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%id == pmeta%id) then
+              pchild%corners(ip,jr)%ptr => pmeta%child(q)%ptr
+            else
+              if (pneigh%level > pmeta%level)                                  &
+                                           pchild%corners(ip,jr)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-        pmeta%child(6)%ptr%neigh(1,1,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(8)%ptr%neigh(1,1,p)%ptr => pmeta%child(7)%ptr
-#endif /* NDIMS == 3 */
+      do kp = 1, nsides
+        kr = 3 - kp
+        do jp = 1, nsides
+          jr = 3 - jp
+          do ip = 1, nsides
+            ir = 3 - ip
 
-! associate pneigh with a neighbor
+! calculate the child index
 !
-        pneigh => pmeta%neigh(1,1,1)%ptr
+            p  = 4 * (kp - 1) + 2 * (jp - 1) + ip
 
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
+! associate pchild with the proper child
 !
-        if (associated(pneigh)) then
+            pchild => pmeta%child(p)%ptr
 
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(1,1,p)%ptr => pmeta%child(2)%ptr
-            pmeta%child(3)%ptr%neigh(1,1,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-            pmeta%child(5)%ptr%neigh(1,1,p)%ptr => pmeta%child(6)%ptr
-            pmeta%child(7)%ptr%neigh(1,1,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! X direction (right side)
+!--- update face neighbor pointers ---
 !
-        pmeta%child(1)%ptr%neigh(1,2,p)%ptr => pmeta%child(2)%ptr
-        pmeta%child(3)%ptr%neigh(1,2,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-        pmeta%child(5)%ptr%neigh(1,2,p)%ptr => pmeta%child(6)%ptr
-        pmeta%child(7)%ptr%neigh(1,2,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
+! prepare the index of neighbor child for X-faces
 !
-        pneigh => pmeta%neigh(1,2,1)%ptr
+            q = 4 * (kp - 1) + 2 * (jp - 1) + ir
 
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
+! set the internal side neighbor pointer
 !
-        if (associated(pneigh)) then
+            do k = 1, nsides
+              do j = 1, nsides
+                pchild%faces(ir,j,k,1)%ptr => pmeta%child(q)%ptr
+              end do ! j = 1, nsides
+            end do ! k = 1, nsides
 
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(2)%ptr%neigh(1,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(4)%ptr%neigh(1,2,p)%ptr => pmeta%child(3)%ptr
-#if NDIMS == 3
-            pmeta%child(6)%ptr%neigh(1,2,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(8)%ptr%neigh(1,2,p)%ptr => pmeta%child(7)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! Y direction (left side)
+! associate pneigh with the X-face neighbor
 !
-        pmeta%child(3)%ptr%neigh(2,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(4)%ptr%neigh(2,1,p)%ptr => pmeta%child(2)%ptr
-#if NDIMS == 3
-        pmeta%child(7)%ptr%neigh(2,1,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(8)%ptr%neigh(2,1,p)%ptr => pmeta%child(6)%ptr
-#endif /* NDIMS == 3 */
+            pneigh => pmeta%faces(ip,jp,kp,1)%ptr
 
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(2,1,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(2,1,p)%ptr => pmeta%child(3)%ptr
-            pmeta%child(2)%ptr%neigh(2,1,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-            pmeta%child(5)%ptr%neigh(2,1,p)%ptr => pmeta%child(7)%ptr
-            pmeta%child(6)%ptr%neigh(2,1,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! Y direction (right side)
-!
-        pmeta%child(1)%ptr%neigh(2,2,p)%ptr => pmeta%child(3)%ptr
-        pmeta%child(2)%ptr%neigh(2,2,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-        pmeta%child(5)%ptr%neigh(2,2,p)%ptr => pmeta%child(7)%ptr
-        pmeta%child(6)%ptr%neigh(2,2,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(2,2,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(3)%ptr%neigh(2,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(4)%ptr%neigh(2,2,p)%ptr => pmeta%child(2)%ptr
-#if NDIMS == 3
-            pmeta%child(7)%ptr%neigh(2,2,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(8)%ptr%neigh(2,2,p)%ptr => pmeta%child(6)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-#if NDIMS == 3
-! Z direction (left side)
-!
-        pmeta%child(5)%ptr%neigh(3,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(6)%ptr%neigh(3,1,p)%ptr => pmeta%child(2)%ptr
-        pmeta%child(7)%ptr%neigh(3,1,p)%ptr => pmeta%child(3)%ptr
-        pmeta%child(8)%ptr%neigh(3,1,p)%ptr => pmeta%child(4)%ptr
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(3,1,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(3,1,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(2)%ptr%neigh(3,1,p)%ptr => pmeta%child(6)%ptr
-            pmeta%child(3)%ptr%neigh(3,1,p)%ptr => pmeta%child(7)%ptr
-            pmeta%child(4)%ptr%neigh(3,1,p)%ptr => pmeta%child(8)%ptr
-
-          end if
-
-        end if
-
-! Z direction (right side)
-!
-        pmeta%child(1)%ptr%neigh(3,2,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(2)%ptr%neigh(3,2,p)%ptr => pmeta%child(6)%ptr
-        pmeta%child(3)%ptr%neigh(3,2,p)%ptr => pmeta%child(7)%ptr
-        pmeta%child(4)%ptr%neigh(3,2,p)%ptr => pmeta%child(8)%ptr
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(3,2,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(5)%ptr%neigh(3,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(6)%ptr%neigh(3,2,p)%ptr => pmeta%child(2)%ptr
-            pmeta%child(7)%ptr%neigh(3,2,p)%ptr => pmeta%child(3)%ptr
-            pmeta%child(8)%ptr%neigh(3,2,p)%ptr => pmeta%child(4)%ptr
-
-          end if
-
-        end if
-#endif /* NDIMS == 3 */
-
-      end do ! nfaces
-
-!! UPDATE NEIGHBORS AND EXTERNAL NEIGHBORS OF CHILDREN
-!!
-! set pointers to neighbors and update neighbors' pointers
-!
-      do i = 1, ndims
-        do j = 1, nsides
-
-! prepare reverse side index
-!
-          q = 3 - j
-
-! iterate over all faces
-!
-          do k = 1, nfaces
-
-! associate pointers with the neighbor and child
-!
-            pneigh => pmeta%neigh(i,j,k)%ptr
-            pchild => pmeta%child(set(i,j,k))%ptr
-
-! check if neighbor is associated
+! set the external side neighbor pointer
 !
             if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                do k = 1, nsides
+                  do j = 1, nsides
+                    pchild%faces(ip,j,k,1)%ptr => pmeta%child(q)%ptr
+                  end do ! j = 1, nsides
+                end do ! k = 1, nsides
+              else
+                do k = 1, nsides
+                  do j = 1, nsides
+                pchild%faces(ip,j,k,1)%ptr => pneigh
+                  end do ! j = 1, nsides
+                end do ! k = 1, nsides
+              end if
+            end if ! pneigh associated
 
-! check if the parent block does not point to itself (periodic boundaries)
+! prepare the index of neighbor child for Y-faces
 !
-              if (pneigh%id /= pmeta%id) then
+            q = 4 * (kp - 1) + 2 * (jr - 1) + ip
 
-! point the child neigh field to the right neighbor
+! set the internal side neighbor pointer
 !
-                do p = 1, nfaces
-                  pchild%neigh(i,j,p)%ptr => pneigh
-                end do
+            do k = 1, nsides
+              do i = 1, nsides
+                pchild%faces(i,jr,k,2)%ptr => pmeta%child(q)%ptr
+              end do ! i = 1, nsides
+            end do ! k = 1, nsides
 
-! update neighbor pointer if it is at the same level
+! associate pneigh with the Y-face neighbor
 !
-                if (pneigh%level == pmeta%level) then
-                  pneigh%neigh(i,q,k)%ptr => pchild
-                end if
+            pneigh => pmeta%faces(ip,jp,kp,2)%ptr
 
-! update neighbor pointer if it is at higher level
+! set the external side neighbor pointer
 !
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                do k = 1, nsides
+                  do i = 1, nsides
+                    pchild%faces(i,jp,k,2)%ptr => pmeta%child(q)%ptr
+                  end do ! i = 1, nsides
+                end do ! k = 1, nsides
+              else
+                do k = 1, nsides
+                  do i = 1, nsides
+                pchild%faces(i,jp,k,2)%ptr => pneigh
+                  end do ! i = 1, nsides
+                end do ! k = 1, nsides
+              end if
+            end if ! pneigh associated
+
+! prepare the index of neighbor child for Z-faces
+!
+            q = 4 * (kr - 1) + 2 * (jp - 1) + ip
+
+! set the internal side neighbor pointer
+!
+            do j = 1, nsides
+              do i = 1, nsides
+                pchild%faces(i,j,kr,3)%ptr => pmeta%child(q)%ptr
+              end do ! i = 1, nsides
+            end do ! j = 1, nsides
+
+! associate pneigh with the Z-face neighbor
+!
+            pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! set the external side neighbor pointer
+!
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                do j = 1, nsides
+                  do i = 1, nsides
+                    pchild%faces(i,j,kp,3)%ptr => pmeta%child(q)%ptr
+                  end do ! i = 1, nsides
+                end do ! j = 1, nsides
+              else
+                do j = 1, nsides
+                  do i = 1, nsides
+                pchild%faces(i,j,kp,3)%ptr => pneigh
+                  end do ! i = 1, nsides
+                end do ! j = 1, nsides
+              end if
+            end if ! pneigh associated
+
+!--- update edge neighbor pointers ---
+!
+! process child edges which lay on the parent's edges
+!
+! along X direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+                pchild%edges(ip,jp,kp,1)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ir,jp,kp,1)%ptr => pmeta%child(q)%ptr
+              else
+                pchild%edges(ip,jp,kp,1)%ptr => pneigh
+                pchild%edges(ir,jp,kp,1)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! along Y direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+                pchild%edges(ip,jp,kp,2)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ip,jr,kp,2)%ptr => pmeta%child(q)%ptr
+              else
+                pchild%edges(ip,jp,kp,2)%ptr => pneigh
+                pchild%edges(ip,jr,kp,2)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! along Z direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+                pchild%edges(ip,jp,kp,3)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ip,jp,kr,3)%ptr => pmeta%child(q)%ptr
+              else
+                pchild%edges(ip,jp,kp,3)%ptr => pneigh
+                pchild%edges(ip,jp,kr,3)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! process child edges which are neighbors with other children
+!
+! along X direction
+!
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+            pchild%edges(ip,jr,kr,1)%ptr => pmeta%child(q)%ptr
+            pchild%edges(ir,jr,kr,1)%ptr => pmeta%child(q)%ptr
+
+! along Y direction
+!
+            q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+            pchild%edges(ir,jp,kr,2)%ptr => pmeta%child(q)%ptr
+            pchild%edges(ir,jr,kr,2)%ptr => pmeta%child(q)%ptr
+
+! along Z direction
+!
+            q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+            pchild%edges(ir,jr,kp,3)%ptr => pmeta%child(q)%ptr
+            pchild%edges(ir,jr,kr,3)%ptr => pmeta%child(q)%ptr
+
+! process child edges on the parent's X-face
+!
+! along Z-edge
+!
+            pneigh => pmeta%faces(ip,jr,kp,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+                pchild%edges(ip,jr,kp,3)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ip,jr,kr,3)%ptr => pmeta%child(q)%ptr
+              else
                 if (pneigh%level > pmeta%level) then
-                  do p = 1, nfaces
-                    pneigh%neigh(i,q,p)%ptr => pchild
-                  end do
+                  pchild%edges(ip,jr,kp,3)%ptr => pneigh
+                  pchild%edges(ip,jr,kr,3)%ptr => pneigh
                 end if
+              end if
+            end if ! pneigh associated
 
-! if neighbor has lower level than parent, something is wrong, since lower
-! levels should be already refined
+! along Y-edge
 !
-                if (pneigh%level < pmeta%level) then
-                  call print_error("blocks::refine_block"                      &
-                                           , "Neighbor found at lower level!")
+            pneigh => pmeta%faces(ip,jp,kr,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+                pchild%edges(ip,jp,kr,2)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ip,jr,kr,2)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level) then
+                  pchild%edges(ip,jp,kr,2)%ptr => pneigh
+                  pchild%edges(ip,jr,kr,2)%ptr => pneigh
                 end if
+              end if
+            end if ! pneigh associated
 
-              end if ! pmeta and pneigh point to different blocks
+! process child edges on the parent's Y-face
+!
+! along Z-edge
+!
+            pneigh => pmeta%faces(ir,jp,kp,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+                pchild%edges(ir,jp,kp,3)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ir,jp,kr,3)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level) then
+                  pchild%edges(ir,jp,kp,3)%ptr => pneigh
+                  pchild%edges(ir,jp,kr,3)%ptr => pneigh
+                end if
+              end if
+            end if ! pneigh associated
 
-            end if ! pneigh is associated
+! along X-edge
+!
+            pneigh => pmeta%faces(ip,jp,kr,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+                pchild%edges(ip,jp,kr,1)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ir,jp,kr,1)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level) then
+                  pchild%edges(ip,jp,kr,1)%ptr => pneigh
+                  pchild%edges(ir,jp,kr,1)%ptr => pneigh
+                end if
+              end if
+            end if ! pneigh associated
 
-          end do ! nfaces
-        end do ! nsides
-      end do ! ndims
+! process child edges on the parent's Z-face
+!
+! along Y-edge
+!
+            pneigh => pmeta%faces(ir,jp,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+                pchild%edges(ir,jp,kp,2)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ir,jr,kp,2)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level) then
+                  pchild%edges(ir,jp,kp,2)%ptr => pneigh
+                  pchild%edges(ir,jr,kp,2)%ptr => pneigh
+                end if
+              end if
+            end if ! pneigh associated
+
+! along X-edge
+!
+            pneigh => pmeta%faces(ip,jr,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+                pchild%edges(ip,jr,kp,1)%ptr => pmeta%child(q)%ptr
+                pchild%edges(ir,jr,kp,1)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level) then
+                  pchild%edges(ip,jr,kp,1)%ptr => pneigh
+                  pchild%edges(ir,jr,kp,1)%ptr => pneigh
+                end if
+              end if
+            end if ! pneigh associated
+
+!--- update corner neighbor pointers ---
+!
+! calculate the index of the neighbor child
+!
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ir
+
+! process child corner which overlaps with the parent's one
+!
+            pneigh => pmeta%corners(ip,jp,kp)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ip,jp,kp)%ptr => pmeta%child(q)%ptr
+              else
+                pchild%corners(ip,jp,kp)%ptr => pmeta%corners(ip,jp,kp)%ptr
+              end if
+            end if ! pneigh associated
+
+! process child corner which points to another child
+!
+            pchild%corners(ir,jr,kr)%ptr => pmeta%child(q)%ptr
+
+! process child corners which lay on parent's edges
+!
+! along X direction
+!
+            pneigh => pmeta%edges(ir,jp,kp,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ir,jp,kp)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ir,jp,kp)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! along Y direction
+!
+            pneigh => pmeta%edges(ip,jr,kp,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ip,jr,kp)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ip,jr,kp)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! along Z-direction
+!
+            pneigh => pmeta%edges(ip,jp,kr,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ip,jp,kr)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ip,jp,kr)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! process child corners which lay on parent's faces
+!
+! on X-face
+!
+            pneigh => pmeta%faces(ip,jr,kr,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ip,jr,kr)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ip,jr,kr)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! on Y-face
+!
+            pneigh => pmeta%faces(ir,jp,kr,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ir,jp,kr)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ir,jp,kr)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+! on Z-face
+!
+            pneigh => pmeta%faces(ir,jr,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%id == pmeta%id) then
+                pchild%corners(ir,jr,kp)%ptr => pmeta%child(q)%ptr
+              else
+                if (pneigh%level > pmeta%level)                                &
+                                        pchild%corners(ir,jr,kp)%ptr => pneigh
+              end if
+            end if ! pneigh associated
+
+          end do ! ip = 1, nsides
+        end do ! jp = 1, nsides
+      end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
+
+! update neighbor pointers of the neighbor blocks
+!
+#if NDIMS == 2
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+! calculate the child index
+!
+          p  = 2 * (jp - 1) + ip
+
+! associate pchild with the proper child
+!
+          pchild => pmeta%child(p)%ptr
+
+!--- update neighbor's edge pointers ---
+!
+! along X-direction
+!
+          pneigh => pchild%edges(ip,jp,1)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ip,jr,1)%ptr => pchild
+            if (pneigh%level > pmeta%level) pneigh%edges(ir,jr,1)%ptr => pchild
+          end if ! pneigh associated
+
+! along Y-direction
+!
+          pneigh => pchild%edges(ip,jp,2)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ir,jp,2)%ptr => pchild
+            if (pneigh%level > pmeta%level) pneigh%edges(ir,jr,2)%ptr => pchild
+          end if ! pneigh associated
+
+!--- update neighbor's corner pointers ---
+!
+! neighbor corner located at the parent's one
+!
+          pneigh => pmeta%corners(ip,jp)%ptr
+          if (associated(pneigh)) pneigh%corners(ir,jr)%ptr => pchild
+
+! neighbor corners laying on the parent's edges
+!
+! along X-direction
+!
+          pneigh => pmeta%edges(ir,jp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) pneigh%corners(ip,jr)%ptr => pchild
+          end if ! pneigh associated
+
+! along Y-direction
+!
+          pneigh => pmeta%edges(ip,jr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) pneigh%corners(ir,jp)%ptr => pchild
+          end if ! pneigh associated
+
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! update neighbor's face pointers (only in 3D)
+!
+      do kp = 1, nsides
+        kr = 3 - kp
+        do jp = 1, nsides
+          jr = 3 - jp
+          do ip = 1, nsides
+            ir = 3 - ip
+
+! calculate the child index
+!
+            p  = 4 * (kp - 1) + 2 * (jp - 1) + ip
+
+! associate pchild with the proper child
+!
+            pchild => pmeta%child(p)%ptr
+
+!--- update neighbor's face pointers ---
+!
+! assign pneigh to the X-face neighbor
+!
+            pneigh => pmeta%faces(ip,jp,kp,1)%ptr
+
+! set the corresponding neighbor face pointers
+!
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level) then
+                do k = 1, nsides
+                  do j = 1, nsides
+                    pneigh%faces(ir,j,k,1)%ptr => pchild
+                  end do
+                end do
+              else
+                pneigh%faces(ir,jp,kp,1)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+! assign pneigh to the Y-face neighbor
+!
+            pneigh => pmeta%faces(ip,jp,kp,2)%ptr
+
+! set the corresponding neighbor face pointers
+!
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level) then
+                do k = 1, nsides
+                  do i = 1, nsides
+                    pneigh%faces(i,jr,k,2)%ptr => pchild
+                  end do
+                end do
+              else
+                pneigh%faces(ip,jr,kp,2)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+! assign pneigh to the Z-face neighbor
+!
+            pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! set the corresponding neighbor face pointers
+!
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level) then
+                do j = 1, nsides
+                  do i = 1, nsides
+                    pneigh%faces(i,j,kr,3)%ptr => pchild
+                  end do
+                end do
+              else
+                pneigh%faces(ip,jp,kr,3)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+!--- update neighbor's edge pointers ---
+!
+! along X direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+            if (associated(pneigh)) then
+              pneigh%edges(ip,jr,kr,1)%ptr => pchild
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%edges(ir,jr,kr,1)%ptr => pchild
+            end if ! pneigh associated
+
+! along Y direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+            if (associated(pneigh)) then
+              pneigh%edges(ir,jp,kr,2)%ptr => pchild
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%edges(ir,jr,kr,2)%ptr => pchild
+            end if ! pneigh associated
+
+! along Z direction
+!
+            pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+            if (associated(pneigh)) then
+              pneigh%edges(ir,jr,kp,3)%ptr => pchild
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%edges(ir,jr,kr,3)%ptr => pchild
+            end if ! pneigh associated
+
+! process child edges on the parent's X face
+!
+! Z-direction
+!
+            pneigh => pmeta%faces(ip,jr,kp,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ir,jp,kp,3)%ptr => pchild
+                pneigh%edges(ir,jp,kr,3)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+! Y-direction
+!
+            pneigh => pmeta%faces(ip,jp,kr,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ir,jp,kp,2)%ptr => pchild
+                pneigh%edges(ir,jr,kp,2)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+! process child edges on the parent's Y face
+!
+! Z-direction
+!
+            pneigh => pmeta%faces(ir,jp,kp,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ip,jr,kp,3)%ptr => pchild
+                pneigh%edges(ip,jr,kr,3)%ptr => pchild
+              end if
+            end if ! pneigh associated
+! X-direction
+!
+            pneigh => pmeta%faces(ip,jp,kr,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ip,jr,kp,1)%ptr => pchild
+                pneigh%edges(ir,jr,kp,1)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+! process child edges on the parent's Z face
+!
+! Y-direction
+!
+            pneigh => pmeta%faces(ir,jp,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ip,jp,kr,2)%ptr => pchild
+                pneigh%edges(ip,jr,kr,2)%ptr => pchild
+              end if
+            end if ! pneigh associated
+! X-direction
+!
+            pneigh => pmeta%faces(ip,jr,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level == pchild%level) then
+                pneigh%edges(ip,jp,kr,1)%ptr => pchild
+                pneigh%edges(ir,jp,kr,1)%ptr => pchild
+              end if
+            end if ! pneigh associated
+
+!--- update neighbor's corner pointers ---
+!
+! calculate the index of the opposite child
+!
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ir
+
+! update neighbor's corner which overlaps with the parent's one
+!
+            pneigh => pmeta%corners(ip,jp,kp)%ptr
+            if (associated(pneigh)) pneigh%corners(ir,jr,kr)%ptr => pchild
+
+! process neighbot's corners which lay on parent's edges
+!
+! X-edge
+!
+            pneigh => pmeta%edges(ir,jp,kp,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ip,jr,kr)%ptr => pchild
+            end if ! pneigh associated
+! Y-edge
+!
+            pneigh => pmeta%edges(ip,jr,kp,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ir,jp,kr)%ptr => pchild
+            end if ! pneigh associated
+! Z-edge
+!
+            pneigh => pmeta%edges(ip,jp,kr,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ir,jr,kp)%ptr => pchild
+            end if ! pneigh associated
+
+! process child corners which lay on parent's faces
+!
+! X-face
+!
+            pneigh => pmeta%faces(ip,jr,kr,1)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ir,jp,kp)%ptr => pchild
+            end if ! pneigh associated
+! Y-face
+!
+            pneigh => pmeta%faces(ir,jp,kr,2)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ip,jr,kp)%ptr => pchild
+            end if ! pneigh associated
+! Z-face
+!
+            pneigh => pmeta%faces(ir,jr,kp,3)%ptr
+            if (associated(pneigh)) then
+              if (pneigh%level > pmeta%level)                                  &
+                                        pneigh%corners(ip,jp,kr)%ptr => pchild
+            end if ! pneigh associated
+
+          end do ! ip = 1, nsides
+        end do ! jp = 1, nsides
+      end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 ! mark all neighbors to be updated as well
 !
@@ -1761,16 +2370,6 @@ module blocks
 ! reset the refinement flag
 !
       call metablock_set_refinement(pmeta, 0)
-
-! nullify the parent's neighbor pointers
-!
-      do i = 1, ndims
-        do j = 1, nsides
-          do k = 1, nfaces
-            nullify(pmeta%neigh(i,j,k)%ptr)
-          end do
-        end do
-      end do
 
 ! restore the pointer to the current block
 !
@@ -1830,15 +2429,10 @@ module blocks
 
 ! local variables
 !
-    integer       :: i, j, k, l, p
-
-! local saved variables
-!
-    logical, save :: first = .true.
-
-! local arrays
-!
-    integer, dimension(ndims, nsides, nfaces), save :: arr
+    integer       :: l , p , q
+    integer       :: i , j , k
+    integer       :: ip, jp, kp
+    integer       :: ir, jr, kr
 !
 !-------------------------------------------------------------------------------
 !
@@ -1848,64 +2442,446 @@ module blocks
     call start_timer(imd)
 #endif /* PROFILE */
 
-! prepare saved variables at the first execution
+! update neighbor pointers of the parent block
 !
-    if (first) then
+#if NDIMS == 2
+    do jp = 1, nsides
+      jr = 3 - jp
+      do ip = 1, nsides
+        ir = 3 - ip
 
-! prepare reference array
+! calculate the child index
 !
+        p  = 2 * (jp - 1) + ip
+
+! associate pchild with the proper child
+!
+        pchild => pmeta%child(p)%ptr
+
+!--- update edge neighbor pointers ---
+!
+! along X-direction
+!
+        pneigh => pchild%edges(ip,jp,1)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jr - 1) + ip
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%edges(ip,jp,1)%ptr => pmeta
+          else
+            pmeta%edges(ip,jp,1)%ptr => pneigh
+          end if
+        end if ! pneigh associated
+
+! along Y-direction
+!
+        pneigh => pchild%edges(ip,jp,2)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jp - 1) + ir
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%edges(ip,jp,2)%ptr => pmeta
+          else
+            pmeta%edges(ip,jp,2)%ptr => pneigh
+          end if
+        end if ! pneigh associated
+
+!--- update corner neighbor pointers ---
+!
+        pneigh => pchild%corners(ip,jp)%ptr
+        if (associated(pneigh)) then
+          q  = 2 * (jr - 1) + ir
+          if (pneigh%id == pmeta%child(q)%ptr%id) then
+            pmeta%corners(ip,jp)%ptr => pmeta
+          else
+            pmeta%corners(ip,jp)%ptr => pneigh
+          end if
+        end if ! pneigh associated
+
+      end do ! ip = 1, nsides
+    end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-      arr(1,1,:) = (/ 1, 3, 5, 7 /)
-      arr(1,2,:) = (/ 2, 4, 6, 8 /)
-      arr(2,1,:) = (/ 1, 2, 5, 6 /)
-      arr(2,2,:) = (/ 3, 4, 7, 8 /)
-      arr(3,1,:) = (/ 1, 2, 3, 4 /)
-      arr(3,2,:) = (/ 5, 6, 7, 8 /)
-#else /* NDIMS == 3 */
-      arr(1,1,:) = (/ 1, 3 /)
-      arr(1,2,:) = (/ 2, 4 /)
-      arr(2,1,:) = (/ 1, 2 /)
-      arr(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 3 */
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
 
-! reset the first execution flag
+! calculate the child index
 !
-      first = .false.
+          p  = 4 * (kp - 1) + 2 * (jp - 1) + ip
 
-    end if
-
-! iterate over dimensions, sides, and faces
+! associate pchild with the proper child
 !
-    do i = 1, ndims
-      do j = 1, nsides
-        do k = 1, nfaces
+          pchild => pmeta%child(p)%ptr
 
-! get the current child index
+!--- update face neighbor pointers ---
 !
-          p = arr(i,j,k)
-
-! associate a pointer with the neighbor
+! assign pneigh to the X-face neighbor
 !
-          pneigh => pmeta%child(p)%ptr%neigh(i,j,k)%ptr
+          pneigh => pchild%faces(ip,jp,kp,1)%ptr
 
-! update the parent neighbor field
+! set the corresponding neighbor face pointers
 !
-          pmeta%neigh(i,j,k)%ptr => pneigh
+          if (associated(pneigh)) then
+            q  = 4 * (kp - 1) + 2 * (jp - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,1)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,1)%ptr => pneigh
+            end if
+          end if
 
-! update the neigh field of the neighbor
+! assign pneigh to the Y-face neighbor
+!
+          pneigh => pchild%faces(ip,jp,kp,2)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            q  = 4 * (kp - 1) + 2 * (jr - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,2)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,2)%ptr => pneigh
+            end if
+          end if
+
+! assign pneigh to the Z-face neighbor
+!
+          pneigh => pchild%faces(ip,jp,kp,3)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            q  = 4 * (kr - 1) + 2 * (jp - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%faces(ip,jp,kp,3)%ptr => pmeta
+            else
+              pmeta%faces(ip,jp,kp,3)%ptr => pneigh
+            end if
+          end if
+
+!--- update edge neighbor pointers ---
+!
+! associate pneigh with the X edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,1)%ptr
+
+! process edge along X-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ip
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,1)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,1)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! associate pneigh with the Y edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,2)%ptr
+
+! process edge along Y-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kr - 1) + 2 * (jp - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,2)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,2)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+! associate pneigh with the Z edge neighbor
+!
+          pneigh => pchild%edges(ip,jp,kp,3)%ptr
+
+! process edge along Y-direction if pneigh associated
+!
+          if (associated(pneigh)) then
+            q = 4 * (kp - 1) + 2 * (jr - 1) + ir
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%edges(ip,jp,kp,3)%ptr => pmeta
+            else
+              pmeta%edges(ip,jp,kp,3)%ptr => pneigh
+            end if
+          end if ! pneigh associated
+
+!--- update corner neighbor pointers ---
+!
+! associate pneigh with the corner neighbor
+!
+          pneigh => pchild%corners(ip,jp,kp)%ptr
+
+! update the corner neighbor pointer
 !
           if (associated(pneigh)) then
 
-            l = 3 - j
-            do p = 1, nfaces
-              pneigh%neigh(i,l,p)%ptr => pmeta
-            end do
+! calculate the index of the opposite child
+!
+            q = 4 * (kr - 1) + 2 * (jr - 1) + ir
 
-          end if ! pneigh is associated
+            if (pneigh%id == pmeta%child(q)%ptr%id) then
+              pmeta%corners(ip,jp,kp)%ptr => pmeta
+            else
+              pmeta%corners(ip,jp,kp)%ptr => pneigh
+            end if
+          end if ! pneigh associated
 
-        end do ! nfaces
-      end do ! nsides
-    end do ! ndims
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
+
+! update neighbor pointers of the neighbor blocks
+!
+#if NDIMS == 2
+    do jp = 1, nsides
+      jr = 3 - jp
+      do ip = 1, nsides
+        ir = 3 - ip
+
+!--- update neighbor's edge pointers ---
+!
+! along X-direction
+!
+        pneigh => pmeta%edges(ip,jp,1)%ptr
+        if (associated(pneigh)) then
+          pneigh%edges(ip,jr,1)%ptr => pmeta
+          if (pneigh%level > pmeta%level) pneigh%edges(ir,jr,1)%ptr => pmeta
+        end if ! pneigh associated
+
+! along Y-direction
+!
+        pneigh => pmeta%edges(ip,jp,2)%ptr
+        if (associated(pneigh)) then
+          pneigh%edges(ir,jp,2)%ptr => pmeta
+          if (pneigh%level > pmeta%level) pneigh%edges(ir,jr,2)%ptr => pmeta
+        end if
+
+!--- update neighbor's corner pointers ---
+!
+! neighbor corner linked to the parent's corner
+!
+        pneigh => pmeta%corners(ip,jp)%ptr
+        if (associated(pneigh)) pneigh%corners(ir,jr)%ptr => pmeta
+
+! nullify neighbor corners pointing to parent's edges
+!
+! along X-direction
+!
+        pneigh => pmeta%edges(ir,jp,1)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%level > pmeta%level) nullify(pneigh%corners(ip,jr)%ptr)
+        end if ! pneigh associated
+
+! along Y-direction
+!
+        pneigh => pmeta%edges(ip,jr,2)%ptr
+        if (associated(pneigh)) then
+          if (pneigh%level > pmeta%level) nullify(pneigh%corners(ir,jp)%ptr)
+        end if ! pneigh associated
+
+      end do ! ip = 1, nsides
+    end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+!--- update neighbor's face pointers ---
+!
+! assign pneigh to the X-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,1)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do k = 1, nsides
+                do j = 1, nsides
+                  pneigh%faces(ir,j,k,1)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ir,jp,kp,1)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+! assign pneigh to the Y-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,2)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do k = 1, nsides
+                do i = 1, nsides
+                  pneigh%faces(i,jr,k,2)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ip,jr,kp,2)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+! assign pneigh to the Z-face neighbor
+!
+          pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! set the corresponding neighbor face pointers
+!
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              do j = 1, nsides
+                do i = 1, nsides
+                  pneigh%faces(i,j,kr,3)%ptr => pmeta
+                end do
+              end do
+            else
+              pneigh%faces(ip,jp,kr,3)%ptr => pmeta
+            end if
+          end if ! pneigh associated
+
+!--- update neighbor's edge pointers ---
+!
+! process the edges in all directions which lay on the parent's edges
+!
+! X-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ip,jr,kr,1)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,1)%ptr => pmeta
+          end if ! pneigh associated
+
+! Y-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ir,jp,kr,2)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,2)%ptr => pmeta
+          end if ! pneigh associated
+
+! Z-edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+          if (associated(pneigh)) then
+            pneigh%edges(ir,jr,kp,3)%ptr => pmeta
+            if (pneigh%level > pmeta%level)                                    &
+                                         pneigh%edges(ir,jr,kr,3)%ptr => pmeta
+          end if ! pneigh associated
+
+! nullify neighbors edge pointers if they are on higher levels
+!
+! X-face
+!
+          pneigh => pmeta%faces(ip,jr,kp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ir,jp,kp,3)%ptr)
+              nullify(pneigh%edges(ir,jp,kr,3)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jp,kr,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ir,jp,kp,2)%ptr)
+              nullify(pneigh%edges(ir,jr,kp,2)%ptr)
+            end if
+          end if ! pneigh associated
+
+! Y-face
+!
+          pneigh => pmeta%faces(ir,jp,kp,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jr,kp,3)%ptr)
+              nullify(pneigh%edges(ip,jr,kr,3)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jp,kr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jr,kp,1)%ptr)
+              nullify(pneigh%edges(ir,jr,kp,1)%ptr)
+            end if
+          end if ! pneigh associated
+
+! Z-face
+!
+          pneigh => pmeta%faces(ir,jp,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jp,kr,2)%ptr)
+              nullify(pneigh%edges(ip,jr,kr,2)%ptr)
+            end if
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ip,jr,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level) then
+              nullify(pneigh%edges(ip,jp,kr,1)%ptr)
+              nullify(pneigh%edges(ir,jp,kr,1)%ptr)
+            end if
+          end if ! pneigh associated
+
+!--- update neighbor's corner pointers ---
+!
+! associate pneigh with the corner pointer
+!
+          pneigh => pmeta%corners(ip,jp,kp)%ptr
+          if (associated(pneigh)) pneigh%corners(ir,jr,kr)%ptr => pmeta
+
+! nullify neighbor corners pointing to pmeta edges
+!
+          pneigh => pmeta%edges(ir,jp,kp,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jr,kr)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%edges(ip,jr,kp,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jp,kr)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%edges(ip,jp,kr,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jr,kp)%ptr)
+          end if ! pneigh associated
+
+! nullify neighbor corners pointing to pmeta faces
+!
+          pneigh => pmeta%faces(ip,jr,kr,1)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ir,jp,kp)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ir,jp,kr,2)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jr,kp)%ptr)
+          end if ! pneigh associated
+          pneigh => pmeta%faces(ir,jr,kp,3)%ptr
+          if (associated(pneigh)) then
+            if (pneigh%level > pmeta%level)                                    &
+                                         nullify(pneigh%corners(ip,jp,kr)%ptr)
+          end if ! pneigh associated
+
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 ! iterate over children
 !
@@ -2564,6 +3540,10 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+! return, if it is a leaf already
+!
+    if (pmeta%leaf) return
+
 ! set the block's leaf flag
 !
     pmeta%leaf = .true.
@@ -2601,6 +3581,10 @@ module blocks
 !
 !-------------------------------------------------------------------------------
 !
+! return, if is not a leaf
+!
+    if (.not. pmeta%leaf) return
+
 ! unset the block's leaf flag
 !
     pmeta%leaf = .false.
@@ -2878,6 +3862,10 @@ module blocks
 
     end if
 
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
+
 !-------------------------------------------------------------------------------
 !
   end subroutine insert_metablock_after
@@ -2972,6 +3960,10 @@ module blocks
       end if
 
     end if
+
+! increase the number of allocated meta blocks stored in the meta block list
+!
+    mblocks = mblocks + 1
 
 !-------------------------------------------------------------------------------
 !
@@ -3186,437 +4178,90 @@ module blocks
     type(block_meta)                 , pointer, intent(inout) :: pmeta
     procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
 
-! local saved variables
+! local pointers
 !
-    logical, save :: first = .true.
-
-! local saved arrays
-!
-    integer, dimension(mfaces,3)  , save :: fidx
-    integer, dimension(mfaces,2,3), save :: eidx
-    integer, dimension(mfaces,2,3), save :: cidx
+    type(block_meta), pointer :: pneigh
 
 ! local variables
 !
-    integer :: l
+    integer :: i, j, k, n
 !
 !-------------------------------------------------------------------------------
 !
-! prepare indices
+! return if pmeta not associated
 !
-    if (first) then
+    if (.not. associated(pmeta)) return
 
-! inicialize indices
-!
-      fidx(:  ,:) = 0
-      eidx(:,:,:) = 0
-      cidx(:,:,:) = 0
-
-! prepare indices to get proper face, edge and corner neighbors
-!
 #if NDIMS == 2
-! around (0,0,0) corner
+! iterate over edges and corners
 !
-! [1,1,1]:X:(1,2,1) <- Y = [2,1,2]
-!
-      fidx( 1,  :) = (/ 1, 1, 1 /)
-      eidx( 1,1,:) = (/ 2, 1, 2 /)
+    do j = 1, nsides
+      do i = 1, nsides
+        do n = 1, ndims
 
-! [2,1,1]:Y:(2,2,1) <- X = [1,1,2]
+! associate pneigh with the face neighbor
 !
-      fidx( 2,  :) = (/ 2, 1, 1 /)
-      eidx( 2,1,:) = (/ 1, 1, 2 /)
+          pneigh => pmeta%edges(i,j,n)%ptr
 
-! around (0,1,0) corner
+! call the procedure for the face neighbor
 !
-! [1,1,2]:X:(1,2,2) -> Y = [2,2,2]
-!
-      fidx( 3,  :) = (/ 1, 1, 2 /)
-      eidx( 3,1,:) = (/ 2, 2, 2 /)
+          if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [2,2,1]:Y:(2,1,2) <- X = [1,1,1]
-!
-      fidx( 4,  :) = (/ 2, 2, 1 /)
-      eidx( 4,1,:) = (/ 1, 1, 1 /)
+        end do ! n = 1, ndims
 
-! around (1,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,2,2]:X:(1,1,2) -> Y = [2,2,1]
-!
-      fidx( 5,  :) = (/ 1, 2, 2 /)
-      eidx( 5,1,:) = (/ 2, 2, 1 /)
+        pneigh => pmeta%corners(i,j)%ptr
 
-! [2,2,2]:Y:(2,1,2) -> X = [1,2,1]
+! call the procedure for the face neighbor
 !
-      fidx( 6,  :) = (/ 2, 2, 2 /)
-      eidx( 6,1,:) = (/ 1, 2, 1 /)
+        if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! around (1,0,0) corner
-!
-! [1,2,1]:X:(1,1,1) <- Y = [2,1,1]
-!
-      fidx( 7,  :) = (/ 1, 2, 1 /)
-      eidx( 7,1,:) = (/ 2, 1, 1 /)
-
-! [2,1,2]:Y:(2,2,2) -> X = [1,2,2]
-!
-      fidx( 8,  :) = (/ 2, 1, 2 /)
-      eidx( 8,1,:) = (/ 1, 2, 2 /)
+      end do ! i = 1, nsides
+    end do ! j = 1, nsides
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-! around (0,0,0) corner
+! iterate over faces, edges, and corners
 !
-! [1,1,1]:X:(1,2,1) <- Y = [2,1,2] <- Z = [3,1,4]
-! [1,1,1]:X:(1,2,1) <- Z = [3,1,2] <- Y = [2,1,4]
-!
-      fidx( 1,  :) = (/ 1, 1, 1 /)
-      eidx( 1,1,:) = (/ 2, 1, 2 /)
-      eidx( 1,2,:) = (/ 3, 1, 2 /)
-      cidx( 1,1,:) = (/ 3, 1, 4 /)
-      cidx( 1,2,:) = (/ 2, 1, 4 /)
+    do k = 1, nsides
+      do j = 1, nsides
+        do i = 1, nsides
+          do n = 1, ndims
 
-! [2,1,1]:Y:(2,2,1) <- Z = [3,1,3] <- X = [1,1,4]
-! [2,1,1]:Y:(2,2,1) <- X = [1,1,2] <- Z = [3,1,4]
+! associate pneigh with the face neighbor
 !
-      fidx( 2,  :) = (/ 2, 1, 1 /)
-      eidx( 2,1,:) = (/ 3, 1, 3 /)
-      eidx( 2,2,:) = (/ 1, 1, 2 /)
-      cidx( 2,1,:) = (/ 1, 1, 4 /)
-      cidx( 2,2,:) = (/ 3, 1, 4 /)
+            pneigh => pmeta%faces(i,j,k,n)%ptr
 
-! [3,1,1]:Z:(3,2,1) <- X = [1,1,3] <- Y = [2,1,4]
-! [3,1,1]:Z:(3,2,1) <- Y = [2,1,3] <- X = [1,1,4]
+! call the procedure for the face neighbor
 !
-      fidx( 3,  :) = (/ 3, 1, 1 /)
-      eidx( 3,1,:) = (/ 1, 1, 3 /)
-      eidx( 3,2,:) = (/ 2, 1, 3 /)
-      cidx( 3,1,:) = (/ 2, 1, 4 /)
-      cidx( 3,2,:) = (/ 1, 1, 4 /)
+            if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! around (0,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,1,2]:X:(1,2,2) -> Y = [2,2,2] <- Z = [3,1,2]
-! [1,1,2]:X:(1,2,2) <- Z = [3,1,4] -> Y = [2,2,4]
-!
-      fidx( 4,  :) = (/ 1, 1, 2 /)
-      eidx( 4,1,:) = (/ 2, 2, 2 /)
-      eidx( 4,2,:) = (/ 3, 1, 4 /)
-      cidx( 4,1,:) = (/ 3, 1, 2 /)
-      cidx( 4,2,:) = (/ 2, 2, 4 /)
+            pneigh => pmeta%edges(i,j,k,n)%ptr
 
-! [2,2,1]:Y:(2,1,2) <- Z = [3,1,1] <- X = [1,1,3]
-! [2,2,1]:Y:(2,1,2) <- X = [1,1,1] <- Z = [3,1,2]
+! call the procedure for the face neighbor
 !
-      fidx( 5,  :) = (/ 2, 2, 1 /)
-      eidx( 5,1,:) = (/ 3, 1, 1 /)
-      eidx( 5,2,:) = (/ 1, 1, 1 /)
-      cidx( 5,1,:) = (/ 1, 1, 3 /)
-      cidx( 5,2,:) = (/ 3, 1, 2 /)
+            if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [3,1,3]:Z:(3,2,3) <- X = [1,1,4] -> Y = [2,2,4]
-! [3,1,3]:Z:(3,2,3) -> Y = [2,2,3] <- X = [1,1,3]
-!
-      fidx( 6,  :) = (/ 3, 1, 3 /)
-      eidx( 6,1,:) = (/ 1, 1, 4 /)
-      eidx( 6,2,:) = (/ 2, 2, 3 /)
-      cidx( 6,1,:) = (/ 2, 2, 4 /)
-      cidx( 6,2,:) = (/ 1, 1, 3 /)
+          end do ! n = 1, ndims
 
-! around (1,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,2,2]:X:(1,1,2) -> Y = [2,2,1] <- Z = [3,1,1]
-! [1,2,2]:X:(1,1,2) <- Z = [3,1,3] -> Y = [2,2,3]
-!
-      fidx( 7,  :) = (/ 1, 2, 2 /)
-      eidx( 7,1,:) = (/ 2, 2, 1 /)
-      eidx( 7,2,:) = (/ 3, 1, 3 /)
-      cidx( 7,1,:) = (/ 3, 1, 1 /)
-      cidx( 7,2,:) = (/ 2, 2, 3 /)
+          pneigh => pmeta%corners(i,j,k)%ptr
 
-! [2,2,2]:Y:(2,1,2) <- Z = [3,1,2] -> X = [1,2,3]
-! [2,2,2]:Y:(2,1,2) -> X = [1,2,1] <- Z = [3,1,1]
+! call the procedure for the face neighbor
 !
-      fidx( 8,  :) = (/ 2, 2, 2 /)
-      eidx( 8,1,:) = (/ 3, 1, 2 /)
-      eidx( 8,2,:) = (/ 1, 2, 1 /)
-      cidx( 8,1,:) = (/ 1, 2, 3 /)
-      cidx( 8,2,:) = (/ 3, 1, 1 /)
+          if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [3,1,4]:Z:(3,2,4) -> X = [1,2,4] -> Y = [2,2,3]
-! [3,1,4]:Z:(3,2,4) -> Y = [2,2,4] -> X = [1,2,3]
-!
-      fidx( 9,  :) = (/ 3, 1, 4 /)
-      eidx( 9,1,:) = (/ 1, 2, 4 /)
-      eidx( 9,2,:) = (/ 2, 2, 4 /)
-      cidx( 9,1,:) = (/ 2, 2, 3 /)
-      cidx( 9,2,:) = (/ 1, 2, 3 /)
-
-! around (1,0,0) corner
-!
-! [1,2,1]:X:(1,1,1) <- Y = [2,1,1] <- Z = [3,1,3]
-! [1,2,1]:X:(1,1,1) <- Z = [3,1,1] <- Y = [2,1,3]
-!
-      fidx(10,  :) = (/ 1, 2, 1 /)
-      eidx(10,1,:) = (/ 2, 1, 1 /)
-      eidx(10,2,:) = (/ 3, 1, 1 /)
-      cidx(10,1,:) = (/ 3, 1, 3 /)
-      cidx(10,2,:) = (/ 2, 1, 3 /)
-
-! [2,1,2]:Y:(2,2,2) <- Z = [3,1,4] -> X = [1,2,4]
-! [2,1,2]:Y:(2,2,2) -> X = [1,2,2] <- Z = [3,1,3]
-!
-      fidx(11,  :) = (/ 2, 1, 2 /)
-      eidx(11,1,:) = (/ 3, 1, 4 /)
-      eidx(11,2,:) = (/ 1, 2, 2 /)
-      cidx(11,1,:) = (/ 1, 2, 4 /)
-      cidx(11,2,:) = (/ 3, 1, 3 /)
-
-! [3,1,2]:Z:(3,2,2) -> X = [1,2,3] <- Y = [2,1,3]
-! [3,1,2]:Z:(3,2,2) <- Y = [2,1,4] -> X = [1,2,4]
-!
-      fidx(12,  :) = (/ 3, 1, 2 /)
-      eidx(12,1,:) = (/ 1, 2, 3 /)
-      eidx(12,2,:) = (/ 2, 1, 4 /)
-      cidx(12,1,:) = (/ 2, 1, 3 /)
-      cidx(12,2,:) = (/ 1, 2, 4 /)
-
-! around (0,0,1) corner
-!
-! [1,1,3]:X:(1,2,3) <- Y = [2,1,4] -> Z = [3,2,4]
-! [1,1,3]:X:(1,2,3) -> Z = [3,2,2] <- Y = [2,1,2]
-!
-      fidx(13,  :) = (/ 1, 1, 3 /)
-      eidx(13,1,:) = (/ 2, 1, 4 /)
-      eidx(13,2,:) = (/ 3, 2, 2 /)
-      cidx(13,1,:) = (/ 3, 2, 4 /)
-      cidx(13,2,:) = (/ 2, 1, 2 /)
-
-! [2,1,3]:Y:(2,2,3) -> Z = [3,2,3] <- X = [1,1,2]
-! [2,1,3]:Y:(2,2,3) <- X = [1,1,4] -> Z = [3,2,1]
-!
-      fidx(14,  :) = (/ 2, 1, 3 /)
-      eidx(14,1,:) = (/ 3, 2, 3 /)
-      eidx(14,2,:) = (/ 1, 1, 4 /)
-      cidx(14,1,:) = (/ 1, 1, 2 /)
-      cidx(14,2,:) = (/ 3, 2, 1 /)
-
-! [3,2,1]:Z:(3,1,1) <- X = [1,1,1] <- Y = [2,1,2]
-! [3,2,1]:Z:(3,1,1) <- Y = [2,1,1] <- X = [1,1,2]
-!
-      fidx(15,  :) = (/ 3, 2, 1 /)
-      eidx(15,1,:) = (/ 1, 1, 1 /)
-      eidx(15,2,:) = (/ 2, 1, 1 /)
-      cidx(15,1,:) = (/ 2, 1, 2 /)
-      cidx(15,2,:) = (/ 1, 1, 2 /)
-
-! around (0,1,1) corner
-!
-! [1,1,4]:X:(1,2,4) -> Y = [2,2,4] -> Z = [3,2,2]
-! [1,1,4]:X:(1,2,4) -> Z = [3,2,4] -> Y = [2,2,2]
-!
-      fidx(16,  :) = (/ 1, 1, 4 /)
-      eidx(16,1,:) = (/ 2, 2, 4 /)
-      eidx(16,2,:) = (/ 3, 2, 4 /)
-      cidx(16,1,:) = (/ 3, 2, 2 /)
-      cidx(16,2,:) = (/ 2, 2, 2 /)
-
-! [2,2,3]:Y:(2,1,3) -> Z = [3,2,1] <- X = [1,1,1]
-! [2,2,3]:Y:(2,1,3) <- X = [1,1,3] -> Z = [3,2,2]
-!
-      fidx(17,  :) = (/ 2, 2, 3 /)
-      eidx(17,1,:) = (/ 3, 2, 1 /)
-      eidx(17,2,:) = (/ 1, 1, 3 /)
-      cidx(17,1,:) = (/ 1, 1, 1 /)
-      cidx(17,2,:) = (/ 3, 2, 2 /)
-
-! [3,2,3]:Z:(3,1,3) <- X = [1,1,2] -> Y = [2,2,2]
-! [3,2,3]:Z:(3,1,3) -> Y = [2,2,1] <- X = [1,1,1]
-!
-      fidx(18,  :) = (/ 3, 2, 3 /)
-      eidx(18,1,:) = (/ 1, 1, 2 /)
-      eidx(18,2,:) = (/ 2, 2, 1 /)
-      cidx(18,1,:) = (/ 2, 2, 2 /)
-      cidx(18,2,:) = (/ 1, 1, 1 /)
-
-! around (1,1,1) corner
-!
-! [1,2,4]:X:(1,1,4) -> Y = [2,2,3] -> Z = [3,2,1]
-! [1,2,4]:X:(1,1,4) -> Z = [3,2,3] -> Y = [2,2,1]
-!
-      fidx(19,  :) = (/ 1, 2, 4 /)
-      eidx(19,1,:) = (/ 2, 2, 3 /)
-      eidx(19,2,:) = (/ 3, 2, 3 /)
-      cidx(19,1,:) = (/ 3, 2, 1 /)
-      cidx(19,2,:) = (/ 2, 2, 1 /)
-
-! [2,2,4]:Y:(2,1,4) -> Z = [3,2,2] -> X = [1,2,1]
-! [2,2,4]:Y:(2,1,4) -> X = [1,2,3] -> Z = [3,2,1]
-!
-      fidx(20,  :) = (/ 2, 2, 4 /)
-      eidx(20,1,:) = (/ 3, 2, 2 /)
-      eidx(20,2,:) = (/ 1, 2, 3 /)
-      cidx(20,1,:) = (/ 1, 2, 1 /)
-      cidx(20,2,:) = (/ 3, 2, 1 /)
-
-! [3,2,4]:Z:(3,1,4) -> X = [1,2,2] -> Y = [2,2,1]
-! [3,2,4]:Z:(3,1,4) -> Y = [2,2,2] -> X = [1,2,1]
-!
-      fidx(21,  :) = (/ 3, 2, 4 /)
-      eidx(21,1,:) = (/ 1, 2, 2 /)
-      eidx(21,2,:) = (/ 2, 2, 2 /)
-      cidx(21,1,:) = (/ 2, 2, 1 /)
-      cidx(21,2,:) = (/ 1, 2, 1 /)
-
-! around (1,0,1) corner
-!
-! [1,2,3]:X:(1,1,3) <- Y = [2,1,3] -> Z = [3,2,3]
-! [1,2,3]:X:(1,1,3) -> Z = [3,2,1] <- Y = [2,1,1]
-!
-      fidx(22,  :) = (/ 1, 2, 3 /)
-      eidx(22,1,:) = (/ 2, 1, 3 /)
-      eidx(22,2,:) = (/ 3, 2, 1 /)
-      cidx(22,1,:) = (/ 3, 2, 3 /)
-      cidx(22,2,:) = (/ 2, 1, 1 /)
-
-! [2,1,4]:Y:(2,2,4) -> Z = [3,2,4] -> X = [1,2,2]
-! [2,1,4]:Y:(2,2,4) -> X = [1,2,4] -> Z = [3,2,3]
-!
-      fidx(23,  :) = (/ 2, 1, 4 /)
-      eidx(23,1,:) = (/ 3, 2, 4 /)
-      eidx(23,2,:) = (/ 1, 2, 4 /)
-      cidx(23,1,:) = (/ 1, 2, 2 /)
-      cidx(23,2,:) = (/ 3, 2, 3 /)
-
-! [3,2,2]:Z:(3,1,2) -> X = [1,2,1] <- Y = [2,1,3]
-! [3,2,2]:Z:(3,1,2) <- Y = [2,1,2] -> X = [1,2,4]
-!
-      fidx(24,  :) = (/ 3, 2, 2 /)
-      eidx(24,1,:) = (/ 1, 2, 1 /)
-      eidx(24,2,:) = (/ 2, 1, 2 /)
-      cidx(24,1,:) = (/ 2, 1, 3 /)
-      cidx(24,2,:) = (/ 1, 2, 3 /)
+        end do ! i = 1, nsides
+      end do ! j = 1, nsides
+    end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
-
-! reset the first time execution flag
-!
-      first = .false.
-
-    end if
-
-! iterate over all block faces (or edges in the 2D case)
-!
-    do l = 1, mfaces
-      call iterate_over_face(pmeta, pprocedure                                 &
-                                        , fidx(l,:), eidx(l,:,:), cidx(l,:,:))
-    end do
 
 !-------------------------------------------------------------------------------
 !
   end subroutine iterate_over_neighbors
-!
-!===============================================================================
-!
-! subroutine ITERATE_OVER_FACE:
-! ----------------------------
-!
-!   Subroutine iterates over all neighbors, edges and corners linked to
-!   the input meta block and executes a subroutine provided by the pointer.
-!
-!   Arguments:
-!
-!     pmeta - a pointer to the meta block which neighbors are iterated over;
-!     pproc - a pointer to the subroutine called with each pair (pmeta, pneigh);
-!     fidx  - the index of face to process;
-!     eidx  - the indices of faces connected with edges;
-!     cidx  - the indices of faces connected with corners;
-!
-!===============================================================================
-!
-  subroutine iterate_over_face(pmeta, pprocedure, fidx, eidx, cidx)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_meta)                 , pointer, intent(inout) :: pmeta
-    procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
-    integer, dimension(3)                     , intent(in)    :: fidx
-    integer, dimension(2,3)                   , intent(in)    :: eidx
-    integer, dimension(2,3)                   , intent(in)    :: cidx
-
-! local pointers
-!
-    type(block_meta), pointer :: pneigh, pedge, pcorner
-!
-!-------------------------------------------------------------------------------
-!
-! associate a pointer with the neighbor
-!
-    pneigh => pmeta%neigh(fidx(1),fidx(2),fidx(3))%ptr
-
-! check if the neighbors is associated
-!
-    if (associated(pneigh)) then
-
-! call the procedure for the face neighbor
-!
-      call pprocedure(pmeta, pneigh)
-
-! associate a pointer with the first edge
-!
-      pedge => pneigh%neigh(eidx(1,1),eidx(1,2),eidx(1,3))%ptr
-
-! check if the edge pointer is associated
-!
-      if (associated(pedge)) then
-
-! call the procedure for the edge neighbor
-!
-        call pprocedure(pmeta, pedge)
-
-#if NDIMS == 3
-! associate a pointer with the first corner
-!
-        pcorner => pedge%neigh(cidx(1,1),cidx(1,2),cidx(1,3))%ptr
-
-! call the procedure for the corner neighbor if it is associated
-!
-        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
-#endif /* NDIMS == 3 */
-
-      end if ! pedge associated
-
-#if NDIMS == 3
-! associate a pointer with the second edge
-!
-      pedge => pneigh%neigh(eidx(2,1),eidx(2,2),eidx(2,3))%ptr
-
-! check if the edge pointer is associated
-!
-      if (associated(pedge)) then
-
-! call the procedure for the edge neighbor
-!
-        call pprocedure(pmeta, pedge)
-
-! associate a pointer with the second corner
-!
-        pcorner => pedge%neigh(cidx(2,1),cidx(2,2),cidx(2,3))%ptr
-
-! call the procedure for the corner neighbor if it is associated
-!
-        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
-
-      end if ! pedge associated
-#endif /* NDIMS == 3 */
-
-    end if ! pneigh associated
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine iterate_over_face
 #ifdef DEBUG
 !
 !===============================================================================
@@ -3650,11 +4295,19 @@ module blocks
 
 ! local pointers
 !
-    type(block_meta), pointer :: pneigh, pnneigh
+    type(block_meta), pointer             :: pneigh, pself
 
 ! local variables
 !
-    integer :: i, j, k, l, m
+    integer :: ip, ir, ic
+    integer :: jp, jr, jc
+#if NDIMS == 3
+    integer :: kp, kr, kc
+#endif /* NDIMS == 2 */
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "blocks::check_block_neighbors"
 !
 !-------------------------------------------------------------------------------
 !
@@ -3662,114 +4315,981 @@ module blocks
 !
     if (.not. pmeta%leaf) return
 
-! iterate over all face neighbors
+#if NDIMS == 2
+! iterate over all corners
 !
-    do i = 1, ndims
-      do j = 1, nsides
-        m = 3 - j
-        do k = 1, nfaces
+    do jp = 1, nsides
+      jr = 3 - jp
+      do ip = 1, nsides
+        ir = 3 - ip
 
-! assign pointer with the neighbor
+!--- check edges ---
 !
-          pneigh => pmeta%neigh(i,j,k)%ptr
+! along X direction
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%edges(ip,jp,1)%ptr
+
+! check if pneigh is associated
+!
+        if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+          if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+            pself => pneigh%edges(ip,jr,1)%ptr
+
+! check if pself is associated
+!
+            if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+              if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                call print_warning(fname                                       &
+                                  , "Inconsistent same level neighbor edges!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ', pmeta%id , ip, jp, 1
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ip, jr, 1
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+              end if ! %id fields don't match
+
+            else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+              call print_warning(fname                                         &
+                               , "Same level neighbor's edge not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'meta ', pmeta%id , ip, jp, 1
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ip, jr, 1
+
+            end if ! pself associated
+
+          end if ! pneigh and pmeta on the same level
+
+! if pneigh is on the higher level level
+!
+          if (pneigh%level > pmeta%level) then
+
+! iterate over all edges in the given direction and Y side
+!
+            do ic = 1, nsides
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ic,jr,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'meta ',  pmeta%id, ip, jp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'neigh', pneigh%id, ip, jr, 1
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'self ',  pself%id, ic, jr, 1
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                             , "Higher level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 1
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ic, jr, 1
+
+              end if ! pself associated
+
+            end do ! ic = 1, nsides
+
+          end if ! pneigh on higher level
+
+        end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%edges(ip,jp,2)%ptr
+
+! check if pneigh is associated
+!
+        if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+          if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+            pself => pneigh%edges(ir,jp,2)%ptr
+
+! check if pself is associated
+!
+            if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+              if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                call print_warning(fname                                       &
+                                   , "Inconsistent same level neighbor edge!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 2
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jp, 2
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+              end if ! %id fields don't match
+
+            else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+              call print_warning(fname                                         &
+                               , "Same level neighbor's edge not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'meta ', pmeta%id , ip, jp, 2
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ir, jp, 2
+
+            end if ! pself associated
+
+          end if ! pneigh and pmeta on the same level
+
+! if pneigh is on the higher level level
+!
+          if (pneigh%level > pmeta%level) then
+
+! iterate over all edges in the given direction and Y side
+!
+            do jc = 1, nsides
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jc,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'meta ',  pmeta%id, ip, jp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'neigh', pneigh%id, ir, jp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'self ',  pself%id, ir, jc, 2
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                             , "Higher level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 2
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jc, 2
+
+              end if ! pself associated
+
+            end do ! jc = 1, nsides
+
+          end if ! pneigh on higher level
+
+        end if ! pneigh associated
+
+!--- check corners ---
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%corners(ip,jp)%ptr
+
+! check if the neighbor is associated
+!
+        if (associated(pneigh)) then
+
+! assiociate pself to the corresponding corner of the neighbor
+!
+          pself => pneigh%corners(ir,jr)%ptr
+
+! check if pself is associated
+!
+          if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+            if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+              call print_warning(fname                                         &
+                                           , "Inconsistent neighbor corners!")
+              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+                                          'meta ',  pmeta%id, ip, jp
+              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ir, jr
+              write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+            end if ! %id fields don't match
+
+          else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+            call print_warning(fname                                           &
+                                        , "Neighbor's corner not associated!")
+            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+                                        'meta ',  pmeta%id, ip, jp
+            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+                                        'neigh', pneigh%id, ir, jr
+
+          end if ! pself associated
+
+        end if ! pneigh associated
+
+      end do ! ip = 1, nsides
+    end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! iterate over all corners
+!
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+!--- check faces ---
+!
+! along X direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,1)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ir,jp,kp,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kp, 1
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jp, kp, 1
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do kc = 1, nsides
+                do jc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ir,jc,kc,1)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ir, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ir, jc, kc, 1
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ir, jc, kc, 1
+
+                  end if ! pself associated
+
+                end do ! jc = 1, nsides
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,2)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ip,jr,kp,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kp, 2
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 2
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jr, kp, 2
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do kc = 1, nsides
+                do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ic,jr,kc,2)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ip, jr, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ic, jr, kc, 2
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ic, jr, kc, 2
+
+                  end if ! pself associated
+
+                end do ! ic = 1, nsides
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Z direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ip,jp,kr,3)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jp, kr, 3
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 3
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jp, kr, 3
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do jc = 1, nsides
+                do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ic,jc,kr,3)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ip, jp, kr, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ic, jc, kr, 3
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ic, jc, kr, 3
+
+                  end if ! pself associated
+
+                end do ! ic = 1, nsides
+              end do ! jc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+!--- check edges ---
+!
+! along X direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ip,jr,kr,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kr, 1
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 1
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jr, kr, 1
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ic,jr,kr,1)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kr, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ic, jr, kr, 1
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ic, jr, kr, 1
+
+                end if ! pself associated
+
+              end do ! ic = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jp,kr,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kr, 2
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 2
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jp, kr, 2
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do jc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ir,jc,kr,2)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kr, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ir, jc, kr, 2
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ir, jc, kr, 2
+
+                end if ! pself associated
+
+              end do ! jc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Z direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jr,kp,3)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jr, kp, 3
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 3
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jr, kp, 3
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do kc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ir,jr,kc,3)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jr, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ir, jr, kc, 3
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ir, jr, kc, 3
+
+                end if ! pself associated
+
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+!--- check corners ---
+!
+! associate pneigh with the current corner
+!
+          pneigh => pmeta%corners(ip,jp,kp)%ptr
 
 ! check if the neighbor is associated
 !
           if (associated(pneigh)) then
 
-! check neighbors on the same levels
+! assiociate pself to the corresponding corner of the neighbor
 !
-            if (pmeta%level == pneigh%level) then
+            pself => pneigh%corners(ir,jr,kr)%ptr
 
-! assign pointer to the neighbor of the neighbor pointing to the current meta
-! block
+! check if pself is associated
 !
-              pnneigh => pneigh%neigh(i,m,k)%ptr
+            if (associated(pself)) then
 
-! check if it is associated
+! check if pself is the same as pmeta
 !
-              if (associated(pnneigh)) then
-
-! check if the pointer of the neighbor points to the current meta block
-!
-                if (pmeta%id /= pnneigh%id) then
+              if (pmeta%id /= pself%id) then
 
 ! print warning, since the blocks differ
 !
-                  call print_warning("blocks::check_block_neighbors"           &
-                                       , "Inconsistent same level neighbors!")
-                  print *, 'metablock: ', pmeta%id, pnneigh%id
-                  print *, 'neighbor : ', pneigh%id
-                  print *, 'index    : ', i, j, k
+                call print_warning(fname                                       &
+                                           , "Inconsistent neighbor corners!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                        'meta ',  pmeta%id, ip, jp, kp
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jr, kr
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
 
-                end if
+              end if ! %id fields don't match
 
-              else ! pnneigh associated
-
-! print warning, since the pointer should be associated
-!
-                call print_warning("blocks::check_block_neighbors"             &
-                                      , "Same level neighbor not associated!")
-                print *, 'metablock: ', pmeta%id, pnneigh%id
-                print *, 'neighbor : ', pneigh%id
-                print *, 'index    : ', i, j, k
-
-              end if ! pnneigh associated
-
-            end if ! the same levels
-
-! check neighbors on the level higher than the meta block's level; it also
-! covers the other way around, since we iterate over all neighbor faces
-!
-            if (pmeta%level < pneigh%level) then
-
-! iterate over whole face of the corresponding neighbor
-!
-              do l = 1, nfaces
-
-! assign pointer to the corresponding neighbor of the neighbor
-!
-                pnneigh => pneigh%neigh(i,m,l)%ptr
-
-! check if it is associated
-!
-                if (associated(pnneigh)) then
-
-! check if the pointer of the neighbor points to the current meta block
-!
-                  if (pmeta%id /= pnneigh%id) then
-
-! print warning, since the blocks differ
-!
-                    call print_warning("blocks::check_block_neighbors"         &
-                                  , "Inconsistent different level neighbors!")
-                    print *, 'metablock: ', pmeta%id, pnneigh%id
-                    print *, 'neighbor : ', pneigh%id
-                    print *, 'index    : ', i, j, k, l
-
-                  end if
-
-                else ! pnneigh associated
+            else ! pself associated
 
 ! print warning, since the pointer should be associated
 !
-                  call print_warning("blocks::check_block_neighbors"           &
-                                 , "Different level neighbor not associated!")
-                  print *, 'metablock: ', pmeta%id, pnneigh%id
-                  print *, 'neighbor : ', pneigh%id
-                  print *, 'index    : ', i, j, k, l
+              call print_warning(fname                                         &
+                                        , "Neighbor's corner not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                      'meta ',  pmeta%id, ip, jp, kp
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                      'neigh', pneigh%id, ir, jr, kr
 
-                end if ! pnneigh associated
-
-              end do ! l = 1, nfaces
-
-            end if ! pmeta's level < pneigh's level
+            end if ! pself associated
 
           end if ! pneigh associated
 
-        end do ! nfaces
-      end do ! nsides
-    end do ! ndims
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !

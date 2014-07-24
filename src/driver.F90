@@ -36,6 +36,7 @@ program amun
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
   use boundaries    , only : initialize_boundaries, finalize_boundaries
+  use boundaries    , only : boundary_variables
   use coordinates   , only : initialize_coordinates, finalize_coordinates
   use equations     , only : initialize_equations, finalize_equations
   use evolution     , only : initialize_evolution, finalize_evolution
@@ -441,6 +442,10 @@ program amun
 ! the initialized problem
 !
     call generate_mesh()
+
+! update boundaries
+!
+    call boundary_variables()
 
 ! calculate new timestep
 !

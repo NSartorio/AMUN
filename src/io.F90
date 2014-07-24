@@ -41,6 +41,53 @@ module io
 !
   implicit none
 
+! subroutine interfaces
+!
+  interface write_attribute
+#ifdef HDF5
+    module procedure write_scalar_attribute_integer_h5
+    module procedure write_scalar_attribute_double_h5
+    module procedure write_vector_attribute_integer_h5
+    module procedure write_vector_attribute_double_h5
+#endif /* HDF5 */
+  end interface
+  interface read_attribute
+#ifdef HDF5
+    module procedure read_scalar_attribute_integer_h5
+    module procedure read_scalar_attribute_double_h5
+    module procedure read_vector_attribute_integer_h5
+    module procedure read_vector_attribute_double_h5
+#endif /* HDF5 */
+  end interface
+  interface write_array
+#ifdef HDF5
+    module procedure write_1d_array_integer_h5
+    module procedure write_2d_array_integer_h5
+    module procedure write_3d_array_integer_h5
+    module procedure write_4d_array_integer_h5
+    module procedure write_5d_array_integer_h5
+    module procedure write_1d_array_double_h5
+    module procedure write_2d_array_double_h5
+    module procedure write_3d_array_double_h5
+    module procedure write_4d_array_double_h5
+    module procedure write_5d_array_double_h5
+#endif /* HDF5 */
+  end interface
+  interface read_array
+#ifdef HDF5
+    module procedure read_1d_array_integer_h5
+    module procedure read_2d_array_integer_h5
+    module procedure read_3d_array_integer_h5
+    module procedure read_4d_array_integer_h5
+    module procedure read_5d_array_integer_h5
+    module procedure read_1d_array_double_h5
+    module procedure read_2d_array_double_h5
+    module procedure read_3d_array_double_h5
+    module procedure read_4d_array_double_h5
+    module procedure read_5d_array_double_h5
+#endif /* HDF5 */
+  end interface
+
 #ifdef PROFILE
 ! timer indices
 !
@@ -1102,38 +1149,38 @@ module io
 
 ! store the integer attributes
 !
-    call write_attribute_integer_h5(gid, 'ndims'  , NDIMS        )
-    call write_attribute_integer_h5(gid, 'last_id', get_last_id())
-    call write_attribute_integer_h5(gid, 'mblocks', get_mblocks())
-    call write_attribute_integer_h5(gid, 'dblocks', get_dblocks())
-    call write_attribute_integer_h5(gid, 'nleafs' , get_nleafs() )
-    call write_attribute_integer_h5(gid, 'ncells' , nn           )
-    call write_attribute_integer_h5(gid, 'nghost' , ng           )
-    call write_attribute_integer_h5(gid, 'minlev' , minlev       )
-    call write_attribute_integer_h5(gid, 'maxlev' , maxlev       )
-    call write_attribute_integer_h5(gid, 'toplev' , toplev       )
-    call write_attribute_integer_h5(gid, 'nprocs' , nprocs       )
-    call write_attribute_integer_h5(gid, 'nproc'  , nproc        )
-    call write_attribute_integer_h5(gid, 'nseeds' , nseeds       )
-    call write_attribute_integer_h5(gid, 'step'   , step         )
-    call write_attribute_integer_h5(gid, 'isnap'  , isnap        )
+    call write_attribute(gid, 'ndims'  , NDIMS        )
+    call write_attribute(gid, 'last_id', get_last_id())
+    call write_attribute(gid, 'mblocks', get_mblocks())
+    call write_attribute(gid, 'dblocks', get_dblocks())
+    call write_attribute(gid, 'nleafs' , get_nleafs() )
+    call write_attribute(gid, 'ncells' , nn           )
+    call write_attribute(gid, 'nghost' , ng           )
+    call write_attribute(gid, 'minlev' , minlev       )
+    call write_attribute(gid, 'maxlev' , maxlev       )
+    call write_attribute(gid, 'toplev' , toplev       )
+    call write_attribute(gid, 'nprocs' , nprocs       )
+    call write_attribute(gid, 'nproc'  , nproc        )
+    call write_attribute(gid, 'nseeds' , nseeds       )
+    call write_attribute(gid, 'step'   , step         )
+    call write_attribute(gid, 'isnap'  , isnap        )
 
 ! store the real attributes
 !
-    call write_attribute_double_h5(gid, 'xmin', xmin)
-    call write_attribute_double_h5(gid, 'xmax', xmax)
-    call write_attribute_double_h5(gid, 'ymin', ymin)
-    call write_attribute_double_h5(gid, 'ymax', ymax)
-    call write_attribute_double_h5(gid, 'zmin', zmin)
-    call write_attribute_double_h5(gid, 'zmax', zmax)
-    call write_attribute_double_h5(gid, 'time', time)
-    call write_attribute_double_h5(gid, 'dt'  , dt  )
-    call write_attribute_double_h5(gid, 'dtn' , dtn )
+    call write_attribute(gid, 'xmin', xmin)
+    call write_attribute(gid, 'xmax', xmax)
+    call write_attribute(gid, 'ymin', ymin)
+    call write_attribute(gid, 'ymax', ymax)
+    call write_attribute(gid, 'zmin', zmin)
+    call write_attribute(gid, 'zmax', zmax)
+    call write_attribute(gid, 'time', time)
+    call write_attribute(gid, 'dt'  , dt  )
+    call write_attribute(gid, 'dtn' , dtn )
 
 ! store the vector attributes
 !
-    call write_attribute_vector_integer_h5(gid, 'dims' , (/ in, jn, kn /))
-    call write_attribute_vector_integer_h5(gid, 'rdims', (/ ir, jr, kr /))
+    call write_attribute(gid, 'dims' , (/ in, jn, kn /))
+    call write_attribute(gid, 'rdims', (/ ir, jr, kr /))
 
 ! store random number generator seed values
 !
@@ -1149,7 +1196,7 @@ module io
 
 ! store them in the current group
 !
-      call write_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+      call write_attribute(gid, 'seeds', seeds(:))
 
 ! deallocate seed array
 !
@@ -1246,30 +1293,30 @@ module io
 
 ! restore integer attributes
 !
-    call read_attribute_integer_h5(gid, 'ndims'  , lndims  )
-    call read_attribute_integer_h5(gid, 'maxlev' , lmaxlev )
-    call read_attribute_integer_h5(gid, 'nprocs' , nfiles  )
-    call read_attribute_integer_h5(gid, 'nproc'  , lnproc  )
-    call read_attribute_integer_h5(gid, 'mblocks', lmblocks)
-    call read_attribute_integer_h5(gid, 'nleafs' , lnleafs )
-    call read_attribute_integer_h5(gid, 'last_id', llast_id)
-    call read_attribute_integer_h5(gid, 'ncells' , lncells )
-    call read_attribute_integer_h5(gid, 'nghost' , lnghost )
-    call read_attribute_integer_h5(gid, 'nseeds' , lnseeds )
-    call read_attribute_integer_h5(gid, 'step'   , step    )
-    call read_attribute_integer_h5(gid, 'isnap'  , isnap   )
+    call read_attribute(gid, 'ndims'  , lndims  )
+    call read_attribute(gid, 'maxlev' , lmaxlev )
+    call read_attribute(gid, 'nprocs' , nfiles  )
+    call read_attribute(gid, 'nproc'  , lnproc  )
+    call read_attribute(gid, 'mblocks', lmblocks)
+    call read_attribute(gid, 'nleafs' , lnleafs )
+    call read_attribute(gid, 'last_id', llast_id)
+    call read_attribute(gid, 'ncells' , lncells )
+    call read_attribute(gid, 'nghost' , lnghost )
+    call read_attribute(gid, 'nseeds' , lnseeds )
+    call read_attribute(gid, 'step'   , step    )
+    call read_attribute(gid, 'isnap'  , isnap   )
 
 ! restore double precision attributes
 !
-    call read_attribute_double_h5(gid, 'xmin', xmin)
-    call read_attribute_double_h5(gid, 'xmax', xmax)
-    call read_attribute_double_h5(gid, 'ymin', ymin)
-    call read_attribute_double_h5(gid, 'ymax', ymax)
-    call read_attribute_double_h5(gid, 'zmin', zmin)
-    call read_attribute_double_h5(gid, 'zmax', zmax)
-    call read_attribute_double_h5(gid, 'time', time)
-    call read_attribute_double_h5(gid, 'dt'  , dt  )
-    call read_attribute_double_h5(gid, 'dtn' , dtn )
+    call read_attribute(gid, 'xmin', xmin)
+    call read_attribute(gid, 'xmax', xmax)
+    call read_attribute(gid, 'ymin', ymin)
+    call read_attribute(gid, 'ymax', ymax)
+    call read_attribute(gid, 'zmin', zmin)
+    call read_attribute(gid, 'zmax', zmax)
+    call read_attribute(gid, 'time', time)
+    call read_attribute(gid, 'dt'  , dt  )
+    call read_attribute(gid, 'dtn' , dtn )
 
 ! check the number of dimensions
 !
@@ -1324,7 +1371,7 @@ module io
 
 ! store them in the current group
 !
-    call read_attribute_vector_integer_h5(gid, 'seeds', seeds(:))
+    call read_attribute(gid, 'seeds', seeds(:))
 
 ! set the seed values
 !
@@ -1370,617 +1417,51 @@ module io
   end subroutine read_attributes_h5
 !
 !===============================================================================
-!!
-!!---  ATTRIBUTE SUBROUTINES  --------------------------------------------------
-!!
-!===============================================================================
 !
-!===============================================================================
+! subroutine WRITE_METABLOCKS_H5:
+! ------------------------------
 !
-! subroutine READ_ATTRIBUTE_INTEGER_H5:
-! ------------------------------------
-!
-!   Subroutine reads a value of the integer attribute provided by the group
-!   identifier to which it is linked and its name.
+!   Subroutine stores all meta blocks with their complete fields in 'metablock'
+!   group in a provided file identifier.
 !
 !   Arguments:
 !
-!     gid    - the group identifier to which the attribute is linked;
-!     aname  - the attribute name;
-!     avalue - the attribute value;
-!
-!===============================================================================
-!
-  subroutine read_attribute_integer_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5           , only : h5aexists_by_name_f
-    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)  , intent(in)    :: gid
-    character(len=*), intent(in)    :: aname
-    integer         , intent(inout) :: avalue
-
-! local variables
-!
-    logical                         :: exists = .false.
-    integer(hid_t)                  :: aid
-    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
-    integer                         :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! check if the attribute exists in the group provided by gid
-!
-    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_integer_h5"                         &
-                        , "Cannot check if attribute exists :" // trim(aname))
-      return
-    end if
-    if (.not. exists) then
-      call print_error("io::read_attribute_integer_h5"                         &
-                                , "Attribute does not exist :" // trim(aname))
-      return
-    end if
-
-! open the attribute
-!
-    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_integer_h5"                         &
-                                   , "Cannot open attribute :" // trim(aname))
-      return
-    end if
-
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_integer_h5"                         &
-                                   , "Cannot read attribute :" // trim(aname))
-    end if
-
-! close the attribute
-!
-    call h5aclose_f(aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_integer_h5"                         &
-                                  , "Cannot close attribute :" // trim(aname))
-      return
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_integer_h5
-!
-!===============================================================================
-!
-! subroutine READ_ATTRIBUTE_DOUBLE_H5:
-! -----------------------------------
-!
-!   Subroutine reads a value of the double precision attribute provided by
-!   the group identifier to which it is linked and its name.
-!
-!   Arguments:
-!
-!     gid    - the group identifier to which the attribute is linked;
-!     aname  - the attribute name;
-!     avalue - the attribute value;
-!
-!===============================================================================
-!
-  subroutine read_attribute_double_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5           , only : h5aexists_by_name_f
-    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)  , intent(in)    :: gid
-    character(len=*), intent(in)    :: aname
-    real(kind=8)    , intent(inout) :: avalue
-
-! local variables
-!
-    logical                         :: exists = .false.
-    integer(hid_t)                  :: aid
-    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
-    integer                         :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! check if the attribute exists in the group provided by gid
-!
-    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_double_h5"                          &
-                        , "Cannot check if attribute exists :" // trim(aname))
-      return
-    end if
-    if (.not. exists) then
-      call print_error("io::read_attribute_double_h5"                          &
-                                , "Attribute does not exist :" // trim(aname))
-      return
-    end if
-
-! open the attribute
-!
-    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_double_h5"                          &
-                                   , "Cannot open attribute :" // trim(aname))
-      return
-    end if
-
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_double_h5"                          &
-                                   , "Cannot read attribute :" // trim(aname))
-    end if
-
-! close the attribute
-!
-    call h5aclose_f(aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_double_h5"                          &
-                                  , "Cannot close attribute :" // trim(aname))
-      return
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_double_h5
-!
-!===============================================================================
-!
-! subroutine READ_ATTRIBUTE_VECTOR_INTEGER_H5:
-! -------------------------------------------
-!
-!   Subroutine reads a vector of the integer attribute provided by the group
-!   identifier to which it is linked and its name.
-!
-!   Arguments:
-!
-!     gid    - the group identifier to which the attribute is linked;
-!     aname  - the attribute name;
-!     avalue - the attribute value;
-!
-!===============================================================================
-!
-  subroutine read_attribute_vector_integer_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
-    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
-    use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)                , intent(in)    :: gid
-    character(len=*)              , intent(in)    :: aname
-    integer         , dimension(:), intent(inout) :: avalue
-
-! local variables
-!
-    logical                         :: exists = .false.
-    integer(hid_t)                  :: aid, sid
-    integer(hsize_t), dimension(1)  :: am, bm
-    integer(hsize_t)                :: alen
-    integer                         :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! check if the attribute exists in the group provided by gid
-!
-    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                        , "Cannot check if attribute exists :" // trim(aname))
-      return
-    end if
-    if (.not. exists) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                , "Attribute does not exist :" // trim(aname))
-      return
-    end if
-
-! open the attribute
-!
-    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                   , "Cannot open attribute :" // trim(aname))
-      return
-    end if
-
-! get the attribute space
-!
-    call h5aget_space_f(aid, sid, ierr)
-    if (ierr == 0) then
-      call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
-      if (ierr /= 1) then
-        call print_error("io::read_attribute_vector_integer_h5"                &
-                         , "Cannot get attribute dimensions :" // trim(aname))
-      end if
-      call h5sclose_f(sid, ierr)
-      if (ierr /= 0) then
-        call print_error("io::read_attribute_vector_integer_h5"                &
-                        , "Cannot close the attribute space :" // trim(aname))
-      end if
-    else
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                          , "Cannot get the attribute space :" // trim(aname))
-      return
-    end if
-
-! check if the output array is large enough
-!
-    if (am(1) > size(avalue)) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                 , "Attribute too large for output argument :" // trim(aname))
-      return
-    end if
-
-! read attribute value
-!
-    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                   , "Cannot read attribute :" // trim(aname))
-    end if
-
-! close the attribute
-!
-    call h5aclose_f(aid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::read_attribute_vector_integer_h5"                  &
-                                  , "Cannot close attribute :" // trim(aname))
-      return
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine read_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! subroutine WRITE_ATTRIBUTE_INTEGER_H5:
-! -------------------------------------
-!
-!   Subroutine stores a value of the integer attribute in the group provided
-!   by an identifier and the attribute name.
-!
-!   Arguments:
-!
-!     gid    - the group identifier to which the attribute should be linked;
-!     aname  - the attribute name;
-!     avalue - the attribute value;
-!
-!===============================================================================
-!
-  subroutine write_attribute_integer_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5           , only : h5screate_simple_f, h5sclose_f
-    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)  , intent(in) :: gid
-    character(len=*), intent(in) :: aname
-    integer         , intent(in) :: avalue
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the attribute value
-!
-    call h5screate_simple_f(1, am, sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_integer_h5"                        &
-                       , "Cannot create space for attribute :" // trim(aname))
-      return
-    end if
-
-! create the attribute in the given group
-!
-    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
-    if (ierr == 0) then
-
-! write the attribute data
-!
-      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_integer_h5"                      &
-                      , "Cannot write the attribute data in :" // trim(aname))
-      end if
-
-! close the attribute
-!
-      call h5aclose_f(aid, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_integer_h5"                      &
-                                  , "Cannot close attribute :" // trim(aname))
-      end if
-
-    else
-      call print_error("io::write_attribute_integer_h5"                        &
-                                 , "Cannot create attribute :" // trim(aname))
-    end if
-
-! release the space
-!
-    call h5sclose_f(sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_integer_h5"                        &
-                        , "Cannot close space for attribute :" // trim(aname))
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_integer_h5
-!
-!===============================================================================
-!
-! subroutine WRITE_ATTRIBUTE_DOUBLE_H5:
-! ------------------------------------
-!
-!   Subroutine stores a value of the double precision attribute in the group
-!   provided by an identifier and the attribute name.
-!
-!   Arguments:
-!
-!     gid    - the group identifier to which the attribute should be linked;
-!     aname  - the attribute name;
-!     avalue - the attribute value;
-!
-!===============================================================================
-!
-  subroutine write_attribute_double_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5           , only : h5screate_simple_f, h5sclose_f
-    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)  , intent(in) :: gid
-    character(len=*), intent(in) :: aname
-    real(kind=8)    , intent(in) :: avalue
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the attribute value
-!
-    call h5screate_simple_f(1, am, sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_double_h5"                         &
-                       , "Cannot create space for attribute :" // trim(aname))
-      return
-    end if
-
-! create the attribute in the given group
-!
-    call h5acreate_f(gid, aname, H5T_NATIVE_DOUBLE, sid, aid, ierr)
-    if (ierr == 0) then
-
-! write the attribute data
-!
-      call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_double_h5"                       &
-                      , "Cannot write the attribute data in :" // trim(aname))
-      end if
-
-! close the attribute
-!
-      call h5aclose_f(aid, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_double_h5"                       &
-                                  , "Cannot close attribute :" // trim(aname))
-      end if
-
-    else
-      call print_error("io::write_attribute_double_h5"                         &
-                                 , "Cannot create attribute :" // trim(aname))
-    end if
-
-! release the space
-!
-    call h5sclose_f(sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_double_h5"                         &
-                        , "Cannot close space for attribute :" // trim(aname))
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_double_h5
-!
-!===============================================================================
-!
-! subroutine WRITE_ATTRIBUTE_VECTOR_INTEGER_H5:
-! --------------------------------------------
-!
-!   Subroutine stores a vector of the integer attribute in the group provided
-!   by an identifier and the attribute name.
-!
-!   Arguments:
-!
-!     gid    - the group identifier to which the attribute should be linked;
-!     aname  - the attribute name;
-!     avalue - the attribute values;
-!
-!===============================================================================
-!
-  subroutine write_attribute_vector_integer_h5(gid, aname, avalue)
-
-! import external procedures and variables
-!
-    use error          , only : print_error
-    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5           , only : h5screate_simple_f, h5sclose_f
-    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! attribute arguments
-!
-    integer(hid_t)                , intent(in) :: gid
-    character(len=*)              , intent(in) :: aname
-    integer         , dimension(:), intent(in) :: avalue
-
-! local variables
-!
-    integer(hid_t)                 :: sid, aid
-    integer(hsize_t), dimension(1) :: am = (/ 1 /)
-    integer                        :: ierr
-!
-!-------------------------------------------------------------------------------
-!
-! set the proper attribute length
-!
-    am(1) = size(avalue)
-
-! create space for the attribute value
-!
-    call h5screate_simple_f(1, am, sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_vector_integer_h5"                 &
-                       , "Cannot create space for attribute :" // trim(aname))
-      return
-    end if
-
-! create the attribute in the given group
-!
-    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
-    if (ierr == 0) then
-
-! write the attribute data
-!
-      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_vector_integer_h5"               &
-                      , "Cannot write the attribute data in :" // trim(aname))
-      end if
-
-! close the attribute
-!
-      call h5aclose_f(aid, ierr)
-      if (ierr /= 0) then
-        call print_error("io::write_attribute_vector_integer_h5"               &
-                                  , "Cannot close attribute :" // trim(aname))
-      end if
-
-    else
-      call print_error("io::write_attribute_vector_integer_h5"                 &
-                                 , "Cannot create attribute :" // trim(aname))
-    end if
-
-! release the space
-!
-    call h5sclose_f(sid, ierr)
-    if (ierr /= 0) then
-      call print_error("io::write_attribute_vector_integer_h5"                 &
-                        , "Cannot close space for attribute :" // trim(aname))
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_attribute_vector_integer_h5
-!
-!===============================================================================
-!
-! write_metablocks_h5: subroutine writes metablocks in the HDF5 format connected
-!                      to the provided identifier
-!
-! info: this subroutine stores only the metablocks
-!
-! arguments:
-!   fid - the HDF5 file identifier
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine write_metablocks_h5(fid)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : get_last_id, get_mblocks, nchildren, nsides, nfaces
-    use error   , only : print_error
-    use hdf5    , only : hid_t, hsize_t
-    use hdf5    , only : h5gcreate_f, h5gclose_f
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : ndims, nchildren, nsides
+    use blocks         , only : get_last_id, get_mblocks
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: l, p, i, j, k
-    integer                        :: err
+    integer(kind=4)                :: i, j, k, l, n, p
+    integer                        :: iret
     integer(hsize_t), dimension(1) :: am, cm
     integer(hsize_t), dimension(2) :: dm, pm
-    integer(hsize_t), dimension(4) :: qm
+#if NDIMS == 2
+    integer(hsize_t), dimension(4) :: nm
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(hsize_t), dimension(5) :: nm
+#endif /* NDIMS == 3 */
 
 ! local allocatable arrays
 !
@@ -1989,21 +1470,33 @@ module io
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
-    integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
+#if NDIMS == 2
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
+    integer(kind=4), dimension(:,:,:)    , allocatable :: corners
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: faces
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: edges
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: corners
+#endif /* NDIMS == 3 */
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_metablocks_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! create the group for metadata
 !
-    call h5gcreate_f(fid, 'metablocks', gid, err)
+    call h5gcreate_f(fid, 'metablocks', gid, iret)
 
 ! check if the group has been created successfuly
 !
-    if (err .ge. 0) then
+    if (iret >= 0) then
 
 ! prepate dimensions
 !
@@ -2013,16 +1506,22 @@ module io
       dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
-      qm(1) = get_mblocks()
-      qm(2) = NDIMS
-      qm(3) = nsides
-      qm(4) = nfaces
+      nm(1) = get_mblocks()
+      nm(2) = nsides
+      nm(3) = nsides
+#if NDIMS == 2
+      nm(4) = ndims
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      nm(4) = nsides
+      nm(5) = ndims
+#endif /* NDIMS == 3 */
 
-! only process if there are some metablocks
+! only store data from processes that have any meta blocks
 !
       if (am(1) > 0) then
 
-! allocate arrays to store metablocks data
+! allocate arrays to store meta block fields
 !
         allocate(idx(cm(1)))
         allocate(par(am(1)))
@@ -2042,23 +1541,51 @@ module io
         allocate(chl(dm(1),dm(2)))
         allocate(pos(pm(1),pm(2)))
         allocate(cor(pm(1),pm(2)))
-        allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+#if NDIMS == 2
+        allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
+        allocate(corners(nm(1),nm(2),nm(3)))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        allocate(faces  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+        allocate(edges  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+        allocate(corners(nm(1),nm(2),nm(3),nm(4)))
+#endif /* NDIMS == 3 */
 
-! reset vectors
+! reset stored arrays
 !
-        idx(:)       = -1
-        par(:)       = -1
-        dat(:)       = -1
-        lea(:)       = -1
-        chl(:,:)     = -1
-        ngh(:,:,:,:) = -1
+        idx(:)           = -1
+        par(:)           = -1
+        dat(:)           = -1
+        lea(:)           = -1
+        chl(:,:)         = -1
+#if NDIMS == 2
+        edges(:,:,:,:)   = -1
+        corners(:,:,:)   = -1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        faces(:,:,:,:,:) = -1
+        edges(:,:,:,:,:) = -1
+        corners(:,:,:,:) = -1
+#endif /* NDIMS == 3 */
 
-! iterate over all metablocks and fill in the arrays for storage
+! reset the block counter
 !
-        l = 1
+        l = 0
+
+! associate pmeta with the first block on the meta block list
+!
         pmeta => list_meta
+
+! iterate over all meta blocks and fill in the arrays for storage
+!
         do while(associated(pmeta))
 
+! increase the block counter
+!
+          l = l + 1
+
+! store meta block fields
+!
           idx(pmeta%id) = l
 
           if (associated(pmeta%parent)) par(l) = pmeta%parent%id
@@ -2085,75 +1612,111 @@ module io
             if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
           end do
 
-          do i = 1, NDIMS
+! store face, edge and corner neighbor pointers
+!
+#if NDIMS == 2
+          do i = 1, nsides
             do j = 1, nsides
-              do k = 1, nfaces
-                if (associated(pmeta%neigh(i,j,k)%ptr))  &
-                                          ngh(l,i,j,k) = pmeta%neigh(i,j,k)%ptr%id
-              end do
-            end do
-          end do
+              do n = 1, ndims
+                if (associated(pmeta%edges(i,j,n)%ptr))                        &
+                                    edges(l,i,j,n) = pmeta%edges(i,j,n)%ptr%id
+              end do ! ndims
+              if (associated(pmeta%corners(i,j)%ptr))                          &
+                                    corners(l,i,j) = pmeta%corners(i,j)%ptr%id
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+          do i = 1, nsides
+            do j = 1, nsides
+              do k = 1, nsides
+                do n = 1, ndims
+                  if (associated(pmeta%faces(i,j,k,n)%ptr))                    &
+                                faces(l,i,j,k,n) = pmeta%faces(i,j,k,n)%ptr%id
+                  if (associated(pmeta%edges(i,j,k,n)%ptr))                    &
+                                edges(l,i,j,k,n) = pmeta%edges(i,j,k,n)%ptr%id
+                end do ! ndims
+                if (associated(pmeta%corners(i,j,k)%ptr))                      &
+                                corners(l,i,j,k) = pmeta%corners(i,j,k)%ptr%id
+              end do ! i = 1, nsides
+            end do ! j = 1, nsides
+          end do ! k = 1, nsides
+#endif /* NDIMS == 3 */
 
-          l = l + 1
+! associate pmeta with the next block on the list
+!
           pmeta => pmeta%next
-        end do
 
-! store metadata in the HDF5 file
-!
-        call write_vector_integer_h5(gid, 'indices', cm(1), idx)
-        call write_vector_integer_h5(gid, 'parent' , am(1), par)
-        call write_vector_integer_h5(gid, 'data'   , am(1), dat)
-        call write_vector_integer_h5(gid, 'id'     , am(1), id)
-        call write_vector_integer_h5(gid, 'cpu'    , am(1), cpu)
-        call write_vector_integer_h5(gid, 'level'  , am(1), lev)
-        call write_vector_integer_h5(gid, 'config' , am(1), cfg)
-        call write_vector_integer_h5(gid, 'refine' , am(1), ref)
-        call write_vector_integer_h5(gid, 'leaf'   , am(1), lea)
-        call write_vector_double_h5 (gid, 'xmin'   , am(1), xmn)
-        call write_vector_double_h5 (gid, 'xmax'   , am(1), xmx)
-        call write_vector_double_h5 (gid, 'ymin'   , am(1), ymn)
-        call write_vector_double_h5 (gid, 'ymax'   , am(1), ymx)
-        call write_vector_double_h5 (gid, 'zmin'   , am(1), zmn)
-        call write_vector_double_h5 (gid, 'zmax'   , am(1), zmx)
-        call write_array2_integer_h5(gid, 'child'  , dm(:), chl)
-        call write_array2_integer_h5(gid, 'pos'    , pm(:), pos)
-        call write_array2_integer_h5(gid, 'coord'  , pm(:), cor)
-        call write_array4_integer_h5(gid, 'neigh'  , qm(:), ngh)
+        end do ! over all meta blocks
 
-! deallocate allocatable arrays
+! store meta block data in the HDF5 file
 !
-        if (allocated(idx)) deallocate(idx)
-        if (allocated(par)) deallocate(par)
-        if (allocated(dat)) deallocate(dat)
-        if (allocated(id) ) deallocate(id)
-        if (allocated(cpu)) deallocate(cpu)
-        if (allocated(lev)) deallocate(lev)
-        if (allocated(cfg)) deallocate(cfg)
-        if (allocated(ref)) deallocate(ref)
-        if (allocated(lea)) deallocate(lea)
-        if (allocated(xmn)) deallocate(xmn)
-        if (allocated(xmx)) deallocate(xmx)
-        if (allocated(ymn)) deallocate(ymn)
-        if (allocated(ymx)) deallocate(ymx)
-        if (allocated(zmn)) deallocate(zmn)
-        if (allocated(zmx)) deallocate(zmx)
-        if (allocated(chl)) deallocate(chl)
-        if (allocated(cor)) deallocate(cor)
-        if (allocated(ngh)) deallocate(ngh)
+        call write_array(gid, 'indices', cm(1)  , idx)
+        call write_array(gid, 'parent' , am(1)  , par)
+        call write_array(gid, 'data'   , am(1)  , dat)
+        call write_array(gid, 'id'     , am(1)  , id )
+        call write_array(gid, 'cpu'    , am(1)  , cpu)
+        call write_array(gid, 'level'  , am(1)  , lev)
+        call write_array(gid, 'config' , am(1)  , cfg)
+        call write_array(gid, 'refine' , am(1)  , ref)
+        call write_array(gid, 'leaf'   , am(1)  , lea)
+        call write_array(gid, 'xmin'   , am(1)  , xmn)
+        call write_array(gid, 'xmax'   , am(1)  , xmx)
+        call write_array(gid, 'ymin'   , am(1)  , ymn)
+        call write_array(gid, 'ymax'   , am(1)  , ymx)
+        call write_array(gid, 'zmin'   , am(1)  , zmn)
+        call write_array(gid, 'zmax'   , am(1)  , zmx)
+        call write_array(gid, 'child'  , dm(:)  , chl(:,:))
+        call write_array(gid, 'pos'    , pm(:)  , pos(:,:))
+        call write_array(gid, 'coord'  , pm(:)  , cor(:,:))
+#if NDIMS == 2
+        call write_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
+        call write_array(gid, 'corners', nm(1:3), corners(:,:,:))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        call write_array(gid, 'faces'  , nm(1:5), faces(:,:,:,:,:))
+        call write_array(gid, 'edges'  , nm(1:5), edges(:,:,:,:,:))
+        call write_array(gid, 'corners', nm(1:4), corners(:,:,:,:))
+#endif /* NDIMS == 3 */
+
+! deallocate allocated arrays
+!
+        if (allocated(idx))     deallocate(idx)
+        if (allocated(par))     deallocate(par)
+        if (allocated(dat))     deallocate(dat)
+        if (allocated(id) )     deallocate(id)
+        if (allocated(cpu))     deallocate(cpu)
+        if (allocated(lev))     deallocate(lev)
+        if (allocated(cfg))     deallocate(cfg)
+        if (allocated(ref))     deallocate(ref)
+        if (allocated(lea))     deallocate(lea)
+        if (allocated(xmn))     deallocate(xmn)
+        if (allocated(xmx))     deallocate(xmx)
+        if (allocated(ymn))     deallocate(ymn)
+        if (allocated(ymx))     deallocate(ymx)
+        if (allocated(zmn))     deallocate(zmn)
+        if (allocated(zmx))     deallocate(zmx)
+        if (allocated(chl))     deallocate(chl)
+        if (allocated(cor))     deallocate(cor)
+#if NDIMS == 3
+        if (allocated(faces))   deallocate(faces)
+#endif /* NDIMS == 3 */
+        if (allocated(edges))   deallocate(edges)
+        if (allocated(corners)) deallocate(corners)
 
       end if ! meta blocks > 0
 
 ! close the group
 !
-      call h5gclose_f(gid, err)
+      call h5gclose_f(gid, iret)
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (iret > 0) then
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_metablocks_h5", "Cannot close the group!")
+        call print_error(fname, "Cannot close the group!")
 
       end if
 
@@ -2161,7 +1724,7 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_metablocks_h5", "Cannot create the group!")
+      call print_error(fname, "Cannot create the group!")
 
     end if
 
@@ -2171,49 +1734,57 @@ module io
 !
 !===============================================================================
 !
-! read_metablocks_h5: subroutine reads metablocks from the restart HDF5 file
-!                     and restores all their structure fields
+! subroutine READ_METABLOCKS_H5:
+! -----------------------------
 !
-! info: this subroutine restores metablocks only
+!   Subroutine restores all meta blocks with their complete fields from
+!   'metablock' group in a provided restart file identifier.
 !
-! arguments:
-!   fid - the HDF5 file identifier
+!   Arguments:
+!
+!     fid - the HDF5 file identifier;
 !
 !===============================================================================
 !
   subroutine read_metablocks_h5(fid)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use blocks  , only : block_meta, list_meta
-    use blocks  , only : nchildren, nsides, nfaces
-    use blocks  , only : get_mblocks
-    use blocks  , only : metablock_set_id, metablock_set_process               &
-                       , metablock_set_refinement, metablock_set_configuration &
-                       , metablock_set_level, metablock_set_position           &
-                       , metablock_set_coordinates, metablock_set_bounds       &
-                       , metablock_set_leaf
-    use error   , only : print_error
-    use hdf5    , only : hid_t, hsize_t
-    use hdf5    , only : h5gopen_f, h5gclose_f
-    use mpitools, only : nprocs
+    use blocks         , only : block_meta, list_meta
+    use blocks         , only : ndims, nchildren, nsides
+    use blocks         , only : get_mblocks
+    use blocks         , only : metablock_set_id, metablock_set_process
+    use blocks         , only : metablock_set_refinement
+    use blocks         , only : metablock_set_configuration
+    use blocks         , only : metablock_set_level, metablock_set_position
+    use blocks         , only : metablock_set_coordinates, metablock_set_bounds
+    use blocks         , only : metablock_set_leaf
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gopen_f, h5gclose_f
+    use mpitools       , only : nprocs
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t), intent(in) :: fid
 
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: l, p, i, j, k, lcpu
+    integer(kind=4)                :: i, j, k, l, p, n, ip, lcpu
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
-    integer(hsize_t), dimension(4) :: qm
+#if NDIMS == 2
+    integer(hsize_t), dimension(4) :: nm
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(hsize_t), dimension(5) :: nm
+#endif /* NDIMS == 3 */
 
 ! local allocatable arrays
 !
@@ -2222,11 +1793,23 @@ module io
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
-    integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
+#if NDIMS == 2
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
+    integer(kind=4), dimension(:,:,:)    , allocatable :: corners
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: faces
+    integer(kind=4), dimension(:,:,:,:,:), allocatable :: edges
+    integer(kind=4), dimension(:,:,:,:)  , allocatable :: corners
+#endif /* NDIMS == 3 */
 
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_metablocks_h5"
 !
 !-------------------------------------------------------------------------------
 !
@@ -2240,7 +1823,7 @@ module io
 
 ! check if the group has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (err >= 0) then
 
 ! prepate dimensions
 !
@@ -2249,12 +1832,18 @@ module io
       dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
-      qm(1) = get_mblocks()
-      qm(2) = NDIMS
-      qm(3) = nsides
-      qm(4) = nfaces
+      nm(1) = get_mblocks()
+      nm(2) = nsides
+      nm(3) = nsides
+#if NDIMS == 2
+      nm(4) = ndims
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      nm(4) = nsides
+      nm(5) = ndims
+#endif /* NDIMS == 3 */
 
-! allocate arrays to store metablocks data
+! allocate arrays to restore metablocks data
 !
       allocate(id (am(1)))
       allocate(cpu(am(1)))
@@ -2273,35 +1862,59 @@ module io
       allocate(chl(dm(1),dm(2)))
       allocate(pos(pm(1),pm(2)))
       allocate(cor(pm(1),pm(2)))
-      allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
+#if NDIMS == 2
+      allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
+      allocate(corners(nm(1),nm(2),nm(3)))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      allocate(faces  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+      allocate(edges  (nm(1),nm(2),nm(3),nm(4),nm(5)))
+      allocate(corners(nm(1),nm(2),nm(3),nm(4)))
+#endif /* NDIMS == 3 */
 
 ! reset vectors
 !
-      par(:)       = -1
-      dat(:)       = -1
-      lea(:)       = -1
-      chl(:,:)     = -1
-      ngh(:,:,:,:) = -1
+      par(:)           = -1
+      dat(:)           = -1
+      lea(:)           = -1
+      chl(:,:)         = -1
+#if NDIMS == 2
+      edges(:,:,:,:)   = -1
+      corners(:,:,:)   = -1
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      faces(:,:,:,:,:) = -1
+      edges(:,:,:,:,:) = -1
+      corners(:,:,:,:) = -1
+#endif /* NDIMS == 3 */
 
 ! read metablock fields from the HDF5 file
 !
-      call read_vector_integer_h5(gid, 'id'     , am(:), id (:))
-      call read_vector_integer_h5(gid, 'cpu'    , am(:), cpu(:))
-      call read_vector_integer_h5(gid, 'level'  , am(:), lev(:))
-      call read_vector_integer_h5(gid, 'config' , am(:), cfg(:))
-      call read_vector_integer_h5(gid, 'refine' , am(:), ref(:))
-      call read_vector_integer_h5(gid, 'leaf'   , am(:), lea(:))
-      call read_vector_integer_h5(gid, 'parent' , am(:), par(:))
-      call read_vector_double_h5 (gid, 'xmin'   , am(:), xmn(:))
-      call read_vector_double_h5 (gid, 'xmax'   , am(:), xmx(:))
-      call read_vector_double_h5 (gid, 'ymin'   , am(:), ymn(:))
-      call read_vector_double_h5 (gid, 'ymax'   , am(:), ymx(:))
-      call read_vector_double_h5 (gid, 'zmin'   , am(:), zmn(:))
-      call read_vector_double_h5 (gid, 'zmax'   , am(:), zmx(:))
-      call read_array2_integer_h5(gid, 'pos'    , pm(:), pos(:,:))
-      call read_array2_integer_h5(gid, 'coord'  , pm(:), cor(:,:))
-      call read_array2_integer_h5(gid, 'child'  , dm(:), chl(:,:))
-      call read_array4_integer_h5(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
+      call read_array(gid, 'id'     , am(:), id (:))
+      call read_array(gid, 'cpu'    , am(:), cpu(:))
+      call read_array(gid, 'level'  , am(:), lev(:))
+      call read_array(gid, 'config' , am(:), cfg(:))
+      call read_array(gid, 'refine' , am(:), ref(:))
+      call read_array(gid, 'leaf'   , am(:), lea(:))
+      call read_array(gid, 'parent' , am(:), par(:))
+      call read_array(gid, 'xmin'   , am(:), xmn(:))
+      call read_array(gid, 'xmax'   , am(:), xmx(:))
+      call read_array(gid, 'ymin'   , am(:), ymn(:))
+      call read_array(gid, 'ymax'   , am(:), ymx(:))
+      call read_array(gid, 'zmin'   , am(:), zmn(:))
+      call read_array(gid, 'zmax'   , am(:), zmx(:))
+      call read_array(gid, 'pos'    , pm(:), pos(:,:))
+      call read_array(gid, 'coord'  , pm(:), cor(:,:))
+      call read_array(gid, 'child'  , dm(:), chl(:,:))
+#if NDIMS == 2
+      call read_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
+      call read_array(gid, 'corners', nm(1:3), corners(:,:,:))
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+      call read_array(gid, 'faces'  , nm(1:5), faces(:,:,:,:,:))
+      call read_array(gid, 'edges'  , nm(1:5), edges(:,:,:,:,:))
+      call read_array(gid, 'corners', nm(1:4), corners(:,:,:,:))
+#endif /* NDIMS == 3 */
 
 ! check if the maximum level has been changed, is so, rescale block coordinates
 !
@@ -2312,12 +1925,24 @@ module io
         cor(:,:) = cor(:,:) * ucor
       end if
 
-! prepare the array of pointers to metablocks
+! reset the block counter
 !
-      l = 1
+      l = 0
+
+! associate pmeta with the first block on the meta block list
+!
       pmeta => list_meta
+
+! iterate over all meta blocks and restore their fields
+!
       do while(associated(pmeta))
 
+! increase the block counter
+!
+        l = l + 1
+
+! restore meta block fields
+!
         block_array(id(l))%ptr => pmeta
 
         call metablock_set_id           (pmeta, id (l))
@@ -2328,61 +1953,104 @@ module io
         call metablock_set_position     (pmeta, pos(l,1), pos(l,2), pos(l,3))
         call metablock_set_coordinates  (pmeta, cor(l,1), cor(l,2), cor(l,3))
         call metablock_set_bounds       (pmeta, xmn(l), xmx(l), ymn(l), ymx(l) &
-                                                             , zmn(l), zmx(l))
+                                                              , zmn(l), zmx(l))
 
-        if (lea(l) .eq. 1) call metablock_set_leaf(pmeta)
+        if (lea(l) == 1) call metablock_set_leaf(pmeta)
 
-        l = l + 1
-        pmeta => pmeta%next
-      end do
-
-! iterate over all metablocks and restore pointers
+! associate pmeta with the next block on the list
 !
-      l = 1
+        pmeta => pmeta%next
+
+      end do ! over all meta blocks
+
+! reset the block counter
+!
+      l = 0
+
+! associate pmeta with the first block on the meta block list
+!
       pmeta => list_meta
+
+! iterate over all meta blocks and restore their pointers
+!
       do while(associated(pmeta))
 
-        if (par(l) .gt. 0) pmeta%parent => block_array(par(l))%ptr
+! increase the block counter
+!
+        l = l + 1
 
+! restore %parent pointer
+!
+        if (par(l) > 0) pmeta%parent => block_array(par(l))%ptr
+
+! restore %child pointers
+!
         do p = 1, nchildren
-          if (chl(l,p) .gt. 0) then
+          if (chl(l,p) > 0) then
             pmeta%child(p)%ptr => block_array(chl(l,p))%ptr
           end if
-        end do
+        end do ! p = 1, nchildren
 
-        do i = 1, NDIMS
+! restore %faces, %edges and %corners neighbor pointers
+!
+#if NDIMS == 2
+        do i = 1, nsides
           do j = 1, nsides
-            do k = 1, nfaces
-              if (ngh(l,i,j,k) .gt. 0) then
-                pmeta%neigh(i,j,k)%ptr => block_array(ngh(l,i,j,k))%ptr
-              end if
-            end do
-          end do
-        end do
+            do n = 1, ndims
+              ip = edges(l,i,j,n)
+              if (ip > 0) pmeta%edges(i,j,n)%ptr => block_array(ip)%ptr
+            end do ! n = 1, ndims
+            ip = corners(l,i,j)
+            if (ip > 0) pmeta%corners(i,j)%ptr => block_array(ip)%ptr
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+        do i = 1, nsides
+          do j = 1, nsides
+            do k = 1, nsides
+              do n = 1, ndims
+                ip = faces(l,i,j,k,n)
+                if (ip > 0) pmeta%faces(i,j,k,n)%ptr => block_array(ip)%ptr
+                ip = edges(l,i,j,k,n)
+                if (ip > 0) pmeta%edges(i,j,k,n)%ptr => block_array(ip)%ptr
+              end do ! n = 1, ndims
+              ip = corners(l,i,j,k)
+              if (ip > 0) pmeta%corners(i,j,k)%ptr => block_array(ip)%ptr
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
+        end do ! k = 1, nsides
+#endif /* NDIMS == 3 */
 
-        l = l + 1
+! associate pmeta with the next block on the list
+!
         pmeta => pmeta%next
-      end do
+
+      end do ! over all meta blocks
 
 ! deallocate allocatable arrays
 !
-      if (allocated(id) ) deallocate(id )
-      if (allocated(par)) deallocate(par)
-      if (allocated(dat)) deallocate(dat)
-      if (allocated(cpu)) deallocate(cpu)
-      if (allocated(lev)) deallocate(lev)
-      if (allocated(cfg)) deallocate(cfg)
-      if (allocated(ref)) deallocate(ref)
-      if (allocated(lea)) deallocate(lea)
-      if (allocated(xmn)) deallocate(xmn)
-      if (allocated(xmx)) deallocate(xmx)
-      if (allocated(ymn)) deallocate(ymn)
-      if (allocated(ymx)) deallocate(ymx)
-      if (allocated(zmn)) deallocate(zmn)
-      if (allocated(zmx)) deallocate(zmx)
-      if (allocated(chl)) deallocate(chl)
-      if (allocated(cor)) deallocate(cor)
-      if (allocated(ngh)) deallocate(ngh)
+      if (allocated(id) )     deallocate(id )
+      if (allocated(par))     deallocate(par)
+      if (allocated(dat))     deallocate(dat)
+      if (allocated(cpu))     deallocate(cpu)
+      if (allocated(lev))     deallocate(lev)
+      if (allocated(cfg))     deallocate(cfg)
+      if (allocated(ref))     deallocate(ref)
+      if (allocated(lea))     deallocate(lea)
+      if (allocated(xmn))     deallocate(xmn)
+      if (allocated(xmx))     deallocate(xmx)
+      if (allocated(ymn))     deallocate(ymn)
+      if (allocated(ymx))     deallocate(ymx)
+      if (allocated(zmn))     deallocate(zmn)
+      if (allocated(zmx))     deallocate(zmx)
+      if (allocated(chl))     deallocate(chl)
+      if (allocated(cor))     deallocate(cor)
+#if NDIMS == 3
+      if (allocated(faces))   deallocate(faces)
+#endif /* NDIMS == 3 */
+      if (allocated(edges))   deallocate(edges)
+      if (allocated(corners)) deallocate(corners)
 
 ! close the group
 !
@@ -2390,12 +2058,11 @@ module io
 
 ! check if the group has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (err > 0) then
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::read_metablocks_h5"                              &
-                                              , "Cannot close metablock group!")
+        call print_error(fname, "Cannot close metablock group!")
 
       end if
 
@@ -2403,7 +2070,7 @@ module io
 
 ! print error about the problem with opening the group
 !
-      call print_error("io::read_metablocks_h5", "Cannot open metablock group!")
+      call print_error(fname, "Cannot open metablock group!")
 
     end if
 
@@ -2559,9 +2226,9 @@ module io
 
 ! store data arrays in the current group
 !
-        call write_vector_integer_h5(gid, 'meta', am(1), id)
-        call write_array5_double_h5 (gid, 'uvar', dm(:), uv)
-        call write_array5_double_h5 (gid, 'qvar', dm(:), qv)
+        call write_array(gid, 'meta', am(1), id)
+        call write_array(gid, 'uvar', dm(:), uv)
+        call write_array(gid, 'qvar', dm(:), qv)
 
 ! deallocate allocatable arrays
 !
@@ -2660,7 +2327,7 @@ module io
                                          , "Cannot open the attribute group!")
       return
     end if
-    call read_attribute_integer_h5(gid, 'dblocks', dblocks)
+    call read_attribute(gid, 'dblocks', dblocks)
     call h5gclose_f(gid, ierr)
     if (ierr /= 0) then
       call print_error("io::read_datablocks_h5"                                &
@@ -2697,9 +2364,9 @@ module io
 
 ! read array data from the HDF5 file
 !
-      call read_vector_integer_h5(gid, 'meta', dm(1:1), id(:)        )
-      call read_array5_double_h5 (gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
-      call read_array5_double_h5 (gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+      call read_array(gid, 'meta', dm(1:1), id(:)        )
+      call read_array(gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+      call read_array(gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
 
 ! close the data block group
 !
@@ -2862,13 +2529,13 @@ module io
 
 ! write the arrays to the HDF5 file
 !
-        call write_vector_integer_h5(gid, 'levels', cm(1), lev)
-        call write_vector_integer_h5(gid, 'refine', cm(1), ref)
-        call write_array2_integer_h5(gid, 'coords', cm(:), cor)
-        call write_array3_double_h5 (gid, 'bounds', dm(:), bnd)
-        call write_vector_double_h5 (gid, 'dx'    , am(1), adx(1:maxlev))
-        call write_vector_double_h5 (gid, 'dy'    , am(1), ady(1:maxlev))
-        call write_vector_double_h5 (gid, 'dz'    , am(1), adz(1:maxlev))
+        call write_array(gid, 'levels', cm(1), lev)
+        call write_array(gid, 'refine', cm(1), ref)
+        call write_array(gid, 'coords', cm(:), cor)
+        call write_array(gid, 'bounds', dm(:), bnd)
+        call write_array(gid, 'dx'    , am(1), adx(1:maxlev))
+        call write_array(gid, 'dy'    , am(1), ady(1:maxlev))
+        call write_array(gid, 'dz'    , am(1), adz(1:maxlev))
 
 ! deallocate temporary arrays
 !
@@ -3039,7 +2706,7 @@ module io
 
 ! write the variable array to the HDF5 file
 !
-          call write_array4_double_h5(gid, trim(pvars(n)), dm, qarr)
+          call write_array(gid, trim(pvars(n)), dm, qarr)
 
         end do ! n = 1, nv
 
@@ -3211,7 +2878,7 @@ module io
 
 ! write the variable array to the HDF5 file
 !
-          call write_array4_double_h5(gid, trim(cvars(n)), dm, qarr)
+          call write_array(gid, trim(cvars(n)), dm, qarr)
 
         end do ! n = 1, nv
 
@@ -3251,455 +2918,3328 @@ module io
 !
 !===============================================================================
 !
-! write_vector_integer_h5: subroutine stores a 1D integer vector in a group
-!
-! arguments:
-!   gid    - the HDF5 group identifier
-!   name   - the string name representing the dataset
-!   length - the vector length
-!   value  - the data
+! WRITE_ATTRIBUTE SUBROUTINES
 !
 !===============================================================================
 !
-  subroutine write_vector_integer_h5(gid, name, length, data)
-
-! references to other modules
+! subroutine WRITE_SCALAR_ATTRIBUTE_INTEGER_H5:
+! --------------------------------------------
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
+!   Subroutine stores a value of the integer attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine write_scalar_attribute_integer_h5(gid, aname, avalue)
 
-! declare variables
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                , intent(in) :: gid
-    character(len=*)              , intent(in) :: name
-    integer(hsize_t)              , intent(in) :: length
-    integer(kind=4) , dimension(:), intent(in) :: data
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    integer(kind=4) , intent(in) :: avalue
 
 ! local variables
 !
-    integer(hid_t)                 :: sid, did
-    integer(hsize_t), dimension(1) :: am
-    integer                        :: err
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                       "io::write_scalar_attribute_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! prepare the vector dimensions
+! create space for the attribute value
 !
-    am(1) = length
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
 
-! create space for the vector
+! create the attribute in the given group
 !
-    call h5screate_simple_f(1, am, sid, err)
+    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
+    if (ierr == 0) then
 
-! check if the space has been created successfuly
+! write the attribute data
 !
-    if (err .ge. 0) then
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err)
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_INTEGER, data(:), am, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_vector_integer_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
-
-! close the dataset
-!
-        call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-          call print_error("io::write_vector_integer_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_vector_integer_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
+      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                      , "Cannot write the attribute data in :" // trim(aname))
       end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname, "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error(fname, "Cannot create attribute :" // trim(aname))
+    end if
 
 ! release the space
 !
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_vector_integer_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_vector_integer_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
-
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot close space for attribute :" // trim(aname))
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_vector_integer_h5
+  end subroutine write_scalar_attribute_integer_h5
 !
 !===============================================================================
 !
-! read_vector_integer_h5: subroutine reads a 1D integer vector
+! subroutine WRITE_SCALAR_ATTRIBUTE_DOUBLE_H5:
+! -------------------------------------------
 !
-! arguments:
-!   gid    - the HDF5 group identifier
-!   name   - the string name representing the dataset
-!   length - the vector length
-!   value  - the data
+!   Subroutine stores a value of the double precision attribute in the group
+!   provided by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
 !
 !===============================================================================
 !
-  subroutine read_vector_integer_h5(gid, name, dm, data)
+  subroutine write_scalar_attribute_double_h5(gid, aname, avalue)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! attribute arguments
 !
-    integer(hid_t)                , intent(in)    :: gid
-    character(len=*)              , intent(in)    :: name
-    integer(hsize_t), dimension(1), intent(inout) :: dm
-    integer(kind=4) , dimension(:), intent(inout) :: data
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    real(kind=8)    , intent(in) :: avalue
 
 ! local variables
 !
-    integer(hid_t)                 :: did
-    integer                        :: err
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                        "io::write_scalar_attribute_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! open the dataset
+! create space for the attribute value
 !
-    call h5dopen_f(gid, name, did, err)
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
 
-! check if the dataset has been opened successfuly
+! create the attribute in the given group
 !
-    if (err .ge. 0) then
+    call h5acreate_f(gid, aname, H5T_NATIVE_DOUBLE, sid, aid, ierr)
+    if (ierr == 0) then
 
-! read the dataset data
+! write the attribute data
 !
-      call h5dread_f(did, H5T_NATIVE_INTEGER, data(:), dm(:), err)
+      call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
 
-! check if the dataset has been read successfuly
+! close the attribute
 !
-      if (err .gt. 0) then
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname, "Cannot close attribute :" // trim(aname))
+      end if
 
-! print error about the problem with reading the dataset
+    else
+      call print_error(fname, "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
 !
-        call print_error("io::read_vector_integer_h5"                          &
-                                        , "Cannot read dataset: " // trim(name))
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_scalar_attribute_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_VECTOR_ATTRIBUTE_INTEGER_H5:
+! --------------------------------------------
+!
+!   Subroutine stores a vector of the integer attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute values;
+!
+!===============================================================================
+!
+  subroutine write_vector_attribute_integer_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in) :: gid
+    character(len=*)              , intent(in) :: aname
+    integer(kind=4) , dimension(:), intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                       "io::write_vector_attribute_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! set the proper attribute length
+!
+    am(1) = size(avalue)
+
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_INTEGER, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname, "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error(fname, "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_vector_attribute_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_VECTOR_ATTRIBUTE_DOUBLE_H5:
+! -------------------------------------------
+!
+!   Subroutine stores a vector of the double precision attribute in the group
+!   provided by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute values;
+!
+!===============================================================================
+!
+  subroutine write_vector_attribute_double_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in) :: gid
+    character(len=*)              , intent(in) :: aname
+    real(kind=8)    , dimension(:), intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                        "io::write_vector_attribute_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! set the proper attribute length
+!
+    am(1) = size(avalue)
+
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, H5T_NATIVE_DOUBLE, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname, "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error(fname, "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_vector_attribute_double_h5
+
+!===============================================================================
+!
+! READ_ATTRIBUTE SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine READ_SCALAR_ATTRIBUTE_INTEGER_H5:
+! -------------------------------------------
+!
+!   Subroutine reads a value of the integer attribute provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_scalar_attribute_integer_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    integer(kind=4) , intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                        "io::read_scalar_attribute_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_scalar_attribute_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_SCALAR_ATTRIBUTE_DOUBLE_H5:
+! ------------------------------------------
+!
+!   Subroutine reads a value of the double precision attribute provided by
+!   the group identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_scalar_attribute_double_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5aexists_by_name_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)  , intent(in)    :: gid
+    character(len=*), intent(in)    :: aname
+    real(kind=8)    , intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid
+    integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
+    integer                         :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                         "io::read_scalar_attribute_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_scalar_attribute_double_h5
+!
+!===============================================================================
+!
+! subroutine READ_VECTOR_ATTRIBUTE_INTEGER_H5:
+! -------------------------------------------
+!
+!   Subroutine reads a vector of the integer attribute provided by the group
+!   identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_vector_attribute_integer_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: aname
+    integer(kind=4) , dimension(:), intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid, sid
+    integer(hsize_t), dimension(1)  :: am, bm
+    integer(hsize_t)                :: alen
+    integer                         :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                        "io::read_vector_attribute_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! get the attribute space
+!
+    call h5aget_space_f(aid, sid, ierr)
+    if (ierr == 0) then
+      call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
+      if (ierr /= 1) then
+        call print_error(fname                                                 &
+                         , "Cannot get attribute dimensions :" // trim(aname))
+      end if
+      call h5sclose_f(sid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                        , "Cannot close the attribute space :" // trim(aname))
+      end if
+    else
+      call print_error(fname                                                   &
+                          , "Cannot get the attribute space :" // trim(aname))
+      return
+    end if
+
+! check if the output array is large enough
+!
+    if (am(1) > size(avalue)) then
+      call print_error(fname                                                   &
+                 , "Attribute too large for output argument :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_vector_attribute_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_VECTOR_ATTRIBUTE_DOUBLE_H5:
+! ------------------------------------------
+!
+!   Subroutine reads a vector of the double precision attribute provided by
+!   the group identifier to which it is linked and its name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute is linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine read_vector_attribute_double_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
+    use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! attribute arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: aname
+    real(kind=8)    , dimension(:), intent(inout) :: avalue
+
+! local variables
+!
+    logical                         :: exists = .false.
+    integer(hid_t)                  :: aid, sid
+    integer(hsize_t), dimension(1)  :: am, bm
+    integer(hsize_t)                :: alen
+    integer                         :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                         "io::read_vector_attribute_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! check if the attribute exists in the group provided by gid
+!
+    call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot check if attribute exists :" // trim(aname))
+      return
+    end if
+    if (.not. exists) then
+      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      return
+    end if
+
+! open the attribute
+!
+    call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      return
+    end if
+
+! get the attribute space
+!
+    call h5aget_space_f(aid, sid, ierr)
+    if (ierr == 0) then
+      call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
+      if (ierr /= 1) then
+        call print_error(fname                                                 &
+                         , "Cannot get attribute dimensions :" // trim(aname))
+      end if
+      call h5sclose_f(sid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                        , "Cannot close the attribute space :" // trim(aname))
+      end if
+    else
+      call print_error(fname                                                   &
+                          , "Cannot get the attribute space :" // trim(aname))
+      return
+    end if
+
+! check if the output array is large enough
+!
+    if (am(1) > size(avalue)) then
+      call print_error(fname                                                   &
+                 , "Attribute too large for output argument :" // trim(aname))
+      return
+    end if
+
+! read attribute value
+!
+    call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot read attribute :" // trim(aname))
+    end if
+
+! close the attribute
+!
+    call h5aclose_f(aid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      return
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_vector_attribute_double_h5
+!
+!===============================================================================
+!
+! WRITE_ARRAY SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine WRITE_1D_ARRAY_INTEGER_H5:
+! ------------------------------------
+!
+!   Subroutine stores a one-dimensional integer array in a group specified by
+!   identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_1d_array_integer_h5(gid, name, ln, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_INTEGER
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                , intent(in) :: gid
+    character(len=*)              , intent(in) :: name
+    integer(hsize_t)              , intent(in) :: ln
+    integer(kind=4) , dimension(:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! array dimensions
+!
+    integer(hsize_t), dimension(1) :: dm
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_1d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! substitute array dimensions
+!
+    dm(1) = ln
+
+! create a space for the array
+!
+    call h5screate_simple_f(1, dm(1:1), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 1, dm(1:1), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:), dm(1:1), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
 
       end if
 
 ! close the dataset
 !
-      call h5dclose_f(did, err)
+      call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-        call print_error("io::read_vector_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
       end if
 
     else
 
-! print error about the problem with opening the dataset
+! print error about the problem with creating the dataset
 !
-      call print_error("io::read_vector_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_vector_integer_h5
+  end subroutine write_1d_array_integer_h5
 !
 !===============================================================================
 !
-! write_array2_integer_h5: subroutine stores a 2D integer array in a group
+! subroutine WRITE_2D_ARRAY_INTEGER_H5:
+! ------------------------------------
 !
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine stores a two-dimensional integer array in a group specified by
+!   identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_array2_integer_h5(gid, name, dm, var)
+  subroutine write_2d_array_integer_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
 #ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
+    use hdf5           , only : h5pset_deflate_f
 #endif /* DEFLATE */
 #ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
+    use hdf5           , only : h5pset_szip_f
 #endif /* SZIP */
 #endif /* COMPRESS */
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t)                  , intent(in) :: gid
     character(len=*)                , intent(in) :: name
     integer(hsize_t), dimension(2)  , intent(in) :: dm
     integer(kind=4) , dimension(:,:), intent(in) :: var
 
-! local variables
-!
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
 #ifdef COMPRESS
+! test for compression
+!
     logical        :: compress = .false.
 #endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_2d_array_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! create space for the vector
+! create a space for the array
 !
-    call h5screate_simple_f(2, dm, sid, err)
+    call h5screate_simple_f(2, dm(1:2), sid, iret)
 
-! check if the space has been created successfuly
+! check if the space has been created successfuly, if not quit
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
 
 #ifdef COMPRESS
-! prepare compression
+! prepare the property object for compression
 !
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
 
-! check if the properties have been created properly
+! check if the object has been created properly, if not quit
 !
-      if (err .ge. 0) then
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
 
 ! so far ok, so turn on the compression
 !
-        compress = .true.
+    compress = .true.
 
 ! set the chunk size
 !
-        call h5pset_chunk_f(pid, 2, dm, err)
+    call h5pset_chunk_f(pid, 2, dm(1:2), iret)
 
 ! check if the chunk size has been set properly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with setting the chunk size
 !
-          call print_error("io::write_array4_integer_h5"  &
-                                          , "Cannot set the size of the chunk!")
+      call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
 !
-          compress = .false.
+      compress = .false.
 
-        end if
+    end if
 
 ! set the compression algorithm
 !
 #ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
+    call h5pset_deflate_f(pid, 9, iret)
 #endif /* DEFLATE */
 #ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
+    if (product(dm(1:2)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
 #endif /* SZIP */
 
 ! check if the compression algorithm has been set properly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with setting the compression method
 !
-          call print_error("io::write_array4_integer_h5"  &
-                                         , "Cannot set the compression method!")
+      call print_warning(fname, "Cannot set the compression method!")
 
 ! setting compression method failed, so turn off the compression
 !
-          compress = .false.
+      compress = .false.
 
-        end if
-
-      end if
+    end if
 
 ! check if it is safe to use compression
 !
-      if (compress) then
+    if (compress) then
 
 ! create the dataset
 !
-        call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err, pid)
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
-      else
-#endif /* COMPRESS */
+    else
 
 ! create the dataset
 !
-        call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err)
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
 
-#ifdef COMPRESS
-      end if
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
 #endif /* COMPRESS */
 
 ! check if the dataset has been created successfuly
 !
-      if (err .ge. 0) then
+    if (iret >= 0) then
 
 ! write the dataset data
 !
-        call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:), dm, err, sid)
+      call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(1:2), iret, sid)
 
 ! check if the dataset has been written successfuly
 !
-        if (err .gt. 0) then
+      if (iret > 0) then
 
 ! print error about the problem with writing down the dataset
 !
-          call print_error("io::write_array2_integer_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
-
-! close the dataset
-!
-        call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-          call print_error("io::write_array2_integer_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array2_integer_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
+        call print_error(fname, "Cannot write dataset: " // trim(name))
 
       end if
 
-! release the space
+! close the dataset
 !
-      call h5sclose_f(sid, err)
+      call h5dclose_f(did, iret)
 
-! check if the space has been released successfuly
+! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+      if (iret > 0) then
 
-! print error about the problem with closing the space
+! print error about the problem with closing the dataset
 !
-        call print_error("io::write_array2_integer_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
       end if
 
     else
 
-! print error about the problem with creating the space for the attribute
+! print error about the problem with creating the dataset
 !
-      call print_error("io::write_array2_integer_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_array2_integer_h5
+  end subroutine write_2d_array_integer_h5
 !
 !===============================================================================
 !
-! read_array2_integer_h5: subroutine reads a 2D integer array
+! subroutine WRITE_3D_ARRAY_INTEGER_H5:
+! ------------------------------------
 !
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine stores a three-dimensional integer array in a group specified by
+!   identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine read_array2_integer_h5(gid, name, dm, var)
+  subroutine write_3d_array_integer_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_INTEGER
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
+!
+    integer(hid_t)                    , intent(in) :: gid
+    character(len=*)                  , intent(in) :: name
+    integer(hsize_t), dimension(3)    , intent(in) :: dm
+    integer(kind=4) , dimension(:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_3d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(3, dm(1:3), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 3, dm(1:3), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:3)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:,:), dm(1:3), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_3d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_4D_ARRAY_INTEGER_H5:
+! ------------------------------------
+!
+!   Subroutine stores a four-dimensional integer array in a group specified by
+!   identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_4d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_INTEGER
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                      , intent(in) :: gid
+    character(len=*)                    , intent(in) :: name
+    integer(hsize_t), dimension(4)      , intent(in) :: dm
+    integer(kind=4) , dimension(:,:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_4d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(4, dm(1:4), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 4, dm(1:4), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:4)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(1:4), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_4d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_5D_ARRAY_INTEGER_H5:
+! ------------------------------------
+!
+!   Subroutine stores a five-dimensional integer array in a group specified by
+!   identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_5d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_INTEGER
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                        , intent(in) :: gid
+    character(len=*)                      , intent(in) :: name
+    integer(hsize_t), dimension(5)        , intent(in) :: dm
+    integer(kind=4) , dimension(:,:,:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_5d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(5, dm(1:5), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 5, dm(1:5), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:5)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:,:), dm(1:5)         &
+                                                                  , iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_5d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_1D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine stores a one-dimensional double precision array in a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_1d_array_double_h5(gid, name, ln, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                , intent(in) :: gid
+    character(len=*)              , intent(in) :: name
+    integer(hsize_t)              , intent(in) :: ln
+    real(kind=8)    , dimension(:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! array dimensions
+!
+    integer(hsize_t), dimension(1) :: dm
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_1d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! substitute array dimensions
+!
+    dm(1) = ln
+
+! create a space for the array
+!
+    call h5screate_simple_f(1, dm(1:1), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 1, dm(1:1), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:), dm(1:1), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_1d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_2D_ARRAY_DOUBLE_H5:
+! ------------------------------------
+!
+!   Subroutine stores a two-dimensional double precision array in a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_2d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                  , intent(in) :: gid
+    character(len=*)                , intent(in) :: name
+    integer(hsize_t), dimension(2)  , intent(in) :: dm
+    real(kind=8)    , dimension(:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_2d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(2, dm(1:2), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 2, dm(1:2), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:2)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:), dm(1:2), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_2d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_3D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine stores a three-dimensional double precision array in a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_3d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                    , intent(in) :: gid
+    character(len=*)                  , intent(in) :: name
+    integer(hsize_t), dimension(3)    , intent(in) :: dm
+    real(kind=8)    , dimension(:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_3d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(3, dm(1:3), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 3, dm(1:3), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:3)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:), dm(1:3), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_3d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_4D_ARRAY_DOUBLE_H5:
+! ------------------------------------
+!
+!   Subroutine stores a four-dimensional double precision array in a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_4d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                      , intent(in) :: gid
+    character(len=*)                    , intent(in) :: name
+    integer(hsize_t), dimension(4)      , intent(in) :: dm
+    real(kind=8)    , dimension(:,:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_4d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(4, dm(1:4), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 4, dm(1:4), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:4)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:), dm(1:4), iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_4d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_5D_ARRAY_DOUBLE_H5:
+! -----------------------------------
+!
+!   Subroutine stores a five-dimensional double precision array in a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine write_5d_array_double_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error, print_warning
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+#ifdef COMPRESS
+    use hdf5           , only : H5P_DATASET_CREATE_F
+#ifdef SZIP
+    use hdf5           , only : H5_SZIP_NN_OM_F
+#endif /* SZIP */
+#endif /* COMPRESS */
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
+#ifdef COMPRESS
+    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
+#ifdef DEFLATE
+    use hdf5           , only : h5pset_deflate_f
+#endif /* DEFLATE */
+#ifdef SZIP
+    use hdf5           , only : h5pset_szip_f
+#endif /* SZIP */
+#endif /* COMPRESS */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                        , intent(in) :: gid
+    character(len=*)                      , intent(in) :: name
+    integer(hsize_t), dimension(5)        , intent(in) :: dm
+    real(kind=8)    , dimension(:,:,:,:,:), intent(in) :: var
+
+#ifdef COMPRESS
+! test for compression
+!
+    logical        :: compress = .false.
+#endif /* COMPRESS */
+
+! HDF5 object identifiers
+!
+    integer(hid_t) :: sid, pid, did
+
+! procedure return value
+!
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::write_5d_array_double_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! create a space for the array
+!
+    call h5screate_simple_f(5, dm(1:5), sid, iret)
+
+! check if the space has been created successfuly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the space
+!
+      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+#ifdef COMPRESS
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+
+! print error about the problem with creating the compression property
+!
+      call print_error(fname, "Cannot create property for dataset: "           &
+                                                                // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! so far ok, so turn on the compression
+!
+    compress = .true.
+
+! set the chunk size
+!
+    call h5pset_chunk_f(pid, 5, dm(1:5), iret)
+
+! check if the chunk size has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the chunk size
+!
+      call print_warning(fname, "Cannot set the size of the chunk!")
+
+! setting the size of the chunk failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! set the compression algorithm
+!
+#ifdef DEFLATE
+    call h5pset_deflate_f(pid, 9, iret)
+#endif /* DEFLATE */
+#ifdef SZIP
+    if (product(dm(1:5)) >= 32)                                                &
+                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
+#endif /* SZIP */
+
+! check if the compression algorithm has been set properly
+!
+    if (iret > 0) then
+
+! print error about the problem with setting the compression method
+!
+      call print_warning(fname, "Cannot set the compression method!")
+
+! setting compression method failed, so turn off the compression
+!
+      compress = .false.
+
+    end if
+
+! check if it is safe to use compression
+!
+    if (compress) then
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
+
+    else
+
+! create the dataset
+!
+      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+
+    end if
+#else /* COMPRESS */
+! create the dataset
+!
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
+#endif /* COMPRESS */
+
+! check if the dataset has been created successfuly
+!
+    if (iret >= 0) then
+
+! write the dataset data
+!
+      call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(1:5)          &
+                                                                  , iret, sid)
+
+! check if the dataset has been written successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with writing down the dataset
+!
+        call print_error(fname, "Cannot write dataset: " // trim(name))
+
+      end if
+
+! close the dataset
+!
+      call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+      if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+      end if
+
+    else
+
+! print error about the problem with creating the dataset
+!
+      call print_error(fname, "Cannot create dataset: " // trim(name))
+
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, iret)
+
+! check if the space has been released successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the space
+!
+      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_5d_array_double_h5
+
+!===============================================================================
+!
+! READ_ARRAY SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine READ_1D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a one-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_1d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)                , intent(in)    :: gid
+    character(len=*)              , intent(in)    :: name
+    integer(hsize_t), dimension(1), intent(inout) :: dm
+    integer(kind=4) , dimension(:), intent(inout) :: var
+
+! local variables
+!
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_1d_array_integer_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! open the dataset
+!
+    call h5dopen_f(gid, name, did, iret)
+
+! check if the dataset has been opened successfuly
+!
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:), dm(1:1), iret)
+
+! check if the dataset has been read successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with reading the dataset
+!
+      call print_error(fname, "Cannot read dataset: " // trim(name))
+
+    end if
+
+! close the dataset
+!
+    call h5dclose_f(did, iret)
+
+! check if the dataset has been closed successfuly
+!
+    if (iret > 0) then
+
+! print error about the problem with closing the dataset
+!
+        call print_error(fname, "Cannot close dataset: " // trim(name))
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine read_1d_array_integer_h5
+!
+!===============================================================================
+!
+! subroutine READ_2D_ARRAY_INTEGER_H5:
+! -----------------------------------
+!
+!   Subroutine restores a two-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
+!
+!===============================================================================
+!
+  subroutine read_2d_array_integer_h5(gid, name, dm, var)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
 !
     integer(hid_t)                  , intent(in)    :: gid
     character(len=*)                , intent(in)    :: name
@@ -3709,296 +6249,193 @@ module io
 ! local variables
 !
     integer(hid_t) :: did
-    integer        :: err
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_2d_array_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! open the dataset
 !
-    call h5dopen_f(gid, name, did, err)
+    call h5dopen_f(gid, name, did, iret)
 
 ! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
 
 ! read dataset data
 !
-      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(:), err)
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:), dm(1:2), iret)
 
 ! check if the dataset has been read successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with reading the dataset
 !
-        call print_error("io::read_array2_integer_h5"                          &
-                                       , "Cannot read dataset: " // trim(name))
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-      end if
+    end if
 
 ! close the dataset
 !
-      call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-        call print_error("io::read_array2_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array2_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_array2_integer_h5
+  end subroutine read_2d_array_integer_h5
 !
 !===============================================================================
 !
-! write_array4_integer_h5: subroutine stores a 4D integer array in a group
+! subroutine READ_3D_ARRAY_INTEGER_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine restores a three-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_array4_integer_h5(gid, name, dm, var)
+  subroutine read_3d_array_integer_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                      , intent(in) :: gid
-    character(len=*)                    , intent(in) :: name
-    integer(hsize_t), dimension(4)      , intent(in) :: dm
-    integer(kind=4) , dimension(:,:,:,:), intent(in) :: var
+    integer(hid_t)                    , intent(in)    :: gid
+    character(len=*)                  , intent(in)    :: name
+    integer(hsize_t), dimension(3)    , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
-#ifdef COMPRESS
-    logical        :: compress = .false.
-#endif /* COMPRESS */
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_3d_array_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! create space for the vector
+! open the dataset
 !
-    call h5screate_simple_f(4, dm, sid, err)
+    call h5dopen_f(gid, name, did, iret)
 
-! check if the space has been created successfuly
+! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
 
-#ifdef COMPRESS
-! prepare compression
+! print error about the problem with opening the data space
 !
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
 
-! check if the properties have been created properly
+! quit the subroutine
 !
-      if (err .ge. 0) then
+      return
 
-! so far ok, so turn on the compression
+    end if
+
+! read dataset data
 !
-        compress = .true.
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:), dm(1:3), iret)
 
-! set the chunk size
+! check if the dataset has been read successfuly
 !
-        call h5pset_chunk_f(pid, 4, dm, err)
+    if (iret > 0) then
 
-! check if the chunk size has been set properly
+! print error about the problem with reading the dataset
 !
-        if (err .gt. 0) then
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-! print error about the problem with setting the chunk size
-!
-          call print_error("io::write_array4_integer_h5"  &
-                                          , "Cannot set the size of the chunk!")
-
-! setting the size of the chunk failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the compression method
-!
-          call print_error("io::write_array4_integer_h5"  &
-                                         , "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-      end if
-
-! check if it is safe to use compression
-!
-      if (compress) then
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err, pid)
-
-      else
-#endif /* COMPRESS */
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, err)
-
-#ifdef COMPRESS
-      end if
-#endif /* COMPRESS */
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_array4_integer_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
+    end if
 
 ! close the dataset
 !
-        call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-          call print_error("io::write_array4_integer_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array4_integer_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_array4_integer_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_array4_integer_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_array4_integer_h5
+  end subroutine read_3d_array_integer_h5
 !
 !===============================================================================
 !
-! read_array4_integer_h5: subroutine reads a 4D integer array
+! subroutine READ_4D_ARRAY_INTEGER_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine restores a four-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine read_array4_integer_h5(gid, name, dm, var)
+  subroutine read_4d_array_integer_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t)                      , intent(in)    :: gid
     character(len=*)                    , intent(in)    :: name
@@ -4008,1084 +6445,585 @@ module io
 ! local variables
 !
     integer(hid_t) :: did
-    integer        :: err
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_4d_array_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! open the dataset
 !
-    call h5dopen_f(gid, name, did, err)
+    call h5dopen_f(gid, name, did, iret)
 
 ! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
+
+! print error about the problem with opening the data space
+!
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
 
 ! read dataset data
 !
-      call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(:), err)
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:), dm(1:4), iret)
 
 ! check if the dataset has been read successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with reading the dataset
 !
-        call print_error("io::read_array4_integer_h5"                          &
-                                       , "Cannot read dataset: " // trim(name))
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-      end if
+    end if
 
 ! close the dataset
 !
-      call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-        call print_error("io::read_array4_integer_h5"                          &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array4_integer_h5"                            &
-                                        , "Cannot open dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_array4_integer_h5
+  end subroutine read_4d_array_integer_h5
 !
 !===============================================================================
 !
-! write_vector_double_h5: subroutine stores a 1D double precision vector in
-!                         a group
+! subroutine READ_5D_ARRAY_INTEGER_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid - the HDF5 group identifier
+!   Subroutine restores a five-dimensional integer array from a group specified
+!   by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_vector_double_h5(gid, name, length, data)
+  subroutine read_5d_array_integer_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_INTEGER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                , intent(in) :: gid
-    character(len=*)              , intent(in) :: name
-    integer(hsize_t)              , intent(in) :: length
-    real(kind=8)    , dimension(:), intent(in) :: data
+    integer(hid_t)                        , intent(in)    :: gid
+    character(len=*)                      , intent(in)    :: name
+    integer(hsize_t), dimension(5)        , intent(inout) :: dm
+    integer(kind=4) , dimension(:,:,:,:,:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t)                 :: sid, did
-    integer(hsize_t), dimension(1) :: am
-    integer                        :: err
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_5d_array_integer_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! prepare the vector dimensions
+! open the dataset
 !
-    am(1) = length
+    call h5dopen_f(gid, name, did, iret)
 
-! create space for the vector
+! check if the dataset has been opened successfuly
 !
-    call h5screate_simple_f(1, am, sid, err)
+    if (iret < 0) then
 
-! check if the space has been created successfuly
+! print error about the problem with opening the data space
 !
-    if (err .ge. 0) then
+      call print_error(fname, "Cannot open dataset: " // trim(name))
 
-! create the dataset
+! quit the subroutine
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
+      return
 
-! check if the dataset has been created successfuly
+    end if
+
+! read dataset data
 !
-      if (err .ge. 0) then
+    call h5dread_f(did, H5T_NATIVE_INTEGER, var(:,:,:,:,:), dm(1:5), iret)
 
-! write the dataset data
+! check if the dataset has been read successfuly
 !
-        call h5dwrite_f(did, H5T_NATIVE_DOUBLE, data(:), am, err, sid)
+    if (iret > 0) then
 
-! check if the dataset has been written successfuly
+! print error about the problem with reading the dataset
 !
-        if (err .gt. 0) then
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_vector_double_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
+    end if
 
 ! close the dataset
 !
-        call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-          call print_error("io::write_vector_double_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_vector_double_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_vector_double_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_vector_double_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_vector_double_h5
+  end subroutine read_5d_array_integer_h5
 !
 !===============================================================================
 !
-! read_vector_double_h5: subroutine reads a 1D double precision vector
+! subroutine READ_1D_ARRAY_DOUBLE_H5:
+! ----------------------------------
 !
-! arguments:
-!   gid    - the HDF5 group identifier
-!   name   - the string name representing the dataset
-!   dm     - the vector dimensions
-!   value  - the data
+!   Subroutine restores a one-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine read_vector_double_h5(gid, name, dm, data)
+  subroutine read_1d_array_double_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t)                , intent(in)    :: gid
     character(len=*)              , intent(in)    :: name
     integer(hsize_t), dimension(1), intent(inout) :: dm
-    real(kind=8)    , dimension(:), intent(inout) :: data
+    real(kind=8)    , dimension(:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t)                 :: did
-    integer                        :: err
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_1d_array_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! open the dataset
 !
-    call h5dopen_f(gid, name, did, err)
+    call h5dopen_f(gid, name, did, iret)
 
 ! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
 
-! read the dataset data
+! print error about the problem with opening the data space
 !
-      call h5dread_f(did, H5T_NATIVE_DOUBLE, data(:), dm(:), err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:), dm(1:1), iret)
 
 ! check if the dataset has been read successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with reading the dataset
 !
-        call print_error("io::read_vector_double_h5"                           &
-                                        , "Cannot read dataset: " // trim(name))
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-      end if
+    end if
 
 ! close the dataset
 !
-      call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-        call print_error("io::read_vector_double_h5"                           &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_vector_double_h5"                             &
-                                        , "Cannot open dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_vector_double_h5
+  end subroutine read_1d_array_double_h5
 !
 !===============================================================================
 !
-! write_array4_float_h5: subroutine stores a 4D single precision array
+! subroutine READ_2D_ARRAY_DOUBLE_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid   - the HDF5 group identifier where the dataset should be located
-!   name  - the string name representing the dataset
-!   dm    - the dataset dimensions
-!   value - the dataset values
+!   Subroutine restores a two-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_array4_float_h5(gid, name, dm, var)
+  subroutine read_2d_array_double_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error, print_warning
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_REAL
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! define default variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                      , intent(in) :: gid
-    character(len=*)                    , intent(in) :: name
-    integer(hsize_t), dimension(4)      , intent(in) :: dm
-    real(kind=4)    , dimension(:,:,:,:), intent(in) :: var
+    integer(hid_t)                  , intent(in)    :: gid
+    character(len=*)                , intent(in)    :: name
+    integer(hsize_t), dimension(2)  , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_2d_array_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! create a space for the dataset dimensions
+! open the dataset
 !
-    call h5screate_simple_f(4, dm(:), sid, err)
+    call h5dopen_f(gid, name, did, iret)
 
-! print an error, if the space for dimensions couldn't be created
+! check if the dataset has been opened successfuly
 !
-    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
-                    , "Cannot create a space for the dataset: " // trim(name))
+    if (iret < 0) then
 
-! prepare the compression properties
+! print error about the problem with opening the data space
 !
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
 
-! if the compression properties could be created properly, set the compression
-! algorithm and strength
+! quit the subroutine
 !
-    if (err .eq. 0) then
-
-! set the chunk size
-!
-      call h5pset_chunk_f(pid, 4, dm(:), err)
-
-! print a warning, if the chunk size couldn't be set properly
-!
-      if (err .eq. -1) call print_warning("io::write_array4_float_h5"          &
-                                            , "Cannot set the size of chunk!")
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-      call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-      if (product(dm) .ge. 32)                                                 &
-        call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! print a warning, if the compression algorithm couldn't be set
-!
-      if (err .eq. -1) call print_warning("io::write_array4_float_h5"          &
-                                       , "Cannot set the compression method!")
-
-    else
-
-! print a warning, if the property list couldn't be created
-!
-      call print_warning("io::write_array4_float_h5"                           &
-                                           , "Cannot create a property list!")
+      return
 
     end if
 
-! create the dataset
+! read dataset data
 !
-    call h5dcreate_f(gid, name, H5T_NATIVE_REAL, sid, did, err, pid)
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:), dm(1:2), iret)
 
-! print an error, if the dataset couldn't be created
+! check if the dataset has been read successfuly
 !
-    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
-                                , "Cannot create the dataset: " // trim(name))
+    if (iret > 0) then
 
-! write the dataset values
+! print error about the problem with reading the dataset
 !
-    call h5dwrite_f(did, H5T_NATIVE_REAL, var(:,:,:,:), dm, err, sid)
-
-! print an error, if the dataset couldn't be written successfuly
-!
-    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
-                                 , "Cannot write the dataset: " // trim(name))
-
-! close the dataset
-!
-    call h5dclose_f(did, err)
-
-! print an error, if the dataset couldn't be closed
-!
-    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
-                                 , "Cannot close the dataset: " // trim(name))
-
-! if the property list is created
-!
-    if (pid .ne. -1) then
-
-! terminate access to the property list
-!
-      call h5pclose_f(pid, err)
-
-! print a warning, if the property list couldn't be closed
-!
-      if (err .eq. -1)  call print_warning("io::write_array4_float_h5"         &
-                                          , "Cannot close the property list!")
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
     end if
 
-! release the dataspace of the current dataset
-!
-    call h5sclose_f(sid, err)
-
-! print an error, if the space couldn't be released successfuly
-!
-    if (err .eq. -1) call print_error("io::write_array4_float_h5"              &
-                   , "Cannot close the space for the dataset: " // trim(name))
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_array4_float_h5
-!
-!===============================================================================
-!
-! write_array3_double_h5: subroutine stores a 3D double precision array
-!
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
-!
-!===============================================================================
-!
-  subroutine write_array3_double_h5(gid, name, dm, var)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                    , intent(in) :: gid
-    character(len=*)                  , intent(in) :: name
-    integer(hsize_t), dimension(3)    , intent(in) :: dm
-    real(kind=8)    , dimension(:,:,:), intent(in) :: var
-
-! local variables
-!
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
-#ifdef COMPRESS
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the vector
-!
-    call h5screate_simple_f(3, dm, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-#ifdef COMPRESS
-! prepare compression
-!
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
-
-! check if the properties have been created properly
-!
-      if (err .ge. 0) then
-
-! so far ok, so turn on the compression
-!
-        compress = .true.
-
-! set the chunk size
-!
-        call h5pset_chunk_f(pid, 3, dm, err)
-
-! check if the chunk size has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the chunk size
-!
-          call print_error("io::write_array3_double_h5"  &
-                                          , "Cannot set the size of the chunk!")
-
-! setting the size of the chunk failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the compression method
-!
-          call print_error("io::write_array3_double_h5"  &
-                                         , "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-      end if
-
-! check if it is safe to use compression
-!
-      if (compress) then
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
-
-      else
-#endif /* COMPRESS */
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
-
-#ifdef COMPRESS
-      end if
-#endif /* COMPRESS */
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:), dm, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_array3_double_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
-
 ! close the dataset
 !
-        call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-          call print_error("io::write_array3_double_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array3_double_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_array3_double_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_array3_double_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_array3_double_h5
+  end subroutine read_2d_array_double_h5
 !
 !===============================================================================
 !
-! write_array4_double_h5: subroutine stores a 4D double precision array
+! subroutine READ_3D_ARRAY_DOUBLE_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine restores a three-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_array4_double_h5(gid, name, dm, var)
+  subroutine read_3d_array_double_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                      , intent(in) :: gid
-    character(len=*)                    , intent(in) :: name
-    integer(hsize_t), dimension(4)      , intent(in) :: dm
-    real(kind=8)    , dimension(:,:,:,:), intent(in) :: var
+    integer(hid_t)                    , intent(in)    :: gid
+    character(len=*)                  , intent(in)    :: name
+    integer(hsize_t), dimension(3)    , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
-#ifdef COMPRESS
-    logical        :: compress = .false.
-#endif /* COMPRESS */
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_3d_array_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! create space for the vector
+! open the dataset
 !
-    call h5screate_simple_f(4, dm, sid, err)
+    call h5dopen_f(gid, name, did, iret)
 
-! check if the space has been created successfuly
+! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
 
-#ifdef COMPRESS
-! prepare compression
+! print error about the problem with opening the data space
 !
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
 
-! check if the properties have been created properly
+! quit the subroutine
 !
-      if (err .ge. 0) then
+      return
 
-! so far ok, so turn on the compression
+    end if
+
+! read dataset data
 !
-        compress = .true.
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:), dm(1:3), iret)
 
-! set the chunk size
+! check if the dataset has been read successfuly
 !
-        call h5pset_chunk_f(pid, 4, dm, err)
+    if (iret > 0) then
 
-! check if the chunk size has been set properly
+! print error about the problem with reading the dataset
 !
-        if (err .gt. 0) then
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-! print error about the problem with setting the chunk size
-!
-          call print_error("io::write_array4_double_h5"  &
-                                          , "Cannot set the size of the chunk!")
-
-! setting the size of the chunk failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the compression method
-!
-          call print_error("io::write_array4_double_h5"  &
-                                         , "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-      end if
-
-! check if it is safe to use compression
-!
-      if (compress) then
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
-
-      else
-#endif /* COMPRESS */
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
-
-#ifdef COMPRESS
-      end if
-#endif /* COMPRESS */
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:), dm, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_array4_double_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
+    end if
 
 ! close the dataset
 !
-        call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-          call print_error("io::write_array4_double_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array4_double_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_array4_double_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_array4_double_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_array4_double_h5
+  end subroutine read_3d_array_double_h5
 !
 !===============================================================================
 !
-! write_array5_double_h5: subroutine stores a 5D double precision array
+! subroutine READ_4D_ARRAY_DOUBLE_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine restores a four-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine write_array5_double_h5(gid, name, dm, var)
+  subroutine read_4d_array_double_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    integer(hid_t)                        , intent(in) :: gid
-    character(len=*)                      , intent(in) :: name
-    integer(hsize_t), dimension(5)        , intent(in) :: dm
-    real(kind=8)    , dimension(:,:,:,:,:), intent(in) :: var
+    integer(hid_t)                      , intent(in)    :: gid
+    character(len=*)                    , intent(in)    :: name
+    integer(hsize_t), dimension(4)      , intent(inout) :: dm
+    real(kind=8)    , dimension(:,:,:,:), intent(inout) :: var
 
 ! local variables
 !
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
-#ifdef COMPRESS
-    logical        :: compress = .false.
-#endif /* COMPRESS */
+    integer(hid_t) :: did
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_4d_array_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
-! create space for the vector
+! open the dataset
 !
-    call h5screate_simple_f(5, dm, sid, err)
+    call h5dopen_f(gid, name, did, iret)
 
-! check if the space has been created successfuly
+! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
 
-#ifdef COMPRESS
-! prepare compression
+! print error about the problem with opening the data space
 !
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
 
-! check if the properties have been created properly
+! quit the subroutine
 !
-      if (err .ge. 0) then
+      return
 
-! so far ok, so turn on the compression
+    end if
+
+! read dataset data
 !
-        compress = .true.
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:), dm(1:4), iret)
 
-! set the chunk size
+! check if the dataset has been read successfuly
 !
-        call h5pset_chunk_f(pid, 5, dm, err)
+    if (iret > 0) then
 
-! check if the chunk size has been set properly
+! print error about the problem with reading the dataset
 !
-        if (err .gt. 0) then
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-! print error about the problem with setting the chunk size
-!
-          call print_error("io::write_array5_double_h5"  &
-                                          , "Cannot set the size of the chunk!")
-
-! setting the size of the chunk failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the compression method
-!
-          call print_error("io::write_array5_double_h5"  &
-                                         , "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-      end if
-
-! check if it is safe to use compression
-!
-      if (compress) then
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
-
-      else
-#endif /* COMPRESS */
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
-
-#ifdef COMPRESS
-      end if
-#endif /* COMPRESS */
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_array5_double_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
+    end if
 
 ! close the dataset
 !
-        call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-        if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-          call print_error("io::write_array5_double_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array5_double_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! release the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_array5_double_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_array5_double_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine write_array5_double_h5
+  end subroutine read_4d_array_double_h5
 !
 !===============================================================================
 !
-! read_array5_double_h5: subroutine reads a 5D double precision array
+! subroutine READ_5D_ARRAY_DOUBLE_H5:
+! -----------------------------------
 !
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
+!   Subroutine restores a five-dimensional double precision array from a group
+!   specified by identifier.
+!
+!   Arguments:
+!
+!     gid   - the HDF5 group identifier
+!     name  - the string name describing the array
+!     dm    - the array dimensions
+!     value - the array values
 !
 !===============================================================================
 !
-  subroutine read_array5_double_h5(gid, name, dm, var)
+  subroutine read_5d_array_double_h5(gid, name, dm, var)
 
-! references to other modules
+! import procedures and variables from other modules
 !
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5dopen_f, h5dread_f, h5dclose_f
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_DOUBLE
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
 
-! declare variables
+! local variables are not implicit by default
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
     integer(hid_t)                        , intent(in)    :: gid
     character(len=*)                      , intent(in)    :: name
@@ -5095,270 +7033,63 @@ module io
 ! local variables
 !
     integer(hid_t) :: did
-    integer        :: err
+    integer        :: iret
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "io::read_5d_array_double_h5"
 !
 !-------------------------------------------------------------------------------
 !
 ! open the dataset
 !
-    call h5dopen_f(gid, name, did, err)
+    call h5dopen_f(gid, name, did, iret)
 
 ! check if the dataset has been opened successfuly
 !
-    if (err .ge. 0) then
+    if (iret < 0) then
 
-! read dataset
+! print error about the problem with opening the data space
 !
-      call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(:), err)
+      call print_error(fname, "Cannot open dataset: " // trim(name))
+
+! quit the subroutine
+!
+      return
+
+    end if
+
+! read dataset data
+!
+    call h5dread_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:), dm(1:5), iret)
 
 ! check if the dataset has been read successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with reading the dataset
 !
-        call print_error("io::read_array5_double_h5"                           &
-                                        , "Cannot read dataset: " // trim(name))
+      call print_error(fname, "Cannot read dataset: " // trim(name))
 
-      end if
+    end if
 
 ! close the dataset
 !
-      call h5dclose_f(did, err)
+    call h5dclose_f(did, iret)
 
 ! check if the dataset has been closed successfuly
 !
-      if (err .gt. 0) then
+    if (iret > 0) then
 
 ! print error about the problem with closing the dataset
 !
-        call print_error("io::read_array5_double_h5"                           &
-                                       , "Cannot close dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with opening the dataset
-!
-      call print_error("io::read_array5_double_h5"                             &
-                                        , "Cannot open dataset: " // trim(name))
+        call print_error(fname, "Cannot close dataset: " // trim(name))
 
     end if
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine read_array5_double_h5
-!
-!===============================================================================
-!
-! write_array6_double_h5: subroutine stores a 6D double precision array
-!
-! arguments:
-!   gid   - the HDF5 group identifier
-!   name  - the string name representing the dataset
-!   dm    - the data dimensions
-!   value - the data
-!
-!===============================================================================
-!
-  subroutine write_array6_double_h5(gid, name, dm, var)
-
-! references to other modules
-!
-    use error, only : print_error
-    use hdf5 , only : hid_t, hsize_t, H5T_NATIVE_DOUBLE
-    use hdf5 , only : h5screate_simple_f, h5sclose_f                           &
-                    , h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5 , only : H5P_DATASET_CREATE_F
-    use hdf5 , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5 , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5 , only : H5_SZIP_NN_OM_F
-    use hdf5 , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
-
-! declare variables
-!
-    implicit none
-
-! input variables
-!
-    integer(hid_t)                          , intent(in) :: gid
-    character(len=*)                        , intent(in) :: name
-    integer(hsize_t), dimension(6)          , intent(in) :: dm
-    real(kind=8)    , dimension(:,:,:,:,:,:), intent(in) :: var
-
-! local variables
-!
-    integer(hid_t) :: sid, pid, did
-    integer        :: err
-#ifdef COMPRESS
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-!
-!-------------------------------------------------------------------------------
-!
-! create space for the vector
-!
-    call h5screate_simple_f(6, dm, sid, err)
-
-! check if the space has been created successfuly
-!
-    if (err .ge. 0) then
-
-#ifdef COMPRESS
-! prepare compression
-!
-      call h5pcreate_f(H5P_DATASET_CREATE_F, pid, err)
-
-! check if the properties have been created properly
-!
-      if (err .ge. 0) then
-
-! so far ok, so turn on the compression
-!
-        compress = .true.
-
-! set the chunk size
-!
-        call h5pset_chunk_f(pid, 6, dm, err)
-
-! check if the chunk size has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the chunk size
-!
-          call print_error("io::write_array6_double_h5"  &
-                                          , "Cannot set the size of the chunk!")
-
-! setting the size of the chunk failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-        call h5pset_deflate_f(pid, 9, err)
-#endif /* DEFLATE */
-#ifdef SZIP
-        if (product(dm) .ge. 32)                                               &
-          call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, err)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with setting the compression method
-!
-          call print_error("io::write_array6_double_h5"  &
-                                         , "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-          compress = .false.
-
-        end if
-
-      end if
-
-! check if it is safe to use compression
-!
-      if (compress) then
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err, pid)
-
-      else
-#endif /* COMPRESS */
-
-! create the dataset
-!
-        call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, err)
-
-#ifdef COMPRESS
-      end if
-#endif /* COMPRESS */
-
-! check if the dataset has been created successfuly
-!
-      if (err .ge. 0) then
-
-! write the dataset data
-!
-        call h5dwrite_f(did, H5T_NATIVE_DOUBLE, var(:,:,:,:,:,:), dm, err, sid)
-
-! check if the dataset has been written successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with writing down the dataset
-!
-          call print_error("io::write_array6_double_h5"  &
-                                       , "Cannot write dataset: " // trim(name))
-
-        end if
-
-! close the dataset
-!
-        call h5dclose_f(did, err)
-
-! check if the dataset has been closed successfuly
-!
-        if (err .gt. 0) then
-
-! print error about the problem with closing the dataset
-!
-          call print_error("io::write_array6_double_h5"  &
-                                       , "Cannot close dataset: " // trim(name))
-
-        end if
-
-      else
-
-! print error about the problem with creating the dataset
-!
-        call print_error("io::write_array6_double_h5"  &
-                                      , "Cannot create dataset: " // trim(name))
-
-      end if
-
-! close the space
-!
-      call h5sclose_f(sid, err)
-
-! check if the space has been released successfuly
-!
-      if (err .gt. 0) then
-
-! print error about the problem with closing the space
-!
-        call print_error("io::write_array6_double_h5"  &
-                             , "Cannot close space for dataset: " // trim(name))
-
-      end if
-
-    else
-
-! print error about the problem with creating the space for the attribute
-!
-      call print_error("io::write_array6_double_h5"  &
-                            , "Cannot create space for dataset: " // trim(name))
-
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine write_array6_double_h5
+  end subroutine read_5d_array_double_h5
 #endif /* HDF5 */
 
 !===============================================================================

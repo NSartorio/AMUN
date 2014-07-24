@@ -83,6 +83,11 @@ module coordinates
   real(kind=8), save :: zmax = 1.0d+00
   real(kind=8), save :: zlen = 1.0d+00
 
+! the domain volume and its inversion
+!
+  real(kind=8), save ::  vol = 1.0d+00
+  real(kind=8), save :: voli = 1.0d+00
+
 ! the block coordinates for all levels of refinement
 !
   real(kind=8), dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -239,6 +244,19 @@ module coordinates
     call get_parameter_real   ("zmax"  , zmax  )
 #endif /* NDIMS == 3 */
 
+! calculate the domain sizes
+!
+    xlen = xmax - xmin
+    ylen = ymax - ymin
+#if NDIMS == 3
+    zlen = zmax - zmin
+#endif /* NDIMS == 3 */
+
+! calculate the domain volume
+!
+    vol  = xlen * ylen * zlen
+    voli = 1.0d+00 / vol
+
 ! allocate space for coordinate variables
 !
     allocate(ax   (toplev, im))
@@ -280,10 +298,10 @@ module coordinates
 
 ! calculate the cell sizes for each level
 !
-      adx (l) = (xmax - xmin) / (ir * ni)
-      ady (l) = (ymax - ymin) / (jr * nj)
+      adx (l) = xlen / (ir * ni)
+      ady (l) = ylen / (jr * nj)
 #if NDIMS == 3
-      adz (l) = (zmax - zmin) / (kr * nk)
+      adz (l) = zlen / (kr * nk)
 #endif /* NDIMS == 3 */
 #if NDIMS == 2
       adr (l) = sqrt(adx(l)**2 + ady(l)**2)

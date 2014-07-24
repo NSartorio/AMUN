@@ -1,13 +1,13 @@
 # problem name and parameters
 #
 problem              = "blast"
-dens                 = 1.00d+00
-ratio                = 1.00d+02
-radius               = 1.00d-01
-csnd                 = 4.08d-01
-gamma                = 1.67d-01
-buni                 = 0.00d+00
-angle                = 0.00d+00
+dens                 = 1.0000d+00
+ratio                = 1.0000d+02
+radius               = 1.0000d-01
+buni                 = 0.0000d+00
+angle                = 4.5000d+01
+csnd                 = 4.0825d-01
+gamma                = 1.6667d+00
 
 # physics
 #
@@ -28,19 +28,19 @@ clip_extrema         = "off"
 rdimx                =  2
 rdimy                =  3
 rdimz                =  1
-xmin                 = -0.5
-xmax                 =  0.5
-ymin                 = -0.75
-ymax                 =  0.75
-zmin                 = -0.5
-zmax                 =  0.5
+xmin                 = -5.00d-01
+xmax                 =  5.00d-01
+ymin                 = -7.50d-01
+ymax                 =  7.50d-01
+zmin                 = -5.00d-01
+zmax                 =  5.00d-01
 
 # refinement control
 #
 ncells               = 8
 nghost               = 2
 minlev               = 1
-maxlev               = 7
+maxlev               = 6
 crefmin              = 2.00d-01
 crefmax              = 8.00d-01
 epsref               = 1.00d-02
