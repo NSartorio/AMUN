@@ -322,7 +322,8 @@ module refinement
 ! import external procedures and variables
 !
     use blocks         , only : block_data
-    use coordinates    , only : ib, jb, kb, ie, je, ke
+    use coordinates    , only : ibl, jbl, kbl
+    use coordinates    , only : ieu, jeu, keu
 
 ! local variables are not implicit by default
 !
@@ -360,15 +361,15 @@ module refinement
 
 ! find the maximum smoothness indicator over all cells
 !
-      do k = kb, ke
+      do k = kbl, keu
 #if NDIMS == 3
         km1 = k - 1
         kp1 = k + 1
 #endif /* NDIMS == 3 */
-        do j = jb, je
+        do j = jbl, jeu
           jm1 = j - 1
           jp1 = j + 1
-          do i = ib, ie
+          do i = ibl, ieu
             im1 = i - 1
             ip1 = i + 1
 
