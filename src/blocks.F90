@@ -55,15 +55,11 @@ module blocks
 !
 !   ndims     - the number of dimensions (2 or 3);
 !   nsides    - the number of sides along each direction (2);
-!   nfaces    - the number of faces at each side (2 for 2D, 4 for 3D);
 !   nchildren - the number of child blocks for each block (4 for 2D, 8 for 3D);
-!   mfaces    - the number of faces in block (8 for 2D, 24 for 3D);
 !
   integer(kind=4), parameter :: ndims     = NDIMS
   integer(kind=4), parameter :: nsides    = 2
-  integer(kind=4), parameter :: nfaces    = 2**(ndims - 1)
   integer(kind=4), parameter :: nchildren = 2**ndims
-  integer(kind=4), parameter :: mfaces    = nsides * nfaces * ndims
 
 ! MODULE VARIABLES:
 ! ================
@@ -174,10 +170,6 @@ module blocks
                                  !
     type(pointer_meta)          :: corners(nsides,nsides,nsides)
 #endif /* NDIMS == 3 */
-
-                                 ! pointers to neighbor meta blocks
-                                 !
-    type(pointer_meta)          :: neigh(ndims,nsides,nfaces)
 
                                  ! a pointer to the associated data block
                                  !
@@ -321,7 +313,7 @@ module blocks
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
   public :: list_meta, list_data
-  public :: ndims, nsides, nfaces, nchildren
+  public :: ndims, nsides, nchildren
 
 ! declare public subroutines
 !
@@ -909,16 +901,6 @@ module blocks
     end do ! nsides
 #endif /* NDIMS == 3 */
 
-! nullify fields pointing to neighbors
-!
-    do i = 1, ndims
-      do j = 1, nsides
-        do k = 1, nfaces
-          nullify(pmeta%neigh(i,j,k)%ptr)
-        end do
-      end do
-    end do
-
 ! nullify the field pointing to the associated data block
 !
     nullify(pmeta%data)
@@ -1049,16 +1031,6 @@ module blocks
         end do ! nsides
       end do ! nsides
 #endif /* NDIMS == 3 */
-
-! nullify fields pointing to neighbors
-!
-      do i = 1, ndims
-        do j = 1, nsides
-          do k = 1, nfaces
-            nullify(pmeta%neigh(i,j,k)%ptr)
-          end do
-        end do
-      end do
 
 ! if there is a data block is associated, remove it
 !
@@ -1379,7 +1351,6 @@ module blocks
 !
     integer, dimension(0:79,nchildren)     , save :: order
     integer, dimension(0:79,nchildren)     , save :: config
-    integer, dimension(ndims,nsides,nfaces), save :: set
 !
 !-------------------------------------------------------------------------------
 !
@@ -1445,23 +1416,6 @@ module blocks
       config(73,:) = (/ 78, 75, 75, 62, 62, 13, 13, 43 /)
       config(75,:) = (/ 73, 78, 78, 42, 42, 65, 65, 15 /)
       config(78,:) = (/ 75, 73, 73, 12, 12, 48, 48, 68 /)
-#endif /* NDIMS == 3 */
-
-! prepare set array
-!
-#if NDIMS == 2
-      set(1,1,:) = (/ 1, 3 /)
-      set(1,2,:) = (/ 2, 4 /)
-      set(2,1,:) = (/ 1, 2 /)
-      set(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      set(1,1,:) = (/ 1, 3, 5, 7 /)
-      set(1,2,:) = (/ 2, 4, 6, 8 /)
-      set(2,1,:) = (/ 1, 2, 5, 6 /)
-      set(2,2,:) = (/ 3, 4, 7, 8 /)
-      set(3,1,:) = (/ 1, 2, 3, 4 /)
-      set(3,2,:) = (/ 5, 6, 7, 8 /)
 #endif /* NDIMS == 3 */
 
 ! reset the first execution flag
@@ -2377,258 +2331,6 @@ module blocks
       end do ! kp = 1, nsides
 #endif /* NDIMS == 3 */
 
-!! ASSIGN PROPER NEIGHBORS FOR THE CHILDREN IN THE INTERIOR OF THE PARENT BLOCK
-!!
-! iterate over faces and update the interior of the block
-!
-      do p = 1, nfaces
-
-! X direction (left side)
-!
-        pmeta%child(2)%ptr%neigh(1,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(4)%ptr%neigh(1,1,p)%ptr => pmeta%child(3)%ptr
-#if NDIMS == 3
-        pmeta%child(6)%ptr%neigh(1,1,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(8)%ptr%neigh(1,1,p)%ptr => pmeta%child(7)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(1,1,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(1,1,p)%ptr => pmeta%child(2)%ptr
-            pmeta%child(3)%ptr%neigh(1,1,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-            pmeta%child(5)%ptr%neigh(1,1,p)%ptr => pmeta%child(6)%ptr
-            pmeta%child(7)%ptr%neigh(1,1,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! X direction (right side)
-!
-        pmeta%child(1)%ptr%neigh(1,2,p)%ptr => pmeta%child(2)%ptr
-        pmeta%child(3)%ptr%neigh(1,2,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-        pmeta%child(5)%ptr%neigh(1,2,p)%ptr => pmeta%child(6)%ptr
-        pmeta%child(7)%ptr%neigh(1,2,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(1,2,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(2)%ptr%neigh(1,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(4)%ptr%neigh(1,2,p)%ptr => pmeta%child(3)%ptr
-#if NDIMS == 3
-            pmeta%child(6)%ptr%neigh(1,2,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(8)%ptr%neigh(1,2,p)%ptr => pmeta%child(7)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! Y direction (left side)
-!
-        pmeta%child(3)%ptr%neigh(2,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(4)%ptr%neigh(2,1,p)%ptr => pmeta%child(2)%ptr
-#if NDIMS == 3
-        pmeta%child(7)%ptr%neigh(2,1,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(8)%ptr%neigh(2,1,p)%ptr => pmeta%child(6)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(2,1,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(2,1,p)%ptr => pmeta%child(3)%ptr
-            pmeta%child(2)%ptr%neigh(2,1,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-            pmeta%child(5)%ptr%neigh(2,1,p)%ptr => pmeta%child(7)%ptr
-            pmeta%child(6)%ptr%neigh(2,1,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-! Y direction (right side)
-!
-        pmeta%child(1)%ptr%neigh(2,2,p)%ptr => pmeta%child(3)%ptr
-        pmeta%child(2)%ptr%neigh(2,2,p)%ptr => pmeta%child(4)%ptr
-#if NDIMS == 3
-        pmeta%child(5)%ptr%neigh(2,2,p)%ptr => pmeta%child(7)%ptr
-        pmeta%child(6)%ptr%neigh(2,2,p)%ptr => pmeta%child(8)%ptr
-#endif /* NDIMS == 3 */
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(2,2,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(3)%ptr%neigh(2,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(4)%ptr%neigh(2,2,p)%ptr => pmeta%child(2)%ptr
-#if NDIMS == 3
-            pmeta%child(7)%ptr%neigh(2,2,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(8)%ptr%neigh(2,2,p)%ptr => pmeta%child(6)%ptr
-#endif /* NDIMS == 3 */
-
-          end if
-
-        end if
-
-#if NDIMS == 3
-! Z direction (left side)
-!
-        pmeta%child(5)%ptr%neigh(3,1,p)%ptr => pmeta%child(1)%ptr
-        pmeta%child(6)%ptr%neigh(3,1,p)%ptr => pmeta%child(2)%ptr
-        pmeta%child(7)%ptr%neigh(3,1,p)%ptr => pmeta%child(3)%ptr
-        pmeta%child(8)%ptr%neigh(3,1,p)%ptr => pmeta%child(4)%ptr
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(3,1,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(1)%ptr%neigh(3,1,p)%ptr => pmeta%child(5)%ptr
-            pmeta%child(2)%ptr%neigh(3,1,p)%ptr => pmeta%child(6)%ptr
-            pmeta%child(3)%ptr%neigh(3,1,p)%ptr => pmeta%child(7)%ptr
-            pmeta%child(4)%ptr%neigh(3,1,p)%ptr => pmeta%child(8)%ptr
-
-          end if
-
-        end if
-
-! Z direction (right side)
-!
-        pmeta%child(1)%ptr%neigh(3,2,p)%ptr => pmeta%child(5)%ptr
-        pmeta%child(2)%ptr%neigh(3,2,p)%ptr => pmeta%child(6)%ptr
-        pmeta%child(3)%ptr%neigh(3,2,p)%ptr => pmeta%child(7)%ptr
-        pmeta%child(4)%ptr%neigh(3,2,p)%ptr => pmeta%child(8)%ptr
-
-! associate pneigh with a neighbor
-!
-        pneigh => pmeta%neigh(3,2,1)%ptr
-
-! if neighbor and associated and points to parent block, it corresponds to
-! periodic boundaries at the lowest level
-!
-        if (associated(pneigh)) then
-
-          if (pneigh%id == pmeta%id) then
-
-            pmeta%child(5)%ptr%neigh(3,2,p)%ptr => pmeta%child(1)%ptr
-            pmeta%child(6)%ptr%neigh(3,2,p)%ptr => pmeta%child(2)%ptr
-            pmeta%child(7)%ptr%neigh(3,2,p)%ptr => pmeta%child(3)%ptr
-            pmeta%child(8)%ptr%neigh(3,2,p)%ptr => pmeta%child(4)%ptr
-
-          end if
-
-        end if
-#endif /* NDIMS == 3 */
-
-      end do ! nfaces
-
-!! UPDATE NEIGHBORS AND EXTERNAL NEIGHBORS OF CHILDREN
-!!
-! set pointers to neighbors and update neighbors' pointers
-!
-      do i = 1, ndims
-        do j = 1, nsides
-
-! prepare reverse side index
-!
-          q = 3 - j
-
-! iterate over all faces
-!
-          do k = 1, nfaces
-
-! associate pointers with the neighbor and child
-!
-            pneigh => pmeta%neigh(i,j,k)%ptr
-            pchild => pmeta%child(set(i,j,k))%ptr
-
-! check if neighbor is associated
-!
-            if (associated(pneigh)) then
-
-! check if the parent block does not point to itself (periodic boundaries)
-!
-              if (pneigh%id /= pmeta%id) then
-
-! point the child neigh field to the right neighbor
-!
-                do p = 1, nfaces
-                  pchild%neigh(i,j,p)%ptr => pneigh
-                end do
-
-! update neighbor pointer if it is at the same level
-!
-                if (pneigh%level == pmeta%level) then
-                  pneigh%neigh(i,q,k)%ptr => pchild
-                end if
-
-! update neighbor pointer if it is at higher level
-!
-                if (pneigh%level > pmeta%level) then
-                  do p = 1, nfaces
-                    pneigh%neigh(i,q,p)%ptr => pchild
-                  end do
-                end if
-
-! if neighbor has lower level than parent, something is wrong, since lower
-! levels should be already refined
-!
-                if (pneigh%level < pmeta%level) then
-                  call print_error("blocks::refine_block"                      &
-                                           , "Neighbor found at lower level!")
-                end if
-
-              end if ! pmeta and pneigh point to different blocks
-
-            end if ! pneigh is associated
-
-          end do ! nfaces
-        end do ! nsides
-      end do ! ndims
-
 ! mark all neighbors to be updated as well
 !
       call set_neighbors_update(pmeta)
@@ -2668,16 +2370,6 @@ module blocks
 ! reset the refinement flag
 !
       call metablock_set_refinement(pmeta, 0)
-
-! nullify the parent's neighbor pointers
-!
-      do i = 1, ndims
-        do j = 1, nsides
-          do k = 1, nfaces
-            nullify(pmeta%neigh(i,j,k)%ptr)
-          end do
-        end do
-      end do
 
 ! restore the pointer to the current block
 !
@@ -2741,14 +2433,6 @@ module blocks
     integer       :: i , j , k
     integer       :: ip, jp, kp
     integer       :: ir, jr, kr
-
-! local saved variables
-!
-    logical, save :: first = .true.
-
-! local arrays
-!
-    integer, dimension(ndims, nsides, nfaces), save :: arr
 !
 !-------------------------------------------------------------------------------
 !
@@ -2757,32 +2441,6 @@ module blocks
 !
     call start_timer(imd)
 #endif /* PROFILE */
-
-! prepare saved variables at the first execution
-!
-    if (first) then
-
-! prepare reference array
-!
-#if NDIMS == 3
-      arr(1,1,:) = (/ 1, 3, 5, 7 /)
-      arr(1,2,:) = (/ 2, 4, 6, 8 /)
-      arr(2,1,:) = (/ 1, 2, 5, 6 /)
-      arr(2,2,:) = (/ 3, 4, 7, 8 /)
-      arr(3,1,:) = (/ 1, 2, 3, 4 /)
-      arr(3,2,:) = (/ 5, 6, 7, 8 /)
-#else /* NDIMS == 3 */
-      arr(1,1,:) = (/ 1, 3 /)
-      arr(1,2,:) = (/ 2, 4 /)
-      arr(2,1,:) = (/ 1, 2 /)
-      arr(2,2,:) = (/ 3, 4 /)
-#endif /* NDIMS == 3 */
-
-! reset the first execution flag
-!
-      first = .false.
-
-    end if
 
 ! update neighbor pointers of the parent block
 !
@@ -3224,39 +2882,6 @@ module blocks
       end do ! jp = 1, nsides
     end do ! kp = 1, nsides
 #endif /* NDIMS == 3 */
-
-! iterate over dimensions, sides, and faces
-!
-    do i = 1, ndims
-      do j = 1, nsides
-        do k = 1, nfaces
-
-! get the current child index
-!
-          p = arr(i,j,k)
-
-! associate a pointer with the neighbor
-!
-          pneigh => pmeta%child(p)%ptr%neigh(i,j,k)%ptr
-
-! update the parent neighbor field
-!
-          pmeta%neigh(i,j,k)%ptr => pneigh
-
-! update the neigh field of the neighbor
-!
-          if (associated(pneigh)) then
-
-            l = 3 - j
-            do p = 1, nfaces
-              pneigh%neigh(i,l,p)%ptr => pmeta
-            end do
-
-          end if ! pneigh is associated
-
-        end do ! nfaces
-      end do ! nsides
-    end do ! ndims
 
 ! iterate over children
 !

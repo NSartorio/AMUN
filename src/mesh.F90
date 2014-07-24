@@ -456,7 +456,7 @@ module mesh
 ! import external procedures and variables
 !
     use blocks         , only : block_meta, block_data, list_meta, list_data
-    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : ndims, nchildren, nsides
     use blocks         , only : allocate_datablock, deallocate_datablock
     use blocks         , only : append_datablock
     use blocks         , only : link_blocks, unlink_blocks, refine_block
