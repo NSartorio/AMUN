@@ -281,8 +281,6 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : ndims
-    use coordinates    , only : toplev
-    use mpitools       , only : periodic
 
 ! local variables are not implicit by default
 !
@@ -290,7 +288,7 @@ module boundaries
 
 ! local variables
 !
-    integer :: idir, ilev
+    integer :: idir
 !
 !-------------------------------------------------------------------------------
 !
@@ -299,52 +297,6 @@ module boundaries
 !
     call start_timer(imv)
 #endif /* PROFILE */
-
-! step down from the top level
-!
-    do ilev = toplev, 1, -1
-
-! iterate over all directions
-!
-      do idir = 1, ndims
-
-! update boundaries which don't have neighbors and which are not periodic
-!
-        if (.not. periodic(idir)) call specific_boundaries(ilev, idir)
-
-! copy boundaries between blocks at the same levels
-!
-        call copy_boundaries(ilev, idir)
-
-      end do ! directions
-
-! restrict blocks from higher level neighbors
-!
-      do idir = 1, ndims
-
-        call restrict_boundaries(ilev - 1, idir)
-
-      end do ! directions
-
-    end do ! levels
-
-! step up from the first level
-!
-    do ilev = 1, toplev
-
-! prolong boundaries from lower level neighbors
-!
-      do idir = 1, ndims
-
-        call prolong_boundaries(ilev, idir)
-
-      end do ! boundaries
-
-    end do ! levels
-
-! finally, update the corners
-!
-    call update_corners()
 
 ! update specific boundaries
 !
@@ -1083,1838 +1035,9 @@ module boundaries
 !
 !===============================================================================
 !
-! subroutine UPDATE_CORNERS:
-! -------------------------
-!
-!   Subroutine scans over all data blocks and updates their edges and corners.
-!   This is required since the boundary update by restriction leaves the corners
-!   untouched in some cases, which may result in unphysical values, like
-!   negative density or pressure.  The edge/corner update should not influence
-!   the solution, but just assure, that the variables are physical in all
-!   cells.
-!
+!  DOMAIN SPECIFIC BOUNDARY SUBROUTINES
 !
 !===============================================================================
-!
-  subroutine update_corners()
-
-! include external variables
-!
-    use blocks        , only : block_data, list_data
-    use coordinates   , only : im, jm, km, it, jt, kt, nh
-    use coordinates   , only : ibl, jbl, kbl, ieu, jeu, keu
-    use equations     , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! local variables
-!
-    integer      :: i, j, k, p
-
-! local pointers
-!
-    type(block_data), pointer :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! assign the pointer to the first block on the list
-!
-    pdata => list_data
-
-! scan all data blocks until the last is reached
-!
-    do while(associated(pdata))
-
-! iterate over all variables
-!
-      do p = 1, nv
-
-! edges
-!
-#if NDIMS == 3
-        do i = 1, im
-
-          pdata%q(p,i, 1:nh, 1:nh) = pdata%q(p,i,jbl,kbl)
-          pdata%q(p,i,jt:jm, 1:nh) = pdata%q(p,i,jeu,kbl)
-          pdata%q(p,i, 1:nh,kt:km) = pdata%q(p,i,jbl,keu)
-          pdata%q(p,i,jt:jm,kt:km) = pdata%q(p,i,jeu,keu)
-
-        end do
-
-        do j = 1, jm
-
-          pdata%q(p, 1:nh,j, 1:nh) = pdata%q(p,ibl,j,kbl)
-          pdata%q(p,it:im,j, 1:nh) = pdata%q(p,ieu,j,kbl)
-          pdata%q(p, 1:nh,j,kt:km) = pdata%q(p,ibl,j,keu)
-          pdata%q(p,it:im,j,kt:km) = pdata%q(p,ieu,j,keu)
-
-        end do
-#endif /* == 3 */
-
-        do k = 1, km
-
-          pdata%q(p, 1:nh, 1:nh,k) = pdata%q(p,ibl,jbl,k)
-          pdata%q(p,it:im, 1:nh,k) = pdata%q(p,ieu,jbl,k)
-          pdata%q(p, 1:nh,jt:jm,k) = pdata%q(p,ibl,jeu,k)
-          pdata%q(p,it:im,jt:jm,k) = pdata%q(p,ieu,jeu,k)
-
-        end do
-
-! corners
-!
-#if NDIMS == 3
-        pdata%q(p, 1:nh, 1:nh, 1:nh) = pdata%q(p,ibl,jbl,kbl)
-        pdata%q(p,it:im, 1:nh, 1:nh) = pdata%q(p,ieu,jbl,kbl)
-        pdata%q(p, 1:nh,jt:jm, 1:nh) = pdata%q(p,ibl,jeu,kbl)
-        pdata%q(p,it:im,jt:jm, 1:nh) = pdata%q(p,ieu,jeu,kbl)
-        pdata%q(p, 1:nh, 1:nh,kt:km) = pdata%q(p,ibl,jbl,keu)
-        pdata%q(p,it:im, 1:nh,kt:km) = pdata%q(p,ieu,jbl,keu)
-        pdata%q(p, 1:nh,jt:jm,kt:km) = pdata%q(p,ibl,jeu,keu)
-        pdata%q(p,it:im,jt:jm,kt:km) = pdata%q(p,ieu,jeu,keu)
-#endif /* == 3 */
-
-      end do
-
-! assign the pointer to the next block on the list
-!
-      pdata => pdata%next
-
-    end do ! data blocks
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_corners
-!
-!===============================================================================
-!
-! subroutine UPDATE_GHOST_CELLS:
-! -----------------------------
-!
-!   Subroutine updates conservative variables in all ghost cells from
-!   already updated primitive variables.
-!
-!
-!===============================================================================
-!
-  subroutine update_ghost_cells()
-
-! include external variables
-!
-    use blocks        , only : block_data, list_data
-    use coordinates   , only : im , jm , km , in , jn , kn
-    use coordinates   , only : ib , jb , kb , ie , je , ke
-    use coordinates   , only : ibl, jbl, kbl, ieu, jeu, keu
-    use equations     , only : nv
-    use equations     , only : prim2cons
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! local variables
-!
-    integer                   :: i, j, k
-
-! local pointers
-!
-    type(block_data), pointer :: pdata
-!
-!-------------------------------------------------------------------------------
-!
-! assign the pointer to the first block on the list
-!
-    pdata => list_data
-
-! scan all data blocks until the last is reached
-!
-    do while(associated(pdata))
-
-! update the X and Y boundary ghost cells
-!
-      do k = 1, km
-
-! update lower layers of the Y boundary
-!
-        do j = 1, jbl
-          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
-        end do ! j = 1, jbl
-
-! update upper layers of the Y boundary
-!
-        do j = jeu, jm
-          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
-        end do ! j = jeu, jm
-
-! update remaining left layers of the X boundary
-!
-        do i = 1, ibl
-          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
-        end do ! i = 1, ibl
-
-! update remaining right layers of the X boundary
-!
-        do i = ieu, im
-          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
-        end do ! i = 1, ibl
-
-      end do ! k = 1, km
-
-#if NDIMS == 3
-! update the Z boundary ghost cells
-!
-      do j = jb, je
-
-! update the remaining front layers of the Z boundary
-!
-        do k = 1, kbl
-          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
-        end do ! k = 1, kbl
-
-! update the remaining back layers of the Z boundary
-!
-        do k = keu, km
-          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
-        end do ! k = keu, km
-
-      end do ! j = jb, je
-#endif /* NDIMS == 3 */
-
-! assign the pointer to the next block on the list
-!
-      pdata => pdata%next
-
-    end do ! data blocks
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine update_ghost_cells
-!
-!===============================================================================
-!
-! subroutine SPECIFIC_BOUNDARIES:
-! ------------------------------
-!
-!   Subroutine scans over all leaf blocks in order to find blocks without
-!   neighbors, then updates the boundaries for selected type.
-!
-!   Arguments:
-!
-!     ilev - the level to be processed;
-!     idir - the direction to be processed;
-!
-!===============================================================================
-!
-  subroutine specific_boundaries(ilev, idir)
-
-! import external procedures and variables
-!
-    use blocks         , only : block_meta, list_meta
-    use blocks         , only : nsides
-#ifdef MPI
-    use mpitools       , only : nproc
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer, intent(in)       :: ilev, idir
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-
-! local variables
-!
-    integer                   :: iside
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for specific boundary update
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! assign the pointer with the first block on the meta list
-!
-    pmeta => list_meta
-
-! scan all data blocks until the last is reached
-!
-    do while(associated(pmeta))
-
-! check if the current meta block is a leaf
-!
-      if (pmeta%leaf .and. pmeta%level == ilev) then
-
-! process only if this block is marked for update
-!
-        if (pmeta%update) then
-
-#ifdef MPI
-! check if the current block belongs to the local process
-!
-          if (pmeta%process == nproc) then
-#endif /* MPI */
-
-! iterate over all neighbors
-!
-            do iside = 1, nsides
-
-! assign a neighbor pointer to the current neighbor
-!
-              pneigh => pmeta%neigh(idir,iside,1)%ptr
-
-! make sure that the neighbor is not associated, then apply specific boundaries
-!
-              if (.not. associated(pneigh))                                    &
-                               call boundary_specific(pmeta%data, idir, iside)
-
-            end do ! sides
-
-#ifdef MPI
-          end if ! block belong to the local process
-#endif /* MPI */
-
-        end if ! pmeta is marked for update
-
-      end if ! leaf
-
-! assign the pointer to the next block on the list
-!
-      pmeta => pmeta%next
-
-    end do ! meta blocks
-
-#ifdef PROFILE
-! stop accounting time for specific boundary update
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine specific_boundaries
-!
-!===============================================================================
-!
-! subroutine COPY_BOUNDARIES:
-! --------------------------
-!
-!   Subroutine scans over all leaf blocks in order to find neighbors at
-!   the same level, and then updates the boundaries between them.
-!
-!   Arguments:
-!
-!     ilev - the level to be processed;
-!     idir - the direction to be processed;
-!
-!===============================================================================
-!
-  subroutine copy_boundaries(ilev, idir)
-
-! import external procedures and variables
-!
-    use blocks         , only : ndims, nsides, nfaces
-    use blocks         , only : block_meta, block_data, list_meta
-    use blocks         , only : block_info, pointer_info
-    use coordinates    , only : toplev
-    use coordinates    , only : ng, nd, nh, im, jm, km
-    use coordinates    , only : ib, jb, kb, ie, je, ke
-    use coordinates    , only : ibu, jbu, kbu, iel, jel, kel
-#ifdef MPI
-    use equations      , only : nv
-#endif /* MPI */
-    use mpitools       , only : nproc, nprocs, npmax, periodic
-#ifdef MPI
-    use mpitools       , only : send_real_array, receive_real_array
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer, intent(in) :: ilev, idir
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-    type(block_data), pointer :: pdata
-#ifdef MPI
-    type(block_info), pointer :: pinfo
-#endif /* MPI */
-
-! local variables
-!
-    integer :: iside, iface, nside, nface
-    integer :: iret
-    integer :: il, jl, kl, iu, ju, ku
-#ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
-
-! local pointer arrays
-!
-    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
-
-! local arrays
-!
-    integer     , dimension(0:npmax,0:npmax)        :: block_counter
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for copy boundary update
-!
-    call start_timer(imc)
-#endif /* PROFILE */
-
-#ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! reset the exchange block counters
-!
-    block_counter(:,:) = 0
-
-! nullify the info pointers
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-        nullify(block_array(irecv,isend)%ptr)
-      end do
-    end do
-#endif /* MPI */
-
-!! 2. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME PROCESS
-!!    AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! assign the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! scan all meta blocks and process blocks at the current level
-!
-    do while(associated(pmeta))
-
-! check if the block is a leaf at the current level
-!
-      if (pmeta%leaf .and. pmeta%level == ilev) then
-
-! scan over sides and faces
-!
-        do iside = 1, nsides
-          do iface = 1, nfaces
-
-! assign a pointer to the neighbor
-!
-            pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! check if the neighbor is associated
-!
-            if (associated(pneigh)) then
-
-! check if the neighbor is at the same level
-!
-              if (pneigh%level == pmeta%level) then
-
-! process only if this block and its neighbor are marked for update
-!
-                if (pmeta%update .and. pneigh%update) then
-
-! copy blocks only for the first face
-!
-                  if (iface == 1) then
-
-#ifdef MPI
-! check if the current meta block and its neighbor belong to the same process
-!
-                    if (pmeta%process == pneigh%process) then
-
-! check if the current meta block belongs to the current process
-!
-                      if (pmeta%process == nproc) then
-#endif /* MPI */
-
-! assign a pointer to the data structure of the current block
-!
-                        pdata  => pmeta%data
-
-! update boundaries of the current block
-!
-                        select case(idir)
-                        case(1)
-                          if (iside == 1) then
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,iel:ie,:,:), idir, iside)
-                          else
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,ib:ibu,:,:), idir, iside)
-                          end if
-                        case(2)
-                          if (iside == 1) then
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,:,jel:je,:), idir, iside)
-                          else
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,:,jb:jbu,:), idir, iside)
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          if (iside == 1) then
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,:,:,kel:ke), idir, iside)
-                          else
-                            call boundary_copy(pdata                           &
-                                   , pneigh%data%q(:,:,:,kb:kbu), idir, iside)
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
-
-#ifdef MPI
-                      end if ! pmeta on the current process
-
-                    else ! block and neighbor belong to different processes
-
-! increase the counter for number of blocks to exchange
-!
-                      block_counter(pmeta%process,pneigh%process) =            &
-                               block_counter(pmeta%process,pneigh%process) + 1
-
-! allocate a new info object
-!
-                      allocate(pinfo)
-
-! fill out its fields
-!
-                      pinfo%block            => pmeta
-                      pinfo%neigh            => pneigh
-                      pinfo%direction        =  idir
-                      pinfo%side             =  iside
-                      pinfo%face             =  iface
-                      pinfo%level_difference =  pmeta%level - pneigh%level
-
-! nullify pointer fields
-!
-                      nullify(pinfo%prev)
-                      nullify(pinfo%next)
-
-! if the list is not empty append the newly created block
-!
-                      if (associated(block_array(pmeta%process                 &
-                                                        ,pneigh%process)%ptr)) &
-                        pinfo%prev => block_array(pmeta%process                &
-                                                        ,pneigh%process)%ptr
-
-! point the list to the newly created block
-!
-                      block_array(pmeta%process,pneigh%process)%ptr => pinfo
-
-                    end if ! block and neighbor belong to different processes
-#endif /* MPI */
-
-                  end if ! iface = 1
-
-                end if ! pmeta and pneigh marked for update
-
-              end if ! neighbor at the same level
-
-            end if ! neighbor associated
-
-          end do ! faces
-        end do ! sides
-
-      end if ! leaf
-
-! associate the pointer to the next meta block
-!
-      pmeta => pmeta%next
-
-    end do ! meta blocks
-
-#ifdef MPI
-!! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
-!!
-! iterate over sending and receiving processors
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-
-! process only pairs which have boundaries to exchange
-!
-        if (block_counter(irecv,isend) > 0) then
-
-! obtain the number of blocks to exchange
-!
-          nblocks = block_counter(irecv,isend)
-
-! prepare the tag for communication
-!
-          itag = 10 * (irecv * nprocs + isend + 1) + 4
-
-! allocate data buffer for variables to exchange
-!
-          select case(idir)
-          case(1)
-            allocate(rbuf(nblocks,nv,ng,jm,km))
-          case(2)
-            allocate(rbuf(nblocks,nv,im,ng,km))
-#if NDIMS == 3
-          case(3)
-            allocate(rbuf(nblocks,nv,im,jm,ng))
-#endif /* NDIMS == 3 */
-          end select
-
-! if isend == nproc we are sending data
-!
-          if (isend == nproc) then
-
-! reset the block counter
-!
-            l = 0
-
-! iterate over exchange blocks along the current direction and fill out
-! the data buffer with the block variables
-!
-            select case(idir)
-
-            case(1)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! scan over all blocks on the block exchange list
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! fill the buffer with data from the current block (depending on the side)
-!
-                if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,iel:ie,:,:)
-                else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,ib:ibu,:,:)
-                end if
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-            case(2)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! scan over all blocks on the block exchange list
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! fill the buffer with data from the current block (depending on the side)
-!
-                if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jel:je,:)
-                else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jb:jbu,:)
-                end if
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-#if NDIMS == 3
-            case(3)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! scan over all blocks on the block exchange list
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! fill the buffer with data from the current block (depending on the side)
-!
-                if (pinfo%side == 1) then
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kel:ke)
-                else
-                  rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kb:kbu)
-                end if
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-#endif /* NDIMS == 3 */
-
-            end select
-
-! send the data buffer to another process
-!
-            call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
-
-          end if ! isend = nproc
-
-! if irecv == nproc we are receiving data
-!
-          if (irecv == nproc) then
-
-! receive the data buffer
-!
-            call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag         &
-                                                      , rbuf(:,:,:,:,:), iret)
-
-! reset the block counter
-!
-            l = 0
-
-! associate the pointer with the first block in the exchange list
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-! iterate over all received blocks and update boundaries of the corresponding
-! data blocks
-!
-            do while(associated(pinfo))
-
-! increase the block counter
-!
-              l = l + 1
-
-! set the side index
-!
-              iside =  pinfo%side
-
-! assign a pointer to the associated data block
-!
-              pdata => pinfo%block%data
-
-! update the boundaries of the current block
-!
-              call boundary_copy(pdata, rbuf(l,:,:,:,:), idir, iside)
-
-! associate the pointer with the next block
-!
-              pinfo => pinfo%prev
-
-            end do ! %ptr block list
-
-          end if ! irecv = nproc
-
-! deallocate data buffer
-!
-          if (allocated(rbuf)) deallocate(rbuf)
-
-! associate the pointer with the first block in the exchange list
-!
-          pinfo => block_array(irecv,isend)%ptr
-
-! scan over all blocks on the exchange block list
-!
-          do while(associated(pinfo))
-
-! associate the exchange list pointer
-!
-            block_array(irecv,isend)%ptr => pinfo%prev
-
-! nullify the pointer fields
-!
-            nullify(pinfo%prev)
-            nullify(pinfo%next)
-            nullify(pinfo%block)
-            nullify(pinfo%neigh)
-
-! deallocate the object
-!
-            deallocate(pinfo)
-
-! associate the pointer with the next block
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-          end do ! %ptr block list
-
-        end if ! if block_count > 0
-
-      end do ! isend
-    end do ! irecv
-#endif /* MPI */
-
-#ifdef PROFILE
-! stop accounting time for copy boundary update
-!
-    call stop_timer(imc)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine copy_boundaries
-!
-!===============================================================================
-!
-! subroutine RESTRICT_BOUNDARIES:
-! ------------------------------
-!
-!   Subroutine scans over all leaf blocks in order to find neighbors at
-!   different levels, then updates the boundaries of blocks at lower levels by
-!   restricting variables from higher level blocks.
-!
-!   Arguments:
-!
-!     ilev - the level to be processed;
-!     idir - the direction to be processed;
-!
-!===============================================================================
-!
-  subroutine restrict_boundaries(ilev, idir)
-
-! import external procedures and variables
-!
-    use blocks         , only : ndims, nsides, nfaces
-    use blocks         , only : block_meta, block_data, list_meta
-    use blocks         , only : block_info, pointer_info
-    use coordinates    , only : toplev
-    use coordinates    , only : ng, nd, nh, im, jm, km
-    use coordinates    , only : ib, jb, kb, ie, je, ke
-    use coordinates    , only : ibu, jbu, kbu, iel, jel, kel
-#ifdef MPI
-    use equations      , only : nv
-#endif /* MPI */
-    use mpitools       , only : periodic
-#ifdef MPI
-    use mpitools       , only : nproc, nprocs, npmax
-    use mpitools       , only : send_real_array, receive_real_array
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer, intent(in) :: ilev, idir
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-    type(block_data), pointer :: pdata
-#ifdef MPI
-    type(block_info), pointer :: pinfo
-#endif /* MPI */
-
-! local variables
-!
-    integer :: iside, iface, nside, nface, level
-    integer :: iret
-    integer :: il, jl, kl, iu, ju, ku
-#ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
-
-! local pointer arrays
-!
-    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
-
-! local arrays
-!
-    integer     , dimension(0:npmax,0:npmax)        :: block_counter
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for restrict boundary update
-!
-    call start_timer(imr)
-#endif /* PROFILE */
-
-#ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! reset the exchange block counters
-!
-    block_counter(:,:) = 0
-
-! nullify the info pointers
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-        nullify(block_array(irecv,isend)%ptr)
-      end do
-    end do
-#endif /* MPI */
-
-!! 2. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME PROCESS
-!!    AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! assign the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while(associated(pmeta))
-
-! process only leafs from the current level
-!
-      if (pmeta%leaf .and. pmeta%level == ilev) then
-
-! process all sides and faces
-!
-        do iside = 1, nsides
-          do iface = 1, nfaces
-
-! assign the pointer to the current neighbor
-!
-            pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! check if the neighbor is associated
-!
-            if (associated(pneigh)) then
-
-! continue, if the neighbor is at the higher level
-!
-              if (pmeta%level < pneigh%level) then
-
-! process only if this block and its neighbor are marked for update
-!
-                if (pmeta%update .and. pneigh%update) then
-
-#ifdef MPI
-! check if the current meta block and its neighbor belong to the same process
-!
-                  if (pmeta%process == pneigh%process) then
-
-! check if the current meta block belongs to the current process
-!
-                    if (pmeta%process == nproc) then
-#endif /* MPI */
-
-! process each direction separatelly
-!
-                      select case(idir)
-
-                        case(1)
-
-! prepare indices of the neighbor slices used for the boundary update
-!
-                          if (iside == 1) then
-                            il = ie - nd + 1
-                            iu = ie
-                          else
-                            il = ib
-                            iu = ib + nd - 1
-                          end if
-                          jl = 1
-                          ju = jm
-                          kl = 1
-                          ku = km
-
-                        case(2)
-
-! prepare indices of the neighbor slices used for the boundary update
-!
-                          if (iside == 1) then
-                            jl = je - nd + 1
-                            ju = je
-                          else
-                            jl = jb
-                            ju = jb + nd - 1
-                          end if
-                          il = 1
-                          iu = im
-                          kl = 1
-                          ku = km
-
-#if NDIMS == 3
-                        case(3)
-
-! prepare indices of the neighbor slices used for the boundary update
-!
-                          if (iside == 1) then
-                            kl = ke - nd + 1
-                            ku = ke
-                          else
-                            kl = kb
-                            ku = kb + nd - 1
-                          end if
-                          il = 1
-                          iu = im
-                          jl = 1
-                          ju = jm
-#endif /* NDIMS == 3 */
-                      end select
-
-! assign a pointer to the associate data block
-!
-                      pdata  => pmeta%data
-
-! update boundaries of the current block
-!
-                      call boundary_restrict(pdata                             &
-                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
-                                                        , idir, iside, iface)
-
-#ifdef MPI
-                    end if ! block on the current processor
-
-                  else ! block and neighbor on different processors
-
-! increase the counter for number of blocks to exchange
-!
-                    block_counter(pmeta%process,pneigh%process) =              &
-                               block_counter(pmeta%process,pneigh%process) + 1
-
-! allocate a new info object
-!
-                    allocate(pinfo)
-
-! fill out its fields
-!
-                    pinfo%block            => pmeta
-                    pinfo%neigh            => pneigh
-                    pinfo%direction        =  idir
-                    pinfo%side             =  iside
-                    pinfo%face             =  iface
-                    pinfo%level_difference =  pmeta%level - pneigh%level
-
-! nullify pointers
-!
-                    nullify(pinfo%prev)
-                    nullify(pinfo%next)
-
-! if the list is not empty append the created block
-!
-                    if (associated(block_array(pmeta%process                   &
-                                                        ,pneigh%process)%ptr)) &
-                        pinfo%prev => block_array(pmeta%process                &
-                                                        ,pneigh%process)%ptr
-
-! point the list to the last created block
-!
-                    block_array(pmeta%process,pneigh%process)%ptr => pinfo
-
-                  end if ! block and neighbor on different processors
-#endif /* MPI */
-
-                end if ! pmeta and pneigh marked for update
-
-              end if ! block at lower level than neighbor
-
-            end if ! neighbor associated
-
-          end do ! faces
-        end do ! sides
-
-      end if ! leaf
-
-! assign the pointer to the next block on the list
-!
-      pmeta => pmeta%next
-
-    end do ! meta blocks
-
-#ifdef MPI
-!! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
-!!
-! iterate over sending and receiving processors
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-
-! process only pairs which have boundaries to exchange
-!
-        if (block_counter(irecv,isend) > 0) then
-
-! obtain the number of blocks to exchange
-!
-          nblocks = block_counter(irecv,isend)
-
-! prepare the tag for communication
-!
-          itag = 10 * (irecv * nprocs + isend + 1) + 2
-
-! allocate data buffer for block variable exchange
-!
-          select case(idir)
-          case(1)
-            allocate(rbuf(nblocks,nv,nd,jm,km))
-          case(2)
-            allocate(rbuf(nblocks,nv,im,nd,km))
-          case(3)
-            allocate(rbuf(nblocks,nv,im,jm,nd))
-          end select
-
-! if isend == nproc we are sending data
-!
-          if (isend == nproc) then
-
-! reset the block counter
-!
-            l = 0
-
-! process each direction separately
-!
-            select case(idir)
-
-            case(1)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  il = ie - nd + 1
-                  iu = ie
-                else
-                  il = ib
-                  iu = ib + nd - 1
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-            case(2)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  jl = je - nd + 1
-                  ju = je
-                else
-                  jl = jb
-                  ju = jb + nd - 1
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-#if NDIMS == 3
-            case(3)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  kl = ke - nd + 1
-                  ku = ke
-                else
-                  kl = kb
-                  ku = kb + nd - 1
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-#endif /* NDIMS == 3 */
-
-            end select
-
-! send the data buffer to another process
-!
-            call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
-
-          end if ! irecv = nproc
-
-! if irecv == nproc we are receiving data
-!
-          if (irecv == nproc) then
-
-! receive the data buffer
-!
-            call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag         &
-                                                      , rbuf(:,:,:,:,:), iret)
-
-! reset the block counter
-!
-            l = 0
-
-! associate the pointer with the first block in the exchange list
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-! iterate over all received blocks and update boundaries of the corresponding
-! data blocks
-!
-            do while(associated(pinfo))
-
-! increase the block counter
-!
-              l = l + 1
-
-! set side and face indices
-!
-              iside = pinfo%side
-              iface = pinfo%face
-
-! assign a pointer to the associated data block
-!
-              pdata => pinfo%block%data
-
-! update the boundaries of the current block
-!
-              call boundary_restrict(pdata, rbuf(l,:,:,:,:), idir, iside, iface)
-
-! associate the pointer with the next block
-!
-              pinfo => pinfo%prev
-
-            end do ! %ptr block list
-
-          end if ! irecv = nproc
-
-! deallocate data buffer
-!
-          if (allocated(rbuf)) deallocate(rbuf)
-
-! associate the pointer with the first block in the exchange list
-!
-          pinfo => block_array(irecv,isend)%ptr
-
-! scan over all blocks on the exchange block list
-!
-          do while(associated(pinfo))
-
-! associate the exchange list pointer
-!
-            block_array(irecv,isend)%ptr => pinfo%prev
-
-! nullify the pointer fields
-!
-            nullify(pinfo%prev)
-            nullify(pinfo%next)
-            nullify(pinfo%block)
-            nullify(pinfo%neigh)
-
-! deallocate the object
-!
-            deallocate(pinfo)
-
-! associate the pointer with the next block
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-          end do ! %ptr block list
-
-        end if ! if block_count > 0
-
-      end do ! isend
-    end do ! irecv
-#endif /* MPI */
-
-#ifdef PROFILE
-! stop accounting time for restrict boundary update
-!
-    call stop_timer(imr)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine restrict_boundaries
-!
-!===============================================================================
-!
-! subroutine PROLONG_BOUNDARIES:
-! -----------------------------
-!
-!   Subroutine scans over all leaf blocks and updates the variable boundaries
-!   from neighbor blocks laying at lower levels.
-!
-!   Arguments:
-!
-!     ilev - the level to be processed;
-!     idir - the direction to be processed;
-!
-!===============================================================================
-!
-  subroutine prolong_boundaries(ilev, idir)
-
-! import external procedures and variables
-!
-    use blocks         , only : ndims, nsides, nfaces
-    use blocks         , only : block_meta, block_data, list_meta
-    use blocks         , only : block_info, pointer_info
-    use coordinates    , only : toplev
-    use coordinates    , only : ng, nd, nh, im, jm, km
-    use coordinates    , only : ib, jb, kb, ie, je, ke
-    use coordinates    , only : ibu, jbu, kbu, iel, jel, kel
-#ifdef MPI
-    use equations      , only : nv
-    use mpitools       , only : nproc, nprocs, npmax
-    use mpitools       , only : send_real_array, receive_real_array
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer, intent(in) :: ilev, idir
-
-! local pointers
-!
-    type(block_meta), pointer :: pmeta, pneigh
-    type(block_data), pointer :: pdata
-#ifdef MPI
-    type(block_info), pointer :: pinfo
-#endif /* MPI */
-
-! local variables
-!
-    integer :: iside, iface, nside, nface
-    integer :: iret
-    integer :: il, jl, kl, iu, ju, ku
-#ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
-
-! local pointer arrays
-!
-    type(pointer_info), dimension(0:npmax,0:npmax)  :: block_array
-
-! local arrays
-!
-    integer     , dimension(0:npmax,0:npmax)        :: block_counter
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
-#endif /* MPI */
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for prolong boundary update
-!
-    call start_timer(imp)
-#endif /* PROFILE */
-
-#ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! reset the exchange block counters
-!
-    block_counter(:,:) = 0
-
-! nullify the info pointers
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-        nullify(block_array(irecv,isend)%ptr)
-      end do
-    end do
-#endif /* MPI */
-
-!! 2. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME PROCESS
-!!    AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! assign the pointer to the first block on the meta block list
-!
-    pmeta => list_meta
-
-! iterate over all meta blocks
-!
-    do while(associated(pmeta))
-
-! check if the block is the leaf at level ilev
-!
-      if (pmeta%leaf .and. pmeta%level == ilev) then
-
-! iterate over sides and faces
-!
-        do iside = 1, nsides
-          do iface = 1, nfaces
-
-! assign a pointer to the current neighbor
-!
-            pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! check if the neighbor is associated
-!
-            if (associated(pneigh)) then
-
-! check if the neighbor lays at lower level
-!
-              if (pneigh%level < pmeta%level) then
-
-! process only if this block and its neighbor are marked for update
-!
-                if (pmeta%update .and. pneigh%update) then
-
-! perform update only for the first face, since all faces point the same block
-!
-                  if (iface == 1) then
-
-#ifdef MPI
-! check if the current meta block and its neighbor belong to the same process
-!
-                    if (pmeta%process == pneigh%process) then
-
-! check if the current meta block belong to the current process
-!
-                      if (pmeta%process == nproc) then
-#endif /* MPI */
-
-! find the neighbor side and face pointing to the current block
-!
-                        nside = 3 - iside
-                        nface = 1
-                        do while(pmeta%id /=                                   &
-                                        pneigh%neigh(idir,nside,nface)%ptr%id)
-                          nface = nface + 1
-                        end do
-
-! prepare indices of the neighbor slices used for the boundary update
-!
-                        il = 1
-                        iu = im
-                        jl = 1
-                        ju = jm
-                        kl = 1
-                        ku = km
-
-                        select case(idir)
-                        case(1)
-                          if (iside == 1) then
-                            il = ie - nh
-                            iu = ie + 1
-                          else
-                            il = ib - 1
-                            iu = ib + nh
-                          end if
-                        case(2)
-                          if (iside == 1) then
-                            jl = je - nh
-                            ju = je + 1
-                          else
-                            jl = jb - 1
-                            ju = jb + nh
-                          end if
-                        case(3)
-                          if (iside == 1) then
-                            kl = ke - nh
-                            ku = ke + 1
-                          else
-                            kl = kb - 1
-                            ku = kb + nh
-                          end if
-                        end select
-
-! assign a pointer to the associated data block
-!
-                        pdata  => pmeta%data
-
-! update boundaries of the current block from its neighbor
-!
-                        call boundary_prolong(pdata                            &
-                                         , pneigh%data%q(:,il:iu,jl:ju,kl:ku)  &
-                                                         , idir, iside, nface)
-
-#ifdef MPI
-                      end if ! pmeta on the current process
-
-                    else ! block and neighbor belong to different processes
-
-! increase the counter for the number of blocks to exchange
-!
-                      block_counter(pmeta%process,pneigh%process) =            &
-                               block_counter(pmeta%process,pneigh%process) + 1
-
-! allocate a new info object
-!
-                      allocate(pinfo)
-
-! fill out its fields
-!
-                      pinfo%block            => pmeta
-                      pinfo%neigh            => pneigh
-                      pinfo%direction        =  idir
-                      pinfo%side             =  iside
-                      pinfo%face             =  iface
-                      pinfo%level_difference =  pmeta%level - pneigh%level
-
-! nullify pointers
-!
-                      nullify(pinfo%prev)
-                      nullify(pinfo%next)
-
-! if the list is not empty append the newly created info object to it
-!
-                      if (associated(block_array(pmeta%process                 &
-                                                        ,pneigh%process)%ptr)) &
-                        pinfo%prev => block_array(pmeta%process                &
-                                                        ,pneigh%process)%ptr
-
-! point the list to the newly created info object
-!
-                      block_array(pmeta%process,pneigh%process)%ptr => pinfo
-
-                    end if ! block and neighbor belong to different processes
-#endif /* MPI */
-
-                  end if ! iface = 1
-
-                end if ! pmeta and pneigh marked for update
-
-              end if ! neighbor belongs to lower level
-
-            end if ! neighbor is associated
-
-          end do ! faces
-        end do ! sides
-
-      end if ! leaf at level ilev
-
-! associate the pointer with the next meta block
-!
-      pmeta => pmeta%next
-
-    end do ! meta blocks
-
-#ifdef MPI
-!! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
-!!
-! iterate over sending and receiving processes
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-
-! process only pairs which have anything to exchange
-!
-        if (block_counter(irecv,isend) > 0) then
-
-! obtain the number of blocks to exchange
-!
-          nblocks = block_counter(irecv,isend)
-
-! prepare the tag for communication
-!
-          itag = 10 * (irecv * nprocs + isend + 1) + 3
-
-! allocate data buffer for block variable exchange
-!
-          select case(idir)
-          case(1)
-            allocate(rbuf(nblocks,nv,nh+2,jm,km))
-          case(2)
-            allocate(rbuf(nblocks,nv,im,nh+2,km))
-          case(3)
-            allocate(rbuf(nblocks,nv,im,jm,nh+2))
-          end select
-
-! if isend == nproc we are sending data
-!
-          if (isend == nproc) then
-
-! reset the block counter
-!
-            l = 0
-
-! process each direction separately
-!
-            select case(idir)
-
-            case(1)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  il = ie - nh
-                  iu = ie + 1
-                else
-                  il = ib - 1
-                  iu = ib + nh
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,il:iu,:,:)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-            case(2)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  jl = je - nh
-                  ju = je + 1
-                else
-                  jl = jb - 1
-                  ju = jb + nh
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,jl:ju,:)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-
-#if NDIMS == 3
-            case(3)
-
-! associate the pointer with the first block in the exchange list
-!
-              pinfo => block_array(irecv,isend)%ptr
-
-! iterate over exchange blocks and fill out the data buffer with the block
-! variables
-!
-              do while(associated(pinfo))
-
-! increase the block counter
-!
-                l = l + 1
-
-! prepare slice indices depending on the side
-!
-                if (pinfo%side == 1) then
-                  kl = ke - nh
-                  ku = ke + 1
-                else
-                  kl = kb - 1
-                  ku = kb + nh
-                end if
-
-! fill the data buffer with the current block variable slices
-!
-                rbuf(l,:,:,:,:) = pinfo%neigh%data%q(:,:,:,kl:ku)
-
-! associate the pointer with the next block
-!
-                pinfo => pinfo%prev
-
-              end do ! %ptr block list
-#endif /* NDIMS == 3 */
-
-            end select
-
-! send the data buffer to another process
-!
-            call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
-
-          end if ! irecv = nproc
-
-! if irecv == nproc we are receiving data
-!
-          if (irecv == nproc) then
-
-! receive the data buffer
-!
-            call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag         &
-                                                      , rbuf(:,:,:,:,:), iret)
-
-! reset the block counter
-!
-            l = 0
-
-! associate the pointer with the first block in the exchange list
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-! iterate over all received blocks and update boundaries of the corresponding
-! data blocks
-!
-            do while(associated(pinfo))
-
-! increase the block counter
-!
-              l = l + 1
-
-! set side and face indices
-!
-              iside = pinfo%side
-              iface = pinfo%face
-
-! assign pointers to the meta, data and neighbor blocks
-!
-              pmeta  => pinfo%block
-              pdata  => pinfo%block%data
-              pneigh => pmeta%neigh(idir,iside,iface)%ptr
-
-! find the neighbor side and face pointing to the current block
-!
-              nside = 3 - iside
-              nface = 1
-              do while(pmeta%id /= pneigh%neigh(idir,nside,nface)%ptr%id)
-                nface = nface + 1
-              end do
-
-! update the boundaries of the current block
-!
-              call boundary_prolong(pdata, rbuf(l,:,:,:,:)                 &
-                                                     , idir, iside, nface)
-
-! associate the pointer with the next block
-!
-              pinfo => pinfo%prev
-
-            end do ! %ptr block list
-
-          end if ! irecv = nproc
-
-! deallocate the data buffer
-!
-          if (allocated(rbuf)) deallocate(rbuf)
-
-! associate the pointer with the first block in the exchange list
-!
-          pinfo => block_array(irecv,isend)%ptr
-
-! iterate over all objects on the exchange list
-!
-          do while(associated(pinfo))
-
-! associate the exchange list pointer
-!
-            block_array(irecv,isend)%ptr => pinfo%prev
-
-! nullify the pointer fields
-!
-            nullify(pinfo%prev)
-            nullify(pinfo%next)
-            nullify(pinfo%block)
-            nullify(pinfo%neigh)
-
-! deallocate the object
-!
-            deallocate(pinfo)
-
-! associate the pointer with the next block
-!
-            pinfo => block_array(irecv,isend)%ptr
-
-          end do ! %ptr block list
-
-        end if ! if block_count > 0
-
-      end do ! isend
-    end do ! irecv
-#endif /* MPI */
-
-#ifdef PROFILE
-! stop accounting time for prolong boundary update
-!
-    call stop_timer(imp)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine prolong_boundaries
 !
 !===============================================================================
 !
@@ -3067,6 +1190,8 @@ module boundaries
 !===============================================================================
 !
 !  DOMAIN FACE BOUNDARY UPDATE SUBROUTINES
+!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -4742,6 +2867,8 @@ module boundaries
 !===============================================================================
 !
 !  DOMAIN EDGE BOUNDARY UPDATE SUBROUTINES
+!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -6497,6 +4624,8 @@ module boundaries
 !
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine BOUNDARIES_CORNER_COPY:
 ! ---------------------------------
 !
@@ -7878,28 +6007,29 @@ module boundaries
 !
 !===============================================================================
 !
-!  BLOCK BOUNDARY UPDATE SUBROUTINES
+!  BLOCK SPECIFIC BOUNDARY SUBROUTINES
 !
 !===============================================================================
 !
-! subroutine BOUNDARY_SPECIFIC:
-! ----------------------------
+!===============================================================================
+!
+! subroutine BLOCK_BOUNDARY_SPECIFIC:
+! ----------------------------------
 !
 !   Subroutine applies specific boundary conditions to the pointed data block.
 !
 !   Arguments:
 !
-!     pdata - the pointer to modified data block;
-!     idir  - the direction to be processed;
-!     iside - the side to be processed;
+!     nc         - the edge direction;
+!     ic, jc, kc - the corner position;
+!     qn         - the variable array;
 !
 !===============================================================================
 !
-  subroutine boundary_specific(pdata, idir, iside)
+  subroutine block_boundary_specific(ic, jc, kc, nc, qn)
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_data
     use coordinates    , only : im , jm , km , ng
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
@@ -7913,744 +6043,266 @@ module boundaries
 
 ! subroutine arguments
 !
-    type(block_data), pointer, intent(inout) :: pdata
-    integer                  , intent(in)    :: idir, iside
+    integer                                     , intent(in)    :: ic, jc, kc
+    integer                                     , intent(in)    :: nc
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
 
 ! local variables
 !
-    integer :: ii, i, j, k, it, jt, kt, is, js, ks
+    integer :: i , j , k
+    integer :: il, jl, kl
+    integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 !
 !-------------------------------------------------------------------------------
 !
-! prepare a direction/side index
+! apply specific boundaries depending on the direction
 !
-    ii = 10 * idir + iside
+    select case(nc)
+    case(1)
 
-! perform update depending on the direction/side flag
+! prepare indices for the boundaries
 !
-    select case(ii)
-
-! left side along the X direction
-!
-    case(11)
+      if (jc == 1) then
+        jl = 1
+        ju = jm / 2 - 1
+      else
+        jl = jm / 2
+        ju = jm
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = 1
+        ku = km / 2 - 1
+      else
+        kl = km / 2
+        ku = km
+      end if
+#else /* NDIMS == 3 */
+        kl = 1
+        ku = km
+#endif /* NDIMS == 3 */
 
 ! apply selected boundary condition
 !
-      select case(bnd_type(idir,iside))
+      select case(bnd_type(nc,ic))
 
 ! "open" boundary conditions
 !
       case(bnd_open)
 
-        do i = 1, ng
-          pdata%q(  :,i,:,:) = pdata%q(:,ib,:,:)
-        end do
+        if (ic == 1) then
+          do i = ibl, 1, -1
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+          end do
+        else
+          do i = ieu, im
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+          end do
+        end if
 
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
 
-        do i = 1, ng
+        if (ic == 1) then
+          do i = 1, ng
+            it = ib  - i
+            is = ibl + i
 
-          it = ib  - i
-          is = ibl + i
+            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
+            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+          end do
+        else
+          do i = 1, ng
+            it = ie  + i
+            is = ieu - i
 
-          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
-          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
-
-        end do
+            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
+            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+          end do
+        end if
 
 ! wrong boundary conditions
 !
       case default
 
-        call print_error("boundaries:boundary_specific()"                      &
+        if (ic == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
                                               , "Wrong left X boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right X boundary type!")
+        end if
 
       end select
 
-! right side along the X direction
+    case(2)
+
+! prepare indices for the boundaries
 !
-    case(12)
+      if (ic == 1) then
+        il = 1
+        iu = im / 2 - 1
+      else
+        il = im / 2
+        iu = im
+      end if
+#if NDIMS == 3
+      if (kc == 1) then
+        kl = 1
+        ku = km / 2 - 1
+      else
+        kl = km / 2
+        ku = km
+      end if
+#else /* NDIMS == 3 */
+        kl = 1
+        ku = km
+#endif /* NDIMS == 3 */
 
 ! apply selected boundary condition
 !
-      select case(bnd_type(idir,iside))
+      select case(bnd_type(nc,jc))
 
 ! "open" boundary conditions
 !
       case(bnd_open)
 
-        do i = ieu, im
-          pdata%q(  :,i ,:,:) =   pdata%q(  :,ie,:,:)
-        end do
+        if (jc == 1) then
+          do j = jbl, 1, -1
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+          end do
+        else
+          do j = jeu, jm
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+          end do
+        end if
 
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
 
-        do i = 1, ng
-          it = ie  + i
-          is = ieu - i
+        if (jc == 1) then
+          do j = 1, ng
+            jt = jb  - j
+            js = jbl + j
 
-          pdata%q(  :,it,:,:) =   pdata%q(  :,is,:,:)
-          pdata%q(ivx,it,:,:) = - pdata%q(ivx,is,:,:)
-        end do
+            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
+            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+          end do
+        else
+          do j = 1, ng
+            jt = je  + j
+            js = jeu - j
 
-! wrong boundary conditions
-!
-      case default
-
-        call print_error("boundaries:boundary_specific()"                      &
-                                             , "Wrong right X boundary type!")
-
-      end select
-
-! left side along the Y direction
-!
-    case(21)
-
-! apply selected boundary condition
-!
-      select case(bnd_type(idir,iside))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        do j = 1, ng
-          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,jb,:)
-        end do
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        do j = 1, ng
-          jt = jb  - j
-          js = jbl + j
-
-          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
-          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
-        end do
+            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
+            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+          end do
+        end if
 
 ! wrong boundary conditions
 !
       case default
 
-        call print_error("boundaries:boundary_specific()"                      &
+        if (jc == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
                                               , "Wrong left Y boundary type!")
-
-      end select
-
-! right side along the Y direction
-!
-    case(22)
-
-! apply selected boundary condition
-!
-      select case(bnd_type(idir,iside))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        do j = jeu, jm
-          pdata%q(  :,:,j ,:) =   pdata%q(  :,:,je,:)
-        end do
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        do j = 1, ng
-          jt = je  + j
-          js = jeu - j
-
-          pdata%q(  :,:,jt,:) =   pdata%q(  :,:,js,:)
-          pdata%q(ivy,:,jt,:) = - pdata%q(ivy,:,js,:)
-        end do
-
-! wrong boundary conditions
-!
-      case default
-
-        call print_error("boundaries:boundary_specific()"                      &
-                                             , "Wrong right Y boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right Y boundary type!")
+        end if
 
       end select
 
 #if NDIMS == 3
-! left side along the Z direction
+    case(3)
+
+! prepare indices for the boundaries
 !
-    case(31)
+      if (ic == 1) then
+        il = 1
+        iu = im / 2 - 1
+      else
+        il = im / 2
+        iu = im
+      end if
+      if (jc == 1) then
+        jl = 1
+        ju = jm / 2 - 1
+      else
+        jl = jm / 2
+        ju = jm
+      end if
 
 ! apply selected boundary condition
 !
-      select case(bnd_type(idir,iside))
+      select case(bnd_type(nc,kc))
 
 ! "open" boundary conditions
 !
       case(bnd_open)
 
-        do k = 1, ng
-          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,kb)
-        end do
+        if (kc == 1) then
+          do k = kbl, 1, -1
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
+          end do
+        else
+          do k = keu, km
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
+          end do
+        end if
 
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
 
-        do k = 1, ng
-          kt = kb  - k
-          ks = kbl + k
+        if (kc == 1) then
+          do k = 1, ng
+            kt = kb  - k
+            ks = kbl + k
 
-          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
-          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
-        end do
+            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
+            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+          end do
+        else
+          do k = 1, ng
+            kt = ke  + k
+            ks = keu - k
+
+            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
+            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+          end do
+        end if
 
 ! wrong boundary conditions
 !
       case default
 
-        call print_error("boundaries:boundary_specific()"                      &
+        if (kc == 1) then
+          call print_error("boundaries:boundary_specific()"                    &
                                               , "Wrong left Z boundary type!")
+        else
+          call print_error("boundaries:boundary_specific()"                    &
+                                              , "Wrong right Z boundary type!")
+        end if
 
       end select
 
-! right side along the Z direction
-!
-    case(32)
-
-! apply selected boundary condition
-!
-      select case(bnd_type(idir,iside))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        do k = keu, km
-          pdata%q(  :,:,:,k ) =   pdata%q(  :,:,:,ke)
-        end do
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        do k = 1, ng
-          kt = ke  + k
-          ks = keu - k
-
-          pdata%q(  :,:,:,kt) =   pdata%q(  :,:,:,ks)
-          pdata%q(ivz,:,:,kt) = - pdata%q(ivz,:,:,ks)
-        end do
-
-! wrong boundary conditions
-!
-      case default
-
-        call print_error("boundaries:boundary_specific()"                      &
-                                             , "Wrong right Z boundary type!")
-
-      end select
 #endif /* NDIMS == 3 */
-
-    case default
-
-! print error if the direction/side flag is wrong
-!
-      call print_warning("boundaries::boundary_specific"                       &
-                       , "Wrong direction or side of the boundary condition!")
-
     end select
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine boundary_specific
-!
-!===============================================================================
-!
-! subroutine BOUNDARY_COPY:
-! ------------------------
-!
-!   Subroutine updates boundaries by copying them from the provided array.
-!
-!   Arguments:
-!
-!     pdata - the pointer to modified data block;
-!     q     - the variable array from which boundaries are updated;
-!     idir  - the direction to be processed;
-!     iside - the side to be processed;
-!
-!===============================================================================
-!
-  subroutine boundary_copy(pdata, q, idir, iside)
-
-! import external procedures and variables
-!
-    use blocks         , only : block_data
-    use coordinates    , only : ng, im, jm, km, ibl, ieu, jbl, jeu, kbl, keu
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: q
-    integer                    , intent(in)    :: idir, iside
-!
-!-------------------------------------------------------------------------------
-!
-! update boundaries depending on the direction
-!
-    select case(idir)
-
-    case(1)
-
-      if (iside == 1) then
-        pdata%q(1:nv,  1:ibl,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
-      else
-        pdata%q(1:nv,ieu:im ,1:jm,1:km) = q(1:nv,1:ng,1:jm,1:km)
-      end if
-
-    case(2)
-
-      if (iside == 1) then
-        pdata%q(1:nv,1:im,  1:jbl,1:km) = q(1:nv,1:im,1:ng,1:km)
-      else
-        pdata%q(1:nv,1:im,jeu:jm ,1:km) = q(1:nv,1:im,1:ng,1:km)
-      end if
-
-#if NDIMS == 3
-    case(3)
-
-      if (iside == 1) then
-        pdata%q(1:nv,1:im,1:jm,  1:kbl) = q(1:nv,1:im,1:jm,1:ng)
-      else
-        pdata%q(1:nv,1:im,1:jm,keu:km ) = q(1:nv,1:im,1:jm,1:ng)
-      end if
-#endif /* NDIMS == 3 */
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_copy
-!
-!===============================================================================
-!
-! subroutine BOUNDARY_RESTRICT:
-! ----------------------------
-!
-!   Subroutine updates the data block boundaries by restricting the data from
-!   the provided variable array.  The process of data restriction conserves
-!   stored variables.
-!
-!   Arguments:
-!
-!     pdata              - the input data block;
-!     q                  - the variable array from which boundaries are updated;
-!     idir, iside, iface - the positions of the neighbor block;
-!
-!===============================================================================
-!
-  subroutine boundary_restrict(pdata, q, idir, iside, iface)
-
-! import external procedures and variables
-!
-    use blocks         , only : block_data
-    use coordinates    , only : ng, im, ih, ib, ie, ieu                        &
-                              , nd, jm, jh, jb, je, jeu                        &
-                              , nh, km, kh, kb, ke, keu
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data)           , pointer, intent(inout) :: pdata
-    real(kind=8)    , dimension(:,:,:,:), intent(in)    :: q
-    integer                             , intent(in)    :: idir, iside, iface
-
-! local variables
-!
-    integer :: ic, jc, kc, ip, jp, kp
-    integer :: il, jl, kl, iu, ju, ku
-    integer :: is, js, ks, it, jt, kt
-!
-!-------------------------------------------------------------------------------
-!
-! prepare indices
-!
-    select case(idir)
-
-    case(1)
-
-! X indices
-!
-      if (iside == 1) then
-        is =  1
-        it = ng
-      else
-        is = ieu
-        it = im
-      end if
-
-      il =  1
-      iu = nd
-      ip = il + 1
-
-! Y indices
-!
-      jc = mod(iface - 1, 2)
-
-      js = jb - nh + (jh - nh) * jc
-      jt = jh      + (jh - nh) * jc
-
-      jl =  1 + ng * jc
-      ju = je + ng * jc
-      jp = jl + 1
-
-#if NDIMS == 3
-! Z indices
-!
-      kc = (iface - 1) / 2
-
-      ks = kb - nh + (kh - nh) * kc
-      kt = kh      + (kh - nh) * kc
-
-      kl =  1 + ng * kc
-      ku = ke + ng * kc
-      kp = kl + 1
-#endif /* NDIMS == 3 */
-
-    case(2)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-
-      is = ib - nh + (ih - nh) * ic
-      it = ih      + (ih - nh) * ic
-
-      il =  1 + ng * ic
-      iu = ie + ng * ic
-      ip = il + 1
-
-! Y indices
-!
-      if (iside == 1) then
-        js =  1
-        jt = ng
-      else
-        js = jeu
-        jt = jm
-      end if
-
-      jl =  1
-      ju = nd
-      jp = jl + 1
-
-#if NDIMS == 3
-! Z indices
-!
-      kc = (iface - 1) / 2
-
-      ks = kb - nh + (kh - nh) * kc
-      kt = kh      + (kh - nh) * kc
-
-      kl =  1 + ng * kc
-      ku = ke + ng * kc
-      kp = kl + 1
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-
-      is = ib - nh + (ih - nh) * ic
-      it = ih      + (ih - nh) * ic
-
-      il =  1 + ng * ic
-      iu = ie + ng * ic
-      ip = il + 1
-
-! Y indices
-!
-      jc = (iface - 1) / 2
-
-      js = jb - nh + (jh - nh) * jc
-      jt = jh      + (jh - nh) * jc
-
-      jl =  1 + ng * jc
-      ju = je + ng * jc
-      jp = jl + 1
-
-! Z indices
-!
-      if (iside == 1) then
-        ks =  1
-        kt = ng
-      else
-        ks = keu
-        kt = km
-      end if
-
-      kl =  1
-      ku = nd
-      kp = kl + 1
-#endif /* NDIMS == 3 */
-
-    end select
-
-! update boundaries of the conserved variables
-!
-#if NDIMS == 2
-    pdata%q(:,is:it,js:jt, 1   ) =                                             &
-                               2.50d-01 *  ((q(1:nv,il:iu:2,jl:ju:2, 1     )   &
-                                        +    q(1:nv,ip:iu:2,jp:ju:2, 1     ))  &
-                                        +   (q(1:nv,il:iu:2,jp:ju:2, 1     )   &
-                                        +    q(1:nv,ip:iu:2,jl:ju:2, 1     )))
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    pdata%q(:,is:it,js:jt,ks:kt) =                                             &
-                               1.25d-01 * (((q(1:nv,il:iu:2,jl:ju:2,kl:ku:2)   &
-                                        +    q(1:nv,ip:iu:2,jp:ju:2,kp:ku:2))  &
-                                        +   (q(1:nv,il:iu:2,jl:ju:2,kp:ku:2)   &
-                                        +    q(1:nv,ip:iu:2,jp:ju:2,kl:ku:2))) &
-                                        +  ((q(1:nv,il:iu:2,jp:ju:2,kp:ku:2)   &
-                                        +    q(1:nv,ip:iu:2,jl:ju:2,kl:ku:2))  &
-                                        +   (q(1:nv,il:iu:2,jp:ju:2,kl:ku:2)   &
-                                        +    q(1:nv,ip:iu:2,jl:ju:2,kp:ku:2))))
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_restrict
-!
-!===============================================================================
-!
-! subroutine BOUNDARY_PROLONG:
-! ---------------------------
-!
-!   Subroutine updates the data block boundaries by prolonging the data from
-!   the provided variable array.  The process of data restriction conserves
-!   stored variables.
-!
-!   Arguments:
-!
-!     pdata              - the input data block;
-!     q                  - the variable array from which boundaries are updated;
-!     idir, iside, iface - the positions of the neighbor block;
-!
-!===============================================================================
-!
-  subroutine boundary_prolong(pdata, q, idir, iside, iface)
-
-! import external procedures and variables
-!
-    use blocks         , only : block_data
-    use coordinates    , only : ng, im, ih, ib, ie, ieu                        &
-                              , nd, jm, jh, jb, je, jeu                        &
-                              , nh, km, kh, kb, ke, keu
-    use equations      , only : nv
-    use interpolations , only : limiter
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_data), pointer  , intent(inout) :: pdata
-    real   , dimension(:,:,:,:), intent(in)    :: q
-    integer                    , intent(in)    :: idir, iside, iface
-
-! local variables
-!
-    integer :: i, j, k, p
-    integer :: ic, jc, kc, ip, jp, kp
-    integer :: il, jl, kl, iu, ju, ku
-    integer :: is, js, ks, it, jt, kt
-    real    :: dql, dqr, dqx, dqy, dqz, dq1, dq2, dq3, dq4
-!
-!-------------------------------------------------------------------------------
-!
-! prepare indices depending on the direction
-!
-    select case(idir)
-
-    case(1)
-
-! X indices
-!
-      if (iside == 1) then
-        is = 1
-      else
-        is = ieu
-      end if
-
-      il = 2
-      iu = 1 + nh
-
-! Y indices
-!
-      jc = mod(iface - 1, 2)
-      js = jb
-      jl = jb + (jh - ng) * jc
-      ju = jh + (jh - ng) * jc
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = kb
-      kl = kb + (kh - ng) * kc
-      ku = kh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-    case(2)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = ib
-      il = ib + (ih - ng) * ic
-      iu = ih + (ih - ng) * ic
-
-! Y indices
-!
-      if (iside == 1) then
-        js = 1
-      else
-        js = jeu
-      end if
-
-      jl = 2
-      ju = 1 + nh
-
-#if NDIMS == 3
-! Z indices
-!
-      kc =    (iface - 1) / 2
-      ks = kb
-      kl = kb + (kh - ng) * kc
-      ku = kh + (kh - ng) * kc
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! X indices
-!
-      ic = mod(iface - 1, 2)
-      is = ib
-      il = ib + (ih - ng) * ic
-      iu = ih + (ih - ng) * ic
-
-! Y indices
-!
-      jc =    (iface - 1) / 2
-      js = jb
-      jl = jb + (jh - ng) * jc
-      ju = jh + (jh - ng) * jc
-
-! Z indices
-!
-      if (iside == 1) then
-        ks = 1
-      else
-        ks = keu
-      end if
-
-      kl = 2
-      ku = 1 + nh
-#endif /* NDIMS == 3 */
-
-    end select
-
-! update variable boundaries with the linear interpolation
-!
-#if NDIMS == 2
-    do k = 1, km
-      kt = 1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    do k = kl, ku
-      kt = 2 * (k - kl) + ks
-      kp = kt + 1
-#endif /* NDIMS == 3 */
-      do j = jl, ju
-        jt = 2 * (j - jl) + js
-        jp = jt + 1
-        do i = il, iu
-          it = 2 * (i - il) + is
-          ip = it + 1
-
-! iterate over all variables
-!
-          do p = 1, nv
-
-            dql = q(p,i  ,j,k) - q(p,i-1,j,k)
-            dqr = q(p,i+1,j,k) - q(p,i  ,j,k)
-            dqx = limiter(0.25d+00, dql, dqr)
-
-            dql = q(p,i,j  ,k) - q(p,i,j-1,k)
-            dqr = q(p,i,j+1,k) - q(p,i,j  ,k)
-            dqy = limiter(0.25d+00, dql, dqr)
-
-#if NDIMS == 3
-            dql = q(p,i,j,k  ) - q(p,i,j,k-1)
-            dqr = q(p,i,j,k+1) - q(p,i,j,k  )
-            dqz = limiter(0.25d+00, dql, dqr)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 2
-            dq1 = dqx + dqy
-            dq2 = dqx - dqy
-            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
-            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
-            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq2
-            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq1
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            dq1 = dqx + dqy + dqz
-            dq2 = dqx - dqy - dqz
-            dq3 = dqx - dqy + dqz
-            dq4 = dqx + dqy - dqz
-            pdata%q(p,it,jt,kt) = q(p,i,j,k) - dq1
-            pdata%q(p,ip,jt,kt) = q(p,i,j,k) + dq2
-            pdata%q(p,it,jp,kt) = q(p,i,j,k) - dq3
-            pdata%q(p,ip,jp,kt) = q(p,i,j,k) + dq4
-            pdata%q(p,it,jt,kp) = q(p,i,j,k) - dq4
-            pdata%q(p,ip,jt,kp) = q(p,i,j,k) + dq3
-            pdata%q(p,it,jp,kp) = q(p,i,j,k) - dq2
-            pdata%q(p,ip,jp,kp) = q(p,i,j,k) + dq1
-#endif /* NDIMS == 3 */
-
-          end do ! q - 1, nv
-
-        end do ! i = il, iu
-      end do ! j = jl, ju
-    end do ! k = kl, ku
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine boundary_prolong
+  end subroutine block_boundary_specific
 #if NDIMS == 3
 !
 !===============================================================================
 !
 !  BLOCK FACE UPDATE SUBROUTINES
+!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -9204,6 +6856,8 @@ module boundaries
 !===============================================================================
 !
 !  BLOCK EDGE UPDATE SUBROUTINES
+!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -9837,6 +7491,8 @@ module boundaries
 !
 !===============================================================================
 !
+!===============================================================================
+!
 ! subroutine BLOCK_CORNER_COPY:
 ! ----------------------------
 !
@@ -10202,293 +7858,9 @@ module boundaries
 !
 !===============================================================================
 !
-! subroutine BLOCK_BOUNDARY_SPECIFIC:
-! ----------------------------------
-!
-!   Subroutine applies specific boundary conditions to the pointed data block.
-!
-!   Arguments:
-!
-!     nc         - the edge direction;
-!     ic, jc, kc - the corner position;
-!     qn         - the variable array;
-!
-!===============================================================================
-!
-  subroutine block_boundary_specific(ic, jc, kc, nc, qn)
-
-! import external procedures and variables
-!
-    use coordinates    , only : im , jm , km , ng
-    use coordinates    , only : ib , jb , kb , ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
-    use equations      , only : nv
-    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
-    use error          , only : print_error, print_warning
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)    :: ic, jc, kc
-    integer                                     , intent(in)    :: nc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
-
-! local variables
-!
-    integer :: i , j , k
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-    integer :: is, js, ks
-    integer :: it, jt, kt
-!
-!-------------------------------------------------------------------------------
-!
-! apply specific boundaries depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! prepare indices for the boundaries
-!
-      if (jc == 1) then
-        jl = 1
-        ju = jm / 2 - 1
-      else
-        jl = jm / 2
-        ju = jm
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = 1
-        ku = km / 2 - 1
-      else
-        kl = km / 2
-        ku = km
-      end if
-#else /* NDIMS == 3 */
-        kl = 1
-        ku = km
-#endif /* NDIMS == 3 */
-
-! apply selected boundary condition
-!
-      select case(bnd_type(nc,ic))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        if (ic == 1) then
-          do i = ibl, 1, -1
-            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
-          end do
-        else
-          do i = ieu, im
-            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
-          end do
-        end if
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        if (ic == 1) then
-          do i = 1, ng
-            it = ib  - i
-            is = ibl + i
-
-            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
-            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
-          end do
-        else
-          do i = 1, ng
-            it = ie  + i
-            is = ieu - i
-
-            qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
-            qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
-          end do
-        end if
-
-! wrong boundary conditions
-!
-      case default
-
-        if (ic == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left X boundary type!")
-        else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right X boundary type!")
-        end if
-
-      end select
-
-    case(2)
-
-! prepare indices for the boundaries
-!
-      if (ic == 1) then
-        il = 1
-        iu = im / 2 - 1
-      else
-        il = im / 2
-        iu = im
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = 1
-        ku = km / 2 - 1
-      else
-        kl = km / 2
-        ku = km
-      end if
-#else /* NDIMS == 3 */
-        kl = 1
-        ku = km
-#endif /* NDIMS == 3 */
-
-! apply selected boundary condition
-!
-      select case(bnd_type(nc,jc))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        if (jc == 1) then
-          do j = jbl, 1, -1
-            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
-          end do
-        else
-          do j = jeu, jm
-            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
-          end do
-        end if
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        if (jc == 1) then
-          do j = 1, ng
-            jt = jb  - j
-            js = jbl + j
-
-            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
-            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
-          end do
-        else
-          do j = 1, ng
-            jt = je  + j
-            js = jeu - j
-
-            qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
-            qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
-          end do
-        end if
-
-! wrong boundary conditions
-!
-      case default
-
-        if (jc == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left Y boundary type!")
-        else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right Y boundary type!")
-        end if
-
-      end select
-
-#if NDIMS == 3
-    case(3)
-
-! prepare indices for the boundaries
-!
-      if (ic == 1) then
-        il = 1
-        iu = im / 2 - 1
-      else
-        il = im / 2
-        iu = im
-      end if
-      if (jc == 1) then
-        jl = 1
-        ju = jm / 2 - 1
-      else
-        jl = jm / 2
-        ju = jm
-      end if
-
-! apply selected boundary condition
-!
-      select case(bnd_type(nc,kc))
-
-! "open" boundary conditions
-!
-      case(bnd_open)
-
-        if (kc == 1) then
-          do k = kbl, 1, -1
-            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
-          end do
-        else
-          do k = keu, km
-            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
-          end do
-        end if
-
-! "reflective" boundary conditions
-!
-      case(bnd_reflective)
-
-        if (kc == 1) then
-          do k = 1, ng
-            kt = kb  - k
-            ks = kbl + k
-
-            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
-            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
-          end do
-        else
-          do k = 1, ng
-            kt = ke  + k
-            ks = keu - k
-
-            qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
-            qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
-          end do
-        end if
-
-! wrong boundary conditions
-!
-      case default
-
-        if (kc == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left Z boundary type!")
-        else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right Z boundary type!")
-        end if
-
-      end select
-
-#endif /* NDIMS == 3 */
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_boundary_specific
-!
-!===============================================================================
-!
 !  BLOCK FLUX UPDATE SUBROUTINES
+!
+!===============================================================================
 !
 !===============================================================================
 !
@@ -10582,6 +7954,116 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine block_update_flux
+!
+!===============================================================================
+!
+!  OTHER BOUNDARY SUBROUTINES
+!
+!===============================================================================
+!
+!===============================================================================
+!
+! subroutine UPDATE_GHOST_CELLS:
+! -----------------------------
+!
+!   Subroutine updates conservative variables in all ghost cells from
+!   already updated primitive variables.
+!
+!
+!===============================================================================
+!
+  subroutine update_ghost_cells()
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im , jm , km , in , jn , kn
+    use coordinates   , only : ib , jb , kb , ie , je , ke
+    use coordinates   , only : ibl, jbl, kbl, ieu, jeu, keu
+    use equations     , only : nv
+    use equations     , only : prim2cons
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer                   :: i, j, k
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+!
+!-------------------------------------------------------------------------------
+!
+! assign the pointer to the first block on the list
+!
+    pdata => list_data
+
+! scan all data blocks until the last is reached
+!
+    do while(associated(pdata))
+
+! update the X and Y boundary ghost cells
+!
+      do k = 1, km
+
+! update lower layers of the Y boundary
+!
+        do j = 1, jbl
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = 1, jbl
+
+! update upper layers of the Y boundary
+!
+        do j = jeu, jm
+          call prim2cons(im, pdata%q(1:nv,1:im,j,k), pdata%u(1:nv,1:im,j,k))
+        end do ! j = jeu, jm
+
+! update remaining left layers of the X boundary
+!
+        do i = 1, ibl
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+! update remaining right layers of the X boundary
+!
+        do i = ieu, im
+          call prim2cons(jn, pdata%q(1:nv,i,jb:je,k), pdata%u(1:nv,i,jb:je,k))
+        end do ! i = 1, ibl
+
+      end do ! k = 1, km
+
+#if NDIMS == 3
+! update the Z boundary ghost cells
+!
+      do j = jb, je
+
+! update the remaining front layers of the Z boundary
+!
+        do k = 1, kbl
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = 1, kbl
+
+! update the remaining back layers of the Z boundary
+!
+        do k = keu, km
+          call prim2cons(in, pdata%q(1:nv,ib:ie,j,k), pdata%u(1:nv,ib:ie,j,k))
+        end do ! k = keu, km
+
+      end do ! j = jb, je
+#endif /* NDIMS == 3 */
+
+! assign the pointer to the next block on the list
+!
+      pdata => pdata%next
+
+    end do ! data blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_ghost_cells
 
 !===============================================================================
 !
