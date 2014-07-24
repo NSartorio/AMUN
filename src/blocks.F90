@@ -4553,437 +4553,90 @@ module blocks
     type(block_meta)                 , pointer, intent(inout) :: pmeta
     procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
 
-! local saved variables
+! local pointers
 !
-    logical, save :: first = .true.
-
-! local saved arrays
-!
-    integer, dimension(mfaces,3)  , save :: fidx
-    integer, dimension(mfaces,2,3), save :: eidx
-    integer, dimension(mfaces,2,3), save :: cidx
+    type(block_meta), pointer :: pneigh
 
 ! local variables
 !
-    integer :: l
+    integer :: i, j, k, n
 !
 !-------------------------------------------------------------------------------
 !
-! prepare indices
+! return if pmeta not associated
 !
-    if (first) then
+    if (.not. associated(pmeta)) return
 
-! inicialize indices
-!
-      fidx(:  ,:) = 0
-      eidx(:,:,:) = 0
-      cidx(:,:,:) = 0
-
-! prepare indices to get proper face, edge and corner neighbors
-!
 #if NDIMS == 2
-! around (0,0,0) corner
+! iterate over edges and corners
 !
-! [1,1,1]:X:(1,2,1) <- Y = [2,1,2]
-!
-      fidx( 1,  :) = (/ 1, 1, 1 /)
-      eidx( 1,1,:) = (/ 2, 1, 2 /)
+    do j = 1, nsides
+      do i = 1, nsides
+        do n = 1, ndims
 
-! [2,1,1]:Y:(2,2,1) <- X = [1,1,2]
+! associate pneigh with the face neighbor
 !
-      fidx( 2,  :) = (/ 2, 1, 1 /)
-      eidx( 2,1,:) = (/ 1, 1, 2 /)
+          pneigh => pmeta%edges(i,j,n)%ptr
 
-! around (0,1,0) corner
+! call the procedure for the face neighbor
 !
-! [1,1,2]:X:(1,2,2) -> Y = [2,2,2]
-!
-      fidx( 3,  :) = (/ 1, 1, 2 /)
-      eidx( 3,1,:) = (/ 2, 2, 2 /)
+          if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [2,2,1]:Y:(2,1,2) <- X = [1,1,1]
-!
-      fidx( 4,  :) = (/ 2, 2, 1 /)
-      eidx( 4,1,:) = (/ 1, 1, 1 /)
+        end do ! n = 1, ndims
 
-! around (1,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,2,2]:X:(1,1,2) -> Y = [2,2,1]
-!
-      fidx( 5,  :) = (/ 1, 2, 2 /)
-      eidx( 5,1,:) = (/ 2, 2, 1 /)
+        pneigh => pmeta%corners(i,j)%ptr
 
-! [2,2,2]:Y:(2,1,2) -> X = [1,2,1]
+! call the procedure for the face neighbor
 !
-      fidx( 6,  :) = (/ 2, 2, 2 /)
-      eidx( 6,1,:) = (/ 1, 2, 1 /)
+        if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! around (1,0,0) corner
-!
-! [1,2,1]:X:(1,1,1) <- Y = [2,1,1]
-!
-      fidx( 7,  :) = (/ 1, 2, 1 /)
-      eidx( 7,1,:) = (/ 2, 1, 1 /)
-
-! [2,1,2]:Y:(2,2,2) -> X = [1,2,2]
-!
-      fidx( 8,  :) = (/ 2, 1, 2 /)
-      eidx( 8,1,:) = (/ 1, 2, 2 /)
+      end do ! i = 1, nsides
+    end do ! j = 1, nsides
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-! around (0,0,0) corner
+! iterate over faces, edges, and corners
 !
-! [1,1,1]:X:(1,2,1) <- Y = [2,1,2] <- Z = [3,1,4]
-! [1,1,1]:X:(1,2,1) <- Z = [3,1,2] <- Y = [2,1,4]
-!
-      fidx( 1,  :) = (/ 1, 1, 1 /)
-      eidx( 1,1,:) = (/ 2, 1, 2 /)
-      eidx( 1,2,:) = (/ 3, 1, 2 /)
-      cidx( 1,1,:) = (/ 3, 1, 4 /)
-      cidx( 1,2,:) = (/ 2, 1, 4 /)
+    do k = 1, nsides
+      do j = 1, nsides
+        do i = 1, nsides
+          do n = 1, ndims
 
-! [2,1,1]:Y:(2,2,1) <- Z = [3,1,3] <- X = [1,1,4]
-! [2,1,1]:Y:(2,2,1) <- X = [1,1,2] <- Z = [3,1,4]
+! associate pneigh with the face neighbor
 !
-      fidx( 2,  :) = (/ 2, 1, 1 /)
-      eidx( 2,1,:) = (/ 3, 1, 3 /)
-      eidx( 2,2,:) = (/ 1, 1, 2 /)
-      cidx( 2,1,:) = (/ 1, 1, 4 /)
-      cidx( 2,2,:) = (/ 3, 1, 4 /)
+            pneigh => pmeta%faces(i,j,k,n)%ptr
 
-! [3,1,1]:Z:(3,2,1) <- X = [1,1,3] <- Y = [2,1,4]
-! [3,1,1]:Z:(3,2,1) <- Y = [2,1,3] <- X = [1,1,4]
+! call the procedure for the face neighbor
 !
-      fidx( 3,  :) = (/ 3, 1, 1 /)
-      eidx( 3,1,:) = (/ 1, 1, 3 /)
-      eidx( 3,2,:) = (/ 2, 1, 3 /)
-      cidx( 3,1,:) = (/ 2, 1, 4 /)
-      cidx( 3,2,:) = (/ 1, 1, 4 /)
+            if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! around (0,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,1,2]:X:(1,2,2) -> Y = [2,2,2] <- Z = [3,1,2]
-! [1,1,2]:X:(1,2,2) <- Z = [3,1,4] -> Y = [2,2,4]
-!
-      fidx( 4,  :) = (/ 1, 1, 2 /)
-      eidx( 4,1,:) = (/ 2, 2, 2 /)
-      eidx( 4,2,:) = (/ 3, 1, 4 /)
-      cidx( 4,1,:) = (/ 3, 1, 2 /)
-      cidx( 4,2,:) = (/ 2, 2, 4 /)
+            pneigh => pmeta%edges(i,j,k,n)%ptr
 
-! [2,2,1]:Y:(2,1,2) <- Z = [3,1,1] <- X = [1,1,3]
-! [2,2,1]:Y:(2,1,2) <- X = [1,1,1] <- Z = [3,1,2]
+! call the procedure for the face neighbor
 !
-      fidx( 5,  :) = (/ 2, 2, 1 /)
-      eidx( 5,1,:) = (/ 3, 1, 1 /)
-      eidx( 5,2,:) = (/ 1, 1, 1 /)
-      cidx( 5,1,:) = (/ 1, 1, 3 /)
-      cidx( 5,2,:) = (/ 3, 1, 2 /)
+            if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [3,1,3]:Z:(3,2,3) <- X = [1,1,4] -> Y = [2,2,4]
-! [3,1,3]:Z:(3,2,3) -> Y = [2,2,3] <- X = [1,1,3]
-!
-      fidx( 6,  :) = (/ 3, 1, 3 /)
-      eidx( 6,1,:) = (/ 1, 1, 4 /)
-      eidx( 6,2,:) = (/ 2, 2, 3 /)
-      cidx( 6,1,:) = (/ 2, 2, 4 /)
-      cidx( 6,2,:) = (/ 1, 1, 3 /)
+          end do ! n = 1, ndims
 
-! around (1,1,0) corner
+! associate pneigh with the face neighbor
 !
-! [1,2,2]:X:(1,1,2) -> Y = [2,2,1] <- Z = [3,1,1]
-! [1,2,2]:X:(1,1,2) <- Z = [3,1,3] -> Y = [2,2,3]
-!
-      fidx( 7,  :) = (/ 1, 2, 2 /)
-      eidx( 7,1,:) = (/ 2, 2, 1 /)
-      eidx( 7,2,:) = (/ 3, 1, 3 /)
-      cidx( 7,1,:) = (/ 3, 1, 1 /)
-      cidx( 7,2,:) = (/ 2, 2, 3 /)
+          pneigh => pmeta%corners(i,j,k)%ptr
 
-! [2,2,2]:Y:(2,1,2) <- Z = [3,1,2] -> X = [1,2,3]
-! [2,2,2]:Y:(2,1,2) -> X = [1,2,1] <- Z = [3,1,1]
+! call the procedure for the face neighbor
 !
-      fidx( 8,  :) = (/ 2, 2, 2 /)
-      eidx( 8,1,:) = (/ 3, 1, 2 /)
-      eidx( 8,2,:) = (/ 1, 2, 1 /)
-      cidx( 8,1,:) = (/ 1, 2, 3 /)
-      cidx( 8,2,:) = (/ 3, 1, 1 /)
+          if (associated(pneigh)) call pprocedure(pmeta, pneigh)
 
-! [3,1,4]:Z:(3,2,4) -> X = [1,2,4] -> Y = [2,2,3]
-! [3,1,4]:Z:(3,2,4) -> Y = [2,2,4] -> X = [1,2,3]
-!
-      fidx( 9,  :) = (/ 3, 1, 4 /)
-      eidx( 9,1,:) = (/ 1, 2, 4 /)
-      eidx( 9,2,:) = (/ 2, 2, 4 /)
-      cidx( 9,1,:) = (/ 2, 2, 3 /)
-      cidx( 9,2,:) = (/ 1, 2, 3 /)
-
-! around (1,0,0) corner
-!
-! [1,2,1]:X:(1,1,1) <- Y = [2,1,1] <- Z = [3,1,3]
-! [1,2,1]:X:(1,1,1) <- Z = [3,1,1] <- Y = [2,1,3]
-!
-      fidx(10,  :) = (/ 1, 2, 1 /)
-      eidx(10,1,:) = (/ 2, 1, 1 /)
-      eidx(10,2,:) = (/ 3, 1, 1 /)
-      cidx(10,1,:) = (/ 3, 1, 3 /)
-      cidx(10,2,:) = (/ 2, 1, 3 /)
-
-! [2,1,2]:Y:(2,2,2) <- Z = [3,1,4] -> X = [1,2,4]
-! [2,1,2]:Y:(2,2,2) -> X = [1,2,2] <- Z = [3,1,3]
-!
-      fidx(11,  :) = (/ 2, 1, 2 /)
-      eidx(11,1,:) = (/ 3, 1, 4 /)
-      eidx(11,2,:) = (/ 1, 2, 2 /)
-      cidx(11,1,:) = (/ 1, 2, 4 /)
-      cidx(11,2,:) = (/ 3, 1, 3 /)
-
-! [3,1,2]:Z:(3,2,2) -> X = [1,2,3] <- Y = [2,1,3]
-! [3,1,2]:Z:(3,2,2) <- Y = [2,1,4] -> X = [1,2,4]
-!
-      fidx(12,  :) = (/ 3, 1, 2 /)
-      eidx(12,1,:) = (/ 1, 2, 3 /)
-      eidx(12,2,:) = (/ 2, 1, 4 /)
-      cidx(12,1,:) = (/ 2, 1, 3 /)
-      cidx(12,2,:) = (/ 1, 2, 4 /)
-
-! around (0,0,1) corner
-!
-! [1,1,3]:X:(1,2,3) <- Y = [2,1,4] -> Z = [3,2,4]
-! [1,1,3]:X:(1,2,3) -> Z = [3,2,2] <- Y = [2,1,2]
-!
-      fidx(13,  :) = (/ 1, 1, 3 /)
-      eidx(13,1,:) = (/ 2, 1, 4 /)
-      eidx(13,2,:) = (/ 3, 2, 2 /)
-      cidx(13,1,:) = (/ 3, 2, 4 /)
-      cidx(13,2,:) = (/ 2, 1, 2 /)
-
-! [2,1,3]:Y:(2,2,3) -> Z = [3,2,3] <- X = [1,1,2]
-! [2,1,3]:Y:(2,2,3) <- X = [1,1,4] -> Z = [3,2,1]
-!
-      fidx(14,  :) = (/ 2, 1, 3 /)
-      eidx(14,1,:) = (/ 3, 2, 3 /)
-      eidx(14,2,:) = (/ 1, 1, 4 /)
-      cidx(14,1,:) = (/ 1, 1, 2 /)
-      cidx(14,2,:) = (/ 3, 2, 1 /)
-
-! [3,2,1]:Z:(3,1,1) <- X = [1,1,1] <- Y = [2,1,2]
-! [3,2,1]:Z:(3,1,1) <- Y = [2,1,1] <- X = [1,1,2]
-!
-      fidx(15,  :) = (/ 3, 2, 1 /)
-      eidx(15,1,:) = (/ 1, 1, 1 /)
-      eidx(15,2,:) = (/ 2, 1, 1 /)
-      cidx(15,1,:) = (/ 2, 1, 2 /)
-      cidx(15,2,:) = (/ 1, 1, 2 /)
-
-! around (0,1,1) corner
-!
-! [1,1,4]:X:(1,2,4) -> Y = [2,2,4] -> Z = [3,2,2]
-! [1,1,4]:X:(1,2,4) -> Z = [3,2,4] -> Y = [2,2,2]
-!
-      fidx(16,  :) = (/ 1, 1, 4 /)
-      eidx(16,1,:) = (/ 2, 2, 4 /)
-      eidx(16,2,:) = (/ 3, 2, 4 /)
-      cidx(16,1,:) = (/ 3, 2, 2 /)
-      cidx(16,2,:) = (/ 2, 2, 2 /)
-
-! [2,2,3]:Y:(2,1,3) -> Z = [3,2,1] <- X = [1,1,1]
-! [2,2,3]:Y:(2,1,3) <- X = [1,1,3] -> Z = [3,2,2]
-!
-      fidx(17,  :) = (/ 2, 2, 3 /)
-      eidx(17,1,:) = (/ 3, 2, 1 /)
-      eidx(17,2,:) = (/ 1, 1, 3 /)
-      cidx(17,1,:) = (/ 1, 1, 1 /)
-      cidx(17,2,:) = (/ 3, 2, 2 /)
-
-! [3,2,3]:Z:(3,1,3) <- X = [1,1,2] -> Y = [2,2,2]
-! [3,2,3]:Z:(3,1,3) -> Y = [2,2,1] <- X = [1,1,1]
-!
-      fidx(18,  :) = (/ 3, 2, 3 /)
-      eidx(18,1,:) = (/ 1, 1, 2 /)
-      eidx(18,2,:) = (/ 2, 2, 1 /)
-      cidx(18,1,:) = (/ 2, 2, 2 /)
-      cidx(18,2,:) = (/ 1, 1, 1 /)
-
-! around (1,1,1) corner
-!
-! [1,2,4]:X:(1,1,4) -> Y = [2,2,3] -> Z = [3,2,1]
-! [1,2,4]:X:(1,1,4) -> Z = [3,2,3] -> Y = [2,2,1]
-!
-      fidx(19,  :) = (/ 1, 2, 4 /)
-      eidx(19,1,:) = (/ 2, 2, 3 /)
-      eidx(19,2,:) = (/ 3, 2, 3 /)
-      cidx(19,1,:) = (/ 3, 2, 1 /)
-      cidx(19,2,:) = (/ 2, 2, 1 /)
-
-! [2,2,4]:Y:(2,1,4) -> Z = [3,2,2] -> X = [1,2,1]
-! [2,2,4]:Y:(2,1,4) -> X = [1,2,3] -> Z = [3,2,1]
-!
-      fidx(20,  :) = (/ 2, 2, 4 /)
-      eidx(20,1,:) = (/ 3, 2, 2 /)
-      eidx(20,2,:) = (/ 1, 2, 3 /)
-      cidx(20,1,:) = (/ 1, 2, 1 /)
-      cidx(20,2,:) = (/ 3, 2, 1 /)
-
-! [3,2,4]:Z:(3,1,4) -> X = [1,2,2] -> Y = [2,2,1]
-! [3,2,4]:Z:(3,1,4) -> Y = [2,2,2] -> X = [1,2,1]
-!
-      fidx(21,  :) = (/ 3, 2, 4 /)
-      eidx(21,1,:) = (/ 1, 2, 2 /)
-      eidx(21,2,:) = (/ 2, 2, 2 /)
-      cidx(21,1,:) = (/ 2, 2, 1 /)
-      cidx(21,2,:) = (/ 1, 2, 1 /)
-
-! around (1,0,1) corner
-!
-! [1,2,3]:X:(1,1,3) <- Y = [2,1,3] -> Z = [3,2,3]
-! [1,2,3]:X:(1,1,3) -> Z = [3,2,1] <- Y = [2,1,1]
-!
-      fidx(22,  :) = (/ 1, 2, 3 /)
-      eidx(22,1,:) = (/ 2, 1, 3 /)
-      eidx(22,2,:) = (/ 3, 2, 1 /)
-      cidx(22,1,:) = (/ 3, 2, 3 /)
-      cidx(22,2,:) = (/ 2, 1, 1 /)
-
-! [2,1,4]:Y:(2,2,4) -> Z = [3,2,4] -> X = [1,2,2]
-! [2,1,4]:Y:(2,2,4) -> X = [1,2,4] -> Z = [3,2,3]
-!
-      fidx(23,  :) = (/ 2, 1, 4 /)
-      eidx(23,1,:) = (/ 3, 2, 4 /)
-      eidx(23,2,:) = (/ 1, 2, 4 /)
-      cidx(23,1,:) = (/ 1, 2, 2 /)
-      cidx(23,2,:) = (/ 3, 2, 3 /)
-
-! [3,2,2]:Z:(3,1,2) -> X = [1,2,1] <- Y = [2,1,3]
-! [3,2,2]:Z:(3,1,2) <- Y = [2,1,2] -> X = [1,2,4]
-!
-      fidx(24,  :) = (/ 3, 2, 2 /)
-      eidx(24,1,:) = (/ 1, 2, 1 /)
-      eidx(24,2,:) = (/ 2, 1, 2 /)
-      cidx(24,1,:) = (/ 2, 1, 3 /)
-      cidx(24,2,:) = (/ 1, 2, 3 /)
+        end do ! i = 1, nsides
+      end do ! j = 1, nsides
+    end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
-
-! reset the first time execution flag
-!
-      first = .false.
-
-    end if
-
-! iterate over all block faces (or edges in the 2D case)
-!
-    do l = 1, mfaces
-      call iterate_over_face(pmeta, pprocedure                                 &
-                                        , fidx(l,:), eidx(l,:,:), cidx(l,:,:))
-    end do
 
 !-------------------------------------------------------------------------------
 !
   end subroutine iterate_over_neighbors
-!
-!===============================================================================
-!
-! subroutine ITERATE_OVER_FACE:
-! ----------------------------
-!
-!   Subroutine iterates over all neighbors, edges and corners linked to
-!   the input meta block and executes a subroutine provided by the pointer.
-!
-!   Arguments:
-!
-!     pmeta - a pointer to the meta block which neighbors are iterated over;
-!     pproc - a pointer to the subroutine called with each pair (pmeta, pneigh);
-!     fidx  - the index of face to process;
-!     eidx  - the indices of faces connected with edges;
-!     cidx  - the indices of faces connected with corners;
-!
-!===============================================================================
-!
-  subroutine iterate_over_face(pmeta, pprocedure, fidx, eidx, cidx)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    type(block_meta)                 , pointer, intent(inout) :: pmeta
-    procedure(reset_neighbors_update), pointer, intent(in)    :: pprocedure
-    integer, dimension(3)                     , intent(in)    :: fidx
-    integer, dimension(2,3)                   , intent(in)    :: eidx
-    integer, dimension(2,3)                   , intent(in)    :: cidx
-
-! local pointers
-!
-    type(block_meta), pointer :: pneigh, pedge, pcorner
-!
-!-------------------------------------------------------------------------------
-!
-! associate a pointer with the neighbor
-!
-    pneigh => pmeta%neigh(fidx(1),fidx(2),fidx(3))%ptr
-
-! check if the neighbors is associated
-!
-    if (associated(pneigh)) then
-
-! call the procedure for the face neighbor
-!
-      call pprocedure(pmeta, pneigh)
-
-! associate a pointer with the first edge
-!
-      pedge => pneigh%neigh(eidx(1,1),eidx(1,2),eidx(1,3))%ptr
-
-! check if the edge pointer is associated
-!
-      if (associated(pedge)) then
-
-! call the procedure for the edge neighbor
-!
-        call pprocedure(pmeta, pedge)
-
-#if NDIMS == 3
-! associate a pointer with the first corner
-!
-        pcorner => pedge%neigh(cidx(1,1),cidx(1,2),cidx(1,3))%ptr
-
-! call the procedure for the corner neighbor if it is associated
-!
-        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
-#endif /* NDIMS == 3 */
-
-      end if ! pedge associated
-
-#if NDIMS == 3
-! associate a pointer with the second edge
-!
-      pedge => pneigh%neigh(eidx(2,1),eidx(2,2),eidx(2,3))%ptr
-
-! check if the edge pointer is associated
-!
-      if (associated(pedge)) then
-
-! call the procedure for the edge neighbor
-!
-        call pprocedure(pmeta, pedge)
-
-! associate a pointer with the second corner
-!
-        pcorner => pedge%neigh(cidx(2,1),cidx(2,2),cidx(2,3))%ptr
-
-! call the procedure for the corner neighbor if it is associated
-!
-        if (associated(pcorner)) call pprocedure(pmeta, pcorner)
-
-      end if ! pedge associated
-#endif /* NDIMS == 3 */
-
-    end if ! pneigh associated
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine iterate_over_face
 #ifdef DEBUG
 !
 !===============================================================================
