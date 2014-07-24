@@ -1435,7 +1435,7 @@ module io
 ! import procedures and variables from other modules
 !
     use blocks         , only : block_meta, list_meta
-    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : ndims, nchildren, nsides
     use blocks         , only : get_last_id, get_mblocks
     use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
@@ -1456,7 +1456,6 @@ module io
     integer                        :: iret
     integer(hsize_t), dimension(1) :: am, cm
     integer(hsize_t), dimension(2) :: dm, pm
-    integer(hsize_t), dimension(4) :: qm
 #if NDIMS == 2
     integer(hsize_t), dimension(4) :: nm
 #endif /* NDIMS == 2 */
@@ -1471,7 +1470,6 @@ module io
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
-    integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
 #if NDIMS == 2
     integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
     integer(kind=4), dimension(:,:,:)    , allocatable :: corners
@@ -1508,10 +1506,6 @@ module io
       dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
-      qm(1) = get_mblocks()
-      qm(2) = NDIMS
-      qm(3) = nsides
-      qm(4) = nfaces
       nm(1) = get_mblocks()
       nm(2) = nsides
       nm(3) = nsides
@@ -1547,7 +1541,6 @@ module io
         allocate(chl(dm(1),dm(2)))
         allocate(pos(pm(1),pm(2)))
         allocate(cor(pm(1),pm(2)))
-        allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 #if NDIMS == 2
         allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
         allocate(corners(nm(1),nm(2),nm(3)))
@@ -1565,7 +1558,6 @@ module io
         dat(:)           = -1
         lea(:)           = -1
         chl(:,:)         = -1
-        ngh(:,:,:,:)     = -1
 #if NDIMS == 2
         edges(:,:,:,:)   = -1
         corners(:,:,:)   = -1
@@ -1618,15 +1610,6 @@ module io
 
           do p = 1, nchildren
             if (associated(pmeta%child(p)%ptr)) chl(l,p) = pmeta%child(p)%ptr%id
-          end do
-
-          do i = 1, NDIMS
-            do j = 1, nsides
-              do k = 1, nfaces
-                if (associated(pmeta%neigh(i,j,k)%ptr))  &
-                                          ngh(l,i,j,k) = pmeta%neigh(i,j,k)%ptr%id
-              end do
-            end do
           end do
 
 ! store face, edge and corner neighbor pointers
@@ -1686,7 +1669,6 @@ module io
         call write_array(gid, 'child'  , dm(:)  , chl(:,:))
         call write_array(gid, 'pos'    , pm(:)  , pos(:,:))
         call write_array(gid, 'coord'  , pm(:)  , cor(:,:))
-        call write_array(gid, 'neigh'  , qm(:)  , ngh(:,:,:,:))
 #if NDIMS == 2
         call write_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
         call write_array(gid, 'corners', nm(1:3), corners(:,:,:))
@@ -1716,7 +1698,6 @@ module io
         if (allocated(zmx))     deallocate(zmx)
         if (allocated(chl))     deallocate(chl)
         if (allocated(cor))     deallocate(cor)
-        if (allocated(ngh))     deallocate(ngh)
 #if NDIMS == 3
         if (allocated(faces))   deallocate(faces)
 #endif /* NDIMS == 3 */
@@ -1770,7 +1751,7 @@ module io
 ! import procedures and variables from other modules
 !
     use blocks         , only : block_meta, list_meta
-    use blocks         , only : ndims, nchildren, nsides, nfaces
+    use blocks         , only : ndims, nchildren, nsides
     use blocks         , only : get_mblocks
     use blocks         , only : metablock_set_id, metablock_set_process
     use blocks         , only : metablock_set_refinement
@@ -1798,7 +1779,6 @@ module io
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
-    integer(hsize_t), dimension(4) :: qm
 #if NDIMS == 2
     integer(hsize_t), dimension(4) :: nm
 #endif /* NDIMS == 2 */
@@ -1813,7 +1793,6 @@ module io
     integer(kind=4), dimension(:)  , allocatable ::  id, cpu, lev, cfg, ref, lea
     real   (kind=8), dimension(:)  , allocatable :: xmn, xmx, ymn, ymx, zmn, zmx
     integer(kind=4), dimension(:,:), allocatable :: chl, pos, cor
-    integer(kind=4), dimension(:,:,:,:), allocatable :: ngh
 #if NDIMS == 2
     integer(kind=4), dimension(:,:,:,:)  , allocatable :: edges
     integer(kind=4), dimension(:,:,:)    , allocatable :: corners
@@ -1853,10 +1832,6 @@ module io
       dm(2) = nchildren
       pm(1) = get_mblocks()
       pm(2) = NDIMS
-      qm(1) = get_mblocks()
-      qm(2) = NDIMS
-      qm(3) = nsides
-      qm(4) = nfaces
       nm(1) = get_mblocks()
       nm(2) = nsides
       nm(3) = nsides
@@ -1887,7 +1862,6 @@ module io
       allocate(chl(dm(1),dm(2)))
       allocate(pos(pm(1),pm(2)))
       allocate(cor(pm(1),pm(2)))
-      allocate(ngh(qm(1),qm(2),qm(3),qm(4)))
 #if NDIMS == 2
       allocate(edges  (nm(1),nm(2),nm(3),nm(4)))
       allocate(corners(nm(1),nm(2),nm(3)))
@@ -1904,7 +1878,6 @@ module io
       dat(:)           = -1
       lea(:)           = -1
       chl(:,:)         = -1
-      ngh(:,:,:,:)     = -1
 #if NDIMS == 2
       edges(:,:,:,:)   = -1
       corners(:,:,:)   = -1
@@ -1933,7 +1906,6 @@ module io
       call read_array(gid, 'pos'    , pm(:), pos(:,:))
       call read_array(gid, 'coord'  , pm(:), cor(:,:))
       call read_array(gid, 'child'  , dm(:), chl(:,:))
-      call read_array(gid, 'neigh'  , qm(:), ngh(:,:,:,:))
 #if NDIMS == 2
       call read_array(gid, 'edges'  , nm(1:4), edges(:,:,:,:))
       call read_array(gid, 'corners', nm(1:3), corners(:,:,:))
@@ -2019,17 +1991,6 @@ module io
           end if
         end do ! p = 1, nchildren
 
-! restore %neigh pointers
-!
-        do i = 1, ndims
-          do j = 1, nsides
-            do k = 1, nfaces
-              if (ngh(l,i,j,k) > 0)                                            &
-                       pmeta%neigh(i,j,k)%ptr => block_array(ngh(l,i,j,k))%ptr
-            end do ! k = 1, nfaces
-          end do ! j = 1, nsides
-        end do ! i = 1, ndims
-
 ! restore %faces, %edges and %corners neighbor pointers
 !
 #if NDIMS == 2
@@ -2085,7 +2046,6 @@ module io
       if (allocated(zmx))     deallocate(zmx)
       if (allocated(chl))     deallocate(chl)
       if (allocated(cor))     deallocate(cor)
-      if (allocated(ngh))     deallocate(ngh)
 #if NDIMS == 3
       if (allocated(faces))   deallocate(faces)
 #endif /* NDIMS == 3 */
