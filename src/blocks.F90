@@ -4670,11 +4670,19 @@ module blocks
 
 ! local pointers
 !
-    type(block_meta), pointer :: pneigh, pnneigh
+    type(block_meta), pointer             :: pneigh, pself
 
 ! local variables
 !
-    integer :: i, j, k, l, m
+    integer :: ip, ir, ic
+    integer :: jp, jr, jc
+#if NDIMS == 3
+    integer :: kp, kr, kc
+#endif /* NDIMS == 2 */
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname = "blocks::check_block_neighbors"
 !
 !-------------------------------------------------------------------------------
 !
@@ -4682,114 +4690,981 @@ module blocks
 !
     if (.not. pmeta%leaf) return
 
-! iterate over all face neighbors
+#if NDIMS == 2
+! iterate over all corners
 !
-    do i = 1, ndims
-      do j = 1, nsides
-        m = 3 - j
-        do k = 1, nfaces
+    do jp = 1, nsides
+      jr = 3 - jp
+      do ip = 1, nsides
+        ir = 3 - ip
 
-! assign pointer with the neighbor
+!--- check edges ---
 !
-          pneigh => pmeta%neigh(i,j,k)%ptr
+! along X direction
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%edges(ip,jp,1)%ptr
+
+! check if pneigh is associated
+!
+        if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+          if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+            pself => pneigh%edges(ip,jr,1)%ptr
+
+! check if pself is associated
+!
+            if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+              if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                call print_warning(fname                                       &
+                                  , "Inconsistent same level neighbor edges!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ', pmeta%id , ip, jp, 1
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ip, jr, 1
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+              end if ! %id fields don't match
+
+            else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+              call print_warning(fname                                         &
+                               , "Same level neighbor's edge not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'meta ', pmeta%id , ip, jp, 1
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ip, jr, 1
+
+            end if ! pself associated
+
+          end if ! pneigh and pmeta on the same level
+
+! if pneigh is on the higher level level
+!
+          if (pneigh%level > pmeta%level) then
+
+! iterate over all edges in the given direction and Y side
+!
+            do ic = 1, nsides
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ic,jr,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'meta ',  pmeta%id, ip, jp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'neigh', pneigh%id, ip, jr, 1
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'self ',  pself%id, ic, jr, 1
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                             , "Higher level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 1
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ic, jr, 1
+
+              end if ! pself associated
+
+            end do ! ic = 1, nsides
+
+          end if ! pneigh on higher level
+
+        end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%edges(ip,jp,2)%ptr
+
+! check if pneigh is associated
+!
+        if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+          if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+            pself => pneigh%edges(ir,jp,2)%ptr
+
+! check if pself is associated
+!
+            if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+              if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                call print_warning(fname                                       &
+                                   , "Inconsistent same level neighbor edge!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 2
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jp, 2
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+              end if ! %id fields don't match
+
+            else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+              call print_warning(fname                                         &
+                               , "Same level neighbor's edge not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'meta ', pmeta%id , ip, jp, 2
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ir, jp, 2
+
+            end if ! pself associated
+
+          end if ! pneigh and pmeta on the same level
+
+! if pneigh is on the higher level level
+!
+          if (pneigh%level > pmeta%level) then
+
+! iterate over all edges in the given direction and Y side
+!
+            do jc = 1, nsides
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jc,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'meta ',  pmeta%id, ip, jp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'neigh', pneigh%id, ir, jp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                                              'self ',  pself%id, ir, jc, 2
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                             , "Higher level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'meta ',  pmeta%id, ip, jp, 2
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jc, 2
+
+              end if ! pself associated
+
+            end do ! jc = 1, nsides
+
+          end if ! pneigh on higher level
+
+        end if ! pneigh associated
+
+!--- check corners ---
+!
+! associate pneigh with the current corner
+!
+        pneigh => pmeta%corners(ip,jp)%ptr
+
+! check if the neighbor is associated
+!
+        if (associated(pneigh)) then
+
+! assiociate pself to the corresponding corner of the neighbor
+!
+          pself => pneigh%corners(ir,jr)%ptr
+
+! check if pself is associated
+!
+          if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+            if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+              call print_warning(fname                                         &
+                                           , "Inconsistent neighbor corners!")
+              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+                                          'meta ',  pmeta%id, ip, jp
+              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+                                          'neigh', pneigh%id, ir, jr
+              write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+            end if ! %id fields don't match
+
+          else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+            call print_warning(fname                                           &
+                                        , "Neighbor's corner not associated!")
+            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+                                        'meta ',  pmeta%id, ip, jp
+            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+                                        'neigh', pneigh%id, ir, jr
+
+          end if ! pself associated
+
+        end if ! pneigh associated
+
+      end do ! ip = 1, nsides
+    end do ! jp = 1, nsides
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+! iterate over all corners
+!
+    do kp = 1, nsides
+      kr = 3 - kp
+      do jp = 1, nsides
+        jr = 3 - jp
+        do ip = 1, nsides
+          ir = 3 - ip
+
+!--- check faces ---
+!
+! along X direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,1)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ir,jp,kp,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kp, 1
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                            'neigh', pneigh%id, ir, jp, kp, 1
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do kc = 1, nsides
+                do jc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ir,jc,kc,1)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ir, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ir, jc, kc, 1
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ir, jc, kc, 1
+
+                  end if ! pself associated
+
+                end do ! jc = 1, nsides
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,2)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ip,jr,kp,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kp, 2
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 2
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jr, kp, 2
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do kc = 1, nsides
+                do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ic,jr,kc,2)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ip, jr, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ic, jr, kc, 2
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 2
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ic, jr, kc, 2
+
+                  end if ! pself associated
+
+                end do ! ic = 1, nsides
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Z direction
+!
+! associate pneigh with the current face
+!
+          pneigh => pmeta%faces(ip,jp,kp,3)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding face of the neighbor
+!
+              pself => pneigh%faces(ip,jp,kr,3)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor faces!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jp, kr, 3
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's face not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 3
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jp, kr, 3
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor faces
+!
+              do jc = 1, nsides
+                do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                  pself => pneigh%faces(ic,jc,kr,3)%ptr
+
+! check if pself is associated
+!
+                  if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                    if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                    call print_warning(fname                                   &
+                                 , "Inconsistent higher level neighbor face!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ip, jp, kr, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'self ',  pself%id, ic, jc, kr, 3
+
+                    end if ! %id fields don't match
+
+                  else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                    call print_warning(fname                                   &
+                             , "Higher level neighbor's face not associated!")
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'meta ', pmeta%id , ip, jp, kp, 3
+                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                            'neigh', pneigh%id, ic, jc, kr, 3
+
+                  end if ! pself associated
+
+                end do ! ic = 1, nsides
+              end do ! jc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+!--- check edges ---
+!
+! along X direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,1)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ip,jr,kr,1)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kr, 1
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 1
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ip, jr, kr, 1
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do ic = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ic,jr,kr,1)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ip, jr, kr, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ic, jr, kr, 1
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 1
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ic, jr, kr, 1
+
+                end if ! pself associated
+
+              end do ! ic = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Y direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,2)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jp,kr,2)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kr, 2
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 2
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jp, kr, 2
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do jc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ir,jc,kr,2)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jp, kr, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ir, jc, kr, 2
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 2
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ir, jc, kr, 2
+
+                end if ! pself associated
+
+              end do ! jc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+! along Z direction
+!
+! associate pneigh with the current edge
+!
+          pneigh => pmeta%edges(ip,jp,kp,3)%ptr
+
+! check if pneigh is associated
+!
+          if (associated(pneigh)) then
+
+! if pneigh is on the same level
+!
+            if (pneigh%level == pmeta%level) then
+
+! assiociate pself to the corresponding edge of the neighbor
+!
+              pself => pneigh%edges(ir,jr,kp,3)%ptr
+
+! check if pself is associated
+!
+              if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                  , "Inconsistent same level neighbor edges!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jr, kp, 3
+                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+
+                end if ! %id fields don't match
+
+              else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                call print_warning(fname                                       &
+                               , "Same level neighbor's edge not associated!")
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'meta ', pmeta%id , ip, jp, kp, 3
+                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jr, kp, 3
+
+              end if ! pself associated
+
+            end if ! pneigh and pmeta on the same level
+
+! if pneigh is on higher level
+!
+            if (pneigh%level > pmeta%level) then
+
+! iterate over all neighbor edges
+!
+              do kc = 1, nsides
+
+! assiociate pself to the corresponding face of the neighbor
+!
+                pself => pneigh%edges(ir,jr,kc,3)%ptr
+
+! check if pself is associated
+!
+                if (associated(pself)) then
+
+! check if pself is the same as pmeta
+!
+                  if (pmeta%id /= pself%id) then
+
+! print warning, since the blocks differ
+!
+                  call print_warning(fname                                     &
+                                 , "Inconsistent higher level neighbor edge!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'neigh', pneigh%id, ir, jr, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                                          'self ',  pself%id, ir, jr, kc, 3
+
+                  end if ! %id fields don't match
+
+                else ! pself associated
+
+! print warning, since the pointer should be associated
+!
+                  call print_warning(fname                                   &
+                             , "Higher level neighbor's edge not associated!")
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'meta ', pmeta%id , ip, jp, kp, 3
+                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                                          'neigh', pneigh%id, ir, jr, kc, 3
+
+                end if ! pself associated
+
+              end do ! kc = 1, nsides
+
+            end if ! pneigh on higher level
+
+          end if ! pneigh associated
+
+!--- check corners ---
+!
+! associate pneigh with the current corner
+!
+          pneigh => pmeta%corners(ip,jp,kp)%ptr
 
 ! check if the neighbor is associated
 !
           if (associated(pneigh)) then
 
-! check neighbors on the same levels
+! assiociate pself to the corresponding corner of the neighbor
 !
-            if (pmeta%level == pneigh%level) then
+            pself => pneigh%corners(ir,jr,kr)%ptr
 
-! assign pointer to the neighbor of the neighbor pointing to the current meta
-! block
+! check if pself is associated
 !
-              pnneigh => pneigh%neigh(i,m,k)%ptr
+            if (associated(pself)) then
 
-! check if it is associated
+! check if pself is the same as pmeta
 !
-              if (associated(pnneigh)) then
-
-! check if the pointer of the neighbor points to the current meta block
-!
-                if (pmeta%id /= pnneigh%id) then
+              if (pmeta%id /= pself%id) then
 
 ! print warning, since the blocks differ
 !
-                  call print_warning("blocks::check_block_neighbors"           &
-                                       , "Inconsistent same level neighbors!")
-                  print *, 'metablock: ', pmeta%id, pnneigh%id
-                  print *, 'neighbor : ', pneigh%id
-                  print *, 'index    : ', i, j, k
+                call print_warning(fname                                       &
+                                           , "Inconsistent neighbor corners!")
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                        'meta ',  pmeta%id, ip, jp, kp
+                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                                        'neigh', pneigh%id, ir, jr, kr
+                write(*,"(a6,' id: ',i8)")  'self ', pself%id
 
-                end if
+              end if ! %id fields don't match
 
-              else ! pnneigh associated
-
-! print warning, since the pointer should be associated
-!
-                call print_warning("blocks::check_block_neighbors"             &
-                                      , "Same level neighbor not associated!")
-                print *, 'metablock: ', pmeta%id, pnneigh%id
-                print *, 'neighbor : ', pneigh%id
-                print *, 'index    : ', i, j, k
-
-              end if ! pnneigh associated
-
-            end if ! the same levels
-
-! check neighbors on the level higher than the meta block's level; it also
-! covers the other way around, since we iterate over all neighbor faces
-!
-            if (pmeta%level < pneigh%level) then
-
-! iterate over whole face of the corresponding neighbor
-!
-              do l = 1, nfaces
-
-! assign pointer to the corresponding neighbor of the neighbor
-!
-                pnneigh => pneigh%neigh(i,m,l)%ptr
-
-! check if it is associated
-!
-                if (associated(pnneigh)) then
-
-! check if the pointer of the neighbor points to the current meta block
-!
-                  if (pmeta%id /= pnneigh%id) then
-
-! print warning, since the blocks differ
-!
-                    call print_warning("blocks::check_block_neighbors"         &
-                                  , "Inconsistent different level neighbors!")
-                    print *, 'metablock: ', pmeta%id, pnneigh%id
-                    print *, 'neighbor : ', pneigh%id
-                    print *, 'index    : ', i, j, k, l
-
-                  end if
-
-                else ! pnneigh associated
+            else ! pself associated
 
 ! print warning, since the pointer should be associated
 !
-                  call print_warning("blocks::check_block_neighbors"           &
-                                 , "Different level neighbor not associated!")
-                  print *, 'metablock: ', pmeta%id, pnneigh%id
-                  print *, 'neighbor : ', pneigh%id
-                  print *, 'index    : ', i, j, k, l
+              call print_warning(fname                                         &
+                                        , "Neighbor's corner not associated!")
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                      'meta ',  pmeta%id, ip, jp, kp
+              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+                                      'neigh', pneigh%id, ir, jr, kr
 
-                end if ! pnneigh associated
-
-              end do ! l = 1, nfaces
-
-            end if ! pmeta's level < pneigh's level
+            end if ! pself associated
 
           end if ! pneigh associated
 
-        end do ! nfaces
-      end do ! nsides
-    end do ! ndims
+        end do ! ip = 1, nsides
+      end do ! jp = 1, nsides
+    end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !
