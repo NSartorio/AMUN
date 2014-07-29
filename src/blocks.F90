@@ -1343,7 +1343,7 @@ module blocks
     logical, save :: first = .true.
     integer       :: p , q
     integer       :: i , j , k
-    integer       :: ip, jp, kp
+    integer       :: ip, jp, kp, np
     integer       :: ir, jr, kr
     real(kind=8)  :: xln, yln, zln, xmn, xmx, ymn, ymx, zmn, zmx
 
@@ -2363,6 +2363,39 @@ module blocks
 
 !! RESET PARENT'S FIELDS
 !!
+! derefine all neighbors
+!
+#if NDIMS == 3
+      do kp = 1, nsides
+#endif /* NDIMS == 3 */
+        do jp = 1, nsides
+          do ip = 1, nsides
+            do np = 1, ndims
+#if NDIMS == 2
+              if (associated(pmeta%edges(ip,jp,np)%ptr))                       &
+                                         nullify(pmeta%edges(ip,jp,np)%ptr)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              if (associated(pmeta%faces(ip,jp,kp,np)%ptr))                    &
+                                         nullify(pmeta%faces(ip,jp,kp,np)%ptr)
+              if (associated(pmeta%edges(ip,jp,kp,np)%ptr))                    &
+                                         nullify(pmeta%edges(ip,jp,kp,np)%ptr)
+#endif /* NDIMS == 3 */
+            end do ! np = 1, ndims
+#if NDIMS == 2
+            if (associated(pmeta%corners(ip,jp)%ptr))                          &
+                                          nullify(pmeta%corners(ip,jp)%ptr)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            if (associated(pmeta%corners(ip,jp,kp)%ptr))                       &
+                                          nullify(pmeta%corners(ip,jp,kp)%ptr)
+#endif /* NDIMS == 3 */
+          end do ! ip = 1, nsides
+        end do ! jp = 1, nsides
+#if NDIMS == 3
+      end do ! kp = 1, nsides
+#endif /* NDIMS == 3 */
+
 ! unset the block leaf flag
 !
       call metablock_unset_leaf(pmeta)
