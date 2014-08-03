@@ -1073,7 +1073,7 @@ module boundaries
 
 ! local variables
 !
-    integer                   :: i, j, k, n
+    integer                   :: i, j, k, n, m
 !
 !-------------------------------------------------------------------------------
 !
@@ -1114,6 +1114,11 @@ module boundaries
 !
               if (.not. periodic(n)) then
 
+! calculate the edge direction (in 2D we don't have face neighbors, so we have
+! to use edge neighbors)
+!
+                m = 3 - n
+
 ! iterate over all corners
 !
                 do j = 1, nsides
@@ -1121,8 +1126,8 @@ module boundaries
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
-                  if (.not. associated(pmeta%edges(i,j,n)%ptr))                &
-                            call block_boundary_specific(i, j, k, 3 - n        &
+                  if (.not. associated(pmeta%edges(i,j,m)%ptr))                &
+                            call block_boundary_specific(i, j, k, n            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                   end do ! i = 1, sides
