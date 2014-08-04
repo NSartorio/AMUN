@@ -117,9 +117,9 @@ module io
   integer(kind=4)   , save :: irest       =  1
   integer(kind=4)   , save :: isnap       =  0
   integer(kind=4)   , save :: ishift      =  0
-  real              , save :: hrest       =  6.0e+00
-  real              , save :: hsnap       =  1.0e+00
-  real              , save :: tsnap       =  0.0e+00
+  real(kind=8)      , save :: hrest       =  6.0e+00
+  real(kind=8)      , save :: hsnap       =  1.0e+00
+  real(kind=8)      , save :: tsnap       =  0.0e+00
 
 ! flags to determine the way of data writing
 !
@@ -374,9 +374,9 @@ module io
 
 ! input and output arguments
 !
-    real   , intent(in)  :: thrs
-    integer, intent(in)  :: nrun
-    integer, intent(out) :: iret
+    real(kind=8), intent(in)  :: thrs
+    integer     , intent(in)  :: nrun
+    integer     , intent(out) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -475,7 +475,7 @@ module io
 !
 !===============================================================================
 !
-  real function next_tout()
+  real(kind=8) function next_tout()
 
 ! local variables are not implicit by default
 !
