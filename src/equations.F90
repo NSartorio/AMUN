@@ -1144,8 +1144,8 @@ module equations
 
 ! local variables
 !
-    integer :: i
-    real    :: ek, ei
+    integer      :: i
+    real(kind=8) :: ek, ei
 !
 !-------------------------------------------------------------------------------
 !
@@ -1209,8 +1209,8 @@ module equations
 
 ! local variables
 !
-    integer :: i
-    real    :: ek, ei
+    integer      :: i
+    real(kind=8) :: ek, ei
 !
 !-------------------------------------------------------------------------------
 !
