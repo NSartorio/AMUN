@@ -559,6 +559,14 @@ program amun
     step   = step   +  1
     nsteps = nsteps +  1
 
+! get current time in seconds
+!
+    tm_curr = get_timer_total()
+
+! compute elapsed time
+!
+    thrs = tm_curr / 3.6d+03
+
 ! store mesh statistics
 !
     call store_mesh_stats(step, time)
@@ -574,14 +582,6 @@ program amun
 ! store data
 !
     call write_snapshot()
-
-! get current time in seconds
-!
-    tm_curr = get_timer_total()
-
-! compute elapsed time
-!
-    thrs = tm_curr / 3.6d+03
 
 ! check if the time exceeds execution time limit
 !

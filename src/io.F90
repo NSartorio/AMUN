@@ -117,9 +117,9 @@ module io
   integer(kind=4)   , save :: irest       =  1
   integer(kind=4)   , save :: isnap       =  0
   integer(kind=4)   , save :: ishift      =  0
-  real(kind=8)      , save :: hrest       =  6.0e+00
-  real(kind=8)      , save :: hsnap       =  1.0e+00
-  real(kind=8)      , save :: tsnap       =  0.0e+00
+  real(kind=8)      , save :: hrest       =  6.0d+00
+  real(kind=8)      , save :: hsnap       =  1.0d+00
+  real(kind=8)      , save :: tsnap       =  0.0d+00
 
 ! flags to determine the way of data writing
 !
@@ -382,7 +382,7 @@ module io
 !
 ! check if conditions for storing the restart snapshot have been met
 !
-    if (hrest < 5.0e-02 .or. thrs < irest * hrest) return
+    if (hrest < 5.0d-02 .or. thrs < irest * hrest) return
 
 #ifdef PROFILE
 ! start accounting time for the data writing
