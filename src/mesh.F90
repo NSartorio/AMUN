@@ -1055,10 +1055,10 @@ module mesh
 
 ! local variables
 !
-    integer :: i, j, k, q, p
-    integer :: il, iu, jl, ju, kl, ku
-    integer :: ic, jc, kc, ip, jp, kp
-    real    :: dul, dur, dux, duy, duz, du1, du2, du3, du4
+    integer      :: i, j, k, q, p
+    integer      :: il, iu, jl, ju, kl, ku
+    integer      :: ic, jc, kc, ip, jp, kp
+    real(kind=8) :: dul, dur, dux, duy, duz, du1, du2, du3, du4
 
 ! local pointers
 !
@@ -1071,7 +1071,7 @@ module mesh
 
 ! local allocatable arrays
 !
-    real, dimension(:,:,:,:), allocatable :: u
+    real(kind=8), dimension(:,:,:,:), allocatable :: u
 
 !-------------------------------------------------------------------------------
 !
