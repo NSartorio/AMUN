@@ -41,19 +41,19 @@ module evolution
 
 ! evolution parameters
 !
-  real   , save :: cfl     = 0.5d+00
+  real(kind=8), save :: cfl     = 0.5d+00
 
 ! coefficient controlling the decay of scalar potential ѱ
 !
-  real   , save :: alpha   = 2.0d+00
-  real   , save :: decay   = 1.0d+00
+  real(kind=8), save :: alpha   = 2.0d+00
+  real(kind=8), save :: decay   = 1.0d+00
 
 ! time variables
 !
-  integer, save :: step    = 0
-  real   , save :: time    = 0.0d+00
-  real   , save :: dt      = 1.0d+00
-  real   , save :: dtn     = 1.0d+00
+  integer     , save :: step    = 0
+  real(kind=8), save :: time    = 0.0d+00
+  real(kind=8), save :: dt      = 1.0d+00
+  real(kind=8), save :: dtn     = 1.0d+00
 
 ! by default everything is private
 !
@@ -225,7 +225,7 @@ module evolution
 
 ! input variables
 !
-    real, intent(in) :: dtnext
+    real(kind=8), intent(in) :: dtnext
 !
 !-------------------------------------------------------------------------------
 !
@@ -309,7 +309,7 @@ module evolution
 
 ! input variables
 !
-    real, intent(in) :: dtnext
+    real(kind=8), intent(in) :: dtnext
 
 ! local pointers
 !
@@ -319,11 +319,11 @@ module evolution
 !
     integer                   :: iret
     integer(kind=4)           :: lev
-    real                      :: cm, dx_min
+    real(kind=8)              :: cm, dx_min
 
 ! local parameters
 !
-    real, parameter           :: eps = tiny(cmax)
+    real(kind=8), parameter   :: eps = tiny(cmax)
 !
 !-------------------------------------------------------------------------------
 !
@@ -432,7 +432,7 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nv,im,jm,km) :: du
+    real(kind=8), dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -517,7 +517,7 @@ module evolution
 
 ! local arrays
 !
-    real, dimension(nv,im,jm,km) :: du
+    real(kind=8), dimension(nv,im,jm,km) :: du
 !
 !-------------------------------------------------------------------------------
 !
@@ -638,15 +638,15 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer :: pblock
+    type(block_data), pointer  :: pblock
 
 ! local vectors
 !
-    real, dimension(3)        :: dx
+    real(kind=8), dimension(3) :: dx
 
 ! local variables
 !
-    integer                   :: n
+    integer                    :: n
 !
 !-------------------------------------------------------------------------------
 !
