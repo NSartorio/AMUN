@@ -96,8 +96,8 @@ module random
 
 ! local variables
 !
-    integer :: i
-    real    :: r
+    integer      :: i
+    real(kind=4) :: r
 !
 !-------------------------------------------------------------------------------
 !
@@ -217,8 +217,8 @@ module random
 
 ! local variables
 !
-    integer :: i, l
-    real    :: r
+    integer      :: i, l
+    real(kind=4) :: r
 !
 !-------------------------------------------------------------------------------
 !
@@ -326,7 +326,7 @@ module random
 
 ! output variables
 !
-    real            :: val
+    real(kind=8)    :: val
 
 ! local variables
 !
@@ -349,7 +349,7 @@ module random
 
     seeds(kp) = jsr
 
-    val = 0.5 + 0.23283064365e-9 * (jz + jsr)
+    val = 0.5d+00 + 0.23283064365d-09 * (jz + jsr)
 
 #ifdef PROFILE
 ! stop accounting time for the random number generation
@@ -380,7 +380,7 @@ module random
 
 ! output variables
 !
-    real            :: val
+    real(kind=8)    :: val
 
 ! local variables
 !
@@ -403,7 +403,7 @@ module random
 
     seeds(kp) = jsr
 
-    val = 0.23283064365e-9 * (jz + jsr)
+    val = 0.23283064365d-09 * (jz + jsr)
 
 #ifdef PROFILE
 ! stop accounting time for the random number generation
@@ -434,7 +434,7 @@ module random
 
 ! output variables
 !
-    real            :: val
+    real(kind=8)    :: val
 
 ! local variables
 !
@@ -457,7 +457,7 @@ module random
 
     seeds(kp) = jsr
 
-    val = 0.46566128730e-9 * (jz + jsr)
+    val = 0.46566128730d-09 * (jz + jsr)
 
 #ifdef PROFILE
 ! stop accounting time for the random number generation
