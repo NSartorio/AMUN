@@ -85,7 +85,7 @@ program amun
   integer, dimension(3) :: div = 1
   logical, dimension(3) :: per = .true.
   integer               :: nmax  = huge(1), ndat = 1
-  real                  :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
+  real(kind=8)          :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
   real(kind=8)          :: dtnext = 0.0d+00
 
 ! flag to adjust time precisely to the snapshots
@@ -118,7 +118,7 @@ program amun
   integer               :: nsteps = 1
   character(len=80)     :: fmt, tmp
 
-  real                  :: tbeg, thrs
+  real(kind=8)          :: tbeg, thrs
   real(kind=8)          :: tm_curr, tm_exec, tm_conv
 
 #ifdef INTEL
@@ -593,7 +593,7 @@ program amun
 
 ! calculate days, hours, seconds
 !
-      ec   = int(tm_curr * (tmax - time) / max(1.0e-8, time - tbeg), kind = 4)
+      ec   = int(tm_curr * (tmax - time) / max(1.0d-08, time - tbeg), kind = 4)
       es   = max(0, int(mod(ec, 60)))
       em   = int(mod(ec / 60, 60))
       eh   = int(ec / 3600)

@@ -401,8 +401,8 @@ module boundaries
     use coordinates    , only : ib, ie, ibl
     use coordinates    , only : jb, je, jbl
     use coordinates    , only : kb, ke, kbl
-#ifdef MPI
     use equations      , only : nv
+#ifdef MPI
     use mpitools       , only : nprocs, nproc, npmax
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
@@ -1073,7 +1073,7 @@ module boundaries
 
 ! local variables
 !
-    integer                   :: i, j, k, n
+    integer                   :: i, j, k, n, m
 !
 !-------------------------------------------------------------------------------
 !
@@ -1114,6 +1114,11 @@ module boundaries
 !
               if (.not. periodic(n)) then
 
+! calculate the edge direction (in 2D we don't have face neighbors, so we have
+! to use edge neighbors)
+!
+                m = 3 - n
+
 ! iterate over all corners
 !
                 do j = 1, nsides
@@ -1121,8 +1126,8 @@ module boundaries
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
-                  if (.not. associated(pmeta%edges(i,j,n)%ptr))                &
-                            call block_boundary_specific(i, j, k, 3 - n        &
+                  if (.not. associated(pmeta%edges(i,j,m)%ptr))                &
+                            call block_boundary_specific(i, j, k, n            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                   end do ! i = 1, sides
@@ -1223,9 +1228,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -1773,9 +1776,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -2323,9 +2324,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -2900,9 +2899,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -3479,9 +3476,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -4058,9 +4053,7 @@ module boundaries
     use coordinates    , only : ie , je , ke
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -4648,9 +4641,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -5109,9 +5100,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array
@@ -5569,9 +5558,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
-#ifdef MPI
     use equations      , only : nv
-#endif /* MPI */
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
     use mpitools       , only : send_real_array, receive_real_array

@@ -142,13 +142,18 @@ module integrals
 
 ! create a new integrals file
 !
+#ifdef GNU
+      open (newunit = funit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace')
+#endif /* GNU */
 #ifdef INTEL
       open (newunit = funit, file = fname, form = 'formatted'                  &
                                        , status = 'replace', buffered = 'yes')
-#else /* INTEL */
-      open (newunit = funit, file = fname, form = 'formatted'                  &
-                                       , status = 'replace')
 #endif /* INTEL */
+#ifdef IBM
+      open (unit = funit, file = fname, form = 'formatted'                     &
+                                       , status = 'replace')
+#endif /* IBM */
 
 ! write the integral file header
 !
@@ -163,13 +168,18 @@ module integrals
 
 ! create a new statistics file
 !
+#ifdef GNU
+      open (newunit = sunit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace')
+#endif /* GNU */
 #ifdef INTEL
       open (newunit = sunit, file = fname, form = 'formatted'                  &
                                        , status = 'replace', buffered = 'yes')
-#else /* INTEL */
-      open (newunit = sunit, file = fname, form = 'formatted'                  &
-                                       , status = 'replace')
 #endif /* INTEL */
+#ifdef IBM
+      open (unit = sunit, file = fname, form = 'formatted'                     &
+                                       , status = 'replace')
+#endif /* IBM */
 
 ! write the integral file header
 !

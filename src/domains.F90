@@ -153,8 +153,8 @@ module domains
 
 ! local variables
 !
-    integer :: i, j, k, n, p, ic, jc, kc
-    real    :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
+    integer      :: i, j, k, n, p, ic, jc, kc
+    real(kind=8) :: xl, xmn, xmx, yl, ymn, ymx, zl, zmn, zmx
 
 ! local arrays
 !
