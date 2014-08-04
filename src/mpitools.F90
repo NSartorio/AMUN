@@ -457,8 +457,8 @@ module mpitools
 
 ! subroutine arguments
 !
-    real   , intent(inout) :: rbuf
-    integer, intent(inout) :: iret
+    real(kind=8), intent(inout) :: rbuf
+    integer     , intent(inout) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -604,12 +604,12 @@ module mpitools
 
 ! subroutine arguments
 !
-    real   , intent(inout) :: rbuf
-    integer, intent(out)   :: iret
+    real(kind=8), intent(inout) :: rbuf
+    integer     , intent(out)   :: iret
 
 ! local variables
 !
-    real                   :: tbuf
+    real(kind=8) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -715,12 +715,12 @@ module mpitools
 
 ! subroutine arguments
 !
-    real   , intent(inout) :: rbuf
-    integer, intent(out)   :: iret
+    real(kind=8), intent(inout) :: rbuf
+    integer     , intent(out)   :: iret
 
 ! local variables
 !
-    real                   :: tbuf
+    real(kind=8) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -825,12 +825,12 @@ module mpitools
 
 ! subroutine arguments
 !
-    real   , intent(inout) :: rbuf
-    integer, intent(out)   :: iret
+    real(kind=8), intent(inout) :: rbuf
+    integer     , intent(out)   :: iret
 
 ! local variables
 !
-    real                   :: tbuf
+    real(kind=8) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -881,13 +881,13 @@ module mpitools
 
 ! subroutine arguments
 !
-    integer              , intent(in)    :: n
-    real   , dimension(n), intent(inout) :: rbuf
-    integer              , intent(out)   :: iret
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(inout) :: rbuf
+    integer                   , intent(out)   :: iret
 
 ! local variables
 !
-    real(kind=8), dimension(n)           :: tbuf
+    real(kind=8), dimension(n) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -938,13 +938,13 @@ module mpitools
 
 ! subroutine arguments
 !
-    integer              , intent(in)    :: n
-    real   , dimension(n), intent(inout) :: rbuf
-    integer              , intent(out)   :: iret
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(inout) :: rbuf
+    integer                   , intent(out)   :: iret
 
 ! local variables
 !
-    real(kind=8), dimension(n)           :: tbuf
+    real(kind=8), dimension(n) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -1052,13 +1052,13 @@ module mpitools
 
 ! subroutine arguments
 !
-    integer              , intent(in)    :: n
-    real   , dimension(n), intent(inout) :: rbuf
-    integer              , intent(out)   :: iret
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(inout) :: rbuf
+    integer                   , intent(out)   :: iret
 
 ! local variables
 !
-    real(kind=8), dimension(n)           :: tbuf
+    real(kind=8), dimension(n) :: tbuf
 !
 !-------------------------------------------------------------------------------
 !
@@ -1176,9 +1176,9 @@ module mpitools
 
 ! subroutine arguments
 !
-    integer              , intent(in)  :: n, dst, tag
-    real   , dimension(n), intent(in)  :: rbuf
-    integer              , intent(out) :: iret
+    integer                   , intent(in)  :: n, dst, tag
+    real(kind=8), dimension(n), intent(in)  :: rbuf
+    integer                   , intent(out) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -1232,9 +1232,9 @@ module mpitools
 
 ! subroutine arguments
 !
-    integer              , intent(in)  :: n, src, tag
-    real   , dimension(n), intent(out) :: rbuf
-    integer              , intent(out) :: iret
+    integer                   , intent(in)  :: n, src, tag
+    real(kind=8), dimension(n), intent(out) :: rbuf
+    integer                   , intent(out) :: iret
 
 ! local variables
 !
