@@ -453,7 +453,7 @@ module interpolations
 
 ! selection weights
 !
-    real, parameter :: dp = 2.0d+00 / 3.0d+00, dm = 1.0d+00 / 3.0d+00
+    real(kind=8), parameter :: dp = 2.0d+00 / 3.0d+00, dm = 1.0d+00 / 3.0d+00
 !
 !-------------------------------------------------------------------------------
 !
@@ -1554,9 +1554,9 @@ module interpolations
 
 ! subroutine arguments
 !
-    integer           , intent(in)    :: n
-    real, dimension(n), intent(in)    :: f
-    real, dimension(n), intent(inout) :: fl, fr
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(in)    :: f
+    real(kind=8), dimension(n), intent(inout) :: fl, fr
 
 ! local variables
 !
