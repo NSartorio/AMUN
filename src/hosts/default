@@ -10,25 +10,29 @@
 # compiler and linker setup
 #
 ifeq ($(MPI),Y)
-FC       = mpif90
+FC        = mpif90
 else
-FC       = gfortran
+FC        = gfortran
 endif
-LD       = $(FC)
+LD        = $(FC)
+
+# preprocessor prefix (used by IBM Fortran, e.g.)
+#
+CPPPREFIX =
 
 # compiler and linker flags
 #
 ifeq ($(DEBUG),Y)
-FFLAGS   = -g -O2 -DDEBUG
+FFLAGS    = -g -O2 $(CPPPREFIX)-DDEBUG
 else
-FFLAGS   = -O2
+FFLAGS    = -O2
 endif
 
-LDFLAGS  = $(FFLAGS)
+LDFLAGS   = $(FFLAGS)
 
 # libraries
 #
-LIBS     =
+LIBS      =
 
 #-------------------------------------------------------------------------------
 #
@@ -37,13 +41,11 @@ LDFLAGS += -static
 endif
 
 ifeq ($(SIGNALS),Y)
-FFLAGS += -DSIGNALS
+FFLAGS += $(CPPPREFIX)-DSIGNALS
 endif
 
-FFLAGS  += -default-real-8 -default-double-8
-
 ifeq ($(MPI),Y)
-FFLAGS  += -DMPI
+FFLAGS  += $(CPPPREFIX)-DMPI
 endif
 
 ifeq ($(OUTPUT),HDF5)

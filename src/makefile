@@ -51,20 +51,20 @@ endif
 #
 # compiler
 #
-FFLAGS  += -D${COMPILER}
+FFLAGS  += ${CPPPREFIX}-D${COMPILER}
 
 # number of dimensions
 #
-FFLAGS  += -DNDIMS=${NDIMS}
+FFLAGS  += ${CPPPREFIX}-DNDIMS=${NDIMS}
 
 # output data format
 #
-FFLAGS  += -D${OUTPUT}
+FFLAGS  += ${CPPPREFIX}-D${OUTPUT}
 
 # compression
 #
 ifneq ($(COMPRESS),NONE)
-FFLAGS  += -DCOMPRESS -D${COMPRESS}
+FFLAGS  += ${CPPPREFIX}-DCOMPRESS ${CPPPREFIX}-D${COMPRESS}
 endif
 
 #-------------------------------------------------------------------------------
