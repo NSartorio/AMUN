@@ -261,12 +261,14 @@ module problems
     logical     , save :: first = .true.
     real(kind=8), save :: dn_amb, dn_ovr
     real(kind=8), save :: pr_amb, pr_ovr
+    real(kind=8), save :: bx, by
     real(kind=8), save :: r2
 
 ! local variables
 !
     integer       :: i, j, k, ic, jc, kc
     real(kind=8)  :: xl, yl, zl, xu, yu, zu, rl, ru
+    real(kind=8)  :: sn
 #if NDIMS == 3
     real(kind=8)  :: xb, yb, zb
     real(kind=8)  :: xt, yt, zt
@@ -275,7 +277,7 @@ module problems
     real(kind=8)  :: rlu, rul
     real(kind=8)  :: xb, yb
     real(kind=8)  :: xt, yt
-    real(kind=8)  :: sn, ph
+    real(kind=8)  :: ph
 #endif /* NDIMS == 3 */
     real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, dvol
     real(kind=8)  :: fc_amb, fc_ovr
@@ -338,6 +340,14 @@ module problems
 
       else
         dn_ovr = dn_amb * ratio
+      end if
+
+! calculate initial uniform field components
+!
+      if (ibx > 0) then
+        sn = sin(d2r * angle)
+        bx = buni * sqrt(1.0d+00 - sn * sn)
+        by = buni * sn
       end if
 
 ! calculate the square of radius
@@ -416,8 +426,8 @@ module problems
 !
     if (ibx > 0) then
 
-      q(ibx,:) = buni * cos(d2r * angle)
-      q(iby,:) = buni * sin(d2r * angle)
+      q(ibx,:) = bx
+      q(iby,:) = by
       q(ibz,:) = 0.0d+00
       q(ibp,:) = 0.0d+00
 
