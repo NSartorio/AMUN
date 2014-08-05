@@ -150,6 +150,9 @@ module interpolations
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
       reconstruct_states => reconstruct_limo3
+    case ("weno5", "WENO5")
+      name_rec           =  "5th order WENO"
+      reconstruct_states => reconstruct_weno5
     case ("crweno5", "CRWENO5")
       name_rec           =  "5th order Compact WENO"
       reconstruct_states => reconstruct_crweno5
@@ -225,7 +228,7 @@ module interpolations
 
       write (*,"(4x,a15,8x,'=',1x,a)") "reconstruction ", trim(name_rec)
       select case(trim(sreconstruction))
-      case ("crweno5", "CRWENO5")
+      case ("weno5", "WENO5", "crweno5", "CRWENO5")
         write (*,"(4x,a15,8x,'=',1x,a)") "stencil weights", trim(name_wei)
       case default
       end select
@@ -680,6 +683,79 @@ module interpolations
 !
 !===============================================================================
 !
+! subroutine RECONSTRUCT_WENO5:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO5)
+!   method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Jiang, G.-S., Shu, C.-W.,
+!         "Efficient Implementation of Weighted ENO Schemes"
+!         Journal of Computational Physics,
+!         1996, vol. 126, pp. 202-228,
+!         http://dx.doi.org/10.1006/jcph.1996.0130
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno5(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local arrays
+!
+    real(kind=8), dimension(1:n)   :: bl, bc, br
+    real(kind=8), dimension(1:n)   :: wl, wc, wr
+    real(kind=8), dimension(1:n)   :: u
+!
+!-------------------------------------------------------------------------------
+!
+! calculate smoothness indicators
+!
+    call smoothness_indicators(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
+! calculate stencil weights
+!
+    call stencil_weights(n, f(1:n), bl(1:n), bc(1:n), br(1:n)                  &
+                                                  , wl(1:n), wc(1:n), wr(1:n))
+
+! find the left state interpolation implicitelly
+!
+    call weno5_explicit(n, f(1:n), wl(1:n), wc(1:n), wr(1:n), u(1:n))
+
+! substitute the left state
+!
+    fl(1:n) = u(1:n)
+
+! find the right state interpolation implicitelly
+!
+    call weno5_explicit(n, f(n:1:-1), wr(n:1:-1), wc(n:1:-1), wl(n:1:-1)       &
+                                                                  , u(n:1:-1))
+
+! substitute the right state
+!
+    fr(1:n-1) = u (2:n)
+    fr(  n  ) = fl(  n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno5
+!
+!===============================================================================
+!
 ! subroutine RECONSTRUCT_CRWENO5:
 ! ------------------------------
 !
@@ -758,6 +834,103 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crweno5
+!
+!===============================================================================
+!
+! subroutine WENO5_EXPLICIT:
+! -------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO)
+!   method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Jiang, G.-S., Shu, C.-W.,
+!         "Efficient Implementation of Weighted ENO Schemes"
+!         Journal of Computational Physics,
+!         1996, vol. 126, pp. 202-228,
+!         http://dx.doi.org/10.1006/jcph.1996.0130
+!
+!===============================================================================
+!
+  subroutine weno5_explicit(n, f, wl, wc, wr, u)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(in)  :: wl, wc, wr
+    real(kind=8), dimension(n), intent(out) :: u
+
+! local variables
+!
+    integer      :: im2, im1, i  , ip1, ip2
+    integer      :: nm1, nm2
+    real(kind=8) :: xl, xc, xr, xx
+    real(kind=8) :: bl, bc, br, bt
+
+! local constants
+!
+    real(kind=8), parameter :: al = 1.0d-01, ac = 6.0d-01, ar = 3.0d-01
+    real(kind=8), parameter :: dh = 5.0d-01, ds = 1.0d+00 / 6.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+! calculate indices
+!
+    nm1 = n - 1
+    nm2 = n - 2
+
+! prepare coefficients
+!
+    do i = 3, nm2
+
+! prepare indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! normalize weigths
+!
+      xc = ac * wc(i)
+      xl = al * wl(i)
+      xr = ar * wr(i)
+      xx = xc + (xl + xr)
+      bl = xl / xx
+      br = xr / xx
+      bc = 1.0d+00 - (bl + br)
+
+! prepare right hand side of tridiagonal equation
+!
+      u(i) = (bl * (2.0d+00 * f(im2) - 7.0d+00 * f(im1) + 1.1d+01 * f(i  ))    &
+           +  bc * (        - f(im1) + 5.0d+00 * f(i  ) + 2.0d+00 * f(ip1))    &
+           +  br * (2.0d+00 * f(i  ) + 5.0d+00 * f(ip1) -           f(ip2))) * ds
+
+    end do
+
+! at the left boundaries, we apply 5th order explicit WENO interpolation with
+! different weights
+!
+    u(1) = dh * (f(1) + f(2  ))
+    u(2) = f(2) + limiter(dh, f(2) - f(1), f(3) - f(2))
+
+! at the right boundaries, we do the similar thing
+!
+    u(nm1) = f(nm1) + limiter(dh, f(nm1) - f(nm2), f(n) - f(nm1))
+    u(n  ) = f(n  ) + dh * (f(n) - f(nm1))
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine weno5_explicit
 !
 !===============================================================================
 !
