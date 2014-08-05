@@ -3686,8 +3686,9 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
-    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb, dv
+    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
     real(kind=8)                  :: dnl, dnr, cal, car, sml, smr
+    real(kind=8)                  :: dv, dvl, dvr
 
 ! local arrays to store the states
 !
@@ -3779,9 +3780,14 @@ module schemes
           sml = sm + cal
           smr = sm + car
 
+! calculate division factors (also used to determine degeneracies)
+!
+          dvl = slmm * wl(idn) - b2
+          dvr = srmm * wr(idn) - b2
+
 ! check degeneracy Sl* -> Sl or Sr* -> Sr
 !
-          if (min(sml - sl, sr - smr) > 0.0d+00) then ! no degeneracy
+          if (dvl > 0.0d+00 .and. dvr > 0.0d+00) then ! no degeneracy
 
 ! choose the correct state depending on the speed signs
 !
@@ -3789,11 +3795,10 @@ module schemes
 
 ! primitive variables for the outer left intermediate state
 !
-              dv      =     slmm * wl(idn) - b2
-              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
-              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
-              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
-              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dvl
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dvl
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer left intermediate state
@@ -3812,15 +3817,14 @@ module schemes
 !
               f(:,i)  = sl * ui(:) - wl(:)
 
-          else if (smr <= 0.0d+00) then ! sr* ≤ 0
+            else if (smr <= 0.0d+00) then ! sr* ≤ 0
 
 ! primitive variables for the outer right intermediate state
 !
-              dv      =     srmm * wr(idn) - b2
-              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
-              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
-              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
-              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dvr
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dvr
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer right intermediate state
@@ -3843,11 +3847,10 @@ module schemes
 
 ! primitive variables for the outer left intermediate state
 !
-              dv      =     slmm * wl(idn) - b2
-              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
-              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
-              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
-              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dvl
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dvl
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer left intermediate state
@@ -3868,11 +3871,10 @@ module schemes
 
 ! primitive variables for the outer right intermediate state
 !
-              dv      =     srmm * wr(idn) - b2
-              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
-              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
-              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
-              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dvr
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dvr
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer right intermediate state
@@ -3955,15 +3957,14 @@ module schemes
 
 ! separate degeneracies
 !
-            if ((sml - sl) > 0.0d+00) then ! sr* > sr
+            if (dvl > 0.0d+00) then ! sr* > sr
 
 ! primitive variables for the outer left intermediate state
 !
-              dv      =     slmm * wl(idn) - b2
-              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dv
-              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dv
-              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dv
-              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dv
+              vy      = (   slmm * wl(imy) - bx * wl(iby)) / dvl
+              vz      = (   slmm * wl(imz) - bx * wl(ibz)) / dvl
+              by      = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
+              bz      = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer left intermediate state
@@ -4031,21 +4032,20 @@ module schemes
 
 ! calculate the average flux over the right inner intermediate state
 !
-                  f(:,i)  = (sm * wr(:) - sr * wcl(:)) / (sr - sm)
+                  f(:,i)  = (sm * wr(:) - sr * wcl(:)) / srmm
 
                 end if ! sm < 0
 
               end if ! sl* < 0
 
-            else if ((sr - smr) > 0.0d+00) then ! sl* < sl
+            else if (dvr > 0.0d+00) then ! sl* < sl
 
 ! primitive variables for the outer right intermediate state
 !
-              dv      =     srmm * wr(idn) - b2
-              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dv
-              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dv
-              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dv
-              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dv
+              vy      = (   srmm * wr(imy) - bx * wr(iby)) / dvr
+              vz      = (   srmm * wr(imz) - bx * wr(ibz)) / dvr
+              by      = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
+              bz      = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
               vb      = sm * bx + vy * by + vz * bz
 
 ! conservative variables for the outer right intermediate state
@@ -4113,7 +4113,7 @@ module schemes
 
 ! calculate the average flux over the left inner intermediate state
 !
-                  f(:,i)  = (sm * wl(:) - sl * wcr(:)) / (sl - sm)
+                  f(:,i)  = (sm * wl(:) - sl * wcr(:)) / slmm
 
                 end if ! sm > 0
 
