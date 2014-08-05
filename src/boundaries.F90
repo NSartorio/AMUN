@@ -298,10 +298,6 @@ module boundaries
     call start_timer(imv)
 #endif /* PROFILE */
 
-! update specific boundaries
-!
-    call boundaries_specific()
-
 #if NDIMS == 3
 ! update face boundaries between blocks at the same levels
 !
@@ -337,6 +333,10 @@ module boundaries
 ! restricts corner boundaries from blocks at higher levels
 !
     call boundaries_corner_restrict()
+
+! update specific boundaries
+!
+    call boundaries_specific()
 
 #if NDIMS == 3
 ! prolong face boundaries from lower level blocks
