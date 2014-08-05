@@ -49,7 +49,8 @@ module boundaries
 !
   integer, parameter            :: bnd_periodic   = 0
   integer, parameter            :: bnd_open       = 1
-  integer, parameter            :: bnd_reflective = 2
+  integer, parameter            :: bnd_outflow    = 2
+  integer, parameter            :: bnd_reflective = 3
 
 ! variable to store boundary type flags
 !
@@ -148,6 +149,8 @@ module boundaries
     select case(xlbndry)
     case("open")
       bnd_type(1,1) = bnd_open
+    case("outflow", "out")
+      bnd_type(1,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,1) = bnd_reflective
     case default
@@ -157,6 +160,8 @@ module boundaries
     select case(xubndry)
     case("open")
       bnd_type(1,2) = bnd_open
+    case("outflow", "out")
+      bnd_type(1,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,2) = bnd_reflective
     case default
@@ -166,6 +171,8 @@ module boundaries
     select case(ylbndry)
     case("open")
       bnd_type(2,1) = bnd_open
+    case("outflow", "out")
+      bnd_type(2,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,1) = bnd_reflective
     case default
@@ -175,6 +182,8 @@ module boundaries
     select case(yubndry)
     case("open")
       bnd_type(2,2) = bnd_open
+    case("outflow", "out")
+      bnd_type(2,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,2) = bnd_reflective
     case default
@@ -184,6 +193,8 @@ module boundaries
     select case(zlbndry)
     case("open")
       bnd_type(3,1) = bnd_open
+    case("outflow", "out")
+      bnd_type(3,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,1) = bnd_reflective
     case default
@@ -193,6 +204,8 @@ module boundaries
     select case(zubndry)
     case("open")
       bnd_type(3,2) = bnd_open
+    case("outflow", "out")
+      bnd_type(3,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,2) = bnd_reflective
     case default
@@ -6089,6 +6102,22 @@ module boundaries
           end do
         end if
 
+! "outflow" boundary conditions
+!
+      case(bnd_outflow)
+
+        if (ic == 1) then
+          do i = ibl, 1, -1
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+            qn(ivx ,i,jl:ju,kl:ku) = min(0.0d+00, qn(ivx,ib,jl:ju,kl:ku))
+          end do ! i = ibl, 1, -1
+        else
+          do i = ieu, im
+            qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+            qn(ivx ,i,jl:ju,kl:ku) = max(0.0d+00, qn(ivx,ie,jl:ju,kl:ku))
+          end do ! i = ieu, im
+        end if
+
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
@@ -6167,6 +6196,22 @@ module boundaries
           end do
         end if
 
+! "outflow" boundary conditions
+!
+      case(bnd_outflow)
+
+        if (jc == 1) then
+          do j = jbl, 1, -1
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+            qn(ivy ,il:iu,j,kl:ku) = min(0.0d+00, qn(ivy,il:iu,jb,kl:ku))
+          end do ! j = jbl, 1, -1
+        else
+          do j = jeu, jm
+            qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+            qn(ivy ,il:iu,j,kl:ku) = max(0.0d+00, qn(ivy,il:iu,je,kl:ku))
+          end do ! j = jeu, jm
+        end if
+
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
@@ -6239,6 +6284,22 @@ module boundaries
           do k = keu, km
             qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
           end do
+        end if
+
+! "outflow" boundary conditions
+!
+      case(bnd_outflow)
+
+        if (kc == 1) then
+          do k = kbl, 1, -1
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
+            qn(ivz ,il:iu,jl:ju,k) = min(0.0d+00, qn(ivz,il:iu,jl:ju,kb))
+          end do ! k = kbl, 1, -1
+        else
+          do k = keu, km
+            qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
+            qn(ivz ,il:iu,jl:ju,k) = max(0.0d+00, qn(ivz,il:iu,jl:ju,ke))
+          end do ! k = keu, km
         end if
 
 ! "reflective" boundary conditions
