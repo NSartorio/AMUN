@@ -39,7 +39,7 @@ module coordinates
 !
 ! the domain block dimensions
 !
-  integer     , save :: nn =  8, in =  8, jn =  8, kn =  1
+  integer     , save :: nc =  8, in =  8, jn =  8, kn =  1
 
 ! the number of ghost zones
 !
@@ -144,30 +144,21 @@ module coordinates
 !
 !-------------------------------------------------------------------------------
 !
-! obtain the number of cells along each block dimension in the case when all
-! dimensions are the same
+! obtain the number of cells along each block dimension
 !
-    call get_parameter_integer("ncells", nn    )
-
-! set the block dimensions
-!
-    in = nn
-    jn = nn
-#if NDIMS == 3
-    kn = nn
-#endif /* NDIMS == 3 */
-
-! change individual block dimension if requested
-!
-    call get_parameter_integer("icells", in    )
-    call get_parameter_integer("jcells", jn    )
-#if NDIMS == 3
-    call get_parameter_integer("kcells", kn    )
-#endif /* NDIMS == 3 */
+    call get_parameter_integer("ncells" , nc )
 
 ! obtain the number of ghost zones
 !
-    call get_parameter_integer("nghost", ng    )
+    call get_parameter_integer("nghosts", ng )
+
+! set the block dimensions
+!
+    in = nc
+    jn = nc
+#if NDIMS == 3
+    kn = nc
+#endif /* NDIMS == 3 */
 
 ! calculate half and double of the number of ghose zones
 !
