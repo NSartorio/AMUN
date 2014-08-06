@@ -829,8 +829,8 @@ module interpolations
 ! -------------------------
 !
 !   Subroutine reconstructs the interface states using the fifth order
-!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO)
-!   method.
+!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO5)
+!   method (see [1]). This subroutine uses improved weights from [2].
 !
 !   Arguments are described in subroutine reconstruct().
 !
@@ -841,6 +841,12 @@ module interpolations
 !         Journal of Computational Physics,
 !         1996, vol. 126, pp. 202-228,
 !         http://dx.doi.org/10.1006/jcph.1996.0130
+!     [2] Arshed, G. M. & Hoffmann, K. A.,
+!         "Minimizing errors from linear and nonlinear weights of WENO scheme
+!          for broadband applications with shock waves",
+!         Journal of Computational Physics,
+!         2013, 246, 58-77
+!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -859,62 +865,61 @@ module interpolations
 
 ! local variables
 !
-    integer      :: im2, im1, i  , ip1, ip2
-    integer      :: nm1, nm2
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: xl, xc, xr, xx
-    real(kind=8) :: bl, bc, br, bt
+    real(kind=8) :: ql, qc, qr
 
-! local constants
+! improved weight coefficients (Table 1 in [2])
 !
-    real(kind=8), parameter :: al = 1.0d-01, ac = 6.0d-01, ar = 3.0d-01
-    real(kind=8), parameter :: dh = 5.0d-01, ds = 1.0d+00 / 6.0d+00
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
 !
 !-------------------------------------------------------------------------------
 !
-! calculate indices
-!
-    nm1 = n - 1
-    nm2 = n - 2
-
 ! prepare coefficients
 !
-    do i = 3, nm2
+    do i = 1, n
 
 ! prepare indices
 !
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
 
 ! normalize weigths
 !
-      xc = ac * wc(i)
-      xl = al * wl(i)
-      xr = ar * wr(i)
-      xx = xc + (xl + xr)
-      bl = xl / xx
-      br = xr / xx
-      bc = 1.0d+00 - (bl + br)
+      xc = dc * wc(i)
+      xl = dl * wl(i)
+      xr = dr * wr(i)
+      xx = (xl + xr) + xc
+      xl = xl / xx
+      xr = xr / xx
+      xc = 1.0d+00 - (xl + xr)
 
-! prepare right hand side of tridiagonal equation
+! calculate the interpolations of the left state (eq. 15 in [1])
 !
-      u(i) = (bl * (2.0d+00 * f(im2) - 7.0d+00 * f(im1) + 1.1d+01 * f(i  ))    &
-           +  bc * (        - f(im1) + 5.0d+00 * f(i  ) + 2.0d+00 * f(ip1))    &
-           +  br * (2.0d+00 * f(i  ) + 5.0d+00 * f(ip1) -           f(ip2))) * ds
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
 
-    end do
-
-! at the left boundaries, we apply 5th order explicit WENO interpolation with
-! different weights
+! calculate the interpolation of the left state
 !
-    u(1) = dh * (f(1) + f(2  ))
-    u(2) = f(2) + limiter(dh, f(2) - f(1), f(3) - f(2))
+      u(i) = (xl * ql + xr * qr) + xc * qc
 
-! at the right boundaries, we do the similar thing
-!
-    u(nm1) = f(nm1) + limiter(dh, f(nm1) - f(nm2), f(n) - f(nm1))
-    u(n  ) = f(n  ) + dh * (f(n) - f(nm1))
+    end do ! i = 1, n
 
 !-------------------------------------------------------------------------------
 !
