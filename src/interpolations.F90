@@ -150,6 +150,15 @@ module interpolations
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
       reconstruct_states => reconstruct_limo3
+    case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
+      name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
+      reconstruct_states => reconstruct_weno5z
+    case ("weno5yc", "weno5-yc", "WENO5YC", "WENO5-YC")
+      name_rec           =  "5th order WENO-YC (Yamaleev & Carpenter 2009)"
+      reconstruct_states => reconstruct_weno5yc
+    case ("weno5ns", "weno5-ns", "WENO5NS", "WENO5-NS")
+      name_rec           =  "5th order WENO-NS (Ha et al. 2013)"
+      reconstruct_states => reconstruct_weno5ns
     case ("crweno5", "CRWENO5")
       name_rec           =  "5th order Compact WENO"
       reconstruct_states => reconstruct_crweno5
@@ -680,6 +689,528 @@ module interpolations
 !
 !===============================================================================
 !
+! subroutine RECONSTRUCT_WENO5Z:
+! -----------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Weighted Essentially Non-Oscillatory (WENO5) method with
+!   stencil weights by Borges et al. (2008).
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Borges, R., Carmona, M., Costa, B., & Don, W.-S.,
+!         "An improved weighted essentially non-oscillatory scheme for
+!          hyperbolic conservation laws"
+!         Journal of Computational Physics,
+!         2008, vol. 227, pp. 3191-3211,
+!         http://dx.doi.org/10.1016/j.jcp.2007.11.038
+!     [2] Arshed, G. M. & Hoffmann, K. A.,
+!         "Minimizing errors from linear and nonlinear weights of WENO scheme
+!          for broadband applications with shock waves",
+!         Journal of Computational Physics,
+!         2013, vol. 246, pp. 58-77
+!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno5z(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: bl, bc, br, tt
+    real(kind=8) :: al, ac, ar
+    real(kind=8) :: wl, wc, wr, ww
+    real(kind=8) :: ql, qc, qr
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp, df2
+
+! smoothness indicator coefficients
+!
+    real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
+
+! improved weight coefficients (Table 1 in [2])
+!
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! calculate the absolute value of the second derivative
+!
+    df2(:) = c1 * (dfp(:) - dfm(:))**2
+
+! iterate along the vector
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      im2 = max(1, i - 2)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate βₖ (eqs. 9-11 in [1])
+!
+      bl  = df2(im1) + c2 * (3.0d+00 * dfm(i  ) - dfm(im1))**2
+      bc  = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
+      br  = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
+
+! calculate τ (below eq. 25 in [1])
+!
+      tt  = abs(br - bl)
+
+! calculate αₖ (eq. 28 in [1])
+!
+      al  = 1.0d+00 + tt / (bl + eps)
+      ac  = 1.0d+00 + tt / (bc + eps)
+      ar  = 1.0d+00 + tt / (br + eps)
+
+! calculate weights
+!
+      wl  = dl * al
+      wc  = dc * ac
+      wr  = dr * ar
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i  ) = (wl * ql + wr * qr) + wc * qc
+
+! normalize weights
+!
+      wl  = dl * ar
+      wc  = dc * ac
+      wr  = dr * al
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(im1) = (wl * ql + wr * qr) + wc * qc
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno5z
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_WENO5YC:
+! ------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Weighted Essentially Non-Oscillatory (WENO5) method with
+!   stencil weights by Yamaleev & Carpenter (2009).
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Yamaleev, N. K. & Carpenter, H. C.,
+!         "A Systematic Methodology for Constructing High-Order Energy Stable
+!          WENO Schemes"
+!         Journal of Computational Physics,
+!         2009, vol. 228, pp. 4248-4272,
+!         http://dx.doi.org/10.1016/j.jcp.2009.03.002
+!     [2] Arshed, G. M. & Hoffmann, K. A.,
+!         "Minimizing errors from linear and nonlinear weights of WENO scheme
+!          for broadband applications with shock waves",
+!         Journal of Computational Physics,
+!         2013, vol. 246, pp. 58-77
+!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno5yc(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: bl, bc, br, tt
+    real(kind=8) :: al, ac, ar
+    real(kind=8) :: wl, wc, wr, ww
+    real(kind=8) :: ql, qc, qr
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp, df2
+
+! smoothness indicator coefficients
+!
+    real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
+
+! improved weight coefficients (Table 1 in [2])
+!
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! calculate the absolute value of the second derivative
+!
+    df2(:) = c1 * (dfp(:) - dfm(:))**2
+
+! iterate along the vector
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      im2 = max(1, i - 2)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate βₖ (eq. 19 in [1])
+!
+      bl  = df2(im1) + c2 * (3.0d+00 * dfm(i  ) - dfm(im1))**2
+      bc  = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
+      br  = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
+
+! calculate τ (below eq. 64 in [1])
+!
+      tt  = (6.0d+00 * f(i) + (f(im2) + f(ip2))                                &
+                                             - 4.0d+00 * (f(im1) + f(ip1)))**2
+
+! calculate αₖ (eq. 58 in [1])
+!
+      al  = 1.0d+00 + tt / (bl + eps)
+      ac  = 1.0d+00 + tt / (bc + eps)
+      ar  = 1.0d+00 + tt / (br + eps)
+
+! calculate weights
+!
+      wl  = dl * al
+      wc  = dc * ac
+      wr  = dr * ar
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i  ) = (wl * ql + wr * qr) + wc * qc
+
+! normalize weights
+!
+      wl  = dl * ar
+      wc  = dc * ac
+      wr  = dr * al
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(im1) = (wl * ql + wr * qr) + wc * qc
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno5yc
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_WENO5NS:
+! ------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Weighted Essentially Non-Oscillatory (WENO5) method with new
+!   smoothness indicators and stencil weights by He et al. (2013).
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Ha, Y., Kim, C. H., Lee, Y. J., & Yoon, J.,
+!         "An improved weighted essentially non-oscillatory scheme with a new
+!          smoothness indicator",
+!         Journal of Computational Physics,
+!         2013, vol. 232, pp. 68-86
+!         http://dx.doi.org/10.1016/j.jcp.2012.06.016
+!     [2] Arshed, G. M. & Hoffmann, K. A.,
+!         "Minimizing errors from linear and nonlinear weights of WENO scheme
+!          for broadband applications with shock waves",
+!         Journal of Computational Physics,
+!         2013, vol. 246, pp. 58-77
+!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno5ns(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: bl, bc, br
+    real(kind=8) :: al, ac, ar, aa
+    real(kind=8) :: wl, wc, wr
+    real(kind=8) :: df, lq, l3, zt
+    real(kind=8) :: ql, qc, qr
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp, df2
+
+! improved weight coefficients (Table 1 in [2])
+!
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
+
+! the free parameter for smoothness indicators (see Eq. 3.6 in [1])
+!
+    real(kind=8), parameter :: xi  =   4.0d-01
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! calculate the absolute value of the second derivative
+!
+    df2(:) = 0.5d+00 * abs(dfp(:) - dfm(:))
+
+! iterate along the vector
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      im2 = max(1, i - 2)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate βₖ (eq. 3.6 in [1])
+!
+      df  = abs(dfp(i))
+      lq  = xi * df
+      bl  = df2(im1) + xi * abs(2.0d+00 * dfm(i) - dfm(im1))
+      bc  = df2(i  ) + lq
+      br  = df2(ip1) + lq
+
+! calculate ζ (below eq. 3.6 in [1])
+!
+      l3  = df**3
+      zt  = 0.5d+00 * ((bl - br)**2 + (l3 / (1.0d+00 + l3))**2)
+
+! calculate αₖ (eq. 3.9 in [4])
+!
+      al  = dl * (1.0d+00 + zt / (bl + eps)**2)
+      ac  = dc * (1.0d+00 + zt / (bc + eps)**2)
+      ar  = dr * (1.0d+00 + zt / (br + eps)**2)
+
+! calculate weights
+!
+      aa  = (al + ar) + ac
+      wl  = al / aa
+      wr  = ar / aa
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i  ) = (wl * ql + wr * qr) + wc * qc
+
+! calculate βₖ (eq. 3.6 in [1])
+!
+      df  = abs(dfm(i))
+      lq  = xi * df
+      bl  = df2(ip1) + xi * abs(2.0d+00 * dfp(i) - dfp(ip1))
+      bc  = df2(i  ) + lq
+      br  = df2(im1) + lq
+
+! calculate ζ (below eq. 3.6 in [1])
+
+      l3  = df**3
+      zt  = 0.5d+00 * ((bl - br)**2 + (l3 / (1.0d+00 + l3))**2)
+
+! calculate αₖ (eq. 3.9 in [4])
+!
+      al  = dl * (1.0d+00 + zt / (bl + eps)**2)
+      ac  = dc * (1.0d+00 + zt / (bc + eps)**2)
+      ar  = dr * (1.0d+00 + zt / (br + eps)**2)
+
+! normalize weights
+!
+      aa  = (al + ar) + ac
+      wl  = al / aa
+      wr  = ar / aa
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(im1) = (wl * ql + wr * qr) + wc * qc
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno5ns
+!
+!===============================================================================
+!
 ! subroutine RECONSTRUCT_CRWENO5:
 ! ------------------------------
 !
@@ -722,20 +1253,14 @@ module interpolations
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n)   :: bl, bc, br
     real(kind=8), dimension(1:n)   :: wl, wc, wr
     real(kind=8), dimension(1:n)   :: u
 !
 !-------------------------------------------------------------------------------
 !
-! calculate smoothness indicators
-!
-    call smoothness_indicators(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
-
 ! calculate stencil weights
 !
-    call stencil_weights(n, f(1:n), bl(1:n), bc(1:n), br(1:n)                  &
-                                                  , wl(1:n), wc(1:n), wr(1:n))
+    call stencil_weights(n, f(1:n), wl(1:n), wc(1:n), wr(1:n))
 
 ! find the left state interpolation implicitelly
 !
@@ -941,10 +1466,11 @@ module interpolations
 !
 !===============================================================================
 !
-! subroutine SMOOTHNESS_INDICATORS:
-! --------------------------------
+! subroutine SMOOTHNESS_INDICATORS_JS:
+! -----------------------------------
 !
-!   Subroutine calculates smoothness indicators for a given vector of variables.
+!   Subroutine calculates Jiang-Shu smoothness indicators for a given vector
+!   of variable values.
 !
 !   Arguments:
 !
@@ -962,16 +1488,9 @@ module interpolations
 !         1996, vol. 126, pp. 202-228,
 !         http://dx.doi.org/10.1006/jcph.1996.0130
 !
-!     [2] Ghosh, D. & Baeder, J. D.,
-!         "Compact Reconstruction Schemes with Weighted ENO Limiting for
-!          Hyperbolic Conservation Laws"
-!         SIAM Journal on Scientific Computing,
-!         2012, vol. 34, no. 3, pp. A1678-A1706,
-!         http://dx.doi.org/10.1137/110857659
-!
 !===============================================================================
 !
-  subroutine smoothness_indicators(n, f, bl, bc, br)
+  subroutine smoothness_indicators_js(n, f, bl, bc, br)
 
 ! local variables are not implicit by default
 !
@@ -985,12 +1504,14 @@ module interpolations
 
 ! local variables
 !
-    integer      :: np2, np1, nm1, nm2, i, j
+    integer :: nm1, np1
+    integer :: i  , ip1
 
 ! local arrays
 !
-    real(kind=8), dimension(0:n+2) :: df2, df1
-    real(kind=8), dimension(1:n)   :: dfl, dfc, dfr
+    real(kind=8), dimension(0:n+1) :: df2
+    real(kind=8), dimension(0:n  ) :: dfm
+    real(kind=8), dimension(1:n+1) :: dfp
 
 ! local constants
 !
@@ -1000,47 +1521,37 @@ module interpolations
 !
 ! calculate indices
 !
-    np2 = n + 2
     np1 = n + 1
     nm1 = n - 1
-    nm2 = n - 2
 
-! calculate the second order derivative
+! calculate the left and right first order derivatives
 !
-    df2(2:nm1) = ((f(3:n) + f(1:nm2)) - 2.0d+00 * f(2:nm1))**2
-    df2(1    ) = (f(2  ) - f(1))**2
-    df2(  n  ) = (f(nm1) - f(n))**2
-    df2(0    ) = 0.0d+00
-    df2(  np1) = 0.0d+00
-    df2(  np2) = 0.0d+00
+    do i = 1, nm1
+      ip1 = i + 1
 
-! calculate the first derivative
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1  ) = dfp(1)
+    dfm(0  ) = dfm(1)
+    dfp(n  ) = dfm(n)
+    dfp(np1) = dfp(n)
+
+! the second order derivative
 !
-    df1(2:n)   = f(2:n) - f(1:nm1)
-    df1(0  )   = 0.0d+00
-    df1(1  )   = 0.0d+00
-    df1(np1)   = 0.0d+00
-    df1(np2)   = 0.0d+00
-
-! calculate the first order derivatives for left, central and right stencils
-!
-    dfl(  1:n  ) =   3.0d+00 * df1(1:n) - df1(0:nm1)
-
-    dfc(  2:nm1) = f(1:nm2) - f(3:n)
-    dfc(  1    ) = f(1    ) - f(2  )
-    dfc(    n  ) = f(  nm1) - f(  n)
-
-    dfr(  1:n) = - 3.0d+00 * df1(2:np1) + df1(3:np2)
+    df2(1:n  ) = c1 * (dfp(1:n) - dfm(1:n))**2
+    df2(0    ) = df2(1)
+    df2(  np1) = df2(n)
 
 ! calculate the left, central and right smoothness indicators
 !
-    bl(1:n) = c1 * df2(0:nm1) + c2 * dfl(1:n)**2
-    bc(1:n) = c1 * df2(1:n  ) + c2 * dfc(1:n)**2
-    br(1:n) = c1 * df2(2:np1) + c2 * dfr(1:n)**2
+    bl(1:n) = df2(0:nm1) + c2 * (3.0d+00 * dfm(1:n) - dfm(0:nm1))**2
+    bc(1:n) = df2(1:n  ) + c2 * (          dfp(1:n) + dfm(1:n  ))**2
+    br(1:n) = df2(2:np1) + c2 * (3.0d+00 * dfp(1:n) - dfp(2:np1))**2
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine smoothness_indicators
+  end subroutine smoothness_indicators_js
 !
 !===============================================================================
 !
@@ -1053,9 +1564,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
@@ -1070,7 +1578,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_js(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_js(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1080,11 +1588,18 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: bl, bc, br
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the weights
 !
     wl(1:n) = 1.0d+00 / (bl(1:n) + eps)**2
@@ -1106,9 +1621,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
@@ -1124,7 +1636,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_z(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_z(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1134,15 +1646,19 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n) :: tt
+    real(kind=8), dimension(n) :: bl, bc, br
+    real(kind=8), dimension(n) :: tt
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the factor τ
 !
     tt(1:n) = abs(bl(1:n) - br(1:n))
@@ -1168,9 +1684,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
@@ -1186,7 +1699,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_yc(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_yc(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1196,7 +1709,6 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
 
 ! local variables
@@ -1205,10 +1717,15 @@ module interpolations
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n) :: tt
+    real(kind=8), dimension(n) :: bl, bc, br
+    real(kind=8), dimension(n) :: tt
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the factor τ
 !
     do i = 1, n
