@@ -150,9 +150,6 @@ module interpolations
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
       reconstruct_states => reconstruct_limo3
-    case ("weno5", "WENO5")
-      name_rec           =  "5th order WENO"
-      reconstruct_states => reconstruct_weno5
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       reconstruct_states => reconstruct_weno5z
@@ -237,7 +234,7 @@ module interpolations
 
       write (*,"(4x,a15,8x,'=',1x,a)") "reconstruction ", trim(name_rec)
       select case(trim(sreconstruction))
-      case ("weno5", "WENO5", "crweno5", "CRWENO5")
+      case ("crweno5", "CRWENO5")
         write (*,"(4x,a15,8x,'=',1x,a)") "stencil weights", trim(name_wei)
       case default
       end select
@@ -689,73 +686,6 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_limo3
-!
-!===============================================================================
-!
-! subroutine RECONSTRUCT_WENO5:
-! ----------------------------
-!
-!   Subroutine reconstructs the interface states using the fifth order
-!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO5)
-!   method.
-!
-!   Arguments are described in subroutine reconstruct().
-!
-!   References:
-!
-!     [1] Jiang, G.-S., Shu, C.-W.,
-!         "Efficient Implementation of Weighted ENO Schemes"
-!         Journal of Computational Physics,
-!         1996, vol. 126, pp. 202-228,
-!         http://dx.doi.org/10.1006/jcph.1996.0130
-!
-!===============================================================================
-!
-  subroutine reconstruct_weno5(n, h, f, fl, fr)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                   , intent(in)  :: n
-    real(kind=8)              , intent(in)  :: h
-    real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(out) :: fl, fr
-
-! local arrays
-!
-    real(kind=8), dimension(1:n)   :: wl, wc, wr
-    real(kind=8), dimension(1:n)   :: u
-!
-!-------------------------------------------------------------------------------
-!
-! calculate stencil weights
-!
-    call stencil_weights(n, f(1:n), wl(1:n), wc(1:n), wr(1:n))
-
-! find the left state interpolation implicitelly
-!
-    call weno5_explicit(n, f(1:n), wl(1:n), wc(1:n), wr(1:n), u(1:n))
-
-! substitute the left state
-!
-    fl(1:n) = u(1:n)
-
-! find the right state interpolation implicitelly
-!
-    call weno5_explicit(n, f(n:1:-1), wr(n:1:-1), wc(n:1:-1), wl(n:1:-1)       &
-                                                                  , u(n:1:-1))
-
-! substitute the right state
-!
-    fr(1:n-1) = u (2:n)
-    fr(  n  ) = fl(  n)
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine reconstruct_weno5
 !
 !===============================================================================
 !
@@ -1353,108 +1283,6 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crweno5
-!
-!===============================================================================
-!
-! subroutine WENO5_EXPLICIT:
-! -------------------------
-!
-!   Subroutine reconstructs the interface states using the fifth order
-!   Explicit Reconstruction Weighted Essentially Non-Oscillatory (WENO5)
-!   method (see [1]). This subroutine uses improved weights from [2].
-!
-!   Arguments are described in subroutine reconstruct().
-!
-!   References:
-!
-!     [1] Jiang, G.-S., Shu, C.-W.,
-!         "Efficient Implementation of Weighted ENO Schemes"
-!         Journal of Computational Physics,
-!         1996, vol. 126, pp. 202-228,
-!         http://dx.doi.org/10.1006/jcph.1996.0130
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, 246, 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
-!
-!===============================================================================
-!
-  subroutine weno5_explicit(n, f, wl, wc, wr, u)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                   , intent(in)  :: n
-    real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: wl, wc, wr
-    real(kind=8), dimension(n), intent(out) :: u
-
-! local variables
-!
-    integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: xl, xc, xr, xx
-    real(kind=8) :: ql, qc, qr
-
-! improved weight coefficients (Table 1 in [2])
-!
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
-
-! interpolation coefficients
-!
-    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
-                             , a12 = - 7.0d+00 / 6.0d+00                       &
-                             , a13 =   1.1d+01 / 6.0d+00
-    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
-                             , a22 =   5.0d+00 / 6.0d+00                       &
-                             , a23 =   2.0d+00 / 6.0d+00
-    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
-                             , a32 =   5.0d+00 / 6.0d+00                       &
-                             , a33 = - 1.0d+00 / 6.0d+00
-!
-!-------------------------------------------------------------------------------
-!
-! prepare coefficients
-!
-    do i = 1, n
-
-! prepare indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weigths
-!
-      xc = dc * wc(i)
-      xl = dl * wl(i)
-      xr = dr * wr(i)
-      xx = (xl + xr) + xc
-      xl = xl / xx
-      xr = xr / xx
-      xc = 1.0d+00 - (xl + xr)
-
-! calculate the interpolations of the left state (eq. 15 in [1])
-!
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
-
-! calculate the interpolation of the left state
-!
-      u(i) = (xl * ql + xr * qr) + xc * qc
-
-    end do ! i = 1, n
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine weno5_explicit
 !
 !===============================================================================
 !
