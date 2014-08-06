@@ -1205,9 +1205,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
@@ -1265,9 +1262,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
@@ -1331,9 +1325,6 @@ module interpolations
 !
 !     n  - the length of the input vector;
 !     f  - the input vector of cell averaged values;
-!     bl - the smoothness indicators for the left stencil;
-!     bc - the smoothness indicators for the central stencil;
-!     br - the smoothness indicators for the right stencil;
 !     wl - the weights the left stencil;
 !     wc - the weights for the central stencil;
 !     wr - the weights for the right stencil;
