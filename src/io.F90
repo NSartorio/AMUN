@@ -1101,7 +1101,7 @@ module io
     use blocks         , only : get_mblocks, get_dblocks, get_nleafs
     use blocks         , only : get_last_id
     use coordinates    , only : minlev, maxlev, toplev
-    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
@@ -1154,8 +1154,8 @@ module io
     call write_attribute(gid, 'mblocks', get_mblocks())
     call write_attribute(gid, 'dblocks', get_dblocks())
     call write_attribute(gid, 'nleafs' , get_nleafs() )
-    call write_attribute(gid, 'ncells' , nn           )
-    call write_attribute(gid, 'nghost' , ng           )
+    call write_attribute(gid, 'ncells' , nc           )
+    call write_attribute(gid, 'nghosts', ng           )
     call write_attribute(gid, 'minlev' , minlev       )
     call write_attribute(gid, 'maxlev' , maxlev       )
     call write_attribute(gid, 'toplev' , toplev       )
@@ -1244,7 +1244,7 @@ module io
     use blocks         , only : append_metablock
     use blocks         , only : set_last_id, get_last_id
     use blocks         , only : get_mblocks, get_dblocks, get_nleafs
-    use coordinates    , only : nn, ng, in, jn, kn, ir, jr, kr
+    use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : maxlev, toplev
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : initialize_coordinates, finalize_coordinates
@@ -1301,7 +1301,7 @@ module io
     call read_attribute(gid, 'nleafs' , lnleafs )
     call read_attribute(gid, 'last_id', llast_id)
     call read_attribute(gid, 'ncells' , lncells )
-    call read_attribute(gid, 'nghost' , lnghost )
+    call read_attribute(gid, 'nghosts', lnghost )
     call read_attribute(gid, 'nseeds' , lnseeds )
     call read_attribute(gid, 'step'   , step    )
     call read_attribute(gid, 'isnap'  , isnap   )
@@ -1328,7 +1328,7 @@ module io
 
 ! check the block dimensions
 !
-    if (lncells /= nn) then
+    if (lncells /= nc) then
       call print_error("io::read_attributes_h5"                                &
                                        , "The block dimensions do not match!")
     end if
