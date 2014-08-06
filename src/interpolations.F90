@@ -717,20 +717,14 @@ module interpolations
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n)   :: bl, bc, br
     real(kind=8), dimension(1:n)   :: wl, wc, wr
     real(kind=8), dimension(1:n)   :: u
 !
 !-------------------------------------------------------------------------------
 !
-! calculate smoothness indicators
-!
-    call smoothness_indicators(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
-
 ! calculate stencil weights
 !
-    call stencil_weights(n, f(1:n), bl(1:n), bc(1:n), br(1:n)                  &
-                                                  , wl(1:n), wc(1:n), wr(1:n))
+    call stencil_weights(n, f(1:n), wl(1:n), wc(1:n), wr(1:n))
 
 ! find the left state interpolation implicitelly
 !
@@ -798,20 +792,14 @@ module interpolations
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n)   :: bl, bc, br
     real(kind=8), dimension(1:n)   :: wl, wc, wr
     real(kind=8), dimension(1:n)   :: u
 !
 !-------------------------------------------------------------------------------
 !
-! calculate smoothness indicators
-!
-    call smoothness_indicators(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
-
 ! calculate stencil weights
 !
-    call stencil_weights(n, f(1:n), bl(1:n), bc(1:n), br(1:n)                  &
-                                                  , wl(1:n), wc(1:n), wr(1:n))
+    call stencil_weights(n, f(1:n), wl(1:n), wc(1:n), wr(1:n))
 
 ! find the left state interpolation implicitelly
 !
@@ -1114,10 +1102,11 @@ module interpolations
 !
 !===============================================================================
 !
-! subroutine SMOOTHNESS_INDICATORS:
-! --------------------------------
+! subroutine SMOOTHNESS_INDICATORS_JS:
+! -----------------------------------
 !
-!   Subroutine calculates smoothness indicators for a given vector of variables.
+!   Subroutine calculates Jiang-Shu smoothness indicators for a given vector
+!   of variable values.
 !
 !   Arguments:
 !
@@ -1135,16 +1124,9 @@ module interpolations
 !         1996, vol. 126, pp. 202-228,
 !         http://dx.doi.org/10.1006/jcph.1996.0130
 !
-!     [2] Ghosh, D. & Baeder, J. D.,
-!         "Compact Reconstruction Schemes with Weighted ENO Limiting for
-!          Hyperbolic Conservation Laws"
-!         SIAM Journal on Scientific Computing,
-!         2012, vol. 34, no. 3, pp. A1678-A1706,
-!         http://dx.doi.org/10.1137/110857659
-!
 !===============================================================================
 !
-  subroutine smoothness_indicators(n, f, bl, bc, br)
+  subroutine smoothness_indicators_js(n, f, bl, bc, br)
 
 ! local variables are not implicit by default
 !
@@ -1158,12 +1140,14 @@ module interpolations
 
 ! local variables
 !
-    integer      :: np2, np1, nm1, nm2, i, j
+    integer :: nm1, np1
+    integer :: i  , ip1
 
 ! local arrays
 !
-    real(kind=8), dimension(0:n+2) :: df2, df1
-    real(kind=8), dimension(1:n)   :: dfl, dfc, dfr
+    real(kind=8), dimension(0:n+1) :: df2
+    real(kind=8), dimension(0:n  ) :: dfm
+    real(kind=8), dimension(1:n+1) :: dfp
 
 ! local constants
 !
@@ -1173,47 +1157,37 @@ module interpolations
 !
 ! calculate indices
 !
-    np2 = n + 2
     np1 = n + 1
     nm1 = n - 1
-    nm2 = n - 2
 
-! calculate the second order derivative
+! calculate the left and right first order derivatives
 !
-    df2(2:nm1) = ((f(3:n) + f(1:nm2)) - 2.0d+00 * f(2:nm1))**2
-    df2(1    ) = (f(2  ) - f(1))**2
-    df2(  n  ) = (f(nm1) - f(n))**2
-    df2(0    ) = 0.0d+00
-    df2(  np1) = 0.0d+00
-    df2(  np2) = 0.0d+00
+    do i = 1, nm1
+      ip1 = i + 1
 
-! calculate the first derivative
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1  ) = dfp(1)
+    dfm(0  ) = dfm(1)
+    dfp(n  ) = dfm(n)
+    dfp(np1) = dfp(n)
+
+! the second order derivative
 !
-    df1(2:n)   = f(2:n) - f(1:nm1)
-    df1(0  )   = 0.0d+00
-    df1(1  )   = 0.0d+00
-    df1(np1)   = 0.0d+00
-    df1(np2)   = 0.0d+00
-
-! calculate the first order derivatives for left, central and right stencils
-!
-    dfl(  1:n  ) =   3.0d+00 * df1(1:n) - df1(0:nm1)
-
-    dfc(  2:nm1) = f(1:nm2) - f(3:n)
-    dfc(  1    ) = f(1    ) - f(2  )
-    dfc(    n  ) = f(  nm1) - f(  n)
-
-    dfr(  1:n) = - 3.0d+00 * df1(2:np1) + df1(3:np2)
+    df2(1:n  ) = c1 * (dfp(1:n) - dfm(1:n))**2
+    df2(0    ) = df2(1)
+    df2(  np1) = df2(n)
 
 ! calculate the left, central and right smoothness indicators
 !
-    bl(1:n) = c1 * df2(0:nm1) + c2 * dfl(1:n)**2
-    bc(1:n) = c1 * df2(1:n  ) + c2 * dfc(1:n)**2
-    br(1:n) = c1 * df2(2:np1) + c2 * dfr(1:n)**2
+    bl(1:n) = df2(0:nm1) + c2 * (3.0d+00 * dfm(1:n) - dfm(0:nm1))**2
+    bc(1:n) = df2(1:n  ) + c2 * (          dfp(1:n) + dfm(1:n  ))**2
+    br(1:n) = df2(2:np1) + c2 * (3.0d+00 * dfp(1:n) - dfp(2:np1))**2
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine smoothness_indicators
+  end subroutine smoothness_indicators_js
 !
 !===============================================================================
 !
@@ -1243,7 +1217,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_js(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_js(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1253,11 +1227,18 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: bl, bc, br
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the weights
 !
     wl(1:n) = 1.0d+00 / (bl(1:n) + eps)**2
@@ -1297,7 +1278,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_z(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_z(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1307,15 +1288,19 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n) :: tt
+    real(kind=8), dimension(n) :: bl, bc, br
+    real(kind=8), dimension(n) :: tt
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the factor τ
 !
     tt(1:n) = abs(bl(1:n) - br(1:n))
@@ -1359,7 +1344,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine stencil_weights_yc(n, f, bl, bc, br, wl, wc, wr)
+  subroutine stencil_weights_yc(n, f, wl, wc, wr)
 
 ! local variables are not implicit by default
 !
@@ -1369,7 +1354,6 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: f
-    real(kind=8), dimension(n), intent(in)  :: bl, bc, br
     real(kind=8), dimension(n), intent(out) :: wl, wc, wr
 
 ! local variables
@@ -1378,10 +1362,15 @@ module interpolations
 
 ! local arrays
 !
-    real(kind=8), dimension(1:n) :: tt
+    real(kind=8), dimension(n) :: bl, bc, br
+    real(kind=8), dimension(n) :: tt
 !
 !-------------------------------------------------------------------------------
 !
+! calculate smoothness indicators according to Jiang-Sho
+!
+    call smoothness_indicators_js(n, f(1:n), bl(1:n), bc(1:n), br(1:n))
+
 ! calculate the factor τ
 !
     do i = 1, n
