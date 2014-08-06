@@ -153,6 +153,9 @@ module interpolations
     case ("weno5", "WENO5")
       name_rec           =  "5th order WENO"
       reconstruct_states => reconstruct_weno5
+    case ("weno5ns", "weno5-ns", "WENO5NS", "WENO5-NS")
+      name_rec           =  "5th order WENO-NS (Ha et al. 2013)"
+      reconstruct_states => reconstruct_weno5ns
     case ("crweno5", "CRWENO5")
       name_rec           =  "5th order Compact WENO"
       reconstruct_states => reconstruct_crweno5
@@ -747,6 +750,191 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_weno5
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_WENO5NS:
+! ------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Explicit Weighted Essentially Non-Oscillatory (WENO5) method with new
+!   smoothness indicators and stencil weights by He et al. (2013).
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Ha, Y., Kim, C. H., Lee, Y. J., & Yoon, J.,
+!         "An improved weighted essentially non-oscillatory scheme with a new
+!          smoothness indicator",
+!         Journal of Computational Physics,
+!         2013, vol. 232, pp. 68-86
+!         http://dx.doi.org/10.1016/j.jcp.2012.06.016
+!     [2] Arshed, G. M. & Hoffmann, K. A.,
+!         "Minimizing errors from linear and nonlinear weights of WENO scheme
+!          for broadband applications with shock waves",
+!         Journal of Computational Physics,
+!         2013, 246, 58-77
+!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
+!
+!===============================================================================
+!
+  subroutine reconstruct_weno5ns(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: bl, bc, br
+    real(kind=8) :: al, ac, ar, aa
+    real(kind=8) :: wl, wc, wr
+    real(kind=8) :: df, lq, l3, zt
+    real(kind=8) :: ql, qc, qr
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp, df2
+
+! improved weight coefficients (Table 1 in [2])
+!
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
+
+! the free parameter for smoothness indicators (see Eq. 3.6 in [1])
+!
+    real(kind=8), parameter :: xi  =   4.0d-01
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! calculate the absolute value of the second derivative
+!
+    df2(:) = 0.5d+00 * abs(dfp(:) - dfm(:))
+
+! iterate along the vector
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      im2 = max(1, i - 2)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate βₖ (eq. 3.6 in [1])
+!
+      df  = abs(dfp(i))
+      lq  = xi * df
+      bl  = df2(im1) + xi * abs(2.0d+00 * dfm(i) - dfm(im1))
+      bc  = df2(i  ) + lq
+      br  = df2(ip1) + lq
+
+! calculate ζ (below eq. 3.6 in [1])
+!
+      l3  = df**3
+      zt  = 0.5d+00 * ((bl - br)**2 + (l3 / (1.0d+00 + l3))**2)
+
+! calculate αₖ (eq. 3.9 in [4])
+!
+      al  = dl * (1.0d+00 + zt / (bl + eps)**2)
+      ac  = dc * (1.0d+00 + zt / (bc + eps)**2)
+      ar  = dr * (1.0d+00 + zt / (br + eps)**2)
+
+! calculate weights
+!
+      aa  = (al + ar) + ac
+      wl  = al / aa
+      wr  = ar / aa
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state (eq. 15 in [1])
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i  ) = (wl * ql + wr * qr) + wc * qc
+
+! calculate βₖ (eq. 3.6 in [1])
+!
+      df  = abs(dfm(i))
+      lq  = xi * df
+      bl  = df2(ip1) + xi * abs(2.0d+00 * dfp(i) - dfp(ip1))
+      bc  = df2(i  ) + lq
+      br  = df2(im1) + lq
+
+! calculate ζ (below eq. 3.6 in [1])
+
+      l3  = df**3
+      zt  = 0.5d+00 * ((bl - br)**2 + (l3 / (1.0d+00 + l3))**2)
+
+! calculate αₖ (eq. 3.9 in [4])
+!
+      al  = dl * (1.0d+00 + zt / (bl + eps)**2)
+      ac  = dc * (1.0d+00 + zt / (bc + eps)**2)
+      ar  = dr * (1.0d+00 + zt / (br + eps)**2)
+
+! normalize weights
+!
+      aa  = (al + ar) + ac
+      wl  = al / aa
+      wr  = ar / aa
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state (eq. 15 in [1])
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(im1) = (wl * ql + wr * qr) + wc * qc
+
+    end do ! i = 1, n
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_weno5ns
 !
 !===============================================================================
 !
