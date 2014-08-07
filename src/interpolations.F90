@@ -96,6 +96,7 @@ module interpolations
 
 ! include external procedures
 !
+    use error     , only : print_warning
     use parameters, only : get_parameter_string, get_parameter_integer         &
                          , get_parameter_real
 
@@ -150,30 +151,57 @@ module interpolations
     case ("tvd", "TVD")
       name_rec           =  "2nd order TVD"
       reconstruct_states => reconstruct_tvd
+      if (verbose .and. ng < 2)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>2).")
     case ("weno3", "WENO3")
       name_rec           =  "3rd order WENO"
       reconstruct_states => reconstruct_weno3
+      if (verbose .and. ng < 2)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>2).")
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
       reconstruct_states => reconstruct_limo3
+      if (verbose .and. ng < 2)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>2).")
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       reconstruct_states => reconstruct_weno5z
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case ("weno5yc", "weno5-yc", "WENO5YC", "WENO5-YC")
       name_rec           =  "5th order WENO-YC (Yamaleev & Carpenter 2009)"
       reconstruct_states => reconstruct_weno5yc
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case ("weno5ns", "weno5-ns", "WENO5NS", "WENO5-NS")
       name_rec           =  "5th order WENO-NS (Ha et al. 2013)"
       reconstruct_states => reconstruct_weno5ns
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case ("crweno5z", "crweno5-z", "CRWENO5Z", "CRWENO5-Z")
       name_rec           =  "5th order Compact WENO-Z"
       reconstruct_states => reconstruct_crweno5z
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case ("crweno5yc", "crweno5-yc", "CRWENO5YC", "CRWENO5-YC")
       name_rec           =  "5th order Compact WENO-YC"
       reconstruct_states => reconstruct_crweno5yc
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case ("crweno5", "CRWENO5")
       name_rec           =  "5th order Compact WENO"
       reconstruct_states => reconstruct_crweno5
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                                 , "Increase the number of ghost cells (>4).")
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
