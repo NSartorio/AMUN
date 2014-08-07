@@ -168,6 +168,9 @@ module interpolations
     case ("crweno5z", "crweno5-z", "CRWENO5Z", "CRWENO5-Z")
       name_rec           =  "5th order Compact WENO-Z"
       reconstruct_states => reconstruct_crweno5z
+    case ("crweno5yc", "crweno5-yc", "CRWENO5YC", "CRWENO5-YC")
+      name_rec           =  "5th order Compact WENO-YC"
+      reconstruct_states => reconstruct_crweno5yc
     case ("crweno5", "CRWENO5")
       name_rec           =  "5th order Compact WENO"
       reconstruct_states => reconstruct_crweno5
@@ -1237,7 +1240,6 @@ module interpolations
 !         SIAM Journal on Scientific Computing,
 !         2012, vol. 34, no. 3, pp. A1678-A1706,
 !         http://dx.doi.org/10.1137/110857659
-!
 !     [2] Ghosh, D. & Baeder, J. D.,
 !         "Weighted Non-linear Compact Schemes for the Direct Numerical
 !          Simulation of Compressible, Turbulent Flows"
@@ -1598,6 +1600,389 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crweno5z
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRWENO5YC:
+! --------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Compact-Reconstruction Weighted Essentially Non-Oscillatory (CRWENO)
+!   method and smoothness indicators by Yamaleev & Carpenter (2009).
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Ghosh, D. & Baeder, J. D.,
+!         "Compact Reconstruction Schemes with Weighted ENO Limiting for
+!          Hyperbolic Conservation Laws"
+!         SIAM Journal on Scientific Computing,
+!         2012, vol. 34, no. 3, pp. A1678-A1706,
+!         http://dx.doi.org/10.1137/110857659
+!     [2] Ghosh, D. & Baeder, J. D.,
+!         "Weighted Non-linear Compact Schemes for the Direct Numerical
+!          Simulation of Compressible, Turbulent Flows"
+!         Journal on Scientific Computing,
+!         2014,
+!         http://dx.doi.org/10.1007/s10915-014-9818-0
+!     [3] Yamaleev, N. K. & Carpenter, H. C.,
+!         "A Systematic Methodology for Constructing High-Order Energy Stable
+!          WENO Schemes"
+!         Journal of Computational Physics,
+!         2009, vol. 228, pp. 4248-4272,
+!         http://dx.doi.org/10.1016/j.jcp.2009.03.002
+!
+!===============================================================================
+!
+  subroutine reconstruct_crweno5yc(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    real(kind=8) :: bl, bc, br, tt
+    real(kind=8) :: wl, wc, wr, ww
+    real(kind=8) :: ql, qc, qr
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n)   :: dfm, dfp, df2
+    real(kind=8), dimension(n)   :: al, ac, ar
+    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n,2) :: a, b, c, r
+
+! smoothness indicator coefficients
+!
+    real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
+
+! improved weight coefficients (Table 1 in [2])
+!
+    real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
+    real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
+    real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
+    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
+                             , dc = 5.065006634d-01, dq = 2.5d-01
+
+! interpolation coefficients
+!
+    real(kind=8), parameter :: a11 =   2.0d+00 / 6.0d+00                       &
+                             , a12 = - 7.0d+00 / 6.0d+00                       &
+                             , a13 =   1.1d+01 / 6.0d+00
+    real(kind=8), parameter :: a21 = - 1.0d+00 / 6.0d+00                       &
+                             , a22 =   5.0d+00 / 6.0d+00                       &
+                             , a23 =   2.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 =   2.0d+00 / 6.0d+00                       &
+                             , a32 =   5.0d+00 / 6.0d+00                       &
+                             , a33 = - 1.0d+00 / 6.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! calculate the absolute value of the second derivative
+!
+    df2(:) = c1 * (dfp(:) - dfm(:))**2
+
+! prepare smoothness indicators
+!
+    do i = 1, n
+
+! prepare neighbour indices
+!
+      im2   = max(1, i - 2)
+      im1   = max(1, i - 1)
+      ip1   = min(n, i + 1)
+      ip2   = min(n, i + 2)
+
+! calculate βₖ (eqs. 9-11 in [1])
+!
+      bl    = df2(im1) + c2 * (3.0d+00 * dfm(i  ) - dfm(im1))**2
+      bc    = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
+      br    = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
+
+! calculate τ (below eq. 64 in [3])
+!
+      tt  = (6.0d+00 * f(i) + (f(im2) + f(ip2))                                &
+                                             - 4.0d+00 * (f(im1) + f(ip1)))**2
+
+! calculate αₖ (eq. 28 in [1])
+!
+      al(i) = 1.0d+00 + tt / (bl + eps)
+      ac(i) = 1.0d+00 + tt / (bc + eps)
+      ar(i) = 1.0d+00 + tt / (br + eps)
+
+    end do ! i = 1, n
+
+! prepare tridiagonal system coefficients
+!
+    do i = ng, n - ng
+
+! prepare neighbour indices
+!
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+! calculate weights
+!
+      wl  = cl * al(i)
+      wc  = cc * ac(i)
+      wr  = cr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate tridiagonal matrix coefficients
+!
+      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
+      c(i,1) = 5.0d-01 * wr
+
+! prepare right hand side of tridiagonal equation
+!
+      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
+             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
+             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+
+! calculate weights
+!
+      wl  = cr * al(i)
+      wc  = cc * ac(i)
+      wr  = cl * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate tridiagonal matrix coefficients
+!
+      a(i,2) = 5.0d-01 * wl
+      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+
+! prepare right hand side of tridiagonal equation
+!
+      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
+             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
+             +   2.0d+00 * wr                                * f(ip1)) * dq
+
+    end do ! i = 1, n
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = 1, ng
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 1, ng
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = n - ng, n
+
+! interpolate ghost zones using explicit solver (right-side reconstruction)
+!
+    do i = 1, ng + 1
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! normalize weights
+!
+      wl  = dl * ar(i)
+      wc  = dc * ac(i)
+      wr  = dr * al(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,2) = 0.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
+
+    end do ! i = 1, ng + 1
+
+! interpolate ghost zones using explicit solver (right-side reconstruction)
+!
+    do i = n - ng + 1, n
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+! normalize weights
+!
+      wl  = dl * ar(i)
+      wc  = dc * ac(i)
+      wr  = dr * al(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,2) = 0.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
+
+    end do ! i = 1, ng + 1
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    ib = 1
+    ie = n
+    tt    = 1.0d+00
+    u(ib) = r(ib,1)
+    do i = ib + 1, ie
+      im1  = i - 1
+      g(i) =  c(im1,1) / tt
+      tt   =  1.0d+00 - a(i,1) * g(i)
+      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
+    end do
+    do i = ie - 1, ib, -1
+      ip1  = i + 1
+      u(i) = u(i) - g(ip1) * u(ip1)
+    end do
+    fl(ib:ie) = u(ib:ie)
+
+! solve the tridiagonal system of equations for the right-side interpolation
+!
+    tt    = 1.0d+00
+    u(ie) = r(ie,2)
+    do i = ie - 1, ib, -1
+      ip1  = i + 1
+      g(i) =  a(ip1,2) / tt
+      tt   =  1.0d+00 - c(i,2) * g(i)
+      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
+    end do
+    do i = ib + 1, ie
+      im1  = i - 1
+      u(i) = u(i) - g(im1) * u(im1)
+    end do
+    fr(ib:ie-1) = u(ib+1:ie)
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crweno5yc
 !
 !===============================================================================
 !
