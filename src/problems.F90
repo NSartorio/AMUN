@@ -1292,7 +1292,7 @@ module problems
     real(kind=8), save :: bgui = 0.00d+00
     real(kind=8), save :: vper = 1.00d-02
     real(kind=8), save :: xcut = 4.00d-01
-    real(kind=8), save :: ycut = 1.00d-01
+    real(kind=8), save :: ycut = 1.00d-02
 
 ! local saved parameters
 !
