@@ -1269,7 +1269,7 @@ module problems
 !
     use blocks     , only : block_data
     use coordinates, only : im, jm, km
-    use coordinates, only : ay
+    use coordinates, only : ax, ay
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
@@ -1291,6 +1291,7 @@ module problems
     real(kind=8), save :: bamp = 1.00d+00
     real(kind=8), save :: bgui = 0.00d+00
     real(kind=8), save :: vper = 1.00d-02
+    real(kind=8), save :: xcut = 4.00d-01
     real(kind=8), save :: ycut = 1.00d-01
 
 ! local saved parameters
@@ -1304,6 +1305,7 @@ module problems
 ! local arrays
 !
     real(kind=8), dimension(nv,jm) :: q, u
+    real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
 !
 !-------------------------------------------------------------------------------
@@ -1325,6 +1327,7 @@ module problems
       call get_parameter_real("brecon", bamp)
       call get_parameter_real("bguide", bgui)
       call get_parameter_real("vper"  , vper)
+      call get_parameter_real("xcut"  , xcut)
       call get_parameter_real("ycut"  , ycut)
 
 ! reset the first execution flag
@@ -1335,6 +1338,7 @@ module problems
 
 ! prepare block coordinates
 !
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
 ! set the density and pressure
@@ -1373,7 +1377,7 @@ module problems
 
 ! set the random velocity field in a layer near current sheet
 !
-          if (abs(y(j)) <= ycut) then
+          if (abs(x(i)) <= xcut .and. abs(y(j)) <= ycut) then
 
             q(ivx,j) = vper * randomn()
             q(ivy,j) = vper * randomn()
