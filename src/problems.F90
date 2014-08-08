@@ -1341,57 +1341,56 @@ module problems
     x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
-! set the density and pressure
-!
-    q(idn,:) = dens
-    if (ipr > 0) q(ipr,:) = pres
-
-! reset velocity components
-!
-    q(ivx,:) = 0.0d+00
-    q(ivy,:) = 0.0d+00
-    q(ivz,:) = 0.0d+00
-
-! if magnetic field is present, set it to be uniform with the desired strength
-! and orientation
-!
-    if (ibx > 0) then
-
-! set magnetic field components
-!
-      q(ibx,:) = 0.0d+00
-      q(iby,:) = 0.0d+00
-      q(ibz,:) = bgui
-      q(ibp,:) = 0.0d+00
-
-    end if
-
 ! iterate over all positions in the XZ plane
 !
     do k = 1, km
       do i = 1, im
 
-! sweep along the Y coordinate
+! set the uniform density and pressure
 !
-        do j = 1, jm
+        q(idn,:) = dens
+        if (ipr > 0) q(ipr,:) = pres
 
-! set the random velocity field in a layer near current sheet
+! if magnetic field is present, set its initial configuration
 !
-          if (abs(x(i)) <= xcut .and. abs(y(j)) <= ycut) then
+        if (ibx > 0) then
 
-            q(ivx,j) = vper * randomn()
-            q(ivy,j) = vper * randomn()
-#if NDIMS == 3
-            q(ivz,j) = vper * randomn()
-#endif /* NDIMS == 3 */
-
-          end if
+! reset magnetic field components
+!
+          q(ibx,:) = 0.0d+00
+          q(iby,:) = 0.0d+00
+          q(ibz,:) = bgui
+          q(ibp,:) = 0.0d+00
 
 ! set antiparallel magnetic field component
 !
-          if (ibx > 0) q(ibx,j) = sign(bamp, y(j))
+          do j = 1, jm
+            q(ibx,j) = sign(bamp, y(j))
+          end do ! j = 1, jm
 
-        end do ! j = 1, jm
+        end if ! ibx > 0
+
+! reset velocity components
+!
+        q(ivx,:) = 0.0d+00
+        q(ivy,:) = 0.0d+00
+        q(ivz,:) = 0.0d+00
+
+! set the random velocity field in a layer near current sheet
+!
+        if (abs(x(i)) <= xcut) then
+          do j = 1, jm
+            if (abs(y(j)) <= ycut) then
+
+              q(ivx,j) = vper * randomn()
+              q(ivy,j) = vper * randomn()
+#if NDIMS == 3
+              q(ivz,j) = vper * randomn()
+#endif /* NDIMS == 3 */
+
+            end if ! |y| < ycut
+          end do ! j = 1, jm
+        end if ! |x| < xcut
 
 ! convert the primitive variables to conservative ones
 !
