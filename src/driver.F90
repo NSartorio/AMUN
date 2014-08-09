@@ -286,6 +286,14 @@ program amun
 !
   call get_parameter_integer("ndat" , ndat)
 
+! initialize MPI module and print info
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"        ) "Parallelization:"
+    write (*,"(4x,a,1x,i6 )" ) "MPI processes          =", nprocs
+  end if
+
 ! set up the MPI geometry
 !
   call setup_mpi(div(:), per(:), .false.)
