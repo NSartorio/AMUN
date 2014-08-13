@@ -889,7 +889,7 @@ module evolution
               if (ieee_is_nan(pdata%u(p,i,j,k))) then
                 print *, 'U NaN:', cvars(p), pdata%meta%id, i, j, k
               end if
-              if (ieee_is_isnan(pdata%q(p,i,j,k))) then
+              if (ieee_is_nan(pdata%q(p,i,j,k))) then
                 print *, 'Q NaN:', pvars(p), pdata%meta%id, i, j, k
               end if
 #else /* IBM */
