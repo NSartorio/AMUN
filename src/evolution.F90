@@ -135,6 +135,11 @@ module evolution
       name_int =  "2nd order Runge-Kutta method"
       evolve   => evolve_rk2
 
+    case ("rk3", "RK3")
+
+      name_int =  "3rd order Runge-Kutta method"
+      evolve   => evolve_rk3
+
     case default
 
       if (verbose) then
@@ -491,6 +496,11 @@ module evolution
 !   Subroutine advances the solution by one time step using the 2nd order
 !   Runge-Kutta time integration method.
 !
+!   References:
+!
+!     [1] Press, W. H, Teukolsky, S. A., Vetterling, W. T., Flannery, B. P.,
+!         "Numerical Recipes in Fortran",
+!         Cambridge University Press, Cambridge, 1992
 !
 !===============================================================================
 !
@@ -607,6 +617,200 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
+!
+!===============================================================================
+!
+! subroutine EVOLVE_RK3:
+! ---------------------
+!
+!   Subroutine advances the solution by one time step using the 3rd order
+!   Runge-Kutta time integration method.
+!
+!   References:
+!
+!     [1] Press, W. H, Teukolsky, S. A., Vetterling, W. T., Flannery, B. P.,
+!         "Numerical Recipes in Fortran",
+!         Cambridge University Press, Cambridge, 1992
+!
+!
+!===============================================================================
+!
+  subroutine evolve_rk3()
+
+! include external procedures
+!
+    use boundaries    , only : boundary_variables
+    use sources       , only : update_sources
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv, ibp
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer    :: pblock
+
+! local variables
+!
+    real(kind=8)                         :: ds
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im,jm,km) :: du
+
+! local integration parameters
+!
+    real(kind=8), parameter :: f21 = 3.0d+00 / 4.0d+00, f22 = 1.0d+00 / 4.0d+00
+    real(kind=8), parameter :: f31 = 1.0d+00 / 3.0d+00, f32 = 2.0d+00 / 3.0d+00
+!
+!-------------------------------------------------------------------------------
+!
+!! 1st substep of integration
+!!
+! prepare fractional time step
+!
+    ds = dt
+
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pblock, du(:,:,:,:))
+
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
+
+! update the solution for the fluid variables
+!
+      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+
+! update the conservative variable pointer
+!
+      pblock%u => pblock%u1
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!! 2nd substep of integration
+!!
+! prepare fractional time step
+!
+    ds = f22 * dt
+
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pblock, du(:,:,:,:))
+
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
+
+! update the solution for the fluid variables
+!
+      pblock%u1(1:nv,:,:,:) = f21 * pblock%u0(1:nv,:,:,:)                      &
+                            + f22 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!! 3rd substep of integration
+!!
+! prepare fractional time step
+!
+    ds = f32 * dt
+
+! update fluxes for the second step of the RK2 integration
+!
+    call update_fluxes()
+
+! update the solution using numerical fluxes stored in the data blocks
+!
+    pblock => list_data
+    do while (associated(pblock))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pblock, du(:,:,:,:))
+
+! add source terms
+!
+      call update_sources(pblock, du(:,:,:,:))
+
+! update the solution for the fluid variables
+!
+      pblock%u0(1:nv,:,:,:) = f31 * pblock%u0(1:nv,:,:,:)                      &
+                            + f32 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+
+! update the conservative variable pointer
+!
+      pblock%u => pblock%u0
+
+! update ψ by its source term
+!
+      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
+
+! assign pointer to the next block
+!
+      pblock => pblock%next
+
+    end do
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_rk3
 !
 !===============================================================================
 !
