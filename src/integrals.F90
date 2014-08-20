@@ -271,7 +271,7 @@ module integrals
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use equations      , only : ien, imx, imy, imz
     use equations      , only : gamma, csnd
-    use evolution      , only : step, time, dt
+    use evolution      , only : step, time, dtn
     use mpitools       , only : master
 #ifdef MPI
     use mpitools       , only : reduce_sum_real_array
@@ -473,7 +473,7 @@ module integrals
 ! write down the integrals and statistics to appropriate files
 !
     if (master) then
-      write(funit,"(i9,10(1x,1e18.8))") step, time, dt, inarr(1:8)
+      write(funit,"(i9,10(1x,1e18.8))") step, time, dtn, inarr(1:8)
       write(sunit,"(i9,23(1x,1e18.8))") step, time                             &
                                             , avarr(1), mnarr(1), mxarr(1)     &
                                             , avarr(2), mnarr(2), mxarr(2)     &
