@@ -387,14 +387,14 @@ module evolution
     dx_min = min(adx(lev), ady(lev), adz(lev))
 #endif /* NDIMS == 3 */
 
-! calcilate the new time step
-!
-    dtn = dx_min / max(cmax                                                    &
-                        + 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
-
 ! calculate the new time step
 !
-    dt  = cfl * dtn
+    dtn = cfl * dx_min / max(cmax                                              &
+                        + 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
+
+! substitute the new time step
+!
+    dt  = dtn
 
 ! round the time
 !
