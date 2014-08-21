@@ -127,22 +127,22 @@ module evolution
 
     case ("euler", "EULER")
 
-      name_int =  "1st order Euler method"
+      name_int =  "1st order Euler"
       evolve   => evolve_euler
 
     case ("rk2", "RK2")
 
-      name_int =  "2nd order Runge-Kutta method"
+      name_int =  "2nd order Runge-Kutta"
       evolve   => evolve_rk2
 
     case ("rk3", "RK3")
 
-      name_int =  "3rd order Runge-Kutta method"
+      name_int =  "3rd order Runge-Kutta"
       evolve   => evolve_rk3
 
     case ("rk3.4", "RK3.4")
 
-      name_int =  "3rd order 4-stage Runge-Kutta method"
+      name_int =  "3rd order 4-stage Runge-Kutta"
       evolve   => evolve_rk34
       cfl      = 2.0d+00 * cfl
 
