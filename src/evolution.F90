@@ -868,8 +868,8 @@ module evolution
 
 ! local integration parameters
 !
-    real(kind=8), parameter :: fh = 1.0d+00 / 2.0d+00, fo = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: ft = 2.0d+00 / 3.0d+00, fs = 1.0d+00 / 6.0d+00
+    real(kind=8), parameter :: b1  = 1.0d+00 / 2.0d+00, b3  = 1.0d+00 / 6.0d+00
+    real(kind=8), parameter :: a31 = 2.0d+00 / 3.0d+00, a33 = 1.0d+00 / 3.0d+00
 !
 !-------------------------------------------------------------------------------
 !
@@ -877,7 +877,7 @@ module evolution
 !
 ! calculate fractional time step
 !
-    ds = fh * dt
+    ds = b1 * dt
 
 ! update fluxes for the first step of the RK2 integration
 !
@@ -961,7 +961,7 @@ module evolution
 !
 ! calculate fractional time step
 !
-    ds = fs * dt
+    ds = b3 * dt
 
 ! update fluxes for the first step of the RK2 integration
 !
@@ -982,8 +982,8 @@ module evolution
 
 ! update the solution for the fluid variables
 !
-      pblock%u1(1:nv,:,:,:) = ft * pblock%u0(1:nv,:,:,:)                       &
-                            + fo * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      pblock%u1(1:nv,:,:,:) = a31 * pblock%u0(1:nv,:,:,:)                      &
+                            + a33 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
 
 ! assign pointer to the next block
 !
@@ -1003,7 +1003,7 @@ module evolution
 !
 ! calculate fractional time step
 !
-    ds = fh * dt
+    ds = b1 * dt
 
 ! update fluxes for the second step of the RK2 integration
 !
