@@ -1346,13 +1346,13 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-!= 1st step of the integration: U(1) = U(n) + b1 dt F[U(n)]
+!= 1st step: U(1) = U(n) + b1 dt F[U(n)]
 !
-! calculate fractional time step
+! calculate the fractional time step
 !
     ds = b1 * dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
@@ -1364,15 +1364,15 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the intermediate solution
 !
       pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
                                      + ds * du(1:nv,1:im,1:jm,1:km)
@@ -1381,7 +1381,7 @@ module evolution
 !
       pdata%u => pdata%u1
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
@@ -1395,9 +1395,9 @@ module evolution
 !
     call boundary_variables()
 
-!= 2nd step of the integration: U(2) = U(1) + b1 dt F[U(1)]
+!= 2nd step: U(2) = U(1) + b1 dt F[U(1)]
 !
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
@@ -1409,20 +1409,20 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the intermediate solution
 !
       pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u1(1:nv,1:im,1:jm,1:km)            &
                                      + ds * du(1:nv,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
@@ -1436,13 +1436,13 @@ module evolution
 !
     call boundary_variables()
 
-!= 3rd step of the integration: U(3) = a31 U(n) + a33 U(2) + b3 dt F[U(2)]
+!= 3rd step: U(3) = a31 U(n) + a33 U(2) + b3 dt F[U(2)]
 !
-! calculate fractional time step
+! calculate the fractional time step
 !
     ds = b3 * dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
@@ -1454,21 +1454,21 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the intermediate solution
 !
       pdata%u1(1:nv,1:im,1:jm,1:km) = a31 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
                                     + a33 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
                                            + ds * du(1:nv,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
@@ -1482,13 +1482,13 @@ module evolution
 !
     call boundary_variables()
 
-!= 4th step of the integration: U(4) = a41 U(n) + a44 U(3) + b4 dt F[U(3)]
+!= 4th step: U(4) = a41 U(n) + a44 U(3) + b4 dt F[U(3)]
 !
-! calculate fractional time step
+! calculate the fractional time step
 !
     ds = b4 * dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
@@ -1500,15 +1500,15 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the intermediate solution
 !
       pdata%u0(1:nv,1:im,1:jm,1:km) = a41 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
                                     + a44 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
@@ -1518,7 +1518,7 @@ module evolution
 !
       pdata%u => pdata%u0
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
@@ -1532,13 +1532,13 @@ module evolution
 !
     call boundary_variables()
 
-!= update the final solution: U(n+1) = a53 U(2) + a55 U(4) + b5 dt F[U(4)]
+!= the final step: U(n+1) = a53 U(2) + a55 U(4) + b5 dt F[U(4)]
 !
-! calculate fractional time step
+! calculate the fractional time step
 !
     ds = b5 * dt
 
-! update fluxes for the second step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
@@ -1550,15 +1550,15 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the final solution
 !
       pdata%u0(1:nv,1:im,1:jm,1:km) = a53 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
                                     + a55 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
@@ -1569,7 +1569,7 @@ module evolution
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
