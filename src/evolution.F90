@@ -742,11 +742,11 @@ module evolution
 
 != 2nd step: U(i) = [1 + dt/(m-1) L] U(i-1), for i = 1, ..., m-1
 !
-! integrate intermediate steps
+! integrate the intermediate steps
 !
     do n = 1, stages - 1
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
       call update_fluxes()
 
@@ -758,15 +758,15 @@ module evolution
 !
       do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
         call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
         call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the intermediate solution
 !
         pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u1(1:nv,1:im,1:jm,1:km)          &
                                        + ds * du(1:nv,1:im,1:jm,1:km)
@@ -787,9 +787,9 @@ module evolution
 
     end do ! n = 1, stages - 1
 
-!= 3rd step: U(n+1) = 1/m U(0) + (m-1)/m [1 + dt/(m-1) L] U(m-1)
+!= the final step: U(n+1) = 1/m U(0) + (m-1)/m [1 + dt/(m-1) L] U(m-1)
 !
-! update fluxes for the last step
+! update fluxes
 !
     call update_fluxes()
 
@@ -801,15 +801,15 @@ module evolution
 !
     do while (associated(pdata))
 
-! calculate variable increment for the current block
+! calculate the variable increment
 !
       call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! add source terms
+! add the source terms
 !
       call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! update the final solution
 !
       pdata%u0(1:nv,1:im,1:jm,1:km) = fl *  pdata%u0(1:nv,1:im,1:jm,1:km)      &
                                     + fr * (pdata%u1(1:nv,1:im,1:jm,1:km)      &
