@@ -1268,11 +1268,14 @@ module problems
 ! include external procedures and variables
 !
     use blocks     , only : block_data
+    use constants  , only : pi2
     use coordinates, only : im, jm, km
-    use coordinates, only : ax, ay
+    use coordinates, only : ax, ay, adx, ady, adz
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use equations  , only : csnd2
+    use operators  , only : curl
     use parameters , only : get_parameter_real
     use random     , only : randomn
 
@@ -1289,10 +1292,14 @@ module problems
     real(kind=8), save :: dens = 1.00d+00
     real(kind=8), save :: pres = 1.00d+00
     real(kind=8), save :: bamp = 1.00d+00
+    real(kind=8), save :: bper = 0.00d+00
     real(kind=8), save :: bgui = 0.00d+00
     real(kind=8), save :: vper = 1.00d-02
     real(kind=8), save :: xcut = 4.00d-01
     real(kind=8), save :: ycut = 1.00d-02
+    real(kind=8), save :: yth  = 1.00d-16
+    real(kind=8), save :: pth  = 1.00d-02
+    real(kind=8), save :: pmag = 5.00d-01
 
 ! local saved parameters
 !
@@ -1301,12 +1308,14 @@ module problems
 ! local variables
 !
     integer            :: i, j, k
+    real(kind=8)       :: yt, yp
 
 ! local arrays
 !
     real(kind=8), dimension(nv,jm) :: q, u
     real(kind=8), dimension(im)    :: x
-    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(jm)    :: y, pm
+    real(kind=8), dimension(3)     :: dh
 !
 !-------------------------------------------------------------------------------
 !
@@ -1322,13 +1331,20 @@ module problems
 
 ! get problem parameters
 !
-      call get_parameter_real("dens"  , dens)
-      call get_parameter_real("pres"  , pres)
-      call get_parameter_real("brecon", bamp)
-      call get_parameter_real("bguide", bgui)
-      call get_parameter_real("vper"  , vper)
-      call get_parameter_real("xcut"  , xcut)
-      call get_parameter_real("ycut"  , ycut)
+      call get_parameter_real("dens", dens)
+      call get_parameter_real("pres", pres)
+      call get_parameter_real("bamp", bamp)
+      call get_parameter_real("bper", bper)
+      call get_parameter_real("bgui", bgui)
+      call get_parameter_real("vper", vper)
+      call get_parameter_real("xcut", xcut)
+      call get_parameter_real("ycut", ycut)
+      call get_parameter_real("yth" , yth )
+      call get_parameter_real("pth" , pth )
+
+! calculate the maximum magnetic pressure
+!
+      pmag = 0.5d+00 * (bamp**2 + bgui**2)
 
 ! reset the first execution flag
 !
@@ -1341,40 +1357,95 @@ module problems
     x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
+! prepare cell sizes
+!
+    dh(1) = adx(pdata%meta%level)
+    dh(2) = ady(pdata%meta%level)
+    dh(3) = adz(pdata%meta%level)
+
+! calculate the perturbation of magnetic field
+!
+    if (bper /= 0.0d+00) then
+
+! initiate the vector potential (we use velocity components to store vector
+! potential temporarily, and we store magnetic field perturbation in U)
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+            yt = abs(y(j) / yth)
+            yt = log(exp(yt) + exp(- yt))
+            yp = y(j) / pth
+
+            pdata%q(ivx,i,j,k) = 0.0d+00
+            pdata%q(ivy,i,j,k) = 0.0d+00
+            pdata%q(ivz,i,j,k) = bper * cos(pi2 * x(i)) * exp(- yp * yp) / pi2
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+! calculate magnetic field components from vector potential
+!
+      call curl(dh(1:3), pdata%q(ivx:ivz,1:im,1:jm,1:km)                       &
+                                            , pdata%q(ibx:ibz,1:im,1:jm,1:km))
+
+    else
+
+! reset magnetic field components
+!
+      pdata%q(ibx:ibz,:,:,:) = 0.0d+00
+
+    end if ! bper /= 0.0
+
 ! iterate over all positions in the XZ plane
 !
     do k = 1, km
       do i = 1, im
 
-! set the uniform density and pressure
-!
-        q(idn,:) = dens
-        if (ipr > 0) q(ipr,:) = pres
-
 ! if magnetic field is present, set its initial configuration
 !
         if (ibx > 0) then
 
-! reset magnetic field components
-!
-          q(ibx,:) = 0.0d+00
-          q(iby,:) = 0.0d+00
-          q(ibz,:) = bgui
-          q(ibp,:) = 0.0d+00
-
 ! set antiparallel magnetic field component
 !
           do j = 1, jm
-            q(ibx,j) = sign(bamp, y(j))
+            q(ibx,j) = bamp * tanh(y(j) / yth)
           end do ! j = 1, jm
+
+! set tangential magnetic field components
+!
+          q(iby,1:jm) = 0.0d+00
+          q(ibz,1:jm) = bgui
+          q(ibp,1:jm) = 0.0d+00
+
+! calculate local magnetic pressure
+!
+          pm(1:jm)    = 0.5d+00 * sum(q(ibx:ibz,:) * q(ibx:ibz,:), 1)
+
+! add magnetic field perturbation
+!
+          if (bper /= 0.0d+00) then
+            q(ibx,1:jm) = q(ibx,1:jm) + pdata%q(ibx,i,1:jm,k)
+            q(iby,1:jm) = q(iby,1:jm) + pdata%q(iby,i,1:jm,k)
+            q(ibz,1:jm) = q(ibz,1:jm) + pdata%q(ibz,i,1:jm,k)
+          end if ! bper /= 0.0
 
         end if ! ibx > 0
 
+! set the uniform density and pressure
+!
+        if (ipr > 0) then
+          q(idn,1:jm) = dens
+          q(ipr,1:jm) = pres + (pmag - pm(1:jm))
+        else
+          q(idn,1:jm) = dens + (pmag - pm(1:jm)) / csnd2
+        end if
+
 ! reset velocity components
 !
-        q(ivx,:) = 0.0d+00
-        q(ivy,:) = 0.0d+00
-        q(ivz,:) = 0.0d+00
+        q(ivx,1:jm) = 0.0d+00
+        q(ivy,1:jm) = 0.0d+00
+        q(ivz,1:jm) = 0.0d+00
 
 ! set the random velocity field in a layer near current sheet
 !

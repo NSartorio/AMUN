@@ -151,7 +151,7 @@ mpitools.o       : mpitools.F90 timers.o
 operators.o      : operators.F90
 parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
-                   error.o parameters.o random.o timers.o
+                   error.o operators.o parameters.o random.o timers.o
 random.o         : random.F90 mpitools.o parameters.o
 refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    parameters.o timers.o
