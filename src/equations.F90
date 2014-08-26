@@ -147,7 +147,7 @@ module equations
   public :: eigensystem_roe
   public :: update_primitive_variables
   public :: gamma
-  public :: csnd
+  public :: csnd, csnd2
   public :: cmax, cmax2
   public :: nv
   public :: inx, iny, inz
