@@ -41,7 +41,8 @@ module evolution
 
 ! evolution parameters
 !
-  real(kind=8), save :: cfl     = 0.5d+00
+  real(kind=8), save :: cfl     = 5.0d-01
+  integer     , save :: stages  = 2
 
 ! coefficient controlling the decay of scalar potential ѱ
 !
@@ -96,7 +97,8 @@ module evolution
 
 ! include external procedures
 !
-    use parameters, only : get_parameter_string, get_parameter_real
+    use parameters, only : get_parameter_string, get_parameter_real            &
+                                               , get_parameter_integer
 
 ! local variables are not implicit by default
 !
@@ -116,9 +118,10 @@ module evolution
 !
 ! get the integration method and the value of the CFL coefficient
 !
-    call get_parameter_string("time_advance", integration)
-    call get_parameter_real  ("cfl"         , cfl        )
-    call get_parameter_real  ("alpha"       , alpha      )
+    call get_parameter_string ("time_advance", integration)
+    call get_parameter_integer("stages"      , stages     )
+    call get_parameter_real   ("cfl"         , cfl        )
+    call get_parameter_real   ("alpha"       , alpha      )
 
 ! select the integration method, check the correctness of the integration
 ! parameters and adjust the CFL coefficient if necessary
@@ -134,6 +137,13 @@ module evolution
 
       name_int =  "2nd order Runge-Kutta"
       evolve   => evolve_rk2
+
+    case ("ssprk(m,2)", "SSPRK(m,2)")
+
+      stages   = max(2, min(9, stages))
+      write(name_int, "('2nd order SSPRK(',i1,',2)')") stages
+      evolve   => evolve_ssprk2
+      cfl      = (stages - 1) * cfl
 
     case ("rk3", "RK3")
 
@@ -623,6 +633,208 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
+!
+!===============================================================================
+!
+! subroutine EVOLVE_SSPRK2:
+! ------------------------
+!
+!   Subroutine advances the solution by one time step using the 2nd order
+!   m-stage Strong Stability Preserving Runge-Kutta time integration method.
+!   Up to 9 stages are allowed, due to stability problems with more stages.
+!
+!   References:
+!
+!     [1] Gottlieb, S. and Gottlieb, L.-A., J.
+!         "Strong Stability Preserving Properties of Runge-Kutta Time
+!          Discretization Methods for Linear Constant Coefficient Operators",
+!         Journal of Scientific Computing,
+!         2003, vol. 18, no. 1, pp. 83-109
+!
+!===============================================================================
+!
+  subroutine evolve_ssprk2()
+
+! include external procedures
+!
+    use boundaries    , only : boundary_variables
+    use sources       , only : update_sources
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv, ibp
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+
+! local variables
+!
+    integer      :: n
+    real(kind=8) :: ds
+
+! local saved variables
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: ft, fl, fr
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im,jm,km) :: du
+!
+!-------------------------------------------------------------------------------
+!
+! prepare things which don't change later
+!
+    if (first) then
+
+! calculate integration coefficients
+!
+      ft = 1.0d+00 / (stages - 1)
+      fl = 1.0d+00 / stages
+      fr = 1.0d+00 - fl
+
+! update first flag
+!
+      first = .false.
+
+    end if
+
+! calculate the fractional time step
+!
+    ds = ft * dt
+
+!= 1st step: U(0) = U(n)
+!
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! copy conservative array u0 to u1
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)
+
+! update the conservative variable pointer
+!
+      pdata%u => pdata%u1
+
+! assign pdata to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+!= 2nd step: U(i) = [1 + dt/(m-1) L] U(i-1), for i = 1, ..., m-1
+!
+! integrate intermediate steps
+!
+    do n = 1, stages - 1
+
+! update fluxes for the first step of the RK2 integration
+!
+      call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+      pdata => list_data
+
+! iterate over all data blocks
+!
+      do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+        call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+        call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+        pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u1(1:nv,1:im,1:jm,1:km)          &
+                                       + ds * du(1:nv,1:im,1:jm,1:km)
+
+! assign pdata to the next block
+!
+        pdata => pdata%next
+
+      end do ! over data blocks
+
+! update primitive variables
+!
+      call update_variables()
+
+! update boundaries
+!
+      call boundary_variables()
+
+    end do ! n = 1, stages - 1
+
+!= 3rd step: U(n+1) = 1/m U(0) + (m-1)/m [1 + dt/(m-1) L] U(m-1)
+!
+! update fluxes for the last step
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = fl *  pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + fr * (pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km))
+
+! update the conservative variable pointer
+!
+      pdata%u => pdata%u0
+
+! update ψ by its source term
+!
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_ssprk2
 !
 !===============================================================================
 !
