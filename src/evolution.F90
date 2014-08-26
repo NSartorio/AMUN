@@ -156,6 +156,12 @@ module evolution
       evolve   => evolve_rk34
       cfl      = 2.0d+00 * cfl
 
+    case ("ssprk(5,3)", "SSPRK(5,3)")
+
+      name_int =  "3rd order SSPRK(5,3)"
+      evolve   => evolve_ssprk35
+      cfl      = 2.65062919143939d+00 * cfl
+
     case default
 
       if (verbose) then
@@ -1263,6 +1269,309 @@ module evolution
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk34
+!
+!===============================================================================
+!
+! subroutine EVOLVE_SSPRK35:
+! -------------------------
+!
+!   Subroutine advances the solution by one time step using the 3rd order
+!   5-stage Strong Stability Preserving Runge-Kutta time integration method.
+!
+!   References:
+!
+!     [1] Ruuth, S. J.,
+!         "Global Optimization of Explicit Strong-Stability-Preserving
+!          Runge-Kutta methods",
+!         Mathematics of Computation,
+!         2006, vol. 75, no. 253, pp. 183-207
+!
+!===============================================================================
+!
+  subroutine evolve_ssprk35()
+
+! include external procedures
+!
+    use boundaries    , only : boundary_variables
+    use sources       , only : update_sources
+
+! include external variables
+!
+    use blocks        , only : block_data, list_data
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv, ibp
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer :: pdata
+
+! local variables
+!
+    real(kind=8)                         :: ds
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im,jm,km) :: du
+
+! local integration parameters
+!
+    real(kind=8), parameter :: b1  = 3.77268915331368d-01
+    real(kind=8), parameter :: b3  = 2.42995220537396d-01
+    real(kind=8), parameter :: b4  = 2.38458932846290d-01
+    real(kind=8), parameter :: b5  = 2.87632146308408d-01
+    real(kind=8), parameter :: a31 = 3.55909775063327d-01
+    real(kind=8), parameter :: a33 = 6.44090224936674d-01
+    real(kind=8), parameter :: a41 = 3.67933791638137d-01
+    real(kind=8), parameter :: a44 = 6.32066208361863d-01
+    real(kind=8), parameter :: a53 = 2.37593836598569d-01
+    real(kind=8), parameter :: a55 = 7.62406163401431d-01
+!
+!-------------------------------------------------------------------------------
+!
+!= 1st step of the integration: U(1) = U(n) + b1 dt F[U(n)]
+!
+! calculate fractional time step
+!
+    ds = b1 * dt
+
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
+                                     + ds * du(1:nv,1:im,1:jm,1:km)
+
+! update the conservative variable pointer
+!
+      pdata%u => pdata%u1
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!= 2nd step of the integration: U(2) = U(1) + b1 dt F[U(1)]
+!
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u1(1:nv,1:im,1:jm,1:km)            &
+                                     + ds * du(1:nv,1:im,1:jm,1:km)
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!= 3rd step of the integration: U(3) = a31 U(n) + a33 U(2) + b3 dt F[U(2)]
+!
+! calculate fractional time step
+!
+    ds = b3 * dt
+
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = a31 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + a33 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!= 4th step of the integration: U(4) = a41 U(n) + a44 U(3) + b4 dt F[U(3)]
+!
+! calculate fractional time step
+!
+    ds = b4 * dt
+
+! update fluxes for the first step of the RK2 integration
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = a41 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + a44 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
+
+! update the conservative variable pointer
+!
+      pdata%u => pdata%u0
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!= update the final solution: U(n+1) = a53 U(2) + a55 U(4) + b5 dt F[U(4)]
+!
+! calculate fractional time step
+!
+    ds = b5 * dt
+
+! update fluxes for the second step of the RK2 integration
+!
+    call update_fluxes()
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
+! iterate over all data blocks
+!
+    do while (associated(pdata))
+
+! calculate variable increment for the current block
+!
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! add source terms
+!
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution for the fluid variables
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = a53 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                    + a55 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
+
+! update ψ by its source term
+!
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
+
+! assign pointer to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
+
+! update primitive variables
+!
+    call update_variables()
+
+! update boundaries
+!
+    call boundary_variables()
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine evolve_ssprk35
 !
 !===============================================================================
 !
