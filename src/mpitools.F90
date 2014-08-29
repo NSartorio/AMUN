@@ -42,6 +42,9 @@ module mpitools
 ! timer indices
 !
   integer        , save                 :: imi, imc
+#ifdef PROFILE
+  integer        , save                 :: imb, imm, ims, imr
+#endif /* PROFILE */
 
 ! MPI global variables
 !
@@ -97,8 +100,14 @@ module mpitools
 #ifdef MPI
 ! set timer descriptions
 !
-    call set_timer('MPI initialization', imi)
-    call set_timer('MPI communication' , imc)
+    call set_timer('MPI initialization'  , imi)
+    call set_timer('MPI communication'   , imc)
+#ifdef PROFILE
+    call set_timer('mpitools:: broadcast', imb)
+    call set_timer('mpitools:: reduce'   , imm)
+    call set_timer('mpitools:: send'     , ims)
+    call set_timer('mpitools:: receive'  , imr)
+#endif /* PROFILE */
 
 ! start time accounting for the MPI initialization
 !
@@ -420,7 +429,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI broadcast
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
     call mpi_bcast(ibuf, 1, mpi_integer, 0, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI broadcast
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
 
     if (iret .ne. mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
@@ -466,7 +487,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI broadcast
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
     call mpi_bcast(rbuf, 1, mpi_real8, 0, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI broadcast
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
 
     if (iret .ne. mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
@@ -512,7 +545,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI broadcast
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
     call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI broadcast
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
 
     if (iret .ne. mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast a string variable!'
@@ -562,7 +607,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -617,7 +674,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -673,7 +742,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -728,7 +809,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -783,7 +876,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -838,7 +943,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -895,7 +1012,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -952,7 +1081,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -1009,7 +1150,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -1066,7 +1219,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -1123,10 +1288,22 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI reduce
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
     tbuf(:) = real(cbuf(:))
     call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm3d, iret)
     tbuf(:) = aimag(cbuf(:))
     call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI reduce
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
 
 ! substitute the result
 !
@@ -1186,7 +1363,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI send
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
     call mpi_send(rbuf, n, mpi_real8, dst, tag, comm3d, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI send
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
 
 ! check if the operation was successful
 !
@@ -1246,7 +1435,19 @@ module mpitools
 !
     call start_timer(imc)
 
+#ifdef PROFILE
+! start time accounting for the MPI receive
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
     call mpi_recv(rbuf, n, mpi_real8, src, tag, comm3d, status, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI receive
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
 
 ! check if the operation was successful
 !
