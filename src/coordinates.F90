@@ -88,6 +88,12 @@ module coordinates
   real(kind=8), save ::  vol = 1.0d+00
   real(kind=8), save :: voli = 1.0d+00
 
+! the domain boundary areas
+!
+  real(kind=8), save :: xarea = 1.0d+00
+  real(kind=8), save :: yarea = 1.0d+00
+  real(kind=8), save :: zarea = 1.0d+00
+
 ! the block coordinates for all levels of refinement
 !
   real(kind=8), dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -247,6 +253,12 @@ module coordinates
 !
     vol  = xlen * ylen * zlen
     voli = 1.0d+00 / vol
+
+! calculate the boundary areas
+!
+    xarea = ylen * zlen
+    yarea = xlen * zlen
+    zarea = xlen * ylen
 
 ! allocate space for coordinate variables
 !
