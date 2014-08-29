@@ -55,6 +55,7 @@ module integrals
 !
   integer(kind=4), save :: funit = 7
   integer(kind=4), save :: sunit = 8
+  integer(kind=4), save :: runit = 9
   integer(kind=4), save :: iintd = 1
 
 ! by default everything is private
@@ -193,6 +194,30 @@ module integrals
                                  , 'mean(Malf)', 'min(Malf)', 'max(Malf)'
       write(sunit,"('#')")
 
+! generate the reconnection file name
+!
+      write(fname, "('reconnection_',i2.2,'.dat')") irun
+
+! create a new statistics file
+!
+#ifdef GNU
+      open (newunit = runit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace')
+#endif /* GNU */
+#ifdef INTEL
+      open (newunit = runit, file = fname, form = 'formatted'                  &
+                                       , status = 'replace', buffered = 'yes')
+#endif /* INTEL */
+#ifdef IBM
+      open (unit = runit, file = fname, form = 'formatted'                     &
+                                       , status = 'replace')
+#endif /* IBM */
+
+! write the integral file header
+!
+      write(runit,"('#',a8,3(1x,a18))") 'step', 'time', 'Vrec_l', 'Vrec_u'
+      write(runit,"('#')")
+
     end if ! master
 
 #ifdef PROFILE
@@ -238,6 +263,7 @@ module integrals
     if (master) then
       close(funit)
       close(sunit)
+      close(runit)
     end if
 
 #ifdef PROFILE
@@ -267,7 +293,8 @@ module integrals
 !
     use blocks         , only : block_meta, block_data, list_data
     use coordinates    , only : in, jn, kn, ib, jb, kb, ie, je, ke
-    use coordinates    , only : advol, voli
+    use coordinates    , only : adx, adz, advol, voli
+    use coordinates    , only : ymin, ymax, xlen, zlen, yarea
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use equations      , only : ien, imx, imy, imz
     use equations      , only : gamma, csnd
@@ -286,7 +313,7 @@ module integrals
 ! local variables
 !
     integer                       :: iret
-    real(kind=8)                  :: dvol, dvolh
+    real(kind=8)                  :: dvol, dvolh, dxz
 
 ! local pointers
 !
@@ -352,6 +379,7 @@ module integrals
 !
       dvol  = advol(pdata%meta%level)
       dvolh = 0.5d+00 * dvol
+      dxz   = adx(pdata%meta%level) * adz(pdata%meta%level) / yarea
 
 ! sum up density and momenta components
 !
@@ -444,6 +472,15 @@ module integrals
         mxarr(7) = max(mxarr(7), maxval(tmp(:,:,:)))
       end if
 
+! get the inflow speed
+!
+      if (pdata%meta%ymin == ymin) then
+        inarr(10) = inarr(10) + sum(pdata%q(ivy,ib:ie,jb,kb:ke)) * dxz
+      end if
+      if (pdata%meta%ymax == ymax) then
+        inarr(11) = inarr(11) + sum(pdata%q(ivy,ib:ie,je,kb:ke)) * dxz
+      end if
+
 ! associate the pointer with the next block on the list
 !
       pdata => pdata%next
@@ -482,6 +519,7 @@ module integrals
                                             , avarr(5), mnarr(5), mxarr(5)     &
                                             , avarr(6), mnarr(6), mxarr(6)     &
                                             , avarr(7), mnarr(7), mxarr(7)
+      write(runit,"(i9, 3(1x,1e18.8))") step, time, inarr(10:11)
     end if
 
 #ifdef PROFILE
