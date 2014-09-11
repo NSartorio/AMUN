@@ -743,7 +743,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend) * nprocs
+          itag = 16 * (irecv * nprocs + isend) + 1
 
 ! allocate the buffer for variable exchange
 !
@@ -1516,7 +1516,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 11
+          itag = 16 * (irecv * nprocs + isend) + 2
 
 ! allocate data buffer for variables to exchange
 !
@@ -2064,7 +2064,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 12
+          itag = 16 * (irecv * nprocs + isend) + 3
 
 ! allocate data buffer for variables to exchange
 !
@@ -2625,7 +2625,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 13
+          itag = 16 * (irecv * nprocs + isend) + 4
 
 ! allocate data buffer for variables to exchange
 !
@@ -3190,7 +3190,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 21
+          itag = 16 * (irecv * nprocs + isend) + 5
 
 ! allocate data buffer for variables to exchange
 !
@@ -3767,7 +3767,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 22
+          itag = 16 * (irecv * nprocs + isend) + 6
 
 ! allocate data buffer for variables to exchange
 !
@@ -4351,7 +4351,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 23
+          itag = 16 * (irecv * nprocs + isend) + 7
 
 ! allocate data buffer for variables to exchange
 !
@@ -4890,7 +4890,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 31
+          itag = 16 * (irecv * nprocs + isend) + 8
 
 ! allocate data buffer for variables to exchange
 !
@@ -5348,7 +5348,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 32
+          itag = 16 * (irecv * nprocs + isend) + 9
 
 ! allocate data buffer for variables to exchange
 !
@@ -5806,7 +5806,7 @@ module boundaries
 
 ! prepare the tag for communication
 !
-          itag = 100 * (irecv * nprocs + isend + 1) + 33
+          itag = 16 * (irecv * nprocs + isend) + 10
 
 ! allocate data buffer for variables to exchange
 !
