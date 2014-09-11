@@ -923,7 +923,7 @@ module mesh
 
 ! generate a tag for communication
 !
-            itag = pmeta%process * nprocs + np + nprocs + 1
+            itag = 16 * (np * nprocs + pmeta%process)
 
 ! sends the block to the right process
 !
