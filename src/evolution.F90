@@ -837,7 +837,7 @@ module evolution
 !
       pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
@@ -1292,7 +1292,7 @@ module evolution
 !
       pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
@@ -1595,7 +1595,7 @@ module evolution
                                     + a55 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
                                            + ds * du(1:nv,1:im,1:jm,1:km)
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
