@@ -1641,6 +1641,8 @@ module evolution
 !
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -1648,7 +1650,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer  :: pblock
+    type(block_data), pointer  :: pdata
 
 ! local vectors
 !
@@ -1660,31 +1662,35 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
 ! iterate over all data blocks
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
 
 ! obtain dx, dy, and dz for the current block
 !
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
+      dx(1) = adx(pdata%meta%level)
+      dx(2) = ady(pdata%meta%level)
+      dx(3) = adz(pdata%meta%level)
 
-! update the flux for the current block
+! update fluxes for the current block
 !
       do n = 1, NDIMS
-        call update_flux(n, dx(n), pblock%q(:,:,:,:), pblock%f(n,:,:,:,:))
+        call update_flux(n, dx(n), pdata%q(1:nv,1:im,1:jm,1:km)                &
+                                             , pdata%f(n,1:nv,1:im,1:jm,1:km))
       end do
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! correct the numerical fluxes of the blocks which have neighbours at higher
-! level
+! levels
 !
     call boundary_fluxes()
 
