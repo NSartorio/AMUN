@@ -640,7 +640,7 @@ module evolution
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
       pdata => pdata%next
 
@@ -896,7 +896,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer    :: pblock
+    type(block_data), pointer            :: pdata
 
 ! local variables
 !
@@ -915,40 +915,44 @@ module evolution
 !
 !! 1st substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the first intermediate solution
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
+                                     + ds * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u1
+      pdata%u => pdata%u1
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -960,37 +964,41 @@ module evolution
 
 !! 2nd substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = f22 * dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u1(1:nv,:,:,:) = f21 * pblock%u0(1:nv,:,:,:)                      &
-                            + f22 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! assign pointer to the next block
+! update the second intermediate solution
 !
-      pblock => pblock%next
+      pdata%u1(1:nv,1:im,1:jm,1:km) = f21 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + f22 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
 
-    end do
+! assign pdata to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -1002,45 +1010,50 @@ module evolution
 
 !! 3rd substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = f32 * dt
 
-! update fluxes for the second step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u0(1:nv,:,:,:) = f31 * pblock%u0(1:nv,:,:,:)                      &
-                            + f32 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the final solution
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = f31 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + f32 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u0
+      pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
-      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
