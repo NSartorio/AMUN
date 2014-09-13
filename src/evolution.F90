@@ -334,18 +334,17 @@ module evolution
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    real(kind=8), intent(in) :: dtnext
+    real(kind=8), intent(in)  :: dtnext
 
 ! local pointers
 !
-    type(block_data), pointer :: pblock
+    type(block_data), pointer :: pdata
 
 ! local variables
 !
-    integer                   :: iret
-    integer(kind=4)           :: lev
+    integer                   :: iret, mlev
     real(kind=8)              :: cm, dx_min
 
 ! local parameters
@@ -357,50 +356,53 @@ module evolution
 ! reset the maximum speed, and the highest level
 !
     cmax   = eps
-    lev    = 1
+    mlev   = 1
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
 
 ! iterate over all data blocks in order to find the maximum speed among them
-! and the highest level which is required to obtain the spatial step
+! and the highest level which is required to obtain the minimum spacial step
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
 
-! find the maximum level occupied by blocks (can be smaller than toplev)
+! update the maximum level
 !
-      lev = max(lev, pblock%meta%level)
+      mlev = max(mlev, pdata%meta%level)
 
-! obtain the maximum speed for the current block
+! get the maximum speed for the current block
 !
-      cm = maxspeed(pblock%q(:,:,:,:))
+      cm = maxspeed(pdata%q(:,:,:,:))
 
-! compare global and local maximum speeds
+! update the maximum speed
 !
       cmax = max(cmax, cm)
 
-! assiociate the pointer with the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 #ifdef MPI
-! find maximum speed in the system from all processors
+! reduce maximum speed and level over all processors
 !
     call reduce_maximum_real   (cmax, iret)
-    call reduce_maximum_integer(lev , iret)
+    call reduce_maximum_integer(mlev, iret)
 #endif /* MPI */
 
-! calculate squared cmax
+! calculate the squared cmax
 !
     cmax2 = cmax * cmax
 
-! find the smallest spatial step
+! find the smallest spacial step
 !
 #if NDIMS == 2
-    dx_min = min(adx(lev), ady(lev))
+    dx_min = min(adx(mlev), ady(mlev))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    dx_min = min(adx(lev), ady(lev), adz(lev))
+    dx_min = min(adx(mlev), ady(mlev), adz(mlev))
 #endif /* NDIMS == 3 */
 
 ! calculate the new time step
@@ -408,13 +410,9 @@ module evolution
     dtn = cfl * dx_min / max(cmax                                              &
                         + 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
 
-! substitute the new time step
-!
-    dt  = dtn
-
 ! round the time
 !
-    if (dtnext > 0.0d+00) dt = min(dt, dtnext)
+    if (dtnext > 0.0d+00) dt = min(dtn, dtnext)
 
 !-------------------------------------------------------------------------------
 !
