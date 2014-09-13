@@ -1031,11 +1031,11 @@ module mesh
 !
 !   Arguments:
 !
-!     pblock - the input meta block;
+!     pmeta - the input meta block;
 !
 !===============================================================================
 !
-  subroutine prolong_block(pblock)
+  subroutine prolong_block(pmeta)
 
 ! import external procedures and variables
 !
@@ -1051,7 +1051,7 @@ module mesh
 
 ! input arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
 
 ! local variables
 !
@@ -1083,7 +1083,7 @@ module mesh
 
 ! assign the pdata pointer
 !
-    pdata => pblock%data
+    pdata => pmeta%data
 
 ! prepare dimensions
 !
@@ -1175,7 +1175,7 @@ module mesh
 
 ! assign pointer to the current child
 !
-      pchild => pblock%child(p)%ptr
+      pchild => pmeta%child(p)%ptr
 
 ! obtain the position of child in the parent block
 !
@@ -1236,11 +1236,11 @@ module mesh
 !
 !   Arguments:
 !
-!     pblock - the input meta block;
+!     pmeta - the input meta block;
 !
 !===============================================================================
 !
-  subroutine restrict_block(pblock)
+  subroutine restrict_block(pmeta)
 
 ! import external procedures and variables
 !
@@ -1256,7 +1256,7 @@ module mesh
 
 ! subroutine arguments
 !
-    type(block_meta), pointer, intent(inout) :: pblock
+    type(block_meta), pointer, intent(inout) :: pmeta
 
 ! local variables
 !
@@ -1282,7 +1282,7 @@ module mesh
 
 ! assign the parent data pointer
 !
-    pparent => pblock%data
+    pparent => pmeta%data
 
 ! iterate over all children
 !
@@ -1290,7 +1290,7 @@ module mesh
 
 ! assign a pointer to the current child
 !
-      pchild  => pblock%child(p)%ptr%data
+      pchild  => pmeta%child(p)%ptr%data
 
 ! obtain the child position in the parent block
 !
