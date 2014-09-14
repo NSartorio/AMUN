@@ -31,9 +31,21 @@
 !
 module evolution
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer     , save :: imi, ima, imt, imu, imf, imn, imv
+#endif /* PROFILE */
 
 ! pointer to the temporal integration subroutine
 !
@@ -116,6 +128,22 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('evolution:: initialization'  , imi)
+    call set_timer('evolution:: solution advance', ima)
+    call set_timer('evolution:: new time step'   , imt)
+    call set_timer('evolution:: solution update' , imu)
+    call set_timer('evolution:: flux update'     , imf)
+    call set_timer('evolution:: increment update', imn)
+    call set_timer('evolution:: variable update' , imv)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the integration method and the value of the CFL coefficient
 !
     call get_parameter_string ("time_advance", integration)
@@ -185,6 +213,12 @@ module evolution
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_evolution
@@ -214,7 +248,21 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! nullify pointer to integration subroutine
+!
     nullify(evolve)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -256,6 +304,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for solution advance
+!
+    call start_timer(ima)
+#endif /* PROFILE */
+
 ! find new time step
 !
     call new_time_step(dtnext)
@@ -295,6 +349,12 @@ module evolution
       call set_blocks_update(.true.)
 
     end if ! toplev > 1
+
+#ifdef PROFILE
+! stop accounting time for solution advance
+!
+    call stop_timer(ima)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -353,6 +413,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for new time step estimation
+!
+    call start_timer(imt)
+#endif /* PROFILE */
+
 ! reset the maximum speed, and the highest level
 !
     cmax   = eps
@@ -414,6 +480,12 @@ module evolution
 !
     if (dtnext > 0.0d+00) dt = min(dtn, dtnext)
 
+#ifdef PROFILE
+! stop accounting time for new time step estimation
+!
+    call stop_timer(imt)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine new_time_step
@@ -467,6 +539,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! update fluxes
 !
     call update_fluxes()
@@ -515,6 +593,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_euler
@@ -562,6 +646,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! update fluxes
 !
     call update_fluxes()
@@ -654,6 +744,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk2
@@ -714,6 +810,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare things which don't change later
 !
     if (first) then
@@ -856,6 +958,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_ssprk2
@@ -913,6 +1021,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 !! 1st substep of integration
 !!
 ! prepare the fractional time step
@@ -1063,6 +1177,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_rk3
@@ -1121,6 +1241,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 != 1st step: U(1) = U(n) + 1/2 dt F[U(n)]
 !
 ! calculate the fractional time step
@@ -1311,6 +1437,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_ssprk34
@@ -1377,6 +1509,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 != 1st step: U(1) = U(n) + b1 dt F[U(n)]
 !
 ! calculate the fractional time step
@@ -1614,6 +1752,12 @@ module evolution
 !
     call boundary_variables()
 
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine evolve_ssprk35
@@ -1662,6 +1806,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for fluxe update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
 ! assign pdata with the first block on the data block list
 !
     pdata => list_data
@@ -1693,6 +1843,12 @@ module evolution
 ! levels
 !
     call boundary_fluxes()
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1738,6 +1894,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for increment update
+!
+    call start_timer(imn)
+#endif /* PROFILE */
+
 ! reset the increment array du
 !
     du(:,:,:,:) = 0.0d+00
@@ -1772,6 +1934,12 @@ module evolution
                            - dzi * (pdata%f(3,:,:,:,k) - pdata%f(3,:,:,:,k-1))
     end do
 #endif /* NDIMS == 3 */
+
+#ifdef PROFILE
+! stop accounting time for increment update
+!
+    call stop_timer(imn)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1811,6 +1979,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable update
+!
+    call start_timer(imv)
+#endif /* PROFILE */
+
 ! associate the pointer with the first block on the data block list
 !
     pdata => list_data
@@ -1836,6 +2010,12 @@ module evolution
       pdata => pdata%next
 
     end do
+
+#ifdef PROFILE
+! stop accounting time for variable update
+!
+    call stop_timer(imv)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
