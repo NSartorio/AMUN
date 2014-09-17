@@ -878,7 +878,7 @@ module mesh
 
 ! local buffer for data block exchange
 !
-    real(kind=8)   , dimension(2,nv,im,jm,km) :: rbuf
+    real(kind=8)   , dimension(3,nv,im,jm,km) :: rbuf
 #endif /* MPI */
 
 !-------------------------------------------------------------------------------
@@ -931,8 +931,9 @@ module mesh
 
 ! copy data to buffer
 !
-              rbuf(1,:,:,:,:) = pmeta%data%u(:,:,:,:)
-              rbuf(2,:,:,:,:) = pmeta%data%q(:,:,:,:)
+              rbuf(1,:,:,:,:) = pmeta%data%q (:,:,:,:)
+              rbuf(2,:,:,:,:) = pmeta%data%u0(:,:,:,:)
+              rbuf(3,:,:,:,:) = pmeta%data%u1(:,:,:,:)
 
 ! send data
 !
@@ -961,8 +962,9 @@ module mesh
 
 ! coppy the buffer to data block
 !
-              pmeta%data%u(:,:,:,:) = rbuf(1,:,:,:,:)
-              pmeta%data%q(:,:,:,:) = rbuf(2,:,:,:,:)
+              pmeta%data%q (:,:,:,:) = rbuf(1,:,:,:,:)
+              pmeta%data%u0(:,:,:,:) = rbuf(2,:,:,:,:)
+              pmeta%data%u1(:,:,:,:) = rbuf(3,:,:,:,:)
 
             end if ! nproc == n
 
