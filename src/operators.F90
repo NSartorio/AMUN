@@ -187,6 +187,59 @@ module operators
 !
 !===============================================================================
 !
+! subroutine GRADIENT:
+! -------------------
+!
+!   Subroutine calculates the cell centered gradient of the input scalar field.
+!
+!      grad(U) = ∇ U = [ ∂x U, ∂y U, ∂z U ]
+!
+!   Arguments:
+!
+!     dh  - the spacial intervals in all direction;
+!     u   - the input scalar field;
+!     v   - the output gradient vector field;
+!
+!===============================================================================
+!
+  subroutine gradient(dh, u, v)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input and output variables
+!
+    real(kind=8), dimension(3)      , intent(in)  :: dh
+    real(kind=8), dimension(:,:,:)  , intent(in)  :: u
+    real(kind=8), dimension(:,:,:,:), intent(out) :: v
+
+! local variables
+!
+    integer :: dir
+!
+!-------------------------------------------------------------------------------
+!
+! reset the output array
+!
+    v(:,:,:,:) = 0.0d+00
+
+! iterate over directions and update divergence with directional derivatives
+!
+    do dir = 1, NDIMS
+
+! calculate contribution from the Y derivative of the Y component
+!
+      call derivative_1st(dir, dh(dir), u(:,:,:), v(dir,:,:,:))
+
+    end do ! directions
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine gradient
+!
+!===============================================================================
+!
 ! subroutine CURL:
 ! ---------------
 !
