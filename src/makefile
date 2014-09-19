@@ -148,7 +148,7 @@ mesh.o           : mesh.F90 blocks.o coordinates.o domains.o equations.o       \
                    error.o interpolations.o mpitools.o problems.o refinement.o \
                    timers.o
 mpitools.o       : mpitools.F90 timers.o
-operators.o      : operators.F90
+operators.o      : operators.F90 timers.o
 parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
                    error.o parameters.o random.o timers.o

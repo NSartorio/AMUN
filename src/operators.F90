@@ -30,9 +30,21 @@
 !
 module operators
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer     , save :: imi, imd, img, imc, iml, im1, im2
+#endif /* PROFILE */
 
 ! by default everything is public
 !
@@ -41,7 +53,7 @@ module operators
 ! declare public subroutines
 !
   public :: initialize_operators, finalize_operators
-  public :: divergence, curl, laplace
+  public :: divergence, gradient, curl, laplace
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -80,6 +92,27 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('operators:: initialization', imi)
+    call set_timer('operators:: divergence'    , imd)
+    call set_timer('operators:: gradient'      , img)
+    call set_timer('operators:: curl'          , imc)
+    call set_timer('operators:: laplace'       , iml)
+    call set_timer('operators:: 1st derivative', im1)
+    call set_timer('operators:: 2nd derivative', im2)
+
+! start accounting time for the module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for the module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -110,6 +143,17 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for the module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -155,6 +199,12 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the divergence operator calculation
+!
+    call start_timer(imd)
+#endif /* PROFILE */
+
 ! allocate temporary array
 !
     allocate(w(size(u,2), size(u,3), size(u,4)))
@@ -167,7 +217,7 @@ module operators
 !
     do dir = 1, NDIMS
 
-! calculate contribution from the Y derivative of the Y component
+! calculate derivative along the current direction
 !
       call derivative_1st(dir, dh(dir), u(dir,:,:,:), w(:,:,:))
 
@@ -180,6 +230,12 @@ module operators
 ! deallocate temporary array
 !
     deallocate(w)
+
+#ifdef PROFILE
+! stop accounting time for the divergence operator calculation
+!
+    call stop_timer(imd)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -220,19 +276,31 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the gradient operator calculation
+!
+    call start_timer(img)
+#endif /* PROFILE */
+
 ! reset the output array
 !
     v(:,:,:,:) = 0.0d+00
 
-! iterate over directions and update divergence with directional derivatives
+! iterate over directions and calculate gradient components
 !
     do dir = 1, NDIMS
 
-! calculate contribution from the Y derivative of the Y component
+! calculate derivative along the current direction
 !
       call derivative_1st(dir, dh(dir), u(:,:,:), v(dir,:,:,:))
 
     end do ! directions
+
+#ifdef PROFILE
+! stop accounting time for the gradient operator calculation
+!
+    call stop_timer(img)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -274,6 +342,12 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the rotation operator calculation
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
 ! allocate temporary array
 !
     allocate(w(size(u,2), size(u,3), size(u,4)))
@@ -348,6 +422,12 @@ module operators
 !
     deallocate(w)
 
+#ifdef PROFILE
+! stop accounting time for the rotation operator calculation
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine curl
@@ -387,6 +467,12 @@ module operators
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for the laplace operator calculation
+!
+    call start_timer(iml)
+#endif /* PROFILE */
+
 ! allocate temporary array
 !
     allocate(w(size(u,1), size(u,2), size(u,3)))
@@ -420,6 +506,12 @@ module operators
 ! deallocate temporary array
 !
     deallocate(w)
+
+#ifdef PROFILE
+! stop accounting time for the laplace operator calculation
+!
+    call stop_timer(iml)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -473,6 +565,12 @@ module operators
     if (dir < 1 .or. dir > NDIMS .or. dh == 0.0d+00) return
 #endif /* DEBUG */
 
+#ifdef PROFILE
+! start accounting time for the 1st derivative calculation
+!
+    call start_timer(im1)
+#endif /* PROFILE */
+
 ! prepare index limits
 !
     m0 = size(u, dir)
@@ -510,6 +608,12 @@ module operators
 #endif /* NDIMS == 3 */
 
     end select
+
+#ifdef PROFILE
+! stop accounting time for the 1st derivative calculation
+!
+    call stop_timer(im1)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -557,6 +661,12 @@ module operators
     if (dir < 1 .or. dir > NDIMS .or. dh == 0.0d+00) return
 #endif /* DEBUG */
 
+#ifdef PROFILE
+! start accounting time for the 2nd derivative calculation
+!
+    call start_timer(im2)
+#endif /* PROFILE */
+
 ! prepare index limits
 !
     m0 = size(u, dir)
@@ -594,6 +704,12 @@ module operators
 #endif /* NDIMS == 3 */
 
     end select
+
+#ifdef PROFILE
+! stop accounting time for the 2nd derivative calculation
+!
+    call stop_timer(im2)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
