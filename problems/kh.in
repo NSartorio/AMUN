@@ -31,7 +31,7 @@ zmax                 =  5.0d-01
 # refinement control
 #
 ncells               = 8
-nghost               = 2
+nghosts              = 2
 minlev               = 1
 maxlev               = 7
 
