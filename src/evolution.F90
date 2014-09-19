@@ -31,9 +31,21 @@
 !
 module evolution
 
+#ifdef PROFILE
+! import external subroutines
+!
+  use timers, only : set_timer, start_timer, stop_timer
+#endif /* PROFILE */
+
 ! module variables are not implicit by default
 !
   implicit none
+
+#ifdef PROFILE
+! timer indices
+!
+  integer     , save :: imi, ima, imt, imu, imf, imn, imv
+#endif /* PROFILE */
 
 ! pointer to the temporal integration subroutine
 !
@@ -116,6 +128,22 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! set timer descriptions
+!
+    call set_timer('evolution:: initialization'  , imi)
+    call set_timer('evolution:: solution advance', ima)
+    call set_timer('evolution:: new time step'   , imt)
+    call set_timer('evolution:: solution update' , imu)
+    call set_timer('evolution:: flux update'     , imf)
+    call set_timer('evolution:: increment update', imn)
+    call set_timer('evolution:: variable update' , imv)
+
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
 ! get the integration method and the value of the CFL coefficient
 !
     call get_parameter_string ("time_advance", integration)
@@ -185,6 +213,12 @@ module evolution
 
     end if
 
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_evolution
@@ -214,7 +248,21 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(imi)
+#endif /* PROFILE */
+
+! nullify pointer to integration subroutine
+!
     nullify(evolve)
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(imi)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -256,6 +304,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for solution advance
+!
+    call start_timer(ima)
+#endif /* PROFILE */
+
 ! find new time step
 !
     call new_time_step(dtnext)
@@ -296,6 +350,12 @@ module evolution
 
     end if ! toplev > 1
 
+#ifdef PROFILE
+! stop accounting time for solution advance
+!
+    call stop_timer(ima)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine advance
@@ -334,18 +394,17 @@ module evolution
 !
     implicit none
 
-! input variables
+! subroutine arguments
 !
-    real(kind=8), intent(in) :: dtnext
+    real(kind=8), intent(in)  :: dtnext
 
 ! local pointers
 !
-    type(block_data), pointer :: pblock
+    type(block_data), pointer :: pdata
 
 ! local variables
 !
-    integer                   :: iret
-    integer(kind=4)           :: lev
+    integer                   :: iret, mlev
     real(kind=8)              :: cm, dx_min
 
 ! local parameters
@@ -354,53 +413,62 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for new time step estimation
+!
+    call start_timer(imt)
+#endif /* PROFILE */
+
 ! reset the maximum speed, and the highest level
 !
     cmax   = eps
-    lev    = 1
+    mlev   = 1
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
 
 ! iterate over all data blocks in order to find the maximum speed among them
-! and the highest level which is required to obtain the spatial step
+! and the highest level which is required to obtain the minimum spacial step
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
 
-! find the maximum level occupied by blocks (can be smaller than toplev)
+! update the maximum level
 !
-      lev = max(lev, pblock%meta%level)
+      mlev = max(mlev, pdata%meta%level)
 
-! obtain the maximum speed for the current block
+! get the maximum speed for the current block
 !
-      cm = maxspeed(pblock%q(:,:,:,:))
+      cm = maxspeed(pdata%q(:,:,:,:))
 
-! compare global and local maximum speeds
+! update the maximum speed
 !
       cmax = max(cmax, cm)
 
-! assiociate the pointer with the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 #ifdef MPI
-! find maximum speed in the system from all processors
+! reduce maximum speed and level over all processors
 !
     call reduce_maximum_real   (cmax, iret)
-    call reduce_maximum_integer(lev , iret)
+    call reduce_maximum_integer(mlev, iret)
 #endif /* MPI */
 
-! calculate squared cmax
+! calculate the squared cmax
 !
     cmax2 = cmax * cmax
 
-! find the smallest spatial step
+! find the smallest spacial step
 !
 #if NDIMS == 2
-    dx_min = min(adx(lev), ady(lev))
+    dx_min = min(adx(mlev), ady(mlev))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-    dx_min = min(adx(lev), ady(lev), adz(lev))
+    dx_min = min(adx(mlev), ady(mlev), adz(mlev))
 #endif /* NDIMS == 3 */
 
 ! calculate the new time step
@@ -408,13 +476,15 @@ module evolution
     dtn = cfl * dx_min / max(cmax                                              &
                         + 2.0d+00 * max(viscosity, resistivity) / dx_min, eps)
 
-! substitute the new time step
-!
-    dt  = dtn
-
 ! round the time
 !
-    if (dtnext > 0.0d+00) dt = min(dt, dtnext)
+    if (dtnext > 0.0d+00) dt = min(dtn, dtnext)
+
+#ifdef PROFILE
+! stop accounting time for new time step estimation
+!
+    call stop_timer(imt)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -433,6 +503,12 @@ module evolution
 !
 !   Subroutine advances the solution by one time step using the 1st order
 !   Euler integration method.
+!
+!   References:
+!
+!     [1] Press, W. H, Teukolsky, S. A., Vetterling, W. T., Flannery, B. P.,
+!         "Numerical Recipes in Fortran",
+!         Cambridge University Press, Cambridge, 1992
 !
 !===============================================================================
 !
@@ -455,7 +531,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer    :: pblock
+    type(block_data), pointer            :: pdata
 
 ! local arrays
 !
@@ -463,40 +539,51 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-! update fluxes for the first step of the RK2 integration
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u0(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + dt * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the solution
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
+                                     + dt * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u0
+      pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
-      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -505,6 +592,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -545,7 +638,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer    :: pblock
+    type(block_data), pointer            :: pdata
 
 ! local arrays
 !
@@ -553,36 +646,46 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
-! update fluxes for the first step of the RK2 integration
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + dt * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the intermediate solution
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
+                                     + dt * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u1
+      pdata%u => pdata%u1
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -592,41 +695,46 @@ module evolution
 !
     call boundary_variables()
 
-! update fluxes for the second step of the RK2 integration
+! update fluxes from the intermediate stage
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u0(1:nv,:,:,:) = 0.5d+00 * (pblock%u0(1:nv,:,:,:)                 &
-                                + pblock%u1(1:nv,:,:,:) + dt * du(1:nv,:,:,:))
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the final solution
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = 0.5d+00 * (pdata%u0(1:nv,1:im,1:jm,1:km) &
+                                               + pdata%u1(1:nv,1:im,1:jm,1:km) &
+                                               +  dt * du(1:nv,1:im,1:jm,1:km))
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u0
+      pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
-      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -635,6 +743,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -696,6 +810,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! prepare things which don't change later
 !
     if (first) then
@@ -819,7 +939,7 @@ module evolution
 !
       pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
@@ -837,6 +957,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -878,7 +1004,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer    :: pblock
+    type(block_data), pointer            :: pdata
 
 ! local variables
 !
@@ -895,42 +1021,52 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 !! 1st substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u1(1:nv,:,:,:) = pblock%u0(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the first intermediate solution
+!
+      pdata%u1(1:nv,1:im,1:jm,1:km) = pdata%u0(1:nv,1:im,1:jm,1:km)            &
+                                     + ds * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u1
+      pdata%u => pdata%u1
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -942,37 +1078,41 @@ module evolution
 
 !! 2nd substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = f22 * dt
 
-! update fluxes for the first step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u1(1:nv,:,:,:) = f21 * pblock%u0(1:nv,:,:,:)                      &
-                            + f22 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! assign pointer to the next block
+! update the second intermediate solution
 !
-      pblock => pblock%next
+      pdata%u1(1:nv,1:im,1:jm,1:km) = f21 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + f22 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
 
-    end do
+! assign pdata to the next block
+!
+      pdata => pdata%next
+
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -984,45 +1124,50 @@ module evolution
 
 !! 3rd substep of integration
 !!
-! prepare fractional time step
+! prepare the fractional time step
 !
     ds = f32 * dt
 
-! update fluxes for the second step of the RK2 integration
+! update fluxes
 !
     call update_fluxes()
 
-! update the solution using numerical fluxes stored in the data blocks
+! assign pdata with the first block on the data block list
 !
-    pblock => list_data
-    do while (associated(pblock))
+    pdata => list_data
 
-! calculate variable increment for the current block
+! iterate over all data blocks
 !
-      call update_increment(pblock, du(:,:,:,:))
+    do while (associated(pdata))
 
-! add source terms
+! calculate the variable increment
 !
-      call update_sources(pblock, du(:,:,:,:))
+      call update_increment(pdata, du(1:nv,1:im,1:jm,1:km))
 
-! update the solution for the fluid variables
+! add the source terms
 !
-      pblock%u0(1:nv,:,:,:) = f31 * pblock%u0(1:nv,:,:,:)                      &
-                            + f32 * pblock%u1(1:nv,:,:,:) + ds * du(1:nv,:,:,:)
+      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+
+! update the final solution
+!
+      pdata%u0(1:nv,1:im,1:jm,1:km) = f31 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
+                                    + f32 * pdata%u1(1:nv,1:im,1:jm,1:km)      &
+                                           + ds * du(1:nv,1:im,1:jm,1:km)
 
 ! update the conservative variable pointer
 !
-      pblock%u => pblock%u0
+      pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
-      if (ibp > 0) pblock%u(ibp,:,:,:) = decay * pblock%u(ibp,:,:,:)
+      if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
+                                           decay * pdata%u(ibp,1:im,1:jm,1:km)
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! update primitive variables
 !
@@ -1031,6 +1176,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1090,6 +1241,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 != 1st step: U(1) = U(n) + 1/2 dt F[U(n)]
 !
 ! calculate the fractional time step
@@ -1261,7 +1418,7 @@ module evolution
 !
       pdata%u => pdata%u0
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
@@ -1279,6 +1436,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1346,6 +1509,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for one step update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 != 1st step: U(1) = U(n) + b1 dt F[U(n)]
 !
 ! calculate the fractional time step
@@ -1564,7 +1733,7 @@ module evolution
                                     + a55 * pdata%u0(1:nv,1:im,1:jm,1:km)      &
                                            + ds * du(1:nv,1:im,1:jm,1:km)
 
-! update ψ by its source term
+! update ψ with its source term
 !
       if (ibp > 0) pdata%u(ibp,1:im,1:jm,1:km) =                               &
                                            decay * pdata%u(ibp,1:im,1:jm,1:km)
@@ -1582,6 +1751,12 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+#ifdef PROFILE
+! stop accounting time for one step update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1610,6 +1785,8 @@ module evolution
 !
     use blocks        , only : block_data, list_data
     use coordinates   , only : adx, ady, adz
+    use coordinates   , only : im, jm, km
+    use equations     , only : nv
 
 ! local variables are not implicit by default
 !
@@ -1617,7 +1794,7 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer  :: pblock
+    type(block_data), pointer  :: pdata
 
 ! local vectors
 !
@@ -1629,33 +1806,49 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for fluxe update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! assign pdata with the first block on the data block list
+!
+    pdata => list_data
+
 ! iterate over all data blocks
 !
-    pblock => list_data
-    do while (associated(pblock))
+    do while (associated(pdata))
 
 ! obtain dx, dy, and dz for the current block
 !
-      dx(1) = adx(pblock%meta%level)
-      dx(2) = ady(pblock%meta%level)
-      dx(3) = adz(pblock%meta%level)
+      dx(1) = adx(pdata%meta%level)
+      dx(2) = ady(pdata%meta%level)
+      dx(3) = adz(pdata%meta%level)
 
-! update the flux for the current block
+! update fluxes for the current block
 !
       do n = 1, NDIMS
-        call update_flux(n, dx(n), pblock%q(:,:,:,:), pblock%f(n,:,:,:,:))
+        call update_flux(n, dx(n), pdata%q(1:nv,1:im,1:jm,1:km)                &
+                                             , pdata%f(n,1:nv,1:im,1:jm,1:km))
       end do
 
-! assign pointer to the next block
+! assign pdata to the next block
 !
-      pblock => pblock%next
+      pdata => pdata%next
 
-    end do
+    end do ! over data blocks
 
 ! correct the numerical fluxes of the blocks which have neighbours at higher
-! level
+! levels
 !
     call boundary_fluxes()
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1701,6 +1894,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for increment update
+!
+    call start_timer(imn)
+#endif /* PROFILE */
+
 ! reset the increment array du
 !
     du(:,:,:,:) = 0.0d+00
@@ -1735,6 +1934,12 @@ module evolution
                            - dzi * (pdata%f(3,:,:,:,k) - pdata%f(3,:,:,:,k-1))
     end do
 #endif /* NDIMS == 3 */
+
+#ifdef PROFILE
+! stop accounting time for increment update
+!
+    call stop_timer(imn)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
@@ -1774,6 +1979,12 @@ module evolution
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable update
+!
+    call start_timer(imv)
+#endif /* PROFILE */
+
 ! associate the pointer with the first block on the data block list
 !
     pdata => list_data
@@ -1799,6 +2010,12 @@ module evolution
       pdata => pdata%next
 
     end do
+
+#ifdef PROFILE
+! stop accounting time for variable update
+!
+    call stop_timer(imv)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

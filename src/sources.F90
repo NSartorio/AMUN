@@ -45,6 +45,10 @@ module sources
   integer, save :: imi, imu
 #endif /* PROFILE */
 
+! GLM-MHD source terms type (1 - EGLM, 2 - HEGLM)
+!
+  integer     , save :: glm_type    = 0
+
 ! gravitational acceleration coefficient
 !
   real(kind=8), save :: gpoint      = 0.0d+00
@@ -95,7 +99,7 @@ module sources
 
 ! include external procedures and variables
 !
-    use parameters , only : get_parameter_real
+    use parameters , only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -105,6 +109,10 @@ module sources
 !
     logical, intent(in)    :: verbose
     integer, intent(inout) :: iret
+
+! local variables
+!
+    character(len=8)       :: tglm = "none"
 !
 !-------------------------------------------------------------------------------
 !
@@ -118,6 +126,23 @@ module sources
 !
     call start_timer(imi)
 #endif /* PROFILE */
+
+! get the type of the GLM source terms
+!
+    call get_parameter_string("glm_source_terms", tglm)
+
+! set the glm_type variable to correct value
+!
+    select case(trim(tglm))
+    case("eglm", "EGLM")
+      glm_type = 1
+
+    case("heglm", "HEGLM")
+      glm_type = 2
+
+    case default
+      glm_type = 0
+    end select
 
 ! get acceleration coefficient
 !
@@ -135,6 +160,7 @@ module sources
 !
     if (verbose) then
 
+      write (*,"(4x,a,1x,a)    ") "glm source terms       =", trim(tglm)
       write (*,"(4x,a,1x,1e9.2)") "point mass constant    =", gpoint
       write (*,"(4x,a,1x,1e9.2)") "viscosity              =", viscosity
       write (*,"(4x,a,1x,1e9.2)") "resistivity            =", resistivity
@@ -215,8 +241,8 @@ module sources
     use coordinates    , only : ax, ay, az, adx, ady, adz, adxi, adyi, adzi
     use equations      , only : nv, inx, iny, inz
     use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ien
-    use equations      , only : ibx, iby, ibz
-    use operators      , only : laplace, curl
+    use equations      , only : ibx, iby, ibz, ibp
+    use operators      , only : divergence, gradient, laplace, curl
 
 ! local variables are not implicit by default
 !
@@ -241,6 +267,7 @@ module sources
     real(kind=8), dimension(im) :: x
     real(kind=8), dimension(jm) :: y
     real(kind=8), dimension(km) :: z
+    real(kind=8), dimension(im,jm,km)   :: db
     real(kind=8), dimension(3,im,jm,km) :: jc
 !
 !-------------------------------------------------------------------------------
@@ -440,9 +467,9 @@ module sources
 
     end if ! viscosity is not zero
 
-! proceed only if the resistivity coefficient is not zero
+!=== add magnetic field related source terms ===
 !
-    if (resistivity > 0.0d+00 .and. ibx > 0) then
+    if (ibx > 0) then
 
 ! prepare coordinate increments
 !
@@ -450,43 +477,111 @@ module sources
       dh(2) = ady(pdata%meta%level)
       dh(3) = adz(pdata%meta%level)
 
+! add the EGLM-MHD source terms
+!
+      if (glm_type > 0) then
+
+! calculate the magnetic field divergence
+!
+        call divergence(dh(:), pdata%q(ibx:ibz,:,:,:), db(:,:,:))
+
+! update the momentum component increments, i.e.
+!     d/dt (ρv) + ∇.F = - (∇.B)B
+!
+        du(imx,:,:,:) = du(imx,:,:,:) - db(:,:,:) * pdata%q(ibx,:,:,:)
+        du(imy,:,:,:) = du(imy,:,:,:) - db(:,:,:) * pdata%q(iby,:,:,:)
+        du(imz,:,:,:) = du(imz,:,:,:) - db(:,:,:) * pdata%q(ibz,:,:,:)
+
+! update the energy equation
+!
+        if (ien > 0 .and. ibp > 0) then
+
+! calculate the gradient of divergence potential
+!
+          call gradient(dh(:), pdata%q(ibp,:,:,:), jc(inx:inz,:,:,:))
+
+! add the divergence potential source term to the energy equation, i.e.
+!     d/dt E + ∇.F = - B.(∇ψ)
+!
+          du(ien,:,:,:) = du(ien,:,:,:)                                        &
+                          - sum(pdata%q(ibx:ibz,:,:,:) * jc(inx:inz,:,:,:), 1)
+
+        end if ! ien > 0
+
+! add the HEGLM-MHD source terms
+!
+        if (glm_type > 1) then
+
+! update magnetic field component increments, i.e.
+!     d/dt B + ∇.F = - (∇.B)v
+!
+          du(ibx,:,:,:) = du(ibx,:,:,:) - db(:,:,:) * pdata%q(ivx,:,:,:)
+          du(iby,:,:,:) = du(iby,:,:,:) - db(:,:,:) * pdata%q(ivy,:,:,:)
+          du(ibz,:,:,:) = du(ibz,:,:,:) - db(:,:,:) * pdata%q(ivz,:,:,:)
+
+! update the energy equation
+!
+          if (ien > 0) then
+
+! calculate scalar product of velocity and magnetic field
+!
+            jc(inx,:,:,:) = sum(pdata%q(ivx:ivz,:,:,:)                         &
+                                                  * pdata%q(ibx:ibz,:,:,:), 1)
+
+! add the divergence potential source term to the energy equation, i.e.
+!     d/dt E + ∇.F = - (∇.B) (v.B)
+!
+            du(ien,:,:,:) = du(ien,:,:,:) - db(:,:,:) * jc(inx,:,:,:)
+
+          end if ! ien > 0
+
+        end if ! glm_type > 1
+
+      end if ! glmtype > 0
+
+! proceed only if the resistivity coefficient is not zero
+!
+      if (resistivity > 0.0d+00) then
+
 ! calculate the Laplace operator of B, i.e. Δ(B)
 !
-      call laplace(dh(:), pdata%q(ibx,:,:,:), jc(inx,:,:,:))
-      call laplace(dh(:), pdata%q(iby,:,:,:), jc(iny,:,:,:))
-      call laplace(dh(:), pdata%q(ibz,:,:,:), jc(inz,:,:,:))
+        call laplace(dh(:), pdata%q(ibx,:,:,:), jc(inx,:,:,:))
+        call laplace(dh(:), pdata%q(iby,:,:,:), jc(iny,:,:,:))
+        call laplace(dh(:), pdata%q(ibz,:,:,:), jc(inz,:,:,:))
 
 ! update magnetic field component increments
 !
-      du(ibx,:,:,:) = du(ibx,:,:,:) + resistivity * jc(inx,:,:,:)
-      du(iby,:,:,:) = du(iby,:,:,:) + resistivity * jc(iny,:,:,:)
-      du(ibz,:,:,:) = du(ibz,:,:,:) + resistivity * jc(inz,:,:,:)
+        du(ibx,:,:,:) = du(ibx,:,:,:) + resistivity * jc(inx,:,:,:)
+        du(iby,:,:,:) = du(iby,:,:,:) + resistivity * jc(iny,:,:,:)
+        du(ibz,:,:,:) = du(ibz,:,:,:) + resistivity * jc(inz,:,:,:)
 
 ! update energy equation
 !
-      if (ien > 0) then
+        if (ien > 0) then
 
 ! add the first resistive source term to the energy equation, i.e.
 !     d/dt E + ∇.F = η B.[Δ(B)]
 !
-        du(ien,:,:,:) = du(ien,:,:,:)                                          &
+          du(ien,:,:,:) = du(ien,:,:,:)                                        &
                           + resistivity * (pdata%q(ibx,:,:,:) * jc(inx,:,:,:)  &
                                          + pdata%q(iby,:,:,:) * jc(iny,:,:,:)  &
                                          + pdata%q(ibz,:,:,:) * jc(inz,:,:,:))
 
 ! calculate current density J = ∇xB
 !
-        call curl(dh(:), pdata%q(ibx:ibz,:,:,:), jc(inx:inz,:,:,:))
+          call curl(dh(:), pdata%q(ibx:ibz,:,:,:), jc(inx:inz,:,:,:))
 
 ! add the second resistive source term to the energy equation, i.e.
 !     d/dt E + ∇.F = η J²
 !
-        du(ien,:,:,:) = du(ien,:,:,:)                                          &
+          du(ien,:,:,:) = du(ien,:,:,:)                                        &
                              + resistivity * sum(jc(:,:,:,:) * jc(:,:,:,:), 1)
 
-      end if ! energy equation present
+        end if ! energy equation present
 
-    end if ! resistivity is not zero
+      end if ! resistivity is not zero
+
+    end if ! ibx > 0
 
 #ifdef PROFILE
 ! stop accounting time for source terms
