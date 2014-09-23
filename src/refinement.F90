@@ -514,17 +514,21 @@ module refinement
         do j = jbl, jeu
           do i = ibl, ieu
 
-! calculate the magnitude of current density
+! calculate the squared magnitude of current density
 !
             jabs = sum(jc(inx:inz,i,j,k)**2)
 
-! find the maximum current density
+! find the maximum of squared current density
 !
             jmax = max(jmax, real(jabs, kind=4))
 
           end do ! i = ibl, ieu
         end do ! j = jbl, jeu
       end do ! kbl, keu
+
+! return the maximum current density
+!
+      jmax = sqrt(jmax)
 
 !-------------------------------------------------------------------------------
 !
