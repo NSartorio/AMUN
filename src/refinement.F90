@@ -51,11 +51,14 @@ module refinement
 !
   real(kind=8), save :: crefmin = 2.0d-01
   real(kind=8), save :: crefmax = 8.0d-01
+  real(kind=8), save :: jabsmin = 1.0d+00
+  real(kind=8), save :: jabsmax = 1.0d+01
   real(kind=8), save :: epsref  = 1.0d-02
 
 ! flags for variable included in the refinement criterion calculation
 !
   logical, dimension(:), allocatable, save :: qvar_ref
+  logical                           , save :: jabs_ref = .false.
 
 ! by default everything is private
 !
@@ -94,7 +97,7 @@ module refinement
 
 ! import external procedures and variables
 !
-    use equations      , only : nv, pvars
+    use equations      , only : nv, pvars, ibx
     use parameters     , only : get_parameter_real, get_parameter_string
 
 ! local variables are not implicit by default
@@ -129,6 +132,8 @@ module refinement
 !
     call get_parameter_real("crefmin", crefmin)
     call get_parameter_real("crefmax", crefmax)
+    call get_parameter_real("jabsmin", jabsmin)
+    call get_parameter_real("jabsmax", jabsmax)
     call get_parameter_real("epsref" , epsref )
 
 ! get variables to include in the refinement criterion calculation
@@ -147,13 +152,21 @@ module refinement
       if (qvar_ref(p)) rvars = adjustl(trim(rvars) // ' ' // trim(pvars(p)))
     end do ! p = 1, nv
 
+! turn on current density refinement if turned on
+!
+    if (ibx > 0) then
+      jabs_ref = index(variables, 'jabs') > 0
+      if (jabs_ref) rvars = adjustl(trim(rvars) // ' jabs')
+    end if
+
 ! print information about the refinement criterion
 !
     if (verbose) then
 
       write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
-      write (*,"(4x,a,1x,1e9.2)") "derefinement threshold =", crefmin
-      write (*,"(4x,a,1x,1e9.2)") "refinement threshold   =", crefmax
+      write (*,"(4x,a,1x,2e9.2)") "2nd order error limits =", crefmin, crefmax
+      if (ibx > 0) &
+        write (*,"(4x,a,1x,2e9.2)") "current density limits =", jabsmin, jabsmax
 
     end if
 
@@ -251,7 +264,7 @@ module refinement
 ! local variables
 !
     integer      :: p
-    real(kind=4) :: cref
+    real(kind=4) :: cref, jref
 !
 !-------------------------------------------------------------------------------
 !
@@ -271,14 +284,18 @@ module refinement
       if (qvar_ref(p)) cref = max(cref, second_derivative_error(p, pdata))
     end do ! p = 1, nv
 
+! check current density refinement
+!
+    jref = current_density_magnitude(pdata)
+
 ! return the refinement flag depending on the condition value
 !
     criterion = 0
 
-    if (cref > crefmax) then
+    if (cref > crefmax .or. jref > jabsmax) then
       criterion =  1
     end if
-    if (cref < crefmin) then
+    if (cref < crefmin .and. jref < jabsmin) then
       criterion = -1
     end if
 
@@ -421,6 +438,97 @@ module refinement
 !-------------------------------------------------------------------------------
 !
   end function second_derivative_error
+!
+!===============================================================================
+!
+! function CURRENT_DENSITY_MAGNITUDE:
+! ----------------------------------
+!
+!   Function finds the maximum magnitude of current density from magnetic field
+!   in the block associated with pdata.
+!
+!   Arguments:
+!
+!     pdata - pointer to the data block for which error is calculated;
+!
+!===============================================================================
+!
+  function current_density_magnitude(pdata) result(jmax)
+
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : ibl, jbl, kbl
+    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : adx, ady, adz
+    use equations      , only : inx, iny, inz
+    use equations      , only : ibx, iby, ibz
+    use operators      , only : curl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(in) :: pdata
+
+! return variable
+!
+    real(kind=4)  :: jmax
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: jabs
+
+! local arrays
+!
+    real(kind=8), dimension(3)          :: dh
+    real(kind=8), dimension(3,im,jm,km) :: jc
+!
+!-------------------------------------------------------------------------------
+!
+! reset indicators
+!
+    jmax = 0.0e+00
+
+! return if there is no magnetic field
+!
+    if (ibx <= 0) return
+
+! prepare coordinate increments
+!
+    dh(1) = adx(pdata%meta%level)
+    dh(2) = ady(pdata%meta%level)
+    dh(3) = adz(pdata%meta%level)
+
+! calculate current density J = ∇xB
+!
+    call curl(dh(:), pdata%q(ibx:ibz,:,:,:), jc(inx:inz,:,:,:))
+
+! find maximum current density
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+          do i = ibl, ieu
+
+! calculate the magnitude of current density
+!
+            jabs = sum(jc(inx:inz,i,j,k)**2)
+
+! find the maximum current density
+!
+            jmax = max(jmax, real(jabs, kind=4))
+
+          end do ! i = ibl, ieu
+        end do ! j = jbl, jeu
+      end do ! kbl, keu
+
+!-------------------------------------------------------------------------------
+!
+  end function current_density_magnitude
 
 !===============================================================================
 !
