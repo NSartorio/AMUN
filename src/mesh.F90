@@ -403,7 +403,7 @@ module mesh
 
 ! write down the block statistics
 !
-        write(funit, "(i9,3e14.6,2(2x,i9))", advance="no")                     &
+        write(funit, "(i9,3e14.6e3,2(2x,i9))", advance="no")                   &
                                                     step, time, cv, ef, nm, nl
 
 ! write down the block level distribution
