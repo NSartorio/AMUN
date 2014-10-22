@@ -2120,19 +2120,14 @@ module io
 
 ! local variables
 !
-    integer(hid_t)             :: gid
+    character(len=16)          :: bname
+    integer(hid_t)             :: gid, bid
     integer(kind=4)            :: l
     integer                    :: err
 
 ! local arrays
 !
-    integer(hsize_t), dimension(1) :: am
-    integer(hsize_t), dimension(5) :: dm
-
-! local allocatable arrays
-!
-    integer(kind=4), dimension(:)          , allocatable :: id
-    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: uv, qv
+    integer(hsize_t), dimension(4) :: dm
 !
 !-------------------------------------------------------------------------------
 !
@@ -2149,21 +2144,12 @@ module io
 !
       if (get_dblocks() > 0) then
 
-! prepate dimensions
+! prepate the dimensions
 !
-        am(1) = get_dblocks()
-        dm(1) = get_dblocks()
-        dm(2) = nv
-        dm(3) = im
-        dm(4) = jm
-        dm(5) = km
-
-! allocate arrays to store associated meta block identifiers, conserved and
-! primitive variables
-!
-        allocate(id(am(1)))
-        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        dm(1) = nv
+        dm(2) = im
+        dm(3) = jm
+        dm(4) = km
 
 ! reset the block counter
 !
@@ -2177,64 +2163,37 @@ module io
 !
         do while(associated(pdata))
 
-#ifdef DEBUG
-! store only data from data blocks associated with meta blocks
-!
-          if (associated(pdata%meta)) then
-
 ! increase the block counter
 !
-            l             = l + 1
+          l = l + 1
 
-! fill in the meta block ID array
+! create name for the current block
 !
-            id(l)         = pdata%meta%id
+          write(bname, "('dblk_', i11.11)") l
 
-! fill in the conservative and primitive variable arrays
+! create a group for storing the current data block fields
 !
-            uv(l,:,:,:,:) = pdata%u(:,:,:,:)
-            qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+          call h5gcreate_f(gid, bname, bid, err)
 
-          else ! meta block not associated
-
-! print error about the lack of associated meta block
+! store the corresponding meta block index
 !
-            call print_error("io::write_datablocks_h5"                         &
-                                                , "Meta block no associated!")
+          call write_attribute(bid, 'meta', pdata%meta%id)
 
-          end if ! meta block not associated
-#else /* DEBUG */
-! increase the block counter
+! store the primitive and conservative variables
 !
-          l             = l + 1
+          call write_array(bid, 'pvar' , dm(:), pdata%q (:,:,:,:))
+          call write_array(bid, 'cvar0', dm(:), pdata%u0(:,:,:,:))
+          call write_array(bid, 'cvar1', dm(:), pdata%u1(:,:,:,:))
 
-! fill in the meta block ID array
+! close the block group
 !
-          id(l)         = pdata%meta%id
-
-! fill in the conservative and primitive variable arrays
-!
-          uv(l,:,:,:,:) = pdata%u(:,:,:,:)
-          qv(l,:,:,:,:) = pdata%q(:,:,:,:)
-#endif /* DEBUG */
+          call h5gclose_f(bid, err)
 
 ! associate the pointer with the next data block on the list
 !
           pdata => pdata%next
 
         end do ! data blocks
-
-! store data arrays in the current group
-!
-        call write_array(gid, 'meta', am(1), id)
-        call write_array(gid, 'uvar', dm(:), uv)
-        call write_array(gid, 'qvar', dm(:), qv)
-
-! deallocate allocatable arrays
-!
-        if (allocated(id)) deallocate(id)
-        if (allocated(uv)) deallocate(uv)
-        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
