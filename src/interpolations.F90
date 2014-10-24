@@ -44,7 +44,7 @@ module interpolations
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imr, imf
+  integer            , save :: imi, imr, imf, imc
 #endif /* PROFILE */
 
 ! pointers to the reconstruction and limiter procedures
@@ -126,6 +126,7 @@ module interpolations
     call set_timer('interpolations:: initialization', imi)
     call set_timer('interpolations:: reconstruction', imr)
     call set_timer('interpolations:: fix positivity', imf)
+    call set_timer('interpolations:: clip extrema'  , imc)
 
 ! start accounting time for module initialization/finalization
 !
@@ -2725,6 +2726,12 @@ module interpolations
 !
 !------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for extrema clipping
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
 ! iterate over all points
 !
     do i = 1, n
@@ -2762,6 +2769,12 @@ module interpolations
       end if
 
     end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for extrema clipping
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !

@@ -2120,19 +2120,14 @@ module io
 
 ! local variables
 !
-    integer(hid_t)             :: gid
+    character(len=16)          :: bname
+    integer(hid_t)             :: gid, bid
     integer(kind=4)            :: l
     integer                    :: err
 
 ! local arrays
 !
-    integer(hsize_t), dimension(1) :: am
-    integer(hsize_t), dimension(5) :: dm
-
-! local allocatable arrays
-!
-    integer(kind=4), dimension(:)          , allocatable :: id
-    real(kind=8)   , dimension(:,:,:,:,:)  , allocatable :: uv, qv
+    integer(hsize_t), dimension(4) :: dm
 !
 !-------------------------------------------------------------------------------
 !
@@ -2149,21 +2144,12 @@ module io
 !
       if (get_dblocks() > 0) then
 
-! prepate dimensions
+! prepate the dimensions
 !
-        am(1) = get_dblocks()
-        dm(1) = get_dblocks()
-        dm(2) = nv
-        dm(3) = im
-        dm(4) = jm
-        dm(5) = km
-
-! allocate arrays to store associated meta block identifiers, conserved and
-! primitive variables
-!
-        allocate(id(am(1)))
-        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        dm(1) = nv
+        dm(2) = im
+        dm(3) = jm
+        dm(4) = km
 
 ! reset the block counter
 !
@@ -2177,64 +2163,37 @@ module io
 !
         do while(associated(pdata))
 
-#ifdef DEBUG
-! store only data from data blocks associated with meta blocks
-!
-          if (associated(pdata%meta)) then
-
 ! increase the block counter
 !
-            l             = l + 1
+          l = l + 1
 
-! fill in the meta block ID array
+! create name for the current block
 !
-            id(l)         = pdata%meta%id
+          write(bname, "('dblk_', i11.11)") l
 
-! fill in the conservative and primitive variable arrays
+! create a group for storing the current data block fields
 !
-            uv(l,:,:,:,:) = pdata%u(:,:,:,:)
-            qv(l,:,:,:,:) = pdata%q(:,:,:,:)
+          call h5gcreate_f(gid, bname, bid, err)
 
-          else ! meta block not associated
-
-! print error about the lack of associated meta block
+! store the corresponding meta block index
 !
-            call print_error("io::write_datablocks_h5"                         &
-                                                , "Meta block no associated!")
+          call write_attribute(bid, 'meta', pdata%meta%id)
 
-          end if ! meta block not associated
-#else /* DEBUG */
-! increase the block counter
+! store the primitive and conservative variables
 !
-          l             = l + 1
+          call write_array(bid, 'pvar' , dm(:), pdata%q (:,:,:,:))
+          call write_array(bid, 'cvar0', dm(:), pdata%u0(:,:,:,:))
+          call write_array(bid, 'cvar1', dm(:), pdata%u1(:,:,:,:))
 
-! fill in the meta block ID array
+! close the block group
 !
-          id(l)         = pdata%meta%id
-
-! fill in the conservative and primitive variable arrays
-!
-          uv(l,:,:,:,:) = pdata%u(:,:,:,:)
-          qv(l,:,:,:,:) = pdata%q(:,:,:,:)
-#endif /* DEBUG */
+          call h5gclose_f(bid, err)
 
 ! associate the pointer with the next data block on the list
 !
           pdata => pdata%next
 
         end do ! data blocks
-
-! store data arrays in the current group
-!
-        call write_array(gid, 'meta', am(1), id)
-        call write_array(gid, 'uvar', dm(:), uv)
-        call write_array(gid, 'qvar', dm(:), qv)
-
-! deallocate allocatable arrays
-!
-        if (allocated(id)) deallocate(id)
-        if (allocated(uv)) deallocate(uv)
-        if (allocated(qv)) deallocate(qv)
 
       end if ! dblocks > 0
 
@@ -2288,7 +2247,7 @@ module io
     use equations      , only : nv
     use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
-    use hdf5           , only : h5gopen_f, h5gclose_f
+    use hdf5           , only : h5gopen_f, h5gclose_f, h5lexists_f
 
 ! local variables are not implicit by default
 !
@@ -2304,8 +2263,10 @@ module io
 
 ! local variables
 !
-    integer(hid_t)                 :: gid
-    integer(kind=4)                :: l
+    logical                        :: flag
+    character(len=16)              :: bname
+    integer(hid_t)                 :: gid, bid
+    integer(kind=4)                :: l, i
     integer                        :: dblocks, ierr
 
 ! local arrays
@@ -2339,20 +2300,6 @@ module io
 !
     if (dblocks > 0) then
 
-! fill out dimensions dm(:)
-!
-      dm(1) = dblocks
-      dm(2) = nv
-      dm(3) = im
-      dm(4) = jm
-      dm(5) = km
-
-! allocate arrays to read data
-!
-      allocate(id(dm(1)))
-      allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-      allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
-
 ! open the group 'datablocks'
 !
       call h5gopen_f(fid, 'datablocks', gid, ierr)
@@ -2362,11 +2309,100 @@ module io
         return
       end if
 
+! fill out dimensions dm(:)
+!
+      dm(1) = dblocks
+      dm(2) = nv
+      dm(3) = im
+      dm(4) = jm
+      dm(5) = km
+
+! check if the old data format is used, otherwise use the new one
+!
+      call h5lexists_f(gid, 'meta', flag, ierr)
+
+! restart files are in the old format
+!
+      if (flag) then
+
+! allocate arrays to read data
+!
+        allocate(id(dm(1)))
+        allocate(uv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+        allocate(qv(dm(1),dm(2),dm(3),dm(4),dm(5)))
+
 ! read array data from the HDF5 file
 !
-      call read_array(gid, 'meta', dm(1:1), id(:)        )
-      call read_array(gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
-      call read_array(gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+        call read_array(gid, 'meta', dm(1:1), id(:)        )
+        call read_array(gid, 'uvar', dm(1:5), uv(:,:,:,:,:))
+        call read_array(gid, 'qvar', dm(1:5), qv(:,:,:,:,:))
+
+! iterate over data blocks, allocate them and fill out their fields
+!
+        do l = 1, dm(1)
+
+! allocate and append to the end of the list a new datablock
+!
+          call append_datablock(pdata)
+
+! associate the corresponding meta block with the current data block
+!
+          call link_blocks(block_array(id(l))%ptr, pdata)
+
+! fill out the array of conservative and primitive variables
+!
+          pdata%u(:,:,:,:) = uv(l,:,:,:,:)
+          pdata%q(:,:,:,:) = qv(l,:,:,:,:)
+
+        end do ! l = 1, dm(1)
+
+! deallocate allocatable arrays
+!
+        if (allocated(id)) deallocate(id)
+        if (allocated(uv)) deallocate(uv)
+        if (allocated(qv)) deallocate(qv)
+
+! restart files are in the new format
+!
+      else ! flag
+
+! iterate over data blocks, allocate them and fill out their fields
+!
+        do l = 1, dm(1)
+
+! allocate and append to the end of the list a new datablock
+!
+          call append_datablock(pdata)
+
+! create name for the current block
+!
+          write(bname, "('dblk_', i11.11)") l
+
+! open the group for the current block fields
+!
+          call h5gopen_f(gid, bname, bid, ierr)
+
+! get the id of the linked meta block
+!
+          call read_attribute(bid, 'meta', i)
+
+! associate the corresponding meta block with the current data block
+!
+          call link_blocks(block_array(i)%ptr, pdata)
+
+! fill out the array of primitive and conservative variables
+!
+          call read_array(bid, 'pvar' , dm(2:5), pdata%q (:,:,:,:))
+          call read_array(bid, 'cvar0', dm(2:5), pdata%u0(:,:,:,:))
+          call read_array(bid, 'cvar1', dm(2:5), pdata%u1(:,:,:,:))
+
+! close the current data block group
+!
+          call h5gclose_f(bid, ierr)
+
+        end do ! l = 1, dm(1)
+
+      end if ! flag
 
 ! close the data block group
 !
@@ -2376,31 +2412,6 @@ module io
                                        , "Cannot close the data block group!")
         return
       end if
-
-! iterate over data blocks, allocate them and fill out their fields
-!
-      do l = 1, dm(1)
-
-! allocate and append to the end of the list a new datablock
-!
-        call append_datablock(pdata)
-
-! associate the corresponding meta block with the current data block
-!
-        call link_blocks(block_array(id(l))%ptr, pdata)
-
-! fill out the array of conservative and primitive variables
-!
-        pdata%u(:,:,:,:) = uv(l,:,:,:,:)
-        pdata%q(:,:,:,:) = qv(l,:,:,:,:)
-
-      end do ! l = 1, dm(1)
-
-! deallocate allocatable arrays
-!
-      if (allocated(id)) deallocate(id)
-      if (allocated(uv)) deallocate(uv)
-      if (allocated(qv)) deallocate(qv)
 
     end if ! dblocks > 0
 
