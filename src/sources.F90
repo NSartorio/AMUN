@@ -416,13 +416,6 @@ module sources
 !
       du(imx,1:im,1:jm,1:km) = du(imx,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
 
-! add viscous source term to total energy equation
-!
-      if (ien > 0) then
-        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
-                            + pdata%q(ivx,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
-      end if
-
 ! calculate the divergence of the second tensor row
 !
       call divergence(dh(:), tmp(iny,inx:inz,1:im,1:jm,1:km)                   &
@@ -431,13 +424,6 @@ module sources
 ! add viscous source terms to the Y momentum equation
 !
       du(imy,1:im,1:jm,1:km) = du(imy,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
-
-! add viscous source term to total energy equation
-!
-      if (ien > 0) then
-        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
-                            + pdata%q(ivy,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
-      end if
 
 ! calculate the divergence of the third tensor row
 !
@@ -451,9 +437,45 @@ module sources
 ! add viscous source term to total energy equation
 !
       if (ien > 0) then
-        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
-                            + pdata%q(ivz,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
-      end if
+
+! iterate over all cells
+!
+        do k = 1, km
+          do j = 1, jm
+            do i = 1, jm
+
+! calculate scalar product of v and viscous stress tensor τ
+!
+              gx = pdata%q(ivx,i,j,k) * tmp(inx,inx,i,j,k)                     &
+                 + pdata%q(ivy,i,j,k) * tmp(inx,iny,i,j,k)                     &
+                 + pdata%q(ivz,i,j,k) * tmp(inx,inz,i,j,k)
+              gy = pdata%q(ivx,i,j,k) * tmp(iny,inx,i,j,k)                     &
+                 + pdata%q(ivy,i,j,k) * tmp(iny,iny,i,j,k)                     &
+                 + pdata%q(ivz,i,j,k) * tmp(iny,inz,i,j,k)
+              gz = pdata%q(ivx,i,j,k) * tmp(inz,inx,i,j,k)                     &
+                 + pdata%q(ivy,i,j,k) * tmp(inz,iny,i,j,k)                     &
+                 + pdata%q(ivz,i,j,k) * tmp(inz,inz,i,j,k)
+
+! update (v.τ), use the first row of the tensor tmp
+!
+              tmp(inx,inx,i,j,k) = gx
+              tmp(inx,iny,i,j,k) = gy
+              tmp(inx,inz,i,j,k) = gz
+
+            end do ! i = 1, im
+          end do ! j = 1, jm
+        end do ! k = 1, km
+
+! calculate the divergence of (v.τ)
+!
+        call divergence(dh(:), tmp(inx,inx:inz,1:im,1:jm,1:km)                 &
+                                                         , db(1:im,1:jm,1:km))
+
+! update the energy increment
+!
+        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
+
+      end if ! ien > 0
 
     end if ! viscosity is not zero
 
