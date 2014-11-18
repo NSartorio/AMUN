@@ -238,7 +238,7 @@ module sources
 !
     use blocks         , only : block_data
     use coordinates    , only : im, jm, km
-    use coordinates    , only : ax, ay, az, adx, ady, adz, adxi, adyi, adzi
+    use coordinates    , only : ax, ay, az, adx, ady, adz
     use equations      , only : nv, inx, iny, inz
     use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ien
     use equations      , only : ibx, iby, ibz, ibp
@@ -256,10 +256,12 @@ module sources
 ! local variables
 !
     integer       :: i  , j  , k
-    integer       :: im1, jm1, km1
-    integer       :: ip1, jp1, kp1
-    real(kind=8)  :: r2, r3, gc, gx, gy, gz
-    real(kind=8)  :: dxi2, dyi2, dzi2, dvx, dvy, dvz, dbx, dby, dbz, dvv
+    real(kind=8)  :: fc, gc
+    real(kind=8)  :: r2, r3, gx, gy, gz
+    real(kind=8)  :: dbx, dby, dbz
+    real(kind=8)  :: dvxdx, dvxdy, dvxdz, divv
+    real(kind=8)  :: dvydx, dvydy, dvydz
+    real(kind=8)  :: dvzdx, dvzdy, dvzdz
 
 ! local arrays
 !
@@ -267,8 +269,9 @@ module sources
     real(kind=8), dimension(im) :: x
     real(kind=8), dimension(jm) :: y
     real(kind=8), dimension(km) :: z
-    real(kind=8), dimension(im,jm,km)   :: db
-    real(kind=8), dimension(3,im,jm,km) :: jc
+    real(kind=8), dimension(im,jm,km)     :: db
+    real(kind=8), dimension(3,im,jm,km)   :: jc
+    real(kind=8), dimension(3,3,im,jm,km) :: tmp
 !
 !-------------------------------------------------------------------------------
 !
@@ -351,119 +354,106 @@ module sources
 
 ! prepare coordinate increments
 !
-      dxi2 = viscosity * adxi(pdata%meta%level)**2
-      dyi2 = viscosity * adyi(pdata%meta%level)**2
-#if NDIMS == 3
-      dzi2 = viscosity * adzi(pdata%meta%level)**2
-#endif /* NDIMS == 3 */
+      dh(1) = adx(pdata%meta%level)
+      dh(2) = ady(pdata%meta%level)
+      dh(3) = adz(pdata%meta%level)
 
-! iterate over all positions in the YZ plane
+! calculate the velocity Jacobian
+!
+      call gradient(dh(:), pdata%q(ivx,1:im,1:jm,1:km)                         &
+                                            , tmp(inx,inx:inz,1:im,1:jm,1:km))
+      call gradient(dh(:), pdata%q(ivy,1:im,1:jm,1:km)                         &
+                                            , tmp(iny,inx:inz,1:im,1:jm,1:km))
+      call gradient(dh(:), pdata%q(ivz,1:im,1:jm,1:km)                         &
+                                            , tmp(inz,inx:inz,1:im,1:jm,1:km))
+
+! iterate over all cells
 !
       do k = 1, km
-#if NDIMS == 3
-        km1 = max( 1, k - 1)
-        kp1 = min(km, k + 1)
-#endif /* NDIMS == 3 */
         do j = 1, jm
-          jm1 = max( 1, j - 1)
-          jp1 = min(jm, j + 1)
           do i = 1, jm
-            im1 = max( 1, i - 1)
-            ip1 = min(im, i + 1)
 
-! calculate second order derivatives of Vx
+! prepare the νρ factor
 !
-            dvx = (pdata%q(ivx,ip1,j,k) + pdata%q(ivx,im1,j,k))                &
-                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
-            dvy = (pdata%q(ivx,i,jp1,k) + pdata%q(ivx,i,jm1,k))                &
-                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
-#if NDIMS == 3
-            dvz = (pdata%q(ivx,i,j,kp1) + pdata%q(ivx,i,j,km1))                &
-                                                - 2.0d+00 * pdata%q(ivx,i,j,k)
-#endif /* NDIMS == 3 */
+            gc    = viscosity * pdata%q(idn,i,j,k)
+            fc    = 2.0d+00 * gc
 
-! calculate the source term for Vx
+! get the velocity Jacobian elements
 !
-#if NDIMS == 2
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
-#endif /* NDIMS == 3 */
+            dvxdx = tmp(inx,inx,i,j,k)
+            dvxdy = tmp(inx,iny,i,j,k)
+            dvxdz = tmp(inx,inz,i,j,k)
+            dvydx = tmp(iny,inx,i,j,k)
+            dvydy = tmp(iny,iny,i,j,k)
+            dvydz = tmp(iny,inz,i,j,k)
+            dvzdx = tmp(inz,inx,i,j,k)
+            dvzdy = tmp(inz,iny,i,j,k)
+            dvzdz = tmp(inz,inz,i,j,k)
+            divv  = (dvxdx + dvydy + dvzdz) / 3.0d+00
 
-! add viscous source terms to X-momentum equation
+! calculate elements of the viscous stress tensor
 !
-            du(imx,i,j,k) = du(imx,i,j,k) + dvv
-
-! add viscous source term to total energy equation
-!
-            if (ien > 0) then
-              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivx,i,j,k) * dvv
-            end if
-
-! calculate second order derivatives of Vy
-!
-            dvx = (pdata%q(ivy,ip1,j,k) + pdata%q(ivy,im1,j,k))                &
-                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
-            dvy = (pdata%q(ivy,i,jp1,k) + pdata%q(ivy,i,jm1,k))                &
-                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
-#if NDIMS == 3
-            dvz = (pdata%q(ivy,i,j,kp1) + pdata%q(ivy,i,j,km1))                &
-                                                - 2.0d+00 * pdata%q(ivy,i,j,k)
-#endif /* NDIMS == 3 */
-
-! calculate the source term for Vy
-!
-#if NDIMS == 2
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
-#endif /* NDIMS == 3 */
-
-! add viscous source terms to Y-momentum equation
-!
-            du(imy,i,j,k) = du(imy,i,j,k) + dvv
-
-! add viscous source term to total energy equation
-!
-            if (ien > 0) then
-              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivy,i,j,k) * dvv
-            end if
-
-! calculate second order derivatives of Vz
-!
-            dvx = (pdata%q(ivz,ip1,j,k) + pdata%q(ivz,im1,j,k))                &
-                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
-            dvy = (pdata%q(ivz,i,jp1,k) + pdata%q(ivz,i,jm1,k))                &
-                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
-#if NDIMS == 3
-            dvz = (pdata%q(ivz,i,j,kp1) + pdata%q(ivz,i,j,km1))                &
-                                                - 2.0d+00 * pdata%q(ivz,i,j,k)
-#endif /* NDIMS == 3 */
-
-! calculate the source term for Vz
-!
-#if NDIMS == 2
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            dvv = pdata%q(idn,i,j,k) * (dxi2 * dvx + dyi2 * dvy + dzi2 * dvz)
-#endif /* NDIMS == 3 */
-
-! add viscous source terms to Y-momentum equation
-!
-            du(imz,i,j,k) = du(imz,i,j,k) + dvv
-
-! add viscous source term to total energy equation
-!
-            if (ien > 0) then
-              du(ien,i,j,k) = du(ien,i,j,k) + pdata%q(ivz,i,j,k) * dvv
-            end if
+            tmp(inx,inx,i,j,k) = fc * (dvxdx - divv)
+            tmp(iny,iny,i,j,k) = fc * (dvydy - divv)
+            tmp(inz,inz,i,j,k) = fc * (dvzdz - divv)
+            tmp(inx,iny,i,j,k) = gc * (dvxdy + dvydx)
+            tmp(inx,inz,i,j,k) = gc * (dvxdz + dvzdx)
+            tmp(iny,inz,i,j,k) = gc * (dvydz + dvzdy)
+            tmp(iny,inx,i,j,k) = tmp(inx,iny,i,j,k)
+            tmp(inz,inx,i,j,k) = tmp(inx,inz,i,j,k)
+            tmp(inz,iny,i,j,k) = tmp(iny,inz,i,j,k)
 
           end do ! i = 1, im
         end do ! j = 1, jm
       end do ! k = 1, km
+
+! calculate the divergence of the first tensor row
+!
+      call divergence(dh(:), tmp(inx,inx:inz,1:im,1:jm,1:km)                   &
+                                                         , db(1:im,1:jm,1:km))
+
+! add viscous source terms to the X momentum equation
+!
+      du(imx,1:im,1:jm,1:km) = du(imx,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
+
+! add viscous source term to total energy equation
+!
+      if (ien > 0) then
+        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
+                            + pdata%q(ivx,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
+      end if
+
+! calculate the divergence of the second tensor row
+!
+      call divergence(dh(:), tmp(iny,inx:inz,1:im,1:jm,1:km)                   &
+                                                         , db(1:im,1:jm,1:km))
+
+! add viscous source terms to the Y momentum equation
+!
+      du(imy,1:im,1:jm,1:km) = du(imy,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
+
+! add viscous source term to total energy equation
+!
+      if (ien > 0) then
+        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
+                            + pdata%q(ivy,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
+      end if
+
+! calculate the divergence of the third tensor row
+!
+      call divergence(dh(:), tmp(inz,inx:inz,1:im,1:jm,1:km)                   &
+                                                         , db(1:im,1:jm,1:km))
+
+! add viscous source terms to the Z momentum equation
+!
+      du(imz,1:im,1:jm,1:km) = du(imz,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
+
+! add viscous source term to total energy equation
+!
+      if (ien > 0) then
+        du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                        &
+                            + pdata%q(ivz,1:im,1:jm,1:km) * db(1:im,1:jm,1:km)
+      end if
 
     end if ! viscosity is not zero
 
