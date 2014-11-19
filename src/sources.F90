@@ -555,56 +555,39 @@ module sources
 !
       if (resistivity > 0.0d+00) then
 
-! calculate the current density J = ∇ x B
+! calculate the Laplace operator of B, i.e. Δ(B)
 !
-        call curl(dh(:), pdata%q(ibx:ibz,1:im,1:jm,1:km)                       &
-                                            , tmp(inx,inx:inz,1:im,1:jm,1:km))
-
-! multiply the current density by the resistivity
-!
-        tmp(iny,inx:inz,1:im,1:jm,1:km) =                                      &
-                                resistivity * tmp(inx,inx:inz,1:im,1:jm,1:km)
-
-! calculate the curl of ηJ
-!
-        call curl(dh(:), tmp(iny,inx:inz,1:im,1:jm,1:km)                       &
-                                            , tmp(inz,inx:inz,1:im,1:jm,1:km))
+        call laplace(dh(:), pdata%q(ibx,:,:,:), jc(inx,:,:,:))
+        call laplace(dh(:), pdata%q(iby,:,:,:), jc(iny,:,:,:))
+        call laplace(dh(:), pdata%q(ibz,:,:,:), jc(inz,:,:,:))
 
 ! update magnetic field component increments
-!     d/dt B + ∇.F = - ∇ x (ηJ)
 !
-        du(ibx,1:im,1:jm,1:km) = du(ibx,1:im,1:jm,1:km)                        &
-                                                 - tmp(inz,inx,1:im,1:jm,1:km)
-        du(iby,1:im,1:jm,1:km) = du(iby,1:im,1:jm,1:km)                        &
-                                                 - tmp(inz,iny,1:im,1:jm,1:km)
-        du(ibz,1:im,1:jm,1:km) = du(ibz,1:im,1:jm,1:km)                        &
-                                                 - tmp(inz,inz,1:im,1:jm,1:km)
+        du(ibx,:,:,:) = du(ibx,:,:,:) + resistivity * jc(inx,:,:,:)
+        du(iby,:,:,:) = du(iby,:,:,:) + resistivity * jc(iny,:,:,:)
+        du(ibz,:,:,:) = du(ibz,:,:,:) + resistivity * jc(inz,:,:,:)
 
 ! update energy equation
 !
         if (ien > 0) then
 
-! calculate the cross product B x (ηJ)
+! add the first resistive source term to the energy equation, i.e.
+!     d/dt E + ∇.F = η B.[Δ(B)]
 !
-          tmp(inx,inx,1:im,1:jm,1:km) =                                        &
-                     pdata%q(iby,1:im,1:jm,1:km) * tmp(iny,inz,1:im,1:jm,1:km) &
-                   - pdata%q(ibz,1:im,1:jm,1:km) * tmp(iny,iny,1:im,1:jm,1:km)
-          tmp(inx,iny,1:im,1:jm,1:km) =                                        &
-                     pdata%q(ibz,1:im,1:jm,1:km) * tmp(iny,inx,1:im,1:jm,1:km) &
-                   - pdata%q(ibx,1:im,1:jm,1:km) * tmp(iny,inz,1:im,1:jm,1:km)
-          tmp(inx,inz,1:im,1:jm,1:km) =                                        &
-                     pdata%q(ibx,1:im,1:jm,1:km) * tmp(iny,iny,1:im,1:jm,1:km) &
-                   - pdata%q(iby,1:im,1:jm,1:km) * tmp(iny,inx,1:im,1:jm,1:km)
+          du(ien,:,:,:) = du(ien,:,:,:)                                        &
+                          + resistivity * (pdata%q(ibx,:,:,:) * jc(inx,:,:,:)  &
+                                         + pdata%q(iby,:,:,:) * jc(iny,:,:,:)  &
+                                         + pdata%q(ibz,:,:,:) * jc(inz,:,:,:))
 
-! calculate divergence of [B x (ηJ)]
+! calculate current density J = ∇xB
 !
-          call divergence(dh(:), tmp(inx,inx:inz,1:im,1:jm,1:km)               &
-                                                         , db(1:im,1:jm,1:km))
+          call curl(dh(:), pdata%q(ibx:ibz,:,:,:), jc(inx:inz,:,:,:))
 
-! add the resistive source term to the energy equation, i.e.
-!     d/dt E + ∇.F = ∇.[B x (ηJ)]
+! add the second resistive source term to the energy equation, i.e.
+!     d/dt E + ∇.F = η J²
 !
-          du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km) + db(1:im,1:jm,1:km)
+          du(ien,:,:,:) = du(ien,:,:,:)                                        &
+                             + resistivity * sum(jc(:,:,:,:) * jc(:,:,:,:), 1)
 
         end if ! energy equation present
 
