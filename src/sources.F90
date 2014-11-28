@@ -270,7 +270,6 @@ module sources
     real(kind=8), dimension(jm) :: y
     real(kind=8), dimension(km) :: z
     real(kind=8), dimension(im,jm,km)     :: db
-    real(kind=8), dimension(3,im,jm,km)   :: jc
     real(kind=8), dimension(3,3,im,jm,km) :: tmp
 !
 !-------------------------------------------------------------------------------
@@ -510,13 +509,13 @@ module sources
 
 ! calculate the gradient of divergence potential
 !
-          call gradient(dh(:), pdata%q(ibp,:,:,:), jc(inx:inz,:,:,:))
+          call gradient(dh(:), pdata%q(ibp,:,:,:), tmp(inx:inz,inx,:,:,:))
 
 ! add the divergence potential source term to the energy equation, i.e.
 !     d/dt E + ∇.F = - B.(∇ψ)
 !
           du(ien,:,:,:) = du(ien,:,:,:)                                        &
-                          - sum(pdata%q(ibx:ibz,:,:,:) * jc(inx:inz,:,:,:), 1)
+                     - sum(pdata%q(ibx:ibz,:,:,:) * tmp(inx:inz,inx,:,:,:), 1)
 
         end if ! ien > 0
 
@@ -537,13 +536,13 @@ module sources
 
 ! calculate scalar product of velocity and magnetic field
 !
-            jc(inx,:,:,:) = sum(pdata%q(ivx:ivz,:,:,:)                         &
+            tmp(inx,inx,:,:,:) = sum(pdata%q(ivx:ivz,:,:,:)                    &
                                                   * pdata%q(ibx:ibz,:,:,:), 1)
 
 ! add the divergence potential source term to the energy equation, i.e.
 !     d/dt E + ∇.F = - (∇.B) (v.B)
 !
-            du(ien,:,:,:) = du(ien,:,:,:) - db(:,:,:) * jc(inx,:,:,:)
+            du(ien,:,:,:) = du(ien,:,:,:) - db(:,:,:) * tmp(inx,inx,:,:,:)
 
           end if ! ien > 0
 
