@@ -184,7 +184,7 @@ module mpitools
 
 ! calculate the number of processor pairs for data exchange
 !
-    npairs = mprocs * (mprocs - 1) / 2
+    npairs = nprocs * npmax
 
 ! allocate space for all processor pairs
 !
@@ -235,6 +235,10 @@ module mpitools
       procs(2:mprocs) = cshift(procs(2:mprocs), -1)
 
     end do ! l = 1, mprocs - 1
+
+! fill out the remaining pairs (swapped)
+!
+    pairs(npairs/2+1:npairs,1:2) = pairs(1:npairs/2,2:1:-1)
 
 ! allocate space for the processor order
 !
