@@ -417,6 +417,7 @@ module boundaries
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nprocs, nproc, npmax
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -437,18 +438,14 @@ module boundaries
     integer :: i, is, it, il, iu, ih
     integer :: j, js, jt, jl, ju, jh
     integer :: k, ks, kt, kl, ku, kh
-
 #ifdef MPI
-    integer :: irecv, isend, nblocks, itag, l, iret
-#endif /* MPI */
+    integer :: irecv, isend, nblocks, itag, iret
+    integer :: l, p
 
-#ifdef MPI
 ! local pointer arrays
 !
     type(pointer_info), dimension(0:nprocs-1,0:nprocs-1) :: block_array
-#endif /* MPI */
 
-#ifdef MPI
 ! local arrays
 !
     integer     , dimension(0:nprocs-1,0:nprocs-1) :: block_counter
@@ -728,10 +725,14 @@ module boundaries
     end do ! meta blocks
 
 #ifdef MPI
-! iterate over sending and receiving processes
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have anything to exchange
 !
@@ -1026,8 +1027,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -1244,6 +1244,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -1270,7 +1271,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -1501,10 +1503,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have anything to exchange
 !
@@ -1745,8 +1751,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -1792,6 +1797,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -1818,7 +1824,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -2049,10 +2056,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -2293,8 +2304,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -2340,6 +2350,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -2367,7 +2378,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -2610,10 +2622,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -2861,8 +2877,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -2915,6 +2930,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -2941,7 +2957,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -3175,10 +3192,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -3445,8 +3466,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -3492,6 +3512,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -3518,7 +3539,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -3752,10 +3774,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -4022,8 +4048,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -4069,6 +4094,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -4096,7 +4122,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -4336,10 +4363,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -4610,8 +4641,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -4657,6 +4687,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -4678,7 +4709,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -4875,10 +4907,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -5075,8 +5111,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -5116,6 +5151,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -5137,7 +5173,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -5333,10 +5370,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -5533,8 +5574,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
@@ -5574,6 +5614,7 @@ module boundaries
     use equations      , only : nv
     use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
+    use mpitools       , only : npairs, pairs
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -5595,7 +5636,8 @@ module boundaries
     integer :: iu, ju, ku
     integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag, l
+    integer :: isend, irecv, nblocks, itag
+    integer :: l, p
 
 ! local pointer arrays
 !
@@ -5791,10 +5833,14 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over sending and receiving processors
+! iterate over all processor pairs
 !
-    do irecv = 0, npmax
-      do isend = 0, npmax
+    do p = 1, npairs
+
+! get sending and receiving processor identifiers
+!
+      isend = pairs(p,1)
+      irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
@@ -5991,8 +6037,7 @@ module boundaries
 
         end if ! if block_count > 0
 
-      end do ! isend
-    end do ! irecv
+    end do ! p = 1, npairs
 #endif /* MPI */
 
 #ifdef PROFILE
