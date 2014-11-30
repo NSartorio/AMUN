@@ -2622,260 +2622,260 @@ module boundaries
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
 !!
-! iterate over all processor pairs
+! iterate over all process pairs
 !
     do p = 1, npairs
 
-! get sending and receiving processor identifiers
+! get sending and receiving process identifiers
 !
       isend = pairs(p,1)
       irecv = pairs(p,2)
 
 ! process only pairs which have something to exchange
 !
-        if (block_counter(isend,irecv) > 0) then
+      if (block_counter(isend,irecv) > 0) then
 
 ! obtain the number of blocks to exchange
 !
-          nblocks = block_counter(isend,irecv)
+        nblocks = block_counter(isend,irecv)
 
 ! prepare the tag for communication
 !
-          itag = 16 * (irecv * nprocs + isend) + 4
+        itag = 16 * (irecv * nprocs + isend) + 4
 
 ! allocate data buffer for variables to exchange
 !
-          select case(idir)
-          case(1)
-            allocate(rbuf(nblocks,nv,ng,jh,kh))
-          case(2)
-            allocate(rbuf(nblocks,nv,ih,ng,kh))
-          case(3)
-            allocate(rbuf(nblocks,nv,ih,jh,ng))
-          end select
+        select case(idir)
+        case(1)
+          allocate(rbuf(nblocks,nv,ng,jh,kh))
+        case(2)
+          allocate(rbuf(nblocks,nv,ih,ng,kh))
+        case(3)
+          allocate(rbuf(nblocks,nv,ih,jh,ng))
+        end select
 
 ! if isend == nproc we are sending data
 !
-          if (isend == nproc) then
+        if (isend == nproc) then
 
 ! reset the block counter
 !
-            l = 0
-
-! associate pinfo with the first block in the exchange list
-!
-            pinfo => block_array(isend,irecv)%ptr
-
-! scan over all blocks on the block exchange list
-!
-            do while(associated(pinfo))
-
-! increase the block counter
-!
-              l = l + 1
-
-! prepare pointer for updated meta block and its neighbor
-!
-              pmeta  => pinfo%block
-              pneigh => pinfo%neigh
-
-! get the corner coordinates
-!
-              i = pinfo%corner(1)
-              j = pinfo%corner(2)
-              k = pinfo%corner(3)
-
-! extract the corresponding face region from the neighbor and insert it
-! to the buffer
-!
-              select case(idir)
-              case(1)
-                j = pmeta%pos(2)
-                k = pmeta%pos(3)
-                call block_face_prolong(idir, i, j, k                          &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ng,1:jh,1:kh))
-              case(2)
-                i = pmeta%pos(1)
-                k = pmeta%pos(3)
-                call block_face_prolong(idir, i, j, k                          &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ih,1:ng,1:kh))
-              case(3)
-                i = pmeta%pos(1)
-                j = pmeta%pos(2)
-                call block_face_prolong(idir, i, j, k                          &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ih,1:jh,1:ng))
-              end select
-
-! associate pinfo with the next block
-!
-              pinfo => pinfo%prev
-
-            end do ! %ptr block list
-
-! send the data buffer to another process
-!
-            call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
-
-          end if ! isend = nproc
-
-! if irecv == nproc we are receiving data
-!
-          if (irecv == nproc) then
-
-! receive the data buffer
-!
-            call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag         &
-                                                      , rbuf(:,:,:,:,:), iret)
-
-! reset the block counter
-!
-            l = 0
-
-! associate pinfo with the first block in the exchange list
-!
-            pinfo => block_array(isend,irecv)%ptr
-
-! iterate over all received blocks and update boundaries of the corresponding
-! data blocks
-!
-            do while(associated(pinfo))
-
-! increase the block counter
-!
-              l = l + 1
-
-! prepare the pointer to updated block
-!
-              pmeta => pinfo%block
-
-! get the corner coordinates
-!
-              i = pinfo%corner(1)
-              j = pinfo%corner(2)
-              k = pinfo%corner(3)
-
-! update the corresponding face region of the current block
-!
-              select case(idir)
-              case(1)
-                if (i == 1) then
-                  il = 1
-                  iu = ibl
-                else
-                  il = ieu
-                  iu = im
-                end if
-                if (pmeta%pos(2) == 0) then
-                  jl = jb
-                  ju = jm
-                else
-                  jl =  1
-                  ju = je
-                end if
-                if (pmeta%pos(3) == 0) then
-                  kl = kb
-                  ku = km
-                else
-                  kl =  1
-                  ku = ke
-                end if
-                pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                         &
-                                                   rbuf(l,1:nv,1:ng,1:jh,1:kh)
-              case(2)
-                if (j == 1) then
-                  jl = 1
-                  ju = jbl
-                else
-                  jl = jeu
-                  ju = jm
-                end if
-                if (pmeta%pos(1) == 0) then
-                  il = ib
-                  iu = im
-                else
-                  il =  1
-                  iu = ie
-                end if
-                if (pmeta%pos(3) == 0) then
-                  kl = kb
-                  ku = km
-                else
-                  kl =  1
-                  ku = ke
-                end if
-                pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                         &
-                                                   rbuf(l,1:nv,1:ih,1:ng,1:kh)
-              case(3)
-                if (k == 1) then
-                  kl = 1
-                  ku = kbl
-                else
-                  kl = keu
-                  ku = km
-                end if
-                if (pmeta%pos(1) == 0) then
-                  il = ib
-                  iu = im
-                else
-                  il =  1
-                  iu = ie
-                end if
-                if (pmeta%pos(2) == 0) then
-                  jl = jb
-                  ju = jm
-                else
-                  jl =  1
-                  ju = je
-                end if
-                pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                         &
-                                                   rbuf(l,1:nv,1:ih,1:jh,1:ng)
-              end select
-
-! associate pinfo with the next block
-!
-              pinfo => pinfo%prev
-
-            end do ! %ptr block list
-
-          end if ! irecv = nproc
-
-! deallocate data buffer
-!
-          if (allocated(rbuf)) deallocate(rbuf)
+          l = 0
 
 ! associate pinfo with the first block in the exchange list
 !
           pinfo => block_array(isend,irecv)%ptr
 
-! scan over all blocks on the exchange block list
+! scan over all blocks on the block exchange list
 !
           do while(associated(pinfo))
 
-! associate the exchange list pointer
+! increase the block counter
 !
-            block_array(isend,irecv)%ptr => pinfo%prev
+            l = l + 1
 
-! nullify the pointer fields
+! prepare pointer for updated meta block and its neighbor
 !
-            nullify(pinfo%prev)
-            nullify(pinfo%next)
-            nullify(pinfo%block)
-            nullify(pinfo%neigh)
+            pmeta  => pinfo%block
+            pneigh => pinfo%neigh
 
-! deallocate the object
+! get the corner coordinates
 !
-            deallocate(pinfo)
+            i = pinfo%corner(1)
+            j = pinfo%corner(2)
+            k = pinfo%corner(3)
+
+! extract the corresponding face region from the neighbor and insert it
+! to the buffer
+!
+            select case(idir)
+            case(1)
+              j = pmeta%pos(2)
+              k = pmeta%pos(3)
+              call block_face_prolong(idir, i, j, k                            &
+                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
+                                   ,        rbuf(l,1:nv,1:ng,1:jh,1:kh))
+            case(2)
+              i = pmeta%pos(1)
+              k = pmeta%pos(3)
+              call block_face_prolong(idir, i, j, k                            &
+                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
+                                   ,        rbuf(l,1:nv,1:ih,1:ng,1:kh))
+            case(3)
+              i = pmeta%pos(1)
+              j = pmeta%pos(2)
+              call block_face_prolong(idir, i, j, k                            &
+                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
+                                   ,        rbuf(l,1:nv,1:ih,1:jh,1:ng))
+            end select
 
 ! associate pinfo with the next block
 !
-            pinfo => block_array(isend,irecv)%ptr
+            pinfo => pinfo%prev
 
           end do ! %ptr block list
 
-        end if ! if block_count > 0
+! send the data buffer to another process
+!
+          call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
+
+        end if ! isend = nproc
+
+! if irecv == nproc we are receiving data
+!
+        if (irecv == nproc) then
+
+! receive the data buffer
+!
+          call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag           &
+                                                      , rbuf(:,:,:,:,:), iret)
+
+! reset the block counter
+!
+          l = 0
+
+! associate pinfo with the first block in the exchange list
+!
+          pinfo => block_array(isend,irecv)%ptr
+
+! iterate over all received blocks and update boundaries of the corresponding
+! data blocks
+!
+          do while(associated(pinfo))
+
+! increase the block counter
+!
+            l = l + 1
+
+! prepare the pointer to updated block
+!
+            pmeta => pinfo%block
+
+! get the corner coordinates
+!
+            i = pinfo%corner(1)
+            j = pinfo%corner(2)
+            k = pinfo%corner(3)
+
+! update the corresponding face region of the current block
+!
+            select case(idir)
+            case(1)
+              if (i == 1) then
+                il = 1
+                iu = ibl
+              else
+                il = ieu
+                iu = im
+              end if
+              if (pmeta%pos(2) == 0) then
+                jl = jb
+                ju = jm
+              else
+                jl =  1
+                ju = je
+              end if
+              if (pmeta%pos(3) == 0) then
+                kl = kb
+                ku = km
+              else
+                kl =  1
+                ku = ke
+              end if
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
+                                                   rbuf(l,1:nv,1:ng,1:jh,1:kh)
+            case(2)
+              if (j == 1) then
+                jl = 1
+                ju = jbl
+              else
+                jl = jeu
+                ju = jm
+              end if
+              if (pmeta%pos(1) == 0) then
+                il = ib
+                iu = im
+              else
+                il =  1
+                iu = ie
+              end if
+              if (pmeta%pos(3) == 0) then
+                kl = kb
+                ku = km
+              else
+                kl =  1
+                ku = ke
+              end if
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
+                                                   rbuf(l,1:nv,1:ih,1:ng,1:kh)
+            case(3)
+              if (k == 1) then
+                kl = 1
+                ku = kbl
+              else
+                kl = keu
+                ku = km
+              end if
+              if (pmeta%pos(1) == 0) then
+                il = ib
+                iu = im
+              else
+                il =  1
+                iu = ie
+              end if
+              if (pmeta%pos(2) == 0) then
+                jl = jb
+                ju = jm
+              else
+                jl =  1
+                ju = je
+              end if
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
+                                                   rbuf(l,1:nv,1:ih,1:jh,1:ng)
+            end select
+
+! associate pinfo with the next block
+!
+            pinfo => pinfo%prev
+
+          end do ! %ptr block list
+
+        end if ! irecv = nproc
+
+! deallocate data buffer
+!
+        if (allocated(rbuf)) deallocate(rbuf)
+
+! associate pinfo with the first block in the exchange list
+!
+        pinfo => block_array(isend,irecv)%ptr
+
+! scan over all blocks on the exchange block list
+!
+        do while(associated(pinfo))
+
+! associate the exchange list pointer
+!
+          block_array(isend,irecv)%ptr => pinfo%prev
+
+! nullify the pointer fields
+!
+          nullify(pinfo%prev)
+          nullify(pinfo%next)
+          nullify(pinfo%block)
+          nullify(pinfo%neigh)
+
+! deallocate the object
+!
+          deallocate(pinfo)
+
+! associate pinfo with the next block
+!
+          pinfo => block_array(isend,irecv)%ptr
+
+        end do ! %ptr block list
+
+      end if ! if block_count > 0
 
     end do ! p = 1, npairs
 #endif /* MPI */
