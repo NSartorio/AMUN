@@ -49,11 +49,15 @@ module mpitools
 ! MPI global variables
 !
   integer(kind=4), save                 :: comm3d
-  integer(kind=4), save                 :: nproc, nprocs, npmax
+  integer(kind=4), save                 :: nproc, nprocs, npmax, npairs
   integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
   integer(kind=4), save, dimension(3,2) :: pneighs
   logical        , save, dimension(3)   :: periodic
   logical        , save                 :: master = .true.
+
+! allocatable array for processor pairs
+!
+  integer(kind=4), dimension(:,:), allocatable, save :: pairs
 
 ! by default everything is public
 !
@@ -92,7 +96,11 @@ module mpitools
 ! local variables
 !
 #ifdef MPI
-    integer :: iret
+    integer :: mprocs, i, j, l, n, iret
+
+! allocatable array for processors order
+!
+    integer(kind=4), dimension(:), allocatable :: procs
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -170,6 +178,72 @@ module mpitools
 !
     npmax  = nprocs - 1
 
+! roung up the number of processors to even number
+!
+    mprocs = nprocs + mod(nprocs, 2)
+
+! calculate the number of processor pairs for data exchange
+!
+    npairs = nprocs * npmax
+
+! allocate space for all processor pairs
+!
+    allocate(pairs(npairs, 2))
+
+! allocate space for the processor order
+!
+    allocate(procs(mprocs))
+
+! fill the processor order array
+!
+    procs(:) = (/(l, l = 0, mprocs - 1)/)
+
+! generate processor pairs
+!
+    n = 0
+
+! iterate over turns
+!
+    do l = 1, mprocs - 1
+
+! generate pairs for a given turn
+!
+      do i = 1, mprocs / 2
+
+! calculate the pair for the current processor
+!
+        j = mprocs - i + 1
+
+! continue, if the process number is correct (for odd nprocs case)
+!
+        if (procs(i) < nprocs .and. procs(j) < nprocs) then
+
+! increase the pair number
+!
+          n = n + 1
+
+! substitute the processor numbers for the current pair
+!
+          pairs(n,1:2) = (/ procs(i), procs(j) /)
+
+        end if ! max(procs(i), procs(j)) < nprocs
+
+      end do ! i = 1, mprocs / 2
+
+! shift elements in the processor order array
+!
+      procs(2:mprocs) = cshift(procs(2:mprocs), -1)
+
+    end do ! l = 1, mprocs - 1
+
+! fill out the remaining pairs (swapped)
+!
+    pairs(npairs/2+1:npairs,1:2) = pairs(1:npairs/2,2:1:-1)
+
+! allocate space for the processor order
+!
+    deallocate(procs)
+
 ! store the MPI pool handles
 !
     comm3d = mpi_comm_world
@@ -231,6 +305,10 @@ module mpitools
       end if
       stop
     end if
+
+! deallocate space used for processor pairs
+!
+    if (allocated(pairs)) deallocate(pairs)
 
 ! stop time accounting for the MPI initialization
 !
