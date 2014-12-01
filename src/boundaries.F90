@@ -540,121 +540,125 @@ module boundaries
                   if (pneigh%level > pmeta%level) then
 
 #ifdef MPI
-! check if the current block and its neighbor belong to the same process, if so,
-! update fluxes directly
+! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == nproc .and.                           &
-                                                 pneigh%process == nproc) then
+                    if (pmeta%process == pneigh%process) then
+
+! check if the neighbor belongs to the current process
+!
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! update directional flux from the neighbor
 !
-                      select case(n)
-                      case(1)
+                        select case(n)
+                        case(1)
 
 ! prepare the boundary layer indices depending on the corner position
 !
-                        if (i == 1) then
-                          is = ie
-                          it = ibl
-                        else
-                          is = ibl
-                          it = ie
-                        end if
-                        if (j == 1) then
-                          jl = jb
-                          ju = jb + jh - 1
-                        else
-                          jl = je - jh + 1
-                          ju = je
-                        end if
+                          if (i == 1) then
+                            is = ie
+                            it = ibl
+                          else
+                            is = ibl
+                            it = ie
+                          end if
+                          if (j == 1) then
+                            jl = jb
+                            ju = jb + jh - 1
+                          else
+                            jl = je - jh + 1
+                            ju = je
+                          end if
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = kb
-                          ku = kb + kh - 1
-                        else
-                          kl = ke - kh + 1
-                          ku = ke
-                        end if
+                          if (k == 1) then
+                            kl = kb
+                            ku = kb + kh - 1
+                          else
+                            kl = ke - kh + 1
+                            ku = ke
+                          end if
 #endif /* NDIMS == 3 */
 
 ! update the flux edge from the neighbor at higher level
 !
-                        call block_update_flux(i, j, k, n                      &
-                                 , pneigh%data%f(n,1:nv,is,jb:je,kb:ke)        &
-                                 ,  pmeta%data%f(n,1:nv,it,jl:ju,kl:ku))
+                          call block_update_flux(i, j, k, n                    &
+                                       , pneigh%data%f(n,1:nv,is,jb:je,kb:ke)  &
+                                       ,  pmeta%data%f(n,1:nv,it,jl:ju,kl:ku))
 
-                      case(2)
+                        case(2)
 
 ! prepare the boundary layer indices depending on the corner position
 !
-                        if (i == 1) then
-                          il = ib
-                          iu = ib + ih - 1
-                        else
-                          il = ie - ih + 1
-                          iu = ie
-                        end if
-                        if (j == 1) then
-                          js = je
-                          jt = jbl
-                        else
-                          js = jbl
-                          jt = je
-                        end if
+                          if (i == 1) then
+                            il = ib
+                            iu = ib + ih - 1
+                          else
+                            il = ie - ih + 1
+                            iu = ie
+                          end if
+                          if (j == 1) then
+                            js = je
+                            jt = jbl
+                          else
+                           js = jbl
+                            jt = je
+                          end if
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = kb
-                          ku = kb + kh - 1
-                        else
-                          kl = ke - kh + 1
-                          ku = ke
-                        end if
+                          if (k == 1) then
+                            kl = kb
+                            ku = kb + kh - 1
+                          else
+                            kl = ke - kh + 1
+                            ku = ke
+                          end if
 #endif /* NDIMS == 3 */
 
 ! update the flux edge from the neighbor at higher level
 !
-                        call block_update_flux(i, j, k, n                      &
-                                 , pneigh%data%f(n,1:nv,ib:ie,js,kb:ke)        &
-                                 ,  pmeta%data%f(n,1:nv,il:iu,jt,kl:ku))
+                          call block_update_flux(i, j, k, n                    &
+                                       , pneigh%data%f(n,1:nv,ib:ie,js,kb:ke)  &
+                                       ,  pmeta%data%f(n,1:nv,il:iu,jt,kl:ku))
 
 #if NDIMS == 3
-                      case(3)
+                        case(3)
 
 ! prepare the boundary layer indices depending on the corner position
 !
-                        if (i == 1) then
-                          il = ib
-                          iu = ib + ih - 1
-                        else
-                          il = ie - ih + 1
-                          iu = ie
-                        end if
-                        if (j == 1) then
-                          jl = jb
-                          ju = jb + jh - 1
-                        else
-                          jl = je - jh + 1
-                          ju = je
-                        end if
-                        if (k == 1) then
-                          ks = ke
-                          kt = kbl
-                        else
-                          ks = kbl
-                          kt = ke
-                        end if
+                          if (i == 1) then
+                            il = ib
+                            iu = ib + ih - 1
+                          else
+                            il = ie - ih + 1
+                            iu = ie
+                          end if
+                          if (j == 1) then
+                            jl = jb
+                            ju = jb + jh - 1
+                          else
+                            jl = je - jh + 1
+                            ju = je
+                          end if
+                          if (k == 1) then
+                            ks = ke
+                            kt = kbl
+                          else
+                            ks = kbl
+                            kt = ke
+                          end if
 
 ! update the flux edge from the neighbor at higher level
 !
-                        call block_update_flux(i, j, k, n                      &
-                                 , pneigh%data%f(n,1:nv,ib:ie,jb:je,ks)        &
-                                 ,  pmeta%data%f(n,1:nv,il:iu,jl:ju,kt))
+                          call block_update_flux(i, j, k, n                    &
+                                       , pneigh%data%f(n,1:nv,ib:ie,jb:je,ks)  &
+                                       ,  pmeta%data%f(n,1:nv,il:iu,jl:ju,kt))
 #endif /* NDIMS == 3 */
 
-                      end select
+                        end select
 
 #ifdef MPI
+                      end if ! pneigh on the current process
+
 ! blocks belong to different processes, therefore prepare the block exchange
 ! object
 !
@@ -725,6 +729,8 @@ module boundaries
     end do ! meta blocks
 
 #ifdef MPI
+!! 3. UPDATE FLUX BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
+!!
 ! iterate over all process pairs
 !
     do p = 1, npairs
