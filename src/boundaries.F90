@@ -1918,7 +1918,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for face boundary update
@@ -2475,7 +2475,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! extract the corresponding face region from the neighbor and insert it in
@@ -3060,7 +3060,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
@@ -3642,7 +3642,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
@@ -4228,7 +4228,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
@@ -4804,7 +4804,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
@@ -5268,7 +5268,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
@@ -5731,7 +5731,7 @@ module boundaries
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pmeta%process == nproc) then
+                      if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
