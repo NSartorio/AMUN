@@ -1714,14 +1714,9 @@ module boundaries
     integer :: isend, irecv, nblocks, itag
     integer :: l, p
 
-! local pointer arrays
-!
-    type(pointer_info), dimension(0:npmax,0:npmax) :: block_array
-
 ! local arrays
 !
-    integer     , dimension(0:npmax,0:npmax)              :: block_counter
-    real(kind=8), dimension(:,:,:,:,:)      , allocatable :: rbuf
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -1741,17 +1736,9 @@ module boundaries
 #ifdef MPI
 !! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
 !!
-! reset the exchange block counters
+! prepare the array of exchange block lists and its counters
 !
-    block_counter(:,:) = 0
-
-! nullify the info pointers
-!
-    do irecv = 0, npmax
-      do isend = 0, npmax
-        nullify(block_array(isend,irecv)%ptr)
-      end do
-    end do
+    call prepare_exchange_array()
 #endif /* MPI */
 
 !! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
@@ -1885,39 +1872,9 @@ module boundaries
 
                     else ! block and neighbor belong to different processes
 
-! increase the counter for number of blocks to exchange
+! append the block to the exchange list
 !
-                      block_counter(pneigh%process,pmeta%process) =            &
-                               block_counter(pneigh%process,pmeta%process) + 1
-
-! allocate a new info object
-!
-                      allocate(pinfo)
-
-! fill out only fields which are used
-!
-                      pinfo%block            => pmeta
-                      pinfo%neigh            => pneigh
-                      pinfo%direction        =  idir
-                      pinfo%corner(1)        =  i
-                      pinfo%corner(2)        =  j
-                      pinfo%corner(3)        =  k
-
-! nullify pointer fields of the object
-!
-                      nullify(pinfo%prev)
-                      nullify(pinfo%next)
-
-! if the list is not empty append the newly created block to it
-!
-                      if (associated(block_array(pneigh%process                &
-                                                        ,pmeta%process)%ptr))  &
-                        pinfo%prev => block_array(pneigh%process               &
-                                                        ,pmeta%process)%ptr
-
-! point the list to the newly created block
-!
-                      block_array(pneigh%process,pmeta%process)%ptr => pinfo
+                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
                     end if ! block and neighbor belong to different processes
 #endif /* MPI */
@@ -1954,11 +1911,11 @@ module boundaries
 
 ! process only pairs which have something to exchange
 !
-      if (block_counter(isend,irecv) > 0) then
+      if (bcount(isend,irecv) > 0) then
 
 ! obtain the number of blocks to exchange
 !
-        nblocks = block_counter(isend,irecv)
+        nblocks = bcount(isend,irecv)
 
 ! prepare the tag for communication
 !
@@ -1985,7 +1942,7 @@ module boundaries
 
 ! associate pinfo with the first block in the exchange list
 !
-          pinfo => block_array(isend,irecv)%ptr
+          pinfo => barray(isend,irecv)%ptr
 
 ! scan over all blocks on the block exchange list
 !
@@ -2050,7 +2007,7 @@ module boundaries
 
 ! associate pinfo with the first block in the exchange list
 !
-          pinfo => block_array(isend,irecv)%ptr
+          pinfo => barray(isend,irecv)%ptr
 
 ! iterate over all received blocks and update boundaries of the corresponding
 ! data blocks
@@ -2160,38 +2117,13 @@ module boundaries
 !
         if (allocated(rbuf)) deallocate(rbuf)
 
-! associate pinfo with the first block in the exchange list
-!
-        pinfo => block_array(isend,irecv)%ptr
-
-! scan over all blocks on the exchange block list
-!
-        do while(associated(pinfo))
-
-! associate the exchange list pointer with the previous block
-!
-          block_array(isend,irecv)%ptr => pinfo%prev
-
-! nullify the pointer fields
-!
-          nullify(pinfo%prev)
-          nullify(pinfo%next)
-          nullify(pinfo%block)
-          nullify(pinfo%neigh)
-
-! deallocate the object
-!
-          deallocate(pinfo)
-
-! associate pinfo with the next block
-!
-          pinfo => block_array(isend,irecv)%ptr
-
-        end do ! %ptr block list
-
-      end if ! if block_count > 0
+      end if ! if bcount > 0
 
     end do ! p = 1, npairs
+
+! release the memory used by the array of exchange block lists
+!
+    call release_exchange_array()
 #endif /* MPI */
 
 #ifdef PROFILE
