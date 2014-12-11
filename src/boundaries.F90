@@ -29,9 +29,12 @@
 !
 module boundaries
 
-#ifdef PROFILE
 ! import external subroutines
 !
+#ifdef MPI
+  use blocks, only : pointer_info
+#endif /* MPI */
+#ifdef PROFILE
   use timers, only : set_timer, start_timer, stop_timer
 #endif /* PROFILE */
 
@@ -55,6 +58,14 @@ module boundaries
 ! variable to store boundary type flags
 !
   integer, dimension(3,2), save :: bnd_type       = bnd_periodic
+
+#ifdef MPI
+! arrays to store information about blocks which need to be exchange between
+! processes
+!
+    type(pointer_info), dimension(:,:), allocatable, save :: barray
+    integer           , dimension(:,:), allocatable, save :: bcount
+#endif /* MPI */
 
 ! by default everything is private
 !
@@ -95,7 +106,7 @@ module boundaries
 ! import external procedures and variables
 !
 #ifdef MPI
-    use mpitools       , only : pdims, pcoords, periodic
+    use mpitools       , only : pdims, pcoords, periodic, npmax
 #endif /* MPI */
     use parameters     , only : get_parameter_string
 
@@ -212,6 +223,16 @@ module boundaries
       bnd_type(3,2) = bnd_periodic
     end select
 
+#ifdef MPI
+! allocate the exchange arrays
+!
+    allocate(barray(0:npmax,0:npmax), bcount(0:npmax,0:npmax))
+
+! prepare the exchange arrays
+!
+    call prepare_exchange_array()
+#endif /* MPI */
+
 ! print information about the boundary conditions
 !
     if (verbose) then
@@ -267,6 +288,16 @@ module boundaries
 !
     call start_timer(imi)
 #endif /* PROFILE */
+
+#ifdef MPI
+! release the exchange arrays
+!
+    call release_exchange_array()
+
+! deallocate the exchange arrays
+!
+    deallocate(barray, bcount)
+#endif /* MPI */
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -8157,6 +8188,216 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
   end subroutine update_ghost_cells
+#ifdef MPI
+!
+!===============================================================================
+!
+! subroutine PREPARE_EXCHANGE_ARRAY:
+! ---------------------------------
+!
+!   Subroutine prepares the arrays for block exchange lists and their counters.
+!
+!
+!===============================================================================
+!
+  subroutine prepare_exchange_array()
+
+! include external variables
+!
+    use mpitools      , only : npmax
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer :: icol, irow
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all elements of the block exchange array
+!
+    do irow = 0, npmax
+      do icol = 0, npmax
+
+! nullify the array element pointer
+!
+        nullify(barray(irow,icol)%ptr)
+
+! reset the corresponding counter
+!
+        bcount(irow,icol) = 0
+
+      end do ! icol = 0, npmax
+    end do ! irow = 0, npmax
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prepare_exchange_array
+!
+!===============================================================================
+!
+! subroutine RELEASE_EXCHANGE_ARRAY:
+! ---------------------------------
+!
+!   Subroutine releases objects on the array of block exchange lists.
+!
+!
+!===============================================================================
+!
+  subroutine release_exchange_array()
+
+! include external variables
+!
+    use blocks        , only : block_info, pointer_info
+    use mpitools      , only : npmax
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    integer :: icol, irow
+
+! local pointers
+!
+    type(block_info), pointer :: pinfo
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all elements of the block exchange array
+!
+    do irow = 0, npmax
+      do icol = 0, npmax
+
+! associate pinfo with the first block in the exchange list
+!
+        pinfo => barray(irow,icol)%ptr
+
+! scan all elements on the exchange list
+!
+        do while(associated(pinfo))
+
+! associate the exchange list pointer
+!
+          barray(irow,icol)%ptr => pinfo%prev
+
+! nullify pointer fields
+!
+          nullify(pinfo%prev)
+          nullify(pinfo%next)
+          nullify(pinfo%block)
+          nullify(pinfo%neigh)
+
+! deallocate info block
+!
+          deallocate(pinfo)
+
+! associate pinfo with the next block
+!
+          pinfo => barray(irow,icol)%ptr
+
+        end do ! %ptr blocks
+
+      end do ! icol = 0, npmax
+    end do ! irow = 0, npmax
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine release_exchange_array
+!
+!===============================================================================
+!
+! subroutine APPEND_EXCHANGE_BLOCK:
+! ---------------------------------
+!
+!   Subroutine appends an info block to the element of array of block
+!   exchange lists. The element is determined by the processes of the meta
+!   and neighbor blocks.
+!
+!   Arguments:
+!
+!     pmeta      - the pointer to meta block;
+!     pneigh     - the pointer to the neighbor of pmeta;
+!     n, i, j, k - the location of the neighbor;
+!
+!===============================================================================
+!
+  subroutine append_exchange_block(pmeta, pneigh, n, i, j, k)
+
+! include external variables
+!
+    use blocks        , only : block_info, block_meta
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_meta), pointer, intent(inout) :: pmeta, pneigh
+    integer                  , intent(in)    :: n, i, j, k
+
+! local variables
+!
+    integer :: icol, irow
+
+! local pointers
+!
+    type(block_info), pointer :: pinfo
+!
+!-------------------------------------------------------------------------------
+!
+! get the column and row indices
+!
+    irow = pneigh%process
+    icol = pmeta%process
+
+! increase the counter for the number of blocks to exchange
+!
+    bcount(irow,icol) = bcount(irow,icol) + 1
+
+! allocate a new info object
+!
+    allocate(pinfo)
+
+! fill out its fields
+!
+    pinfo%block            => pmeta
+    pinfo%neigh            => pneigh
+    pinfo%direction        =  n
+    pinfo%corner(1)        =  i
+    pinfo%corner(2)        =  j
+#if NDIMS == 3
+    pinfo%corner(3)        =  k
+#endif /* NDIMS == 3 */
+    pinfo%level_difference =  pmeta%level - pneigh%level
+
+! nullify pointer fields
+!
+    nullify(pinfo%prev)
+    nullify(pinfo%next)
+
+! check if the list is empty
+!
+    if (associated(barray(irow,icol)%ptr)) then
+
+! if it is, associate the newly created block with it
+!
+      pinfo%prev => barray(irow,icol)%ptr
+
+    end if ! %ptr associated
+
+! point the list to the newly created block
+!
+    barray(irow,icol)%ptr => pinfo
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine append_exchange_block
+#endif /* MPI */
 
 !===============================================================================
 !
