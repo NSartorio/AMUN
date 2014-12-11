@@ -179,17 +179,17 @@ module mpitools
 !
     npmax  = nprocs - 1
 
-! roung up the number of processors to even number
+! round up the number of processors to even number
 !
     mprocs = nprocs + mod(nprocs, 2)
 
 ! calculate the number of processor pairs for data exchange
 !
-    npairs = nprocs * npmax
+    npairs = nprocs * npmax / 2
 
 ! allocate space for all processor pairs
 !
-    allocate(pairs(npairs, 2))
+    allocate(pairs(2 * npairs, 2))
 
 ! allocate space for the processor order
 !
@@ -239,7 +239,7 @@ module mpitools
 
 ! fill out the remaining pairs (swapped)
 !
-    pairs(npairs/2+1:npairs,1:2) = pairs(1:npairs/2,2:1:-1)
+    pairs(npairs+1:2*npairs,1:2) = pairs(1:npairs,2:1:-1)
 
 ! allocate space for the processor order
 !

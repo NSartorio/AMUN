@@ -707,7 +707,7 @@ module boundaries
 #ifdef MPI
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -1417,7 +1417,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -1902,7 +1902,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -2400,7 +2400,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -2900,7 +2900,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -3412,7 +3412,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -3931,7 +3931,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -4406,7 +4406,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -4800,7 +4800,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
@@ -5194,7 +5194,7 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, npairs
+    do p = 1, 2 * npairs
 
 ! get sending and receiving process identifiers
 !
