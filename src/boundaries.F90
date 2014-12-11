@@ -1689,10 +1689,9 @@ module boundaries
     use coordinates    , only : ibl, jbl, kbl
     use coordinates    , only : ieu, jeu, keu
     use equations      , only : nv
-    use mpitools       , only : nproc, nprocs, npmax
 #ifdef MPI
-    use mpitools       , only : npairs, pairs
-    use mpitools       , only : send_real_array, receive_real_array
+    use mpitools       , only : nproc, nprocs, npairs, pairs
+    use mpitools       , only : exchange_real_arrays
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -1716,14 +1715,14 @@ module boundaries
     integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
-    integer :: iret
 #ifdef MPI
-    integer :: isend, irecv, nblocks, itag
-    integer :: l, p
+    integer :: sproc, scount, stag
+    integer :: rproc, rcount, rtag
+    integer :: l, p, iret
 
 ! local arrays
 !
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: rbuf
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: sbuf, rbuf
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -1909,47 +1908,60 @@ module boundaries
 !!
 ! iterate over all process pairs
 !
-    do p = 1, 2 * npairs
+    do p = 1, npairs
 
-! get sending and receiving process identifiers
+! process only pairs related to this process
 !
-      isend = pairs(p,1)
-      irecv = pairs(p,2)
+      if (pairs(p,1) == nproc .or. pairs(p,2) == nproc) then
 
-! process only pairs which have something to exchange
+! get sending and receiving process identifiers (depending on pair member)
 !
-      if (bcount(isend,irecv) > 0) then
+        if (pairs(p,1) == nproc) then
+          sproc = pairs(p,1)
+          rproc = pairs(p,2)
+        end if
+        if (pairs(p,2) == nproc) then
+          sproc = pairs(p,2)
+          rproc = pairs(p,1)
+        end if
 
-! obtain the number of blocks to exchange
+! get the number of blocks to exchange
 !
-        nblocks = bcount(isend,irecv)
+        scount = bcount(sproc,rproc)
+        rcount = bcount(rproc,sproc)
+
+! process only pairs which have anything to exchange
+!
+        if ((scount + rcount) > 0) then
 
 ! prepare the tag for communication
 !
-        itag = 16 * (irecv * nprocs + isend) + 3
+          stag = 16 * (rproc * nprocs + sproc) + 3
+          rtag = 16 * (sproc * nprocs + rproc) + 3
 
 ! allocate data buffer for variables to exchange
 !
-        select case(idir)
-        case(1)
-          allocate(rbuf(nblocks,nv,ng,jh,kh))
-        case(2)
-          allocate(rbuf(nblocks,nv,ih,ng,kh))
-        case(3)
-          allocate(rbuf(nblocks,nv,ih,jh,ng))
-        end select
+          select case(idir)
+          case(1)
+            allocate(sbuf(scount,nv,ng,jh,kh))
+            allocate(rbuf(rcount,nv,ng,jh,kh))
+          case(2)
+            allocate(sbuf(scount,nv,ih,ng,kh))
+            allocate(rbuf(rcount,nv,ih,ng,kh))
+          case(3)
+            allocate(sbuf(scount,nv,ih,jh,ng))
+            allocate(rbuf(rcount,nv,ih,jh,ng))
+          end select
 
-! if isend == nproc we are sending data
-!
-        if (isend == nproc) then
-
+!! PREPARE BLOCKS FOR SENDING
+!!
 ! reset the block counter
 !
           l = 0
 
-! associate pinfo with the first block in the exchange list
+! associate the pointer with the first block in the exchange list
 !
-          pinfo => barray(isend,irecv)%ptr
+          pinfo => barray(sproc,rproc)%ptr
 
 ! scan over all blocks on the block exchange list
 !
@@ -1959,7 +1971,7 @@ module boundaries
 !
             l = l + 1
 
-! associate pneigh with pinfo%neigh
+! assign pneigh to the associated neighbor block
 !
             pneigh => pinfo%neigh
 
@@ -1969,52 +1981,46 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
-! extract the corresponding face region from the neighbor and insert it
+! restrict the corresponding face region from the neighbor and insert it
 ! to the buffer
 !
             select case(idir)
             case(1)
               call block_face_restrict(idir, i, j, k                           &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ng,1:jh,1:kh))
+                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:kh))
             case(2)
               call block_face_restrict(idir, i, j, k                           &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ih,1:ng,1:kh))
+                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:kh))
             case(3)
               call block_face_restrict(idir, i, j, k                           &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        rbuf(l,1:nv,1:ih,1:jh,1:ng))
+                                   ,        sbuf(l,1:nv,1:ih,1:jh,1:ng))
             end select
 
-! associate pinfo with the next block
+! associate the pointer with the next block
 !
             pinfo => pinfo%prev
 
           end do ! %ptr block list
 
-! send the data buffer to another process
+!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!!
+! exchange data
 !
-          call send_real_array(size(rbuf), irecv, itag, rbuf(:,:,:,:,:), iret)
+          call exchange_real_arrays(rproc, stag, size(sbuf), sbuf              &
+                                  , rproc, rtag, size(rbuf), rbuf, iret)
 
-        end if ! isend = nproc
-
-! if irecv == nproc we are receiving data
-!
-        if (irecv == nproc) then
-
-! receive the data buffer
-!
-          call receive_real_array(size(rbuf(:,:,:,:,:)), isend, itag           &
-                                                      , rbuf(:,:,:,:,:), iret)
-
+!! PROCESS RECEIVED BLOCKS
+!!
 ! reset the block counter
 !
           l = 0
 
-! associate pinfo with the first block in the exchange list
+! associate the pointer with the first block in the exchange list
 !
-          pinfo => barray(isend,irecv)%ptr
+          pinfo => barray(rproc,sproc)%ptr
 
 ! iterate over all received blocks and update boundaries of the corresponding
 ! data blocks
@@ -2025,7 +2031,7 @@ module boundaries
 !
             l = l + 1
 
-! associate pmeta with pinfo%block
+! assign a pointer to the associated data block
 !
             pmeta => pinfo%block
 
@@ -2112,19 +2118,19 @@ module boundaries
                                                    rbuf(l,1:nv,1:ih,1:jh,1:ng)
             end select
 
-! associate pinfo with the next block
+! associate the pointer with the next block
 !
             pinfo => pinfo%prev
 
           end do ! %ptr block list
 
-        end if ! irecv = nproc
-
 ! deallocate data buffer
 !
-        if (allocated(rbuf)) deallocate(rbuf)
+          deallocate(sbuf, rbuf)
 
-      end if ! if bcount > 0
+        end if ! (scount + rcount) > 0
+
+      end if ! pairs(p,1) == nproc || pairs(p,2) == nproc
 
     end do ! p = 1, npairs
 
