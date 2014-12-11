@@ -4023,8 +4023,9 @@ module boundaries
 !
             l = l + 1
 
-! assign pneigh to the associated neighbor block
+! assign pmeta and pneigh to the associated blocks
 !
+            pmeta  => pinfo%block
             pneigh => pinfo%neigh
 
 ! get the corner coordinates
