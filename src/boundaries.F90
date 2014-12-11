@@ -447,9 +447,8 @@ module boundaries
     use coordinates    , only : kb, ke, kbl
     use equations      , only : nv
 #ifdef MPI
-    use mpitools       , only : nprocs, nproc, npmax
-    use mpitools       , only : npairs, pairs
-    use mpitools       , only : send_real_array, receive_real_array
+    use mpitools       , only : nproc, nprocs, npairs, pairs
+    use mpitools       , only : exchange_real_arrays
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -470,12 +469,13 @@ module boundaries
     integer :: j, js, jt, jl, ju, jh
     integer :: k, ks, kt, kl, ku, kh
 #ifdef MPI
-    integer :: irecv, isend, nblocks, itag, iret
-    integer :: l, p
+    integer :: sproc, scount, stag
+    integer :: rproc, rcount, rtag
+    integer :: l, p, iret
 
 ! local arrays
 !
-    real(kind=8), dimension(:,:,:,:), allocatable  :: rbuf
+    real(kind=8), dimension(:,:,:,:), allocatable  :: sbuf, rbuf
 #endif /* MPI */
 !
 !-------------------------------------------------------------------------------
@@ -707,40 +707,51 @@ module boundaries
 #ifdef MPI
 ! iterate over all process pairs
 !
-    do p = 1, 2 * npairs
+    do p = 1, npairs
 
-! get sending and receiving process identifiers
+! process only pairs related to this process
 !
-      isend = pairs(p,1)
-      irecv = pairs(p,2)
+      if (pairs(p,1) == nproc .or. pairs(p,2) == nproc) then
+
+! get sending and receiving process identifiers (depending on pair member)
+!
+        if (pairs(p,1) == nproc) then
+          sproc = pairs(p,1)
+          rproc = pairs(p,2)
+        end if
+        if (pairs(p,2) == nproc) then
+          sproc = pairs(p,2)
+          rproc = pairs(p,1)
+        end if
+
+! get the number of blocks to exchange
+!
+        scount = bcount(sproc,rproc)
+        rcount = bcount(rproc,sproc)
 
 ! process only pairs which have anything to exchange
 !
-      if (bcount(isend,irecv) > 0) then
-
-! obtain the number of blocks to exchange
-!
-        nblocks = bcount(isend,irecv)
+        if ((scount + rcount) > 0) then
 
 ! prepare the tag for communication
 !
-        itag = 16 * (irecv * nprocs + isend) + 1
+          stag = 16 * (rproc * nprocs + sproc) + 1
+          rtag = 16 * (sproc * nprocs + rproc) + 1
 
-! allocate the buffer for variable exchange
+! allocate buffers for variable exchange
 !
-        allocate(rbuf(nblocks,nv,ih,kh))
+          allocate(sbuf(scount,nv,ih,kh))
+          allocate(rbuf(rcount,nv,ih,kh))
 
-! if isend == nproc we are sending data
-!
-        if (isend == nproc) then
-
+!! PREPARE BLOCKS FOR SENDING
+!!
 ! reset the block counter
 !
           l = 0
 
 ! associate pinfo with the first block in the exchange list
 !
-          pinfo => barray(isend,irecv)%ptr
+          pinfo => barray(sproc,rproc)%ptr
 
 ! scan all blocks on the list
 !
@@ -780,7 +791,7 @@ module boundaries
 !
               call block_update_flux(i, j, k, n                                &
                                  , pneigh%data%f(n,1:nv,is,jb:je,kb:ke)        &
-                                 ,          rbuf(l,1:nv,1:jh,1:kh))
+                                 ,          sbuf(l,1:nv,1:jh,1:kh))
 
             case(2)
 
@@ -796,7 +807,7 @@ module boundaries
 !
               call block_update_flux(i, j, k, n                                &
                                  , pneigh%data%f(n,1:nv,ib:ie,js,kb:ke)        &
-                                 ,          rbuf(l,1:nv,1:ih,1:kh))
+                                 ,          sbuf(l,1:nv,1:ih,1:kh))
 
 #if NDIMS == 3
             case(3)
@@ -813,7 +824,7 @@ module boundaries
 !
               call block_update_flux(i, j, k, n                                &
                                  , pneigh%data%f(n,1:nv,ib:ie,jb:je,ks)        &
-                                 ,          rbuf(l,1:nv,1:ih,1:jh))
+                                 ,          sbuf(l,1:nv,1:ih,1:jh))
 #endif /* NDIMS == 3 */
 
             end select
@@ -824,29 +835,22 @@ module boundaries
 
           end do ! %ptr blocks
 
-! send the data buffer to another process
+!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!!
+! exchange data
 !
-          call send_real_array(size(rbuf(:,:,:,:)), irecv, itag                &
-                                                        , rbuf(:,:,:,:), iret)
+          call exchange_real_arrays(rproc, stag, size(sbuf), sbuf              &
+                                  , rproc, rtag, size(rbuf), rbuf, iret)
 
-        end if ! isend = nproc
-
-! if irecv == nproc we are receiving data
-!
-        if (irecv == nproc) then
-
-! receive the data buffer
-!
-          call receive_real_array(size(rbuf(:,:,:,:)), isend, itag             &
-                                                        , rbuf(:,:,:,:), iret)
-
+!! PROCESS RECEIVED BLOCKS
+!!
 ! reset the block counter
 !
           l = 0
 
 ! associate pinfo with the first block in the exchange list
 !
-          pinfo => barray(isend,irecv)%ptr
+          pinfo => barray(rproc,sproc)%ptr
 
 ! scan all blocks on the list
 !
@@ -970,13 +974,13 @@ module boundaries
 
           end do ! %ptr blocks
 
-        end if ! irecv = nproc
-
 ! deallocate data buffer
 !
-        deallocate(rbuf)
+          deallocate(sbuf, rbuf)
 
-      end if ! if bcount > 0
+        end if ! (scount + rcount) > 0
+
+      end if ! pairs(p,1) == nproc || pairs(p,2) == nproc
 
     end do ! p = 1, npairs
 
