@@ -277,11 +277,10 @@ module blocks
                                  !
     type(block_meta)  , pointer :: neigh
 
-                                 ! the direction, side and face numbers
-                                 ! indicating the neighbor block orientation
-                                 ! with respect to the block
+                                 ! the direction along which the neighbor
+                                 ! is located
                                  !
-    integer(kind=4)             :: direction, side, face
+    integer(kind=4)             :: direction
 
                                  ! the corner index determining the position of
                                  ! the corner boundary and when direction is
