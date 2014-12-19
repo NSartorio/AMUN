@@ -1775,7 +1775,7 @@ module io
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: i, j, k, l, p, n, ip, lcpu
+    integer(kind=4)                :: i, j, k, l, p, n, ip
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
@@ -1813,10 +1813,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! prepare last cpu index
-!
-    lcpu = nprocs - 1
-
 ! open metablock group
 !
     call h5gopen_f(fid, 'metablocks', gid, err)
