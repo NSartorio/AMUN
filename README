@@ -1,7 +1,6 @@
---------------------------------------------------------------------------------
- ==          The AMUN code v0.9              ==================================
- ==  Copyright (C) 2008-2014 Grzegorz Kowal  ==================================
---------------------------------------------------------------------------------
+# **The AMUN code**
+## Copyright (C) 2008-2014 Grzegorz Kowal ##
+---
 
 AMUN is a code to perform numerical simulations in a fluid approximation on
 non-uniform (adaptive) meshes with and without magnetic field.  The goal in
