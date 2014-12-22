@@ -45,7 +45,7 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer                , save :: imi, imv, imf, ims, imc, imr, imp
+  integer                , save :: imi, imv, imf, ims, imc, imr, imp, imu
 #endif /* PROFILE */
 
 ! parameters corresponding to the boundary type
@@ -140,6 +140,7 @@ module boundaries
     call set_timer('boundaries:: copy'          , imc)
     call set_timer('boundaries:: restrict'      , imr)
     call set_timer('boundaries:: prolong'       , imp)
+    call set_timer('boundaries:: update ghosts' , imu)
 
 ! start accounting time for module initialization/finalization
 !
@@ -7485,6 +7486,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time subroutine
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
 ! assign the pointer to the first block on the list
 !
     pdata => list_data
@@ -7548,6 +7555,12 @@ module boundaries
       pdata => pdata%next
 
     end do ! data blocks
+
+#ifdef PROFILE
+! stop accounting time subroutine
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
