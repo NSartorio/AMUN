@@ -468,7 +468,7 @@ module mesh
     use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
     use error          , only : print_error
-    use mpitools       , only : master, nproc, nprocs
+    use mpitools       , only : master, nproc, nprocs, npmax
     use problems       , only : setup_problem
     use refinement     , only : check_refinement_criterion
 
@@ -483,9 +483,9 @@ module mesh
 
 ! local variables
 !
-    integer(kind=4)                        :: level, lev, idir, iside, iface
-    integer(kind=4)                        :: np, nl
-    integer(kind=4), dimension(0:nprocs-1) :: lb
+    integer(kind=4)                     :: level, lev, idir, iside, iface
+    integer(kind=4)                     :: np, nl
+    integer(kind=4), dimension(0:npmax) :: lb
 
 !-------------------------------------------------------------------------------
 !
@@ -726,7 +726,7 @@ module mesh
 
 ! increase the process number
 !
-          np = min(nprocs - 1, np + 1)
+          np = min(npmax, np + 1)
 
         end if ! nl >= lb(np)
 
@@ -849,7 +849,7 @@ module mesh
     use blocks         , only : append_datablock, remove_datablock, link_blocks
     use coordinates    , only : im, jm, km
     use equations      , only : nv
-    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : nprocs, npmax, nproc
     use mpitools       , only : send_real_array, receive_real_array
 #endif /* MPI */
 
@@ -874,7 +874,7 @@ module mesh
 
 ! array for number of data block for autobalancing
 !
-    integer(kind=4), dimension(0:nprocs-1)    :: lb
+    integer(kind=4), dimension(0:npmax)       :: lb
 
 ! local buffer for data block exchange
 !
@@ -996,7 +996,7 @@ module mesh
 
 ! increase the process number
 !
-            np = min(nprocs - 1, np + 1)
+            np = min(npmax, np + 1)
 
           end if ! l >= lb(n)
 

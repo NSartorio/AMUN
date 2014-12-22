@@ -43,7 +43,7 @@ module mpitools
 !
   integer        , save                 :: imi, imc
 #ifdef PROFILE
-  integer        , save                 :: imb, imm, ims, imr
+  integer        , save                 :: imb, imm, ims, imr, ime
 #endif /* PROFILE */
 
 ! MPI global variables
@@ -115,6 +115,7 @@ module mpitools
     call set_timer('mpitools:: reduce'   , imm)
     call set_timer('mpitools:: send'     , ims)
     call set_timer('mpitools:: receive'  , imr)
+    call set_timer('mpitools:: exchange' , ime)
 #endif /* PROFILE */
 
 ! start time accounting for the MPI initialization
@@ -178,17 +179,17 @@ module mpitools
 !
     npmax  = nprocs - 1
 
-! roung up the number of processors to even number
+! round up the number of processors to even number
 !
     mprocs = nprocs + mod(nprocs, 2)
 
 ! calculate the number of processor pairs for data exchange
 !
-    npairs = nprocs * npmax
+    npairs = nprocs * npmax / 2
 
 ! allocate space for all processor pairs
 !
-    allocate(pairs(npairs, 2))
+    allocate(pairs(2 * npairs, 2))
 
 ! allocate space for the processor order
 !
@@ -238,7 +239,7 @@ module mpitools
 
 ! fill out the remaining pairs (swapped)
 !
-    pairs(npairs/2+1:npairs,1:2) = pairs(1:npairs/2,2:1:-1)
+    pairs(npairs+1:2*npairs,1:2) = pairs(1:npairs,2:1:-1)
 
 ! allocate space for the processor order
 !
@@ -1543,6 +1544,90 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine receive_real_array
+!
+!===============================================================================
+!
+! subroutine EXCHANGE_REAL_ARRAYS:
+! -------------------------------
+!
+!   Subroutine exchanges real data buffers between two processes.
+!
+!   Arguments:
+!
+!     sproc - the process number to which send the buffer sbuf;
+!     stag  - the tag identifying the send operation;
+!     ssize - the size of the send buffer sbuf;
+!     sbuf  - the real array buffer to send;
+!     rproc - the process number from which receive the buffer rbuf;
+!     rtag  - the tag identifying the receive operation;
+!     rsize - the size of the receive buffer rbuf;
+!     rbuf  - the real array buffer to receive;
+!     iret  - the result flag identifying if the operation was successful;
+!
+!===============================================================================
+!
+  subroutine exchange_real_arrays(sproc, stag, ssize, sbuffer                  &
+                                , rproc, rtag, rsize, rbuffer, iret)
+
+! include external procedures and variables
+!
+    use error, only : print_error
+    use mpi  , only : mpi_real8, mpi_success, mpi_status_size
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                       , intent(in)  :: sproc, rproc
+    integer                       , intent(in)  :: stag , rtag
+    integer                       , intent(in)  :: ssize, rsize
+    real(kind=8), dimension(ssize), intent(in)  :: sbuffer
+    real(kind=8), dimension(rsize), intent(in)  :: rbuffer
+    integer                       , intent(out) :: iret
+
+! local variables
+!
+    integer :: status(mpi_status_size)
+!
+!-------------------------------------------------------------------------------
+!
+! start time accounting for the MPI communication
+!
+    call start_timer(imc)
+
+#ifdef PROFILE
+! start time accounting for the MPI buffer exchange
+!
+    call start_timer(ime)
+#endif /* PROFILE */
+
+! send sbuf and receive rbuf
+!
+    call mpi_sendrecv(sbuffer(:), ssize, mpi_real8, sproc, stag                &
+                    , rbuffer(:), rsize, mpi_real8, rproc, rtag                &
+                                                       , comm3d, status, iret)
+
+#ifdef PROFILE
+! stop time accounting for the MPI buffer exchange
+!
+    call stop_timer(ime)
+#endif /* PROFILE */
+
+! check if the operation was successful
+!
+    if (iret /= mpi_success)                                                   &
+      call print_error("mpitools::exchange_real_arrays"                        &
+                     , "Could not exchange real data buffers!")
+
+! stop time accounting for the MPI communication
+!
+    call stop_timer(imc)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine exchange_real_arrays
 !
 !===============================================================================
 !!

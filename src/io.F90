@@ -525,7 +525,7 @@ module io
 #ifdef MPI
     use mesh           , only : redistribute_blocks
 #endif /* MPI */
-    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : nprocs, npmax, nproc
 
 ! local variables are not implicit by default
 !
@@ -719,11 +719,11 @@ module io
 
 ! switch meta blocks from the read file to belong to the reading process
 !
-        call change_blocks_process(lfile, nprocs - 1)
+        call change_blocks_process(lfile, npmax)
 
 ! read the remaining files by the last process only
 !
-        if (nproc == nprocs - 1) then
+        if (nproc == npmax) then
 
 ! prepare the filename
 !
@@ -794,7 +794,7 @@ module io
             return
           end if
 
-        end if ! nproc == nprocs - 1
+        end if ! nproc == npmax
 
 #ifdef MPI
 ! redistribute blocks between processors
@@ -1775,7 +1775,7 @@ module io
 ! local variables
 !
     integer(hid_t)                 :: gid
-    integer(kind=4)                :: i, j, k, l, p, n, ip, lcpu
+    integer(kind=4)                :: i, j, k, l, p, n, ip
     integer                        :: err
     integer(hsize_t), dimension(1) :: am
     integer(hsize_t), dimension(2) :: dm, pm
@@ -1813,10 +1813,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! prepare last cpu index
-!
-    lcpu = nprocs - 1
-
 ! open metablock group
 !
     call h5gopen_f(fid, 'metablocks', gid, err)
