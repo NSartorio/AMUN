@@ -1,13 +1,21 @@
+---------------------------------------------------------------
 # **The AMUN code**
 ## Copyright (C) 2008-2014 Grzegorz Kowal ##
----
+---------------------------------------------------------------
 
-AMUN is a code to perform numerical simulations in a fluid approximation on
-non-uniform (adaptive) meshes with and without magnetic field.  The goal in
-developing this code is to create a solid framework for simulations on uniform
-and adaptive meshes in the Cartesian, cylindrical, or spherical coordinate
-systems with a number of numerical methods which can be selectable in an easy
-manner. The code is completely written in Fortran 2003.
+AMUN is a parallel code to perform numerical simulations in fluid approximation on uniform or non-uniform (adaptive) meshes. The goal in developing this code is to create a solid framework for simulations with support for number of numerical methods which can be selected in an easy way through the parameter file. The following features are already implemented:
+
+* hydrodynamic and magnetohydrodynamic set of equations (HD and MHD),
+* Cartesian coordinate system,
+* uniform and adaptive mesh generation and update,
+* 2nd to 4th order time integration using Strong Stability Preserving Runge-Kutta methods,
+* 2nd order TVD interpolation with number of limiters and higher order reconstructions,
+* Riemann solvers of Roe- and HLL-types (HLL, HLLC, and HLLD),
+* periodic and open boundary conditions,
+* viscosity and resistivity source terms,
+* data stored in the HDF5 format,
+* MPI parallization,
+* completely written in Fortran 2003.
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -31,49 +39,31 @@ Developers
 Requirements
 ============
 
- - GNU Fortran compiler 4.5 and newer (http://gcc.gnu.org/fortran/)
- - HDF5 libraries 1.8 and newer (http://www.hdfgroup.org/HDF5/)
+* Fortran 2003 compiler (tested compilers include [GNU Fortran](http://gcc.gnu.org/fortran/) version 4.5 or newer, [Intel Fortran](https://software.intel.com/en-us/fortran-compilers) compiler version 9.0 or newer, [PathScale EKOPath(tm)](http://www.pathscale.com/ekopath.html) compiler version 1.0 or newer)
+* [HDF5 libraries](http://www.hdfgroup.org/HDF5/) version 1.8 or newer.
 
 
-Supported Compilers
-===================
+Environment Variables
+======================
 
-The code supports and has been tested with the following compilers:
-
-GNU Fortran Version 4.5.x
-Intel Fortran Compiler 11, 12, & 13
-PathScale EKOPath(tm) Compiler Suite: Version 1.0.0
+If the HDF5 libraries are not installed in the default location, i.e. in the system directory **/usr**, make sure that the environment variable _HDF5DIR_ is set in your **~/.bashrc** (or **~/.cshrc**) and pointing to the location where the HDF5 libraries have been installed.
 
 
-Preparation
+Compilation
 ===========
-
-1)  Unpack the downloaded source archive or clone it.
-2)  Go to 'src' directory.
-3)  Copy 'make.default' to a new file 'make.config'.
-4)  Modify file 'make.config' in order to change supported physics and methods.
-5)  Go to 'hosts' directory.
-6)  Copy file 'default' to a new file with your host name (has to be exactly
-    the same name as returned by command 'hostname').
-7)  Adjust compiler and compilation options in your new host file.
-8)  Go up to 'src' directory.
-9)  If the HDF5 libraries are not installed in the default location in your
-    system (/usr), make sure that the environment variable 'HDF5DIR' is set
-    in your .bashrc (or .cshrc) and pointing to the location where the HDF5
-    libraries are installed.
-10) Compile sources by typing 'make' in the command line in order to create
-    the executable file 'amun.x'.
+1. Clone or unpack the code sources downloaded from [Bitbucket](git@bitbucket.org:amunteam/amun-code.git).
+2. Go to directory **hosts/** and copy file **default** to a new file named exactly as your host name (name returned by command `hostname`).
+3. Customize your compiler and compilation options in your new host file.
+4. Go to directory **src/** and copy file **make.default** to **make.config**.
+5. Customize compilation time options in **make.config**.
+6. Compile sources by typing `make` in directory **src/**. The executable file **amun.x** should be created.
 
 
 Usage
 =====
 
-First, prepare the parameter file.  By default this is 'params.in'.
-The executable file supports a command line option '-i' to specify a different
-parameter file name.  Without this option it assumes that parameters are read
-from 'params.in'.  Example parameter files can be found in directory 'problems'.
+In order to run some test problems you can simply copy corresponding parameter from directory **problems/** to the location when you wish to run your test. Copy the executable file **amun.x** compiled earlier to the same directory. If you provide option _-i <parameter_file>_, the code will know that the parameters have to be read from file _<parameter_file>_. If you don't provide this option, the code will assume that the parameters are stored in file **params.in** in the same director.
 
-In order to run serial version, just type 'amun.x' in the command line.
+In order to run serial version, type in your terminal:  `amun.x -i params.in`.
 
-In order to run parallel version, type 'mpirun -n N ./amun.x', where N is the
-number of processors.
+In order to run the parallel version (after compiling the code with MPI version), type in your terminal: `mpirun -n N ./amun.x -i params.in`, where N is the number of processors.
