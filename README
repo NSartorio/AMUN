@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
-# **The AMUN code**
+# **The AMUN Code**
 ## Copyright (C) 2008-2014 Grzegorz Kowal ##
 --------------------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ following features are already implemented:
 * periodic and open boundary conditions,
 * viscosity and resistivity source terms,
 * data stored in the HDF5 format,
-* MPI parallization,
+* MPI parallelization,
 * completely written in Fortran 2003.
 
 This program is free software: you can redistribute it and/or modify it under
