@@ -137,7 +137,8 @@ program amun
 
 ! signal definitions
 !
-  integer, parameter    :: SIGINT = 2, SIGABRT = 6, SIGTERM = 15
+  integer, parameter    :: SIGERR = -1
+  integer, parameter    :: SIGINT =  2, SIGABRT =  6, SIGTERM = 15
 #endif /* SIGNALS */
 
 ! an array to store execution times
@@ -150,9 +151,10 @@ program amun
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the termination flag
+! initialize the termination and return flags
 !
   iterm = 0
+  iret  = 0
 
 ! initialize module TIMERS
 !
@@ -169,17 +171,22 @@ program amun
   call start_timer(iin)
 
 #ifdef SIGNALS
-! assign function terminate() with signals
+! assign function terminate() to handle signals
 !
 #ifdef GNU
-  iret = signal(SIGINT , terminate)
-  iret = signal(SIGABRT, terminate)
-  iret = signal(SIGTERM, terminate)
-#else /* GNU */
-  iret = signal(SIGINT , terminate, -1)
-  iret = signal(SIGABRT, terminate, -1)
-  iret = signal(SIGTERM, terminate, -1)
+  if (signal(SIGINT , terminate)     == SIGERR) iret = 1
+  if (signal(SIGABRT, terminate)     == SIGERR) iret = 2
+  if (signal(SIGTERM, terminate)     == SIGERR) iret = 3
 #endif /* GNU */
+#ifdef INTEL
+  if (signal(SIGINT , terminate, -1) == SIGERR) iret = 1
+  if (signal(SIGABRT, terminate, -1) == SIGERR) iret = 2
+  if (signal(SIGTERM, terminate, -1) == SIGERR) iret = 3
+#endif /* INTEL */
+
+! in the case of problems with signal handler assignment, quit the program
+!
+  if (iret > 0) go to 200
 #endif /* SIGNALS */
 
 ! initialize module MPITOOLS
@@ -848,6 +855,12 @@ program amun
 ! finalize module MPITOOLS
 !
   call finalize_mpitools()
+
+#ifdef SIGNALS
+! a label to go to in the case of signal handler problems
+!
+  200 continue
+#endif /* SIGNALS */
 
 ! finalize module TIMERS
 !
