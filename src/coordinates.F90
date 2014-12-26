@@ -101,6 +101,25 @@ module coordinates
   real(kind=8), dimension(:  ), allocatable, save :: adxi, adyi, adzi
   real(kind=8), dimension(:  ), allocatable, save :: advol
 
+! define type for rectangular subarray description
+!
+  type rectangular
+    integer, dimension(NDIMS) :: l ! indices of the lower corner
+    integer, dimension(NDIMS) :: u ! indices of the upper corner
+  end type rectangular
+
+! the ghost subarray indices
+!
+#if NDIMS == 2
+  type(rectangular), dimension(:,:,:)  , allocatable, save :: iedges
+  type(rectangular), dimension(:,:)    , allocatable, save :: icorners
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+  type(rectangular), dimension(:,:,:,:), allocatable, save :: ifaces
+  type(rectangular), dimension(:,:,:,:), allocatable, save :: iedges
+  type(rectangular), dimension(:,:,:)  , allocatable, save :: icorners
+#endif /* NDIMS == 3 */
+
 ! by default everything is private
 !
   public
