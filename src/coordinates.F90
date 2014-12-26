@@ -108,16 +108,27 @@ module coordinates
     integer, dimension(NDIMS) :: u ! indices of the upper corner
   end type rectangular
 
-! the ghost subarray indices
+! the subarray indices to ghost and domain areas used for boundary exchange
+! ('c' for copy, 'p' for prolongation, 'r' for restriction)
 !
 #if NDIMS == 2
-  type(rectangular), dimension(2,2,NDIMS)  , save :: iedges
-  type(rectangular), dimension(2,2)        , save :: icorners
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dc  , edges_gc
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dp  , edges_gp
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dr  , edges_gr
+  type(rectangular), dimension(2,2)        , save :: corners_dc, corners_gc
+  type(rectangular), dimension(2,2)        , save :: corners_dp, corners_gp
+  type(rectangular), dimension(2,2)        , save :: corners_dr, corners_gr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-  type(rectangular), dimension(2,2,2,NDIMS), save :: ifaces
-  type(rectangular), dimension(2,2,2,NDIMS), save :: iedges
-  type(rectangular), dimension(2,2,2)      , save :: icorners
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dc  , faces_gc
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dp  , faces_gp
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dr  , faces_gr
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dc  , edges_gc
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dp  , edges_gp
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dr  , edges_gr
+  type(rectangular), dimension(2,2,2)      , save :: corners_dc, corners_gc
+  type(rectangular), dimension(2,2,2)      , save :: corners_dp, corners_gp
+  type(rectangular), dimension(2,2,2)      , save :: corners_dr, corners_gr
 #endif /* NDIMS == 3 */
 
 ! by default everything is private
