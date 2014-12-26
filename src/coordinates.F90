@@ -111,13 +111,13 @@ module coordinates
 ! the ghost subarray indices
 !
 #if NDIMS == 2
-  type(rectangular), dimension(:,:,:)  , allocatable, save :: iedges
-  type(rectangular), dimension(:,:)    , allocatable, save :: icorners
+  type(rectangular), dimension(2,2,NDIMS)  , save :: iedges
+  type(rectangular), dimension(2,2)        , save :: icorners
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-  type(rectangular), dimension(:,:,:,:), allocatable, save :: ifaces
-  type(rectangular), dimension(:,:,:,:), allocatable, save :: iedges
-  type(rectangular), dimension(:,:,:)  , allocatable, save :: icorners
+  type(rectangular), dimension(2,2,2,NDIMS), save :: ifaces
+  type(rectangular), dimension(2,2,2,NDIMS), save :: iedges
+  type(rectangular), dimension(2,2,2)      , save :: icorners
 #endif /* NDIMS == 3 */
 
 ! by default everything is private
