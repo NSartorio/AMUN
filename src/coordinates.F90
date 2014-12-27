@@ -170,8 +170,9 @@ module coordinates
 
 ! local variables
 !
-    integer :: i, j, k, l, ff
-    integer :: ni, nj, nk
+    integer :: i, j, k, l, p, q, r, ff
+    integer :: fi, fj, fk
+    integer :: ni, nj, nk, nm, np, ns
     logical :: info
 
 ! local arrays
@@ -364,6 +365,142 @@ module coordinates
       advol(l) = adx(l) * ady(l) * adz(l)
 
     end do ! l = 1, toplev
+
+! initialize ghost subarray indices
+!
+    np = nc + ng
+    nm = nc - ng
+    ns = nc / 2
+#if NDIMS == 2
+    do j = 1, 2
+      fj = j - 1
+      q  = 3 - j
+      do i = 1, 2
+        fi = i - 1
+        p  = 3 - i
+
+! for edges
+!
+        edges_gc(i,j,1)%l(1) = ib + fi * ns
+        edges_gc(i,j,1)%l(2) =  1 + fj * np
+        edges_gc(i,j,2)%l(1) =  1 + fi * np
+        edges_gc(i,j,2)%l(2) = jb + fj * ns
+
+        edges_dc(i,q,1)%l(1) = ib + fi * ns
+        edges_dc(i,q,1)%l(2) = jb + fj * nm
+        edges_dc(p,j,2)%l(1) = ib + fi * nm
+        edges_dc(p,j,2)%l(2) = jb + fj * ns
+
+        edges_gc(i,j,1)%u(:) = edges_gc(i,j,1)%l(:) + (/ ns, ng /) - 1
+        edges_gc(i,j,2)%u(:) = edges_gc(i,j,2)%l(:) + (/ ng, ns /) - 1
+
+        edges_dc(i,q,1)%u(:) = edges_dc(i,q,1)%l(:) + (/ ns, ng /) - 1
+        edges_dc(p,j,2)%u(:) = edges_dc(p,j,2)%l(:) + (/ ng, ns /) - 1
+
+! for corners
+!
+        corners_gc(i,j)%l(1) =  1 + fi * np
+        corners_gc(i,j)%l(2) =  1 + fj * np
+
+        corners_dc(p,q)%l(1) = ib + fi * nm
+        corners_dc(p,q)%l(2) = jb + fj * nm
+
+        corners_gc(i,j)%u(:) = corners_gc(i,j)%l(:) + ng - 1
+
+        corners_dc(p,q)%u(:) = corners_dc(p,q)%l(:) + ng - 1
+
+      end do ! i = 1, 2
+    end do ! j = 1, 2
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = 1, 2
+      fk = k - 1
+      r  = 3 - k
+      do j = 1, 2
+        fj = j - 1
+        q  = 3 - j
+        do i = 1, 2
+          fi = i - 1
+          p  = 3 - i
+
+! for faces
+!
+          faces_gc(i,j,k,1)%l(1) =  1 + fi * np
+          faces_gc(i,j,k,1)%l(2) = jb + fj * ns
+          faces_gc(i,j,k,1)%l(3) = kb + fk * ns
+          faces_gc(i,j,k,2)%l(1) = ib + fi * ns
+          faces_gc(i,j,k,2)%l(2) =  1 + fj * np
+          faces_gc(i,j,k,2)%l(3) = kb + fk * ns
+          faces_gc(i,j,k,3)%l(1) = ib + fi * ns
+          faces_gc(i,j,k,3)%l(2) = jb + fj * ns
+          faces_gc(i,j,k,3)%l(3) =  1 + fk * np
+
+          faces_dc(p,j,k,1)%l(1) = ib + fi * nm
+          faces_dc(p,j,k,1)%l(2) = jb + fj * ns
+          faces_dc(p,j,k,1)%l(3) = kb + fk * ns
+          faces_dc(i,q,k,2)%l(1) = ib + fi * ns
+          faces_dc(i,q,k,2)%l(2) = jb + fj * nm
+          faces_dc(i,q,k,2)%l(3) = kb + fk * ns
+          faces_dc(i,j,r,3)%l(1) = ib + fi * ns
+          faces_dc(i,j,r,3)%l(2) = jb + fj * ns
+          faces_dc(i,j,r,3)%l(3) = kb + fk * nm
+
+          faces_gc(i,j,k,1)%u(:) = faces_gc(i,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_gc(i,j,k,2)%u(:) = faces_gc(i,j,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_gc(i,j,k,3)%u(:) = faces_gc(i,j,k,3)%l(:) + (/ ns, ns, ng /) - 1
+
+          faces_dc(p,j,k,1)%u(:) = faces_dc(p,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_dc(i,q,k,2)%u(:) = faces_dc(i,q,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_dc(i,j,r,3)%u(:) = faces_dc(i,j,r,3)%l(:) + (/ ns, ns, ng /) - 1
+
+! for edges
+!
+          edges_gc(i,j,k,1)%l(1) = ib + fi * ns
+          edges_gc(i,j,k,1)%l(2) =  1 + fj * np
+          edges_gc(i,j,k,1)%l(3) =  1 + fk * np
+          edges_gc(i,j,k,2)%l(1) =  1 + fi * np
+          edges_gc(i,j,k,2)%l(2) = jb + fj * ns
+          edges_gc(i,j,k,2)%l(3) =  1 + fk * np
+          edges_gc(i,j,k,3)%l(1) =  1 + fi * np
+          edges_gc(i,j,k,3)%l(2) =  1 + fj * np
+          edges_gc(i,j,k,3)%l(3) = kb + fk * ns
+
+          edges_dc(i,q,r,1)%l(1) = ib + fi * ns
+          edges_dc(i,q,r,1)%l(2) = jb + fj * nm
+          edges_dc(i,q,r,1)%l(3) = kb + fk * nm
+          edges_dc(p,j,r,2)%l(1) = jb + fi * nm
+          edges_dc(p,j,r,2)%l(2) = jb + fj * ns
+          edges_dc(p,j,r,2)%l(3) = kb + fk * nm
+          edges_dc(p,q,k,3)%l(1) = ib + fi * nm
+          edges_dc(p,q,k,3)%l(2) = jb + fj * nm
+          edges_dc(p,q,k,3)%l(3) = kb + fk * ns
+
+          edges_gc(i,j,k,1)%u(:) = edges_gc(i,j,k,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_gc(i,j,k,2)%u(:) = edges_gc(i,j,k,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_gc(i,j,k,3)%u(:) = edges_gc(i,j,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+          edges_dc(i,q,r,1)%u(:) = edges_dc(i,q,r,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_dc(p,j,r,2)%u(:) = edges_dc(p,j,r,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_dc(p,q,k,3)%u(:) = edges_dc(p,q,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+! for corners
+!
+          corners_gc(i,j,k)%l(1) =  1 + fi * np
+          corners_gc(i,j,k)%l(2) =  1 + fj * np
+          corners_gc(i,j,k)%l(3) =  1 + fk * np
+
+          corners_dc(p,q,r)%l(1) = ib + fi * nm
+          corners_dc(p,q,r)%l(2) = jb + fj * nm
+          corners_dc(p,q,r)%l(3) = kb + fk * nm
+
+          corners_gc(i,j,k)%u(:) = corners_gc(i,j,k)%l(:) + ng - 1
+
+          corners_dc(p,q,r)%u(:) = corners_dc(p,q,r)%l(:) + ng - 1
+
+        end do ! i = 1, 2
+      end do ! j = 1, 2
+    end do ! k = 1, 2
+#endif /* NDIMS == 3 */
 
 ! print general information about the level resolutions
 !
