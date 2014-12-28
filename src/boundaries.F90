@@ -6829,11 +6829,11 @@ module boundaries
       end if
 #if NDIMS == 3
       if (kc == 1) then
-        kl = kb
-        ku = kbu
-      else
         kl = kel
         ku = ke
+      else
+        kl = kb
+        ku = kbu
       end if
 #endif /* NDIMS == 3 */
 
