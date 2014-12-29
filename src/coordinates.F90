@@ -172,7 +172,7 @@ module coordinates
 !
     integer :: i, j, k, l, p, q, r, ff
     integer :: fi, fj, fk
-    integer :: ni, nj, nk, nm, np, ns
+    integer :: ni, nj, nk, nm, np, nr, ns
     logical :: info
 
 ! local arrays
@@ -370,6 +370,7 @@ module coordinates
 !
     np = nc + ng
     nm = nc - ng
+    nr = nc - nd
     ns = nc / 2
 #if NDIMS == 2
     do j = 1, 2
@@ -379,7 +380,7 @@ module coordinates
         fi = i - 1
         p  = 3 - i
 
-! for edges
+! for edges copy
 !
         edges_gc(i,j,1)%l(1) = ib + fi * ns
         edges_gc(i,j,1)%l(2) =  1 + fj * np
@@ -397,7 +398,25 @@ module coordinates
         edges_dc(i,q,1)%u(:) = edges_dc(i,q,1)%l(:) + (/ ns, ng /) - 1
         edges_dc(p,j,2)%u(:) = edges_dc(p,j,2)%l(:) + (/ ng, ns /) - 1
 
-! for corners
+! for edges restrict
+!
+        edges_gr(i,j,1)%l(1) = ib + fi * ns
+        edges_gr(i,j,1)%l(2) =  1 + fj * np
+        edges_gr(i,j,2)%l(1) =  1 + fi * np
+        edges_gr(i,j,2)%l(2) = jb + fj * ns
+
+        edges_dr(i,q,1)%l(1) = ib
+        edges_dr(i,q,1)%l(2) = jb + fj * nr
+        edges_dr(p,j,2)%l(1) = ib + fi * nr
+        edges_dr(p,j,2)%l(2) = jb
+
+        edges_gr(i,j,1)%u(:) = edges_gr(i,j,1)%l(:) + (/ ns, ng /) - 1
+        edges_gr(i,j,2)%u(:) = edges_gr(i,j,2)%l(:) + (/ ng, ns /) - 1
+
+        edges_dr(i,q,1)%u(:) = edges_dr(i,q,1)%l(:) + (/ nc, nd /) - 1
+        edges_dr(p,j,2)%u(:) = edges_dr(p,j,2)%l(:) + (/ nd, nc /) - 1
+
+! for corners copy
 !
         corners_gc(i,j)%l(1) =  1 + fi * np
         corners_gc(i,j)%l(2) =  1 + fj * np
@@ -408,6 +427,18 @@ module coordinates
         corners_gc(i,j)%u(:) = corners_gc(i,j)%l(:) + ng - 1
 
         corners_dc(p,q)%u(:) = corners_dc(p,q)%l(:) + ng - 1
+
+! for corners restrict
+!
+        corners_gr(i,j)%l(1) =  1 + fi * np
+        corners_gr(i,j)%l(2) =  1 + fj * np
+
+        corners_dr(p,q)%l(1) = ib + fi * nr
+        corners_dr(p,q)%l(2) = jb + fj * nr
+
+        corners_gr(i,j)%u(:) = corners_gr(i,j)%l(:) + ng - 1
+
+        corners_dr(p,q)%u(:) = corners_dr(p,q)%l(:) + nd - 1
 
       end do ! i = 1, 2
     end do ! j = 1, 2
@@ -423,7 +454,7 @@ module coordinates
           fi = i - 1
           p  = 3 - i
 
-! for faces
+! for faces copy
 !
           faces_gc(i,j,k,1)%l(1) =  1 + fi * np
           faces_gc(i,j,k,1)%l(2) = jb + fj * ns
@@ -453,7 +484,37 @@ module coordinates
           faces_dc(i,q,k,2)%u(:) = faces_dc(i,q,k,2)%l(:) + (/ ns, ng, ns /) - 1
           faces_dc(i,j,r,3)%u(:) = faces_dc(i,j,r,3)%l(:) + (/ ns, ns, ng /) - 1
 
-! for edges
+! for faces restrict
+!
+          faces_gr(i,j,k,1)%l(1) =  1 + fi * np
+          faces_gr(i,j,k,1)%l(2) = jb + fj * ns
+          faces_gr(i,j,k,1)%l(3) = kb + fk * ns
+          faces_gr(i,j,k,2)%l(1) = ib + fi * ns
+          faces_gr(i,j,k,2)%l(2) =  1 + fj * np
+          faces_gr(i,j,k,2)%l(3) = kb + fk * ns
+          faces_gr(i,j,k,3)%l(1) = ib + fi * ns
+          faces_gr(i,j,k,3)%l(2) = jb + fj * ns
+          faces_gr(i,j,k,3)%l(3) =  1 + fk * np
+
+          faces_dr(p,j,k,1)%l(1) = ib + fi * nr
+          faces_dr(p,j,k,1)%l(2) = jb
+          faces_dr(p,j,k,1)%l(3) = kb
+          faces_dr(i,q,k,2)%l(1) = ib
+          faces_dr(i,q,k,2)%l(2) = jb + fj * nr
+          faces_dr(i,q,k,2)%l(3) = kb
+          faces_dr(i,j,r,3)%l(1) = ib
+          faces_dr(i,j,r,3)%l(2) = jb
+          faces_dr(i,j,r,3)%l(3) = kb + fk * nr
+
+          faces_gr(i,j,k,1)%u(:) = faces_gr(i,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_gr(i,j,k,2)%u(:) = faces_gr(i,j,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_gr(i,j,k,3)%u(:) = faces_gr(i,j,k,3)%l(:) + (/ ns, ns, ng /) - 1
+
+          faces_dr(p,j,k,1)%u(:) = faces_dr(p,j,k,1)%l(:) + (/ nd, nc, nc /) - 1
+          faces_dr(i,q,k,2)%u(:) = faces_dr(i,q,k,2)%l(:) + (/ nc, nd, nc /) - 1
+          faces_dr(i,j,r,3)%u(:) = faces_dr(i,j,r,3)%l(:) + (/ nc, nc, nd /) - 1
+
+! for edges copy
 !
           edges_gc(i,j,k,1)%l(1) = ib + fi * ns
           edges_gc(i,j,k,1)%l(2) =  1 + fj * np
@@ -483,7 +544,37 @@ module coordinates
           edges_dc(p,j,r,2)%u(:) = edges_dc(p,j,r,2)%l(:) + (/ ng, ns, ng /) - 1
           edges_dc(p,q,k,3)%u(:) = edges_dc(p,q,k,3)%l(:) + (/ ng, ng, ns /) - 1
 
-! for corners
+! for edges restrict
+!
+          edges_gr(i,j,k,1)%l(1) = ib + fi * ns
+          edges_gr(i,j,k,1)%l(2) =  1 + fj * np
+          edges_gr(i,j,k,1)%l(3) =  1 + fk * np
+          edges_gr(i,j,k,2)%l(1) =  1 + fi * np
+          edges_gr(i,j,k,2)%l(2) = jb + fj * ns
+          edges_gr(i,j,k,2)%l(3) =  1 + fk * np
+          edges_gr(i,j,k,3)%l(1) =  1 + fi * np
+          edges_gr(i,j,k,3)%l(2) =  1 + fj * np
+          edges_gr(i,j,k,3)%l(3) = kb + fk * ns
+
+          edges_dr(i,q,r,1)%l(1) = ib
+          edges_dr(i,q,r,1)%l(2) = jb + fj * nr
+          edges_dr(i,q,r,1)%l(3) = kb + fk * nr
+          edges_dr(p,j,r,2)%l(1) = ib + fi * nr
+          edges_dr(p,j,r,2)%l(2) = jb
+          edges_dr(p,j,r,2)%l(3) = kb + fk * nr
+          edges_dr(p,q,k,3)%l(1) = ib + fi * nr
+          edges_dr(p,q,k,3)%l(2) = jb + fj * nr
+          edges_dr(p,q,k,3)%l(3) = kb
+
+          edges_gr(i,j,k,1)%u(:) = edges_gr(i,j,k,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_gr(i,j,k,2)%u(:) = edges_gr(i,j,k,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_gr(i,j,k,3)%u(:) = edges_gr(i,j,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+          edges_dr(i,q,r,1)%u(:) = edges_dr(i,q,r,1)%l(:) + (/ nc, nd, nd /) - 1
+          edges_dr(p,j,r,2)%u(:) = edges_dr(p,j,r,2)%l(:) + (/ nd, nc, nd /) - 1
+          edges_dr(p,q,k,3)%u(:) = edges_dr(p,q,k,3)%l(:) + (/ nd, nd, nc /) - 1
+
+! for corners copy
 !
           corners_gc(i,j,k)%l(1) =  1 + fi * np
           corners_gc(i,j,k)%l(2) =  1 + fj * np
@@ -496,6 +587,20 @@ module coordinates
           corners_gc(i,j,k)%u(:) = corners_gc(i,j,k)%l(:) + ng - 1
 
           corners_dc(p,q,r)%u(:) = corners_dc(p,q,r)%l(:) + ng - 1
+
+! for corners restrict
+!
+          corners_gr(i,j,k)%l(1) =  1 + fi * np
+          corners_gr(i,j,k)%l(2) =  1 + fj * np
+          corners_gr(i,j,k)%l(3) =  1 + fk * np
+
+          corners_dr(p,q,r)%l(1) = ib + fi * nr
+          corners_dr(p,q,r)%l(2) = jb + fj * nr
+          corners_dr(p,q,r)%l(3) = kb + fk * nr
+
+          corners_gr(i,j,k)%u(:) = corners_gr(i,j,k)%l(:) + ng - 1
+
+          corners_dr(p,q,r)%u(:) = corners_dr(p,q,r)%l(:) + nd - 1
 
         end do ! i = 1, 2
       end do ! j = 1, 2
