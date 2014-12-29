@@ -2591,12 +2591,9 @@ module boundaries
     use blocks         , only : list_meta
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : in, jn, kn
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : edges_gc, edges_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -2624,6 +2621,8 @@ module boundaries
     integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -2713,72 +2712,45 @@ module boundaries
                       if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare the region indices for edge boundary update
-!
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
-#if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
-#endif /* NDIMS == 3 */
-
-! extract the corresponding edge region from the neighbor and insert it in
-! the current data block
-!
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                        case(2)
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
+! prepare region indices of the block and its neighbor for the edge boundary
+! update
 #if NDIMS == 2
-                        call block_edge_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
+                        il = edges_gc(i,j  ,idir)%l(1)
+                        jl = edges_gc(i,j  ,idir)%l(2)
+                        iu = edges_gc(i,j  ,idir)%u(1)
+                        ju = edges_gc(i,j  ,idir)%u(2)
+
+                        is = edges_dc(i,j  ,idir)%l(1)
+                        js = edges_dc(i,j  ,idir)%l(2)
+                        it = edges_dc(i,j  ,idir)%u(1)
+                        jt = edges_dc(i,j  ,idir)%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_edge_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                        il = edges_gc(i,j,k,idir)%l(1)
+                        jl = edges_gc(i,j,k,idir)%l(2)
+                        kl = edges_gc(i,j,k,idir)%l(3)
+                        iu = edges_gc(i,j,k,idir)%u(1)
+                        ju = edges_gc(i,j,k,idir)%u(2)
+                        ku = edges_gc(i,j,k,idir)%u(3)
+
+                        is = edges_dc(i,j,k,idir)%l(1)
+                        js = edges_dc(i,j,k,idir)%l(2)
+                        ks = edges_dc(i,j,k,idir)%l(3)
+                        it = edges_dc(i,j,k,idir)%u(1)
+                        jt = edges_dc(i,j,k,idir)%u(2)
+                        kt = edges_dc(i,j,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding edge region from the neighbor and insert it in
+! the current data block
+!
+#if NDIMS == 2
+                        pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                 &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                        pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                 &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
@@ -2903,37 +2875,49 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding edge region from the neighbor and insert it
-! to the buffer
+! prepare indices of the region for edge boundary update
+!
+#if NDIMS == 2
+            is = edges_dc(i,j  ,idir)%l(1)
+            js = edges_dc(i,j  ,idir)%l(2)
+            it = edges_dc(i,j  ,idir)%u(1)
+            jt = edges_dc(i,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            is = edges_dc(i,j,k,idir)%l(1)
+            js = edges_dc(i,j,k,idir)%l(2)
+            ks = edges_dc(i,j,k,idir)%l(3)
+            it = edges_dc(i,j,k,idir)%u(1)
+            jt = edges_dc(i,j,k,idir)%u(2)
+            kt = edges_dc(i,j,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding edge region from the neighbor and insert it in
+! the buffer
 !
             select case(idir)
             case(1)
 #if NDIMS == 2
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:km))
+              sbuf(l,1:nv,1:ih,1:ng,1:km) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:ng))
+              sbuf(l,1:nv,1:ih,1:ng,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
             case(2)
 #if NDIMS == 2
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:km))
+              sbuf(l,1:nv,1:ng,1:jh,1:km) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:ng))
+              sbuf(l,1:nv,1:ng,1:jh,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:kh))
+              sbuf(l,1:nv,1:ng,1:ng,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
             end select
 
@@ -2943,7 +2927,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -2981,78 +2965,43 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare indices of the region for the edge update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = edges_gc(i,j  ,idir)%l(1)
+            jl = edges_gc(i,j  ,idir)%l(2)
+            iu = edges_gc(i,j  ,idir)%u(1)
+            ju = edges_gc(i,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = edges_gc(i,j,k,idir)%l(1)
+            jl = edges_gc(i,j,k,idir)%l(2)
+            kl = edges_gc(i,j,k,idir)%l(3)
+            iu = edges_gc(i,j,k,idir)%u(1)
+            ju = edges_gc(i,j,k,idir)%u(2)
+            ku = edges_gc(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
-! update the corresponding corner region of the current block
+! update the corresponding edge region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
 #if NDIMS == 2
-              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
-                                                   rbuf(l,1:nv,1:ih,1:ng,1:km)
+              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) = rbuf(l,1:nv,1:ih,1:ng,1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ih,1:ng,1:ng)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:ng)
 #endif /* NDIMS == 3 */
             case(2)
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
 #if NDIMS == 2
-              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:jh,1:km)
+              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) = rbuf(l,1:nv,1:ng,1:jh,1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:jh,1:ng)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:ng)
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:ng,1:kh)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:ng,1:kh)
 #endif /* NDIMS == 3 */
             end select
 
@@ -6081,181 +6030,6 @@ module boundaries
 !  BLOCK EDGE UPDATE SUBROUTINES
 !
 !===============================================================================
-!
-!===============================================================================
-!
-! subroutine BLOCK_EDGE_COPY:
-! --------------------------
-!
-!   Subroutine returns the edge boundary region by copying the corresponding
-!   region from the provided input variable array.
-!
-!   Arguments:
-!
-!     nc         - the edge direction;
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output edge boundary array;
-!
-!===============================================================================
-!
-  subroutine block_edge_copy(nc, ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: nc, ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
-
-! local indices
-!
-    integer :: ih, jh, kh
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half size
-!
-      ih = in / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-#endif /* NDIMS == 3 */
-
-! copy the edge region to the output array
-!
-#if NDIMS == 2
-      qb(1:nv,1:ih,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      qb(1:nv,1:ih,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-    case(2)
-
-! calculate half size
-!
-      jh = jn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-#endif /* NDIMS == 3 */
-
-! copy the edge region to the output array
-!
-#if NDIMS == 2
-      qb(1:nv,1:ng,1:jh,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      qb(1:nv,1:ng,1:jh,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! calculate half size
-!
-      kh = kn / 2
-
-! prepare source edge region indices
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the edge region to the output array
-!
-      qb(1:nv,1:ng,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_edge_copy
 !
 !===============================================================================
 !
