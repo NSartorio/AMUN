@@ -4332,8 +4332,7 @@ module boundaries
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : corners_gr
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -4439,31 +4438,22 @@ module boundaries
 
 ! prepare the region indices for corner boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+#if NDIMS == 2
+                        il = corners_gr(i,j  )%l(1)
+                        jl = corners_gr(i,j  )%l(2)
+                        iu = corners_gr(i,j  )%u(1)
+                        ju = corners_gr(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                        il = corners_gr(i,j,k)%l(1)
+                        jl = corners_gr(i,j,k)%l(2)
+                        kl = corners_gr(i,j,k)%l(3)
+                        iu = corners_gr(i,j,k)%u(1)
+                        ju = corners_gr(i,j,k)%u(2)
+                        ku = corners_gr(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
-! restrict and extract the corresponding corner region from the neighbor and
+! extract and restrict the corresponding corner region from the neighbor and
 ! insert it in the current data block
 !
 #if NDIMS == 2
@@ -4605,7 +4595,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -4643,30 +4633,21 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the region indices for corner boundary update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = corners_gr(i,j  )%l(1)
+            jl = corners_gr(i,j  )%l(2)
+            iu = corners_gr(i,j  )%u(1)
+            ju = corners_gr(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = corners_gr(i,j,k)%l(1)
+            jl = corners_gr(i,j,k)%l(2)
+            kl = corners_gr(i,j,k)%l(3)
+            iu = corners_gr(i,j,k)%u(1)
+            ju = corners_gr(i,j,k)%u(2)
+            ku = corners_gr(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
@@ -6229,8 +6210,7 @@ module boundaries
 !
     use coordinates    , only : ng, nd
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : corners_dr
     use equations      , only : nv
 
 ! local variables are not implicit by default
@@ -6258,34 +6238,24 @@ module boundaries
 !
 ! prepare indices for the corner region
 !
-    if (ic == 1) then
-      il = ie - nd + 1
-      ip = il + 1
-      iu = ie
-    else
-      il = ib
-      ip = il + 1
-      iu = ib + nd - 1
-    end if
-    if (jc == 1) then
-      jl = je - nd + 1
-      jp = jl + 1
-      ju = je
-    else
-      jl = jb
-      jp = jl + 1
-      ju = jb + nd - 1
-    end if
+#if NDIMS == 2
+    il = corners_dr(ic,jc   )%l(1)
+    jl = corners_dr(ic,jc   )%l(2)
+    ip = il + 1
+    jp = jl + 1
+    iu = corners_dr(ic,jc   )%u(1)
+    ju = corners_dr(ic,jc   )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-    if (kc == 1) then
-      kl = ke - nd + 1
-      kp = kl + 1
-      ku = ke
-    else
-      kl = kb
-      kp = kl + 1
-      ku = kb + nd - 1
-    end if
+    il = corners_dr(ic,jc,kc)%l(1)
+    jl = corners_dr(ic,jc,kc)%l(2)
+    kl = corners_dr(ic,jc,kc)%l(3)
+    ip = il + 1
+    jp = jl + 1
+    kp = kl + 1
+    iu = corners_dr(ic,jc,kc)%u(1)
+    ju = corners_dr(ic,jc,kc)%u(2)
+    ku = corners_dr(ic,jc,kc)%u(3)
 #endif /* NDIMS == 3 */
 
 ! restrict the corner region to the output array
