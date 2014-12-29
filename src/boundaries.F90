@@ -2944,10 +2944,7 @@ module boundaries
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : edges_gr
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -3066,61 +3063,24 @@ module boundaries
 
 ! prepare the region indices for edge boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+#if NDIMS == 2
+                        il = edges_gr(i,j,  idir)%l(1)
+                        jl = edges_gr(i,j,  idir)%l(2)
+                        iu = edges_gr(i,j,  idir)%u(1)
+                        ju = edges_gr(i,j,  idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                        il = edges_gr(i,j,k,idir)%l(1)
+                        jl = edges_gr(i,j,k,idir)%l(2)
+                        kl = edges_gr(i,j,k,idir)%l(3)
+                        iu = edges_gr(i,j,k,idir)%u(1)
+                        ju = edges_gr(i,j,k,idir)%u(2)
+                        ku = edges_gr(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding edge region from the neighbor and insert it in
-! the current data block
+! extract the corresponding edge region from the neighbor to the current
+! data block
 !
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                        case(2)
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
 #if NDIMS == 2
                         call block_edge_restrict(idir, i, j, k                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
@@ -3294,7 +3254,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -3332,43 +3292,27 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the region indices for edge boundary update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = edges_gr(i,j,  idir)%l(1)
+            jl = edges_gr(i,j,  idir)%l(2)
+            iu = edges_gr(i,j,  idir)%u(1)
+            ju = edges_gr(i,j,  idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = edges_gr(i,j,k,idir)%l(1)
+            jl = edges_gr(i,j,k,idir)%l(2)
+            kl = edges_gr(i,j,k,idir)%l(3)
+            iu = edges_gr(i,j,k,idir)%u(1)
+            ju = edges_gr(i,j,k,idir)%u(2)
+            ku = edges_gr(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ih,1:ng,1:km)
@@ -3378,13 +3322,6 @@ module boundaries
                                                    rbuf(l,1:nv,1:ih,1:ng,1:ng)
 #endif /* NDIMS == 3 */
             case(2)
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ng,1:jh,1:km)
@@ -3395,13 +3332,6 @@ module boundaries
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ng,1:ng,1:kh)
 #endif /* NDIMS == 3 */
@@ -5900,8 +5830,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : edges_dr
     use equations      , only : nv
 
 ! local variables are not implicit by default
@@ -5923,6 +5852,28 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! prepare indices for the edge region
+!
+#if NDIMS == 2
+    il = edges_dr(ic,jc,nc)%l(1)
+    jl = edges_dr(ic,jc,nc)%l(2)
+    ip = il + 1
+    jp = jl + 1
+    iu = edges_dr(ic,jc,nc)%u(1)
+    ju = edges_dr(ic,jc,nc)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    il = edges_dr(ic,jc,kc,nc)%l(1)
+    jl = edges_dr(ic,jc,kc,nc)%l(2)
+    kl = edges_dr(ic,jc,kc,nc)%l(3)
+    ip = il + 1
+    jp = jl + 1
+    kp = kl + 1
+    iu = edges_dr(ic,jc,kc,nc)%u(1)
+    ju = edges_dr(ic,jc,kc,nc)%u(2)
+    ku = edges_dr(ic,jc,kc,nc)%u(3)
+#endif /* NDIMS == 3 */
+
 ! process depending on the direction
 !
     select case(nc)
@@ -5931,32 +5882,6 @@ module boundaries
 ! calculate half size
 !
       ih = in / 2
-
-! prepare indices for the edge region
-!
-      il = ib
-      ip = il + 1
-      iu = ie
-      if (jc == 1) then
-        jl = je - nd + 1
-        jp = jl + 1
-        ju = je
-      else
-        jl = jb
-        jp = jl + 1
-        ju = jb + nd - 1
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nd + 1
-        kp = kl + 1
-        ku = ke
-      else
-        kl = kb
-        kp = kl + 1
-        ku = kb + nd - 1
-      end if
-#endif /* NDIMS == 3 */
 
 ! restrict the edge region to the output array
 !
@@ -5985,32 +5910,6 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nd + 1
-        ip = il + 1
-        iu = ie
-      else
-        il = ib
-        ip = il + 1
-        iu = ib + nd - 1
-      end if
-      jl = jb
-      jp = jl + 1
-      ju = je
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nd + 1
-        kp = kl + 1
-        ku = ke
-      else
-        kl = kb
-        kp = kl + 1
-        ku = kb + nd - 1
-      end if
-#endif /* NDIMS == 3 */
-
 ! restrict the edge region to the output array
 !
 #if NDIMS == 2
@@ -6038,30 +5937,6 @@ module boundaries
 ! calculate half size
 !
       kh = kn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nd + 1
-        ip = il + 1
-        iu = ie
-      else
-        il = ib
-        ip = il + 1
-        iu = ib + nd - 1
-      end if
-      if (jc == 1) then
-        jl = je - nd + 1
-        jp = jl + 1
-        ju = je
-      else
-        jl = jb
-        jp = jl + 1
-        ju = jb + nd - 1
-      end if
-      kl = kb
-      kp = kl + 1
-      ku = ke
 
 ! restrict the edge region to the output array
 !
