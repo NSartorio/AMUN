@@ -1203,10 +1203,7 @@ module boundaries
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : faces_gc, faces_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -1234,6 +1231,8 @@ module boundaries
     integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -1314,83 +1313,28 @@ module boundaries
                       if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare region indices for the face boundary update
+! prepare region indices of the block and its neighbor for the face boundary
+! update
 !
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = 1
-                            iu = ibl
-                          else
-                            il = ieu
-                            iu = im
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(2)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = 1
-                            ju = jbl
-                          else
-                            jl = jeu
-                            ju = jm
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(3)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = 1
-                            ku = kbl
-                          else
-                            kl = keu
-                            ku = km
-                          end if
-                        end select
+                        il = faces_gc(i,j,k,idir)%l(1)
+                        jl = faces_gc(i,j,k,idir)%l(2)
+                        kl = faces_gc(i,j,k,idir)%l(3)
+                        iu = faces_gc(i,j,k,idir)%u(1)
+                        ju = faces_gc(i,j,k,idir)%u(2)
+                        ku = faces_gc(i,j,k,idir)%u(3)
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+                        is = faces_dc(i,j,k,idir)%l(1)
+                        js = faces_dc(i,j,k,idir)%l(2)
+                        ks = faces_dc(i,j,k,idir)%l(3)
+                        it = faces_dc(i,j,k,idir)%u(1)
+                        jt = faces_dc(i,j,k,idir)%u(2)
+                        kt = faces_dc(i,j,k,idir)%u(3)
+
+! copy the corresponding face region from the neighbor to the current data
+! block
 !
-                        call block_face_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                        pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                 &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 
 #ifdef MPI
                       end if ! pneigh on the current process
@@ -1500,22 +1444,28 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
-! extract the corresponding face region from the neighbor and insert it
-! to the buffer
+! prepare region indices for the face boundary update
+!
+            is = faces_dc(i,j,k,idir)%l(1)
+            js = faces_dc(i,j,k,idir)%l(2)
+            ks = faces_dc(i,j,k,idir)%l(3)
+            it = faces_dc(i,j,k,idir)%u(1)
+            jt = faces_dc(i,j,k,idir)%u(2)
+            kt = faces_dc(i,j,k,idir)%u(3)
+
+! copy the corresponding face region from the neighbor and insert it to
+! the buffer
 !
             select case(idir)
             case(1)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:kh))
+              sbuf(l,1:nv,1:ng,1:jh,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             case(2)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:kh))
+              sbuf(l,1:nv,1:ih,1:ng,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             case(3)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:jh,1:ng))
+              sbuf(l,1:nv,1:ih,1:jh,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             end select
 
 ! associate the pointer with the next block
@@ -1524,7 +1474,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -1560,77 +1510,23 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
+! prepare region indices for the face boundary update
+!
+            il = faces_gc(i,j,k,idir)%l(1)
+            jl = faces_gc(i,j,k,idir)%l(2)
+            kl = faces_gc(i,j,k,idir)%l(3)
+            iu = faces_gc(i,j,k,idir)%u(1)
+            ju = faces_gc(i,j,k,idir)%u(2)
+            ku = faces_gc(i,j,k,idir)%u(3)
+
 ! update the corresponding face region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = 1
-                iu = ibl
-              else
-                il = ieu
-                iu = im
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:kh)
             case(2)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = 1
-                ju = jbl
-              else
-                jl = jeu
-                ju = jm
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:kh)
             case(3)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = 1
-                ku = kbl
-              else
-                kl = keu
-                ku = km
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:jh,1:ng)
             end select
 
@@ -5792,168 +5688,6 @@ module boundaries
 !  BLOCK FACE UPDATE SUBROUTINES
 !
 !===============================================================================
-!
-!===============================================================================
-!
-! subroutine BLOCK_FACE_COPY:
-! --------------------------
-!
-!   Subroutine returns the face boundary region copied from the provided
-!   input variable array.
-!
-!   Arguments:
-!
-!     nc         - the face direction;
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output face boundary array;
-!
-!===============================================================================
-!
-  subroutine block_face_copy(nc, ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: nc, ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
-
-! local indices
-!
-    integer :: ih, jh, kh
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half sizes
-!
-      jh = jn / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ng,1:jh,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    case(2)
-
-! calculate half sizes
-!
-      ih = in / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ih,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    case(3)
-
-! calculate half sizes
-!
-      ih = in / 2
-      jh = jn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ih,1:jh,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_face_copy
 !
 !===============================================================================
 !
