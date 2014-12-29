@@ -4114,9 +4114,8 @@ module boundaries
     use blocks         , only : list_meta
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : corners_gc, corners_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -4139,6 +4138,8 @@ module boundaries
     integer :: i , j , k
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -4220,44 +4221,45 @@ module boundaries
                       if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare the region indices for corner boundary update
-!
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
-#if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
-#endif /* NDIMS == 3 */
-
-! extract the corresponding corner region from the neighbor and insert it in
-! the current data block
-!
+! prepare region indices of the block and its neighbor for the corner boundary
+! update
 #if NDIMS == 2
-                        call block_corner_copy(i, j, k                         &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
+                        il = corners_gc(i,j  )%l(1)
+                        jl = corners_gc(i,j  )%l(2)
+                        iu = corners_gc(i,j  )%u(1)
+                        ju = corners_gc(i,j  )%u(2)
+
+                        is = corners_dc(i,j  )%l(1)
+                        js = corners_dc(i,j  )%l(2)
+                        it = corners_dc(i,j  )%u(1)
+                        jt = corners_dc(i,j  )%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_corner_copy(i, j, k                         &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                        il = corners_gc(i,j,k)%l(1)
+                        jl = corners_gc(i,j,k)%l(2)
+                        kl = corners_gc(i,j,k)%l(3)
+                        iu = corners_gc(i,j,k)%u(1)
+                        ju = corners_gc(i,j,k)%u(2)
+                        ku = corners_gc(i,j,k)%u(3)
+
+                        is = corners_dc(i,j,k)%l(1)
+                        js = corners_dc(i,j,k)%l(2)
+                        ks = corners_dc(i,j,k)%l(3)
+                        it = corners_dc(i,j,k)%u(1)
+                        jt = corners_dc(i,j,k)%u(2)
+                        kt = corners_dc(i,j,k)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding corner region from the neighbor to the current
+! data block
+!
+#if NDIMS == 2
+                        pmeta%data%q(1:nv,il:iu,jl:ju, 1:km)                   &
+                                       = pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                        pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku)                   &
+                                       = pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
@@ -4369,18 +4371,30 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding corner region from the neighbor and insert it
-! to the buffer
+! prepare the corner region indices for the neighbor
 !
 #if NDIMS == 2
-            call block_corner_copy(i, j, k                                     &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:km))
+            is = corners_dc(i,j  )%l(1)
+            js = corners_dc(i,j  )%l(2)
+            it = corners_dc(i,j  )%u(1)
+            jt = corners_dc(i,j  )%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            call block_corner_copy(i, j, k                                     &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:ng))
+            is = corners_dc(i,j,k)%l(1)
+            js = corners_dc(i,j,k)%l(2)
+            ks = corners_dc(i,j,k)%l(3)
+            it = corners_dc(i,j,k)%u(1)
+            jt = corners_dc(i,j,k)%u(2)
+            kt = corners_dc(i,j,k)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding corner region from the neighbor to the buffer
+!
+#if NDIMS == 2
+            sbuf(l,1:nv,1:ng,1:ng,1:km) = pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            sbuf(l,1:nv,1:ng,1:ng,1:ng) = pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 ! associate the pointer with the next block
@@ -4389,7 +4403,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -4427,30 +4441,21 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the corner region indices for the block
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = corners_gc(i,j  )%l(1)
+            jl = corners_gc(i,j  )%l(2)
+            iu = corners_gc(i,j  )%u(1)
+            ju = corners_gc(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = corners_gc(i,j,k)%l(1)
+            jl = corners_gc(i,j,k)%l(2)
+            kl = corners_gc(i,j,k)%l(3)
+            iu = corners_gc(i,j,k)%u(1)
+            ju = corners_gc(i,j,k)%u(2)
+            ku = corners_gc(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
@@ -6487,95 +6492,6 @@ module boundaries
 !  BLOCK CORNER UPDATE SUBROUTINES
 !
 !===============================================================================
-!
-!===============================================================================
-!
-! subroutine BLOCK_CORNER_COPY:
-! ----------------------------
-!
-!   Subroutine returns the corner boundary region by copying the corresponding
-!   region from the provided input variable array.
-!
-!   Arguments:
-!
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output corner boundary array;
-!
-!===============================================================================
-!
-  subroutine block_corner_copy(ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-#if NDIMS == 2
-    real(kind=8), dimension(1:nv,1:ng,1:ng,1:km), intent(out) :: qb
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    real(kind=8), dimension(1:nv,1:ng,1:ng,1:ng), intent(out) :: qb
-#endif /* NDIMS == 3 */
-
-! local indices
-!
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! prepare indices for the corner region
-!
-    if (ic == 1) then
-      il = iel
-      iu = ie
-    else
-      il = ib
-      iu = ibu
-    end if
-    if (jc == 1) then
-      jl = jel
-      ju = je
-    else
-      jl = jb
-      ju = jbu
-    end if
-#if NDIMS == 3
-    if (kc == 1) then
-      kl = kel
-      ku = ke
-    else
-      kl = kb
-      ku = kbu
-    end if
-#endif /* NDIMS == 3 */
-
-! copy the corner region to the output array
-!
-#if NDIMS == 2
-    qb(1:nv,1:ng,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    qb(1:nv,1:ng,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_corner_copy
 !
 !===============================================================================
 !
