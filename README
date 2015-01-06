@@ -18,7 +18,7 @@ following features are already implemented:
   reconstructions,
 * Riemann solvers of Roe- and HLL-types (HLL, HLLC, and HLLD),
 * periodic and open boundary conditions,
-* viscosity and resistivity source terms,
+* viscous and resistive source terms,
 * data stored in the HDF5 format,
 * MPI parallelization,
 * completely written in Fortran 2003.
