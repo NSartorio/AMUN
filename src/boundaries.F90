@@ -1960,10 +1960,7 @@ module boundaries
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : faces_gp
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -2075,88 +2072,42 @@ module boundaries
                       if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+! prepare indices of the region in which the boundaries should be updated
 !
                         select case(idir)
                         case(1)
-                          jc = pmeta%pos(2)
-                          kc = pmeta%pos(3)
-                          if (i == 1) then
-                            il = 1
-                            iu = ibl
-                          else
-                            il = ieu
-                            iu = im
-                          end if
-                          if (jc == 0) then
-                            jl = jb
-                            ju = jm
-                          else
-                            jl = 1
-                            ju = je
-                          end if
-                          if (kc == 0) then
-                            kl = kb
-                            ku = km
-                          else
-                            kl = 1
-                            ku = ke
-                          end if
+                          jc = pmeta%pos(2) + 1
+                          kc = pmeta%pos(3) + 1
+                          il = faces_gp(i ,jc,kc,idir)%l(1)
+                          jl = faces_gp(i ,jc,kc,idir)%l(2)
+                          kl = faces_gp(i ,jc,kc,idir)%l(3)
+                          iu = faces_gp(i ,jc,kc,idir)%u(1)
+                          ju = faces_gp(i ,jc,kc,idir)%u(2)
+                          ku = faces_gp(i ,jc,kc,idir)%u(3)
 
                         case(2)
-                          ic = pmeta%pos(1)
-                          kc = pmeta%pos(3)
-                          if (ic == 0) then
-                            il = ib
-                            iu = im
-                          else
-                            il = 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = 1
-                            ju = jbl
-                          else
-                            jl = jeu
-                            ju = jm
-                          end if
-                          if (kc == 0) then
-                            kl = kb
-                            ku = km
-                          else
-                            kl = 1
-                            ku = ke
-                          end if
+                          ic = pmeta%pos(1) + 1
+                          kc = pmeta%pos(3) + 1
+                          il = faces_gp(ic,j ,kc,idir)%l(1)
+                          jl = faces_gp(ic,j ,kc,idir)%l(2)
+                          kl = faces_gp(ic,j ,kc,idir)%l(3)
+                          iu = faces_gp(ic,j ,kc,idir)%u(1)
+                          ju = faces_gp(ic,j ,kc,idir)%u(2)
+                          ku = faces_gp(ic,j ,kc,idir)%u(3)
 
                         case(3)
-                          ic = pmeta%pos(1)
-                          jc = pmeta%pos(2)
-                          if (ic == 0) then
-                            il = ib
-                            iu = im
-                          else
-                            il = 1
-                            iu = ie
-                          end if
-                          if (jc == 0) then
-                            jl = jb
-                            ju = jm
-                          else
-                            jl = 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = 1
-                            ku = kbl
-                          else
-                            kl = keu
-                            ku = km
-                          end if
+                          ic = pmeta%pos(1) + 1
+                          jc = pmeta%pos(2) + 1
+                          il = faces_gp(ic,jc,k ,idir)%l(1)
+                          jl = faces_gp(ic,jc,k ,idir)%l(2)
+                          kl = faces_gp(ic,jc,k ,idir)%l(3)
+                          iu = faces_gp(ic,jc,k ,idir)%u(1)
+                          ju = faces_gp(ic,jc,k ,idir)%u(2)
+                          ku = faces_gp(ic,jc,k ,idir)%u(3)
                         end select
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+! take the neighbor volume, extract the corresponding face region and insert
+! it in the current data block
 !
                         call block_face_prolong(idir, ic, jc, kc               &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
@@ -2276,20 +2227,20 @@ module boundaries
 !
             select case(idir)
             case(1)
-              j = pmeta%pos(2)
-              k = pmeta%pos(3)
+              j = pmeta%pos(2) + 1
+              k = pmeta%pos(3) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ng,1:jh,1:kh))
             case(2)
-              i = pmeta%pos(1)
-              k = pmeta%pos(3)
+              i = pmeta%pos(1) + 1
+              k = pmeta%pos(3) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ih,1:ng,1:kh))
             case(3)
-              i = pmeta%pos(1)
-              j = pmeta%pos(2)
+              i = pmeta%pos(1) + 1
+              j = pmeta%pos(2) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ih,1:jh,1:ng))
@@ -2301,7 +2252,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -2341,74 +2292,47 @@ module boundaries
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = 1
-                iu = ibl
-              else
-                il = ieu
-                iu = im
-              end if
-              if (pmeta%pos(2) == 0) then
-                jl = jb
-                ju = jm
-              else
-                jl =  1
-                ju = je
-              end if
-              if (pmeta%pos(3) == 0) then
-                kl = kb
-                ku = km
-              else
-                kl =  1
-                ku = ke
-              end if
+
+              jc = pmeta%pos(2) + 1
+              kc = pmeta%pos(3) + 1
+
+              il = faces_gp(i ,jc,kc,idir)%l(1)
+              jl = faces_gp(i ,jc,kc,idir)%l(2)
+              kl = faces_gp(i ,jc,kc,idir)%l(3)
+              iu = faces_gp(i ,jc,kc,idir)%u(1)
+              ju = faces_gp(i ,jc,kc,idir)%u(2)
+              ku = faces_gp(i ,jc,kc,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:kh)
+
             case(2)
-              if (j == 1) then
-                jl = 1
-                ju = jbl
-              else
-                jl = jeu
-                ju = jm
-              end if
-              if (pmeta%pos(1) == 0) then
-                il = ib
-                iu = im
-              else
-                il =  1
-                iu = ie
-              end if
-              if (pmeta%pos(3) == 0) then
-                kl = kb
-                ku = km
-              else
-                kl =  1
-                ku = ke
-              end if
+
+              ic = pmeta%pos(1) + 1
+              kc = pmeta%pos(3) + 1
+
+              il = faces_gp(ic,j ,kc,idir)%l(1)
+              jl = faces_gp(ic,j ,kc,idir)%l(2)
+              kl = faces_gp(ic,j ,kc,idir)%l(3)
+              iu = faces_gp(ic,j ,kc,idir)%u(1)
+              ju = faces_gp(ic,j ,kc,idir)%u(2)
+              ku = faces_gp(ic,j ,kc,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:kh)
+
             case(3)
-              if (k == 1) then
-                kl = 1
-                ku = kbl
-              else
-                kl = keu
-                ku = km
-              end if
-              if (pmeta%pos(1) == 0) then
-                il = ib
-                iu = im
-              else
-                il =  1
-                iu = ie
-              end if
-              if (pmeta%pos(2) == 0) then
-                jl = jb
-                ju = jm
-              else
-                jl =  1
-                ju = je
-              end if
+
+              ic = pmeta%pos(1) + 1
+              jc = pmeta%pos(2) + 1
+
+              il = faces_gp(ic,jc,k ,idir)%l(1)
+              jl = faces_gp(ic,jc,k ,idir)%l(2)
+              kl = faces_gp(ic,jc,k ,idir)%l(3)
+              iu = faces_gp(ic,jc,k ,idir)%u(1)
+              ju = faces_gp(ic,jc,k ,idir)%u(2)
+              ku = faces_gp(ic,jc,k ,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:jh,1:ng)
+
             end select
 
 ! associate the pointer with the next block
@@ -5586,8 +5510,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : faces_dp
     use equations      , only : nv
     use interpolations , only : limiter
 
@@ -5617,103 +5540,12 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half sizes
-!
-      jh = jn / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ie - nh + 1
-        iu = ie
-      else
-        il = ib
-        iu = ib + nh - 1
-      end if
-      if (jc == 0) then
-        jl = jb
-        ju = jb + jh + nh - 1
-      else
-        jl = je - jh - nh + 1
-        ju = je
-      end if
-      if (kc == 0) then
-        kl = kb
-        ku = kb + kh + nh - 1
-      else
-        kl = ke - kh - nh + 1
-        ku = ke
-      end if
-
-    case(2)
-
-! calculate half sizes
-!
-      ih = in / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 0) then
-        il = ib
-        iu = ib + ih + nh - 1
-      else
-        il = ie - ih - nh + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = je - nh + 1
-        ju = je
-      else
-        jl = jb
-        ju = jb + nh - 1
-      end if
-      if (kc == 0) then
-        kl = kb
-        ku = kb + kh + nh - 1
-      else
-        kl = ke - kh - nh + 1
-        ku = ke
-      end if
-
-    case(3)
-
-! calculate half sizes
-!
-      ih = in / 2
-      jh = jn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 0) then
-        il = ib
-        iu = ib + ih + nh - 1
-      else
-        il = ie - ih - nh + 1
-        iu = ie
-      end if
-      if (jc == 0) then
-        jl = jb
-        ju = jb + jh + nh - 1
-      else
-        jl = je - jh - nh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = ke - nh + 1
-        ku = ke
-      else
-        kl = kb
-        ku = kb + nh - 1
-      end if
-
-    end select
+    il = faces_dp(ic,jc,kc,nc)%l(1)
+    jl = faces_dp(ic,jc,kc,nc)%l(2)
+    kl = faces_dp(ic,jc,kc,nc)%l(3)
+    iu = faces_dp(ic,jc,kc,nc)%u(1)
+    ju = faces_dp(ic,jc,kc,nc)%u(2)
+    ku = faces_dp(ic,jc,kc,nc)%u(3)
 
 ! iterate over all face region cells
 !
