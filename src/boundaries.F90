@@ -5540,6 +5540,8 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! prepare subregion indices
+!
     il = faces_dp(ic,jc,kc,nc)%l(1)
     jl = faces_dp(ic,jc,kc,nc)%l(2)
     kl = faces_dp(ic,jc,kc,nc)%l(3)
