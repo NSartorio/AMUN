@@ -20,9 +20,9 @@ fix_positivity       = "off"
 
 # mesh parameters
 #
-rdimx                =  1
-rdimy                =  1
-rdimz                =  1
+xblocks              =  1
+yblocks              =  1
+zblocks              =  1
 xmin                 = -5.0d-01
 xmax                 =  5.0d-01
 ymin                 = -5.0d-01
