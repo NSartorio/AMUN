@@ -255,10 +255,10 @@ module coordinates
 
 ! obtain the domain base division
 !
-    call get_parameter_integer("rdimx" , ir    )
-    call get_parameter_integer("rdimy" , jr    )
+    call get_parameter_integer("xblocks", ir   )
+    call get_parameter_integer("yblocks", jr   )
 #if NDIMS == 3
-    call get_parameter_integer("rdimz" , kr    )
+    call get_parameter_integer("zblocks", kr   )
 #endif /* NDIMS == 3 */
 
 ! obtain the domain bounds
