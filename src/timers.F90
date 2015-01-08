@@ -40,7 +40,7 @@ module timers
 !
   integer          , parameter                :: ntimers = 128
   integer                              , save :: ntimer
-  logical          , dimension(ntimers), save :: ftimer, tlocked
+  logical          , dimension(ntimers), save :: tenabled, tlocked
   character(len=32), dimension(ntimers), save :: description
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
   integer(kind=8)  , dimension(ntimers), save :: tcount
@@ -88,7 +88,7 @@ module timers
 ! initialize arrays of flags for indicating which timers are enabled, and lock
 ! currently active timers
 !
-    ftimer(:)      = .false.
+    tenabled(:)    = .false.
     tlocked(:)     = .false.
 
 ! initialize flag  desciptions
@@ -178,7 +178,7 @@ module timers
 
 ! set the timer flag
 !
-      ftimer(ntimer)      = .true.
+      tenabled(ntimer)      = .true.
 
 ! return the timer index
 !
@@ -411,7 +411,7 @@ module timers
 !
 ! estimate the accounted time for the specified timer
 !
-    timer_enabled = ftimer(timer)
+    timer_enabled = tenabled(timer)
 
 ! return the value
 !
