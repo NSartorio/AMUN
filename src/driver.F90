@@ -731,8 +731,11 @@ program amun
 
     write (*,'(1x,a)') 'EXECUTION TIMINGS'
     do i = 2, ntimers
-     if (timer_enabled(i)) write (*,tmp) timer_description(i), tm(i)           &
-                                                             , tm_conv * tm(i)
+     if (timer_enabled(i)) then
+       if (get_count(i) > 0) then
+         write (*,tmp) timer_description(i), tm(i), tm_conv * tm(i)
+       end if ! timer counter > 0
+     end if ! enabled
     end do
 
 ! print the execution times
