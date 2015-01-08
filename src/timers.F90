@@ -40,7 +40,7 @@ module timers
 !
   integer          , parameter                :: ntimers = 128
   integer                              , save :: ntimer
-  logical          , dimension(ntimers), save :: ftimer
+  logical          , dimension(ntimers), save :: ftimer, tlocked
   character(len=32), dimension(ntimers), save :: description
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
   integer(kind=8)  , dimension(ntimers), save :: tcount
@@ -85,9 +85,11 @@ module timers
 !
     call system_clock(count=tbegin, count_rate=ticks)
 
-! initialize flags array for indicating which timers are enabled
+! initialize arrays of flags for indicating which timers are enabled, and lock
+! currently active timers
 !
     ftimer(:)      = .false.
+    tlocked(:)     = .false.
 
 ! initialize flag  desciptions
 !
@@ -213,9 +215,26 @@ module timers
 !
 !-------------------------------------------------------------------------------
 !
-! get the system clock to initiate the time counting
+! check if the timer is unlocked, if not, lock it and star counting
 !
-    call system_clock(tstart(itimer))
+    if (tlocked(itimer)) then
+
+! the timer is already locked
+!
+      write(*,'("start_timer:: The timer -", a, "- is already locked!")')      &
+                                                     trim(description(itimer))
+
+    else ! unlocked
+
+! lock the timer
+!
+      tlocked(itimer) = .true.
+
+! get the system clock to initiate the counting
+!
+      call system_clock(tstart(itimer))
+
+    end if ! unlocked
 
 !-------------------------------------------------------------------------------
 !
@@ -246,17 +265,34 @@ module timers
 !
 !-------------------------------------------------------------------------------
 !
+! check if the timer is locked
+!
+    if (tlocked(itimer)) then
+
 ! get the system clock to terminate the time counting
 !
-    call system_clock(tstop(itimer))
+      call system_clock(tstop(itimer))
 
 ! add the time increment
 !
-    times(itimer)  = times(itimer) + (tstop(itimer) - tstart(itimer))
+      times(itimer)  = times(itimer) + (tstop(itimer) - tstart(itimer))
 
 ! increase the timer count
 !
-    tcount(itimer) = tcount(itimer) + 1
+      tcount(itimer) = tcount(itimer) + 1
+
+! unlock the timer
+!
+      tlocked(itimer) = .false.
+
+    else ! unlocked
+
+! the timer is unlocked, nothing to count
+!
+      write(*,'("stop_timer:: The timer -", a, "- is already unlocked!")')     &
+                                                     trim(description(itimer))
+
+    end if ! unlocked
 
 !-------------------------------------------------------------------------------
 !
