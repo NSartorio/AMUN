@@ -39,11 +39,11 @@ module timers
 ! module variables
 !
   integer          , parameter                :: ntimers = 128
-  integer                              , save :: ntimer, norder
-  logical          , dimension(ntimers), save :: ftimer, forder
+  integer                              , save :: ntimer
+  logical          , dimension(ntimers), save :: ftimer
   character(len=32), dimension(ntimers), save :: description
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
-  integer(kind=4)  , dimension(ntimers), save :: tcount, torder
+  integer(kind=8)  , dimension(ntimers), save :: tcount
   integer(kind=8)                      , save :: ticks, tbegin
   real   (kind=8)                      , save :: conv    = 1.0d+00
 
@@ -85,28 +85,24 @@ module timers
 !
     call system_clock(count=tbegin, count_rate=ticks)
 
-! initialize flags for enabled timers and timer order
+! initialize flags array for indicating which timers are enabled
 !
     ftimer(:)      = .false.
-    forder(:)      = .false.
 
 ! initialize flag  desciptions
 !
     description(:) = ''
 
-! initialize the next available timer and the number of occupied positions
-! in the order array
+! initialize the next available timer
 !
     ntimer         = 1
-    norder         = 0
 
-! reset timers
+! reset timer variables
 !
     times(:)       = 0
     tstart(:)      = 0
     tstop(:)       = 0
     tcount(:)      = 0
-    torder(:)      = 0
 
 ! prepare the conversion factor
 !
@@ -217,23 +213,9 @@ module timers
 !
 !-------------------------------------------------------------------------------
 !
-! start accounting the time
+! get the system clock to initiate the time counting
 !
     call system_clock(tstart(itimer))
-
-! return, if the timer is already allocated in the order array
-!
-    if (forder(itimer)) return
-
-! otherwise, increase the order position
-!
-    norder = norder + 1
-
-! assign the current timer with the order position and switch the flag
-! signifying that the timer is already in the order array
-!
-    torder(norder) = itimer
-    forder(itimer) = .true.
 
 !-------------------------------------------------------------------------------
 !
@@ -252,7 +234,7 @@ module timers
 !
 !===============================================================================
 !
-  subroutine stop_timer(timer)
+  subroutine stop_timer(itimer)
 
 ! local variables are not implicit by default
 !
@@ -260,21 +242,21 @@ module timers
 
 ! input arguments
 !
-    integer, intent(in) :: timer
+    integer, intent(in) :: itimer
 !
 !-------------------------------------------------------------------------------
 !
-! get the system clock
+! get the system clock to terminate the time counting
 !
-    call system_clock(tstop(timer))
-
-! increase the timer count
-!
-    tcount(timer) = tcount(timer) + 1
+    call system_clock(tstop(itimer))
 
 ! add the time increment
 !
-    times(timer) = times(timer) + (tstop(timer) - tstart(timer))
+    times(itimer)  = times(itimer) + (tstop(itimer) - tstart(itimer))
+
+! increase the timer count
+!
+    tcount(itimer) = tcount(itimer) + 1
 
 !-------------------------------------------------------------------------------
 !
