@@ -1163,7 +1163,8 @@ module equations
       u(imx,i) = q(idn,i) * q(ivx,i)
       u(imy,i) = q(idn,i) * q(ivy,i)
       u(imz,i) = q(idn,i) * q(ivz,i)
-      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ek       = 0.5d+00 * (u(imx,i) * q(ivx,i) + u(imy,i) * q(ivy,i)          &
+                                                + u(imz,i) * q(ivz,i))
       ei       = gammam1i * q(ipr,i)
       u(ien,i) = ei + ek
 
@@ -1228,7 +1229,8 @@ module equations
       q(ivx,i) = u(imx,i) / u(idn,i)
       q(ivy,i) = u(imy,i) / u(idn,i)
       q(ivz,i) = u(imz,i) / u(idn,i)
-      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ek       = 0.5d+00 * (u(imx,i) * q(ivx,i) + u(imy,i) * q(ivy,i)          &
+                                                + u(imz,i) * q(ivz,i))
       ei       = u(ien,i) - ek
       q(ipr,i) = gammam1 * ei
 
@@ -2199,7 +2201,8 @@ module equations
       u(ibz,i) = q(ibz,i)
       u(ibp,i) = q(ibp,i)
       ei       = gammam1i * q(ipr,i)
-      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ek       = 0.5d+00 * (u(imx,i) * q(ivx,i) + u(imy,i) * q(ivy,i)          &
+                                                + u(imz,i) * q(ivz,i))
       em       = 0.5d+00 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       u(ien,i) = ei + ek + em
 
@@ -2268,7 +2271,8 @@ module equations
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
       q(ibp,i) = u(ibp,i)
-      ek       = 0.5d+00 * sum(u(imx:imz,i) * q(ivx:ivz,i))
+      ek       = 0.5d+00 * (u(imx,i) * q(ivx,i) + u(imy,i) * q(ivy,i)          &
+                                                + u(imz,i) * q(ivz,i))
       em       = 0.5d+00 * sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       ei       = u(ien,i) - (ek + em)
       q(ipr,i) = gammam1 * ei
