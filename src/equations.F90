@@ -810,7 +810,8 @@ module equations
 
 ! local variables
 !
-    integer :: i
+    integer      :: i
+    real(kind=8) :: di
 !
 !-------------------------------------------------------------------------------
 !
@@ -824,10 +825,12 @@ module equations
 !
     do i = 1, n
 
+      di       = 1.0d+00 / u(idn,i)
+
       q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ivx,i) = u(imx,i) * di
+      q(ivy,i) = u(imy,i) * di
+      q(ivz,i) = u(imz,i) * di
 
     end do ! i = 1, n
 
@@ -1211,7 +1214,7 @@ module equations
 ! local variables
 !
     integer      :: i
-    real(kind=8) :: ek, ei
+    real(kind=8) :: di, ek, ei
 !
 !-------------------------------------------------------------------------------
 !
@@ -1225,10 +1228,12 @@ module equations
 !
     do i = 1, n
 
+      di       = 1.0d+00 / u(idn,i)
+
       q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ivx,i) = u(imx,i) * di
+      q(ivy,i) = u(imy,i) * di
+      q(ivz,i) = u(imz,i) * di
       ek       = 0.5d+00 * (u(imx,i) * q(ivx,i) + u(imy,i) * q(ivy,i)          &
                                                 + u(imz,i) * q(ivz,i))
       ei       = u(ien,i) - ek
@@ -1657,7 +1662,8 @@ module equations
 
 ! local variables
 !
-    integer :: i
+    integer      :: i
+    real(kind=8) :: di
 !
 !-------------------------------------------------------------------------------
 !
@@ -1671,10 +1677,12 @@ module equations
 !
     do i = 1, n
 
+      di       = 1.0d+00 / u(idn,i)
+
       q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ivx,i) = u(imx,i) * di
+      q(ivy,i) = u(imy,i) * di
+      q(ivz,i) = u(imz,i) * di
       q(ibx,i) = u(ibx,i)
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
@@ -2249,7 +2257,7 @@ module equations
 ! local variables
 !
     integer      :: i
-    real(kind=8) :: ei, ek, em
+    real(kind=8) :: di, ei, ek, em
 !
 !-------------------------------------------------------------------------------
 !
@@ -2263,10 +2271,12 @@ module equations
 !
     do i = 1, n
 
+      di       = 1.0d+00 / u(idn,i)
+
       q(idn,i) = u(idn,i)
-      q(ivx,i) = u(imx,i) / u(idn,i)
-      q(ivy,i) = u(imy,i) / u(idn,i)
-      q(ivz,i) = u(imz,i) / u(idn,i)
+      q(ivx,i) = u(imx,i) * di
+      q(ivy,i) = u(imy,i) * di
+      q(ivz,i) = u(imz,i) * di
       q(ibx,i) = u(ibx,i)
       q(iby,i) = u(iby,i)
       q(ibz,i) = u(ibz,i)
