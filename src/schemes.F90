@@ -479,10 +479,6 @@ module schemes
     call start_timer(imf)
 #endif /* PROFILE */
 
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
-
 ! select the directional flux to compute
 !
     select case(idir)
@@ -989,10 +985,6 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -1686,10 +1678,6 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -3007,10 +2995,6 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
-
-! reset the flux array
-!
-    f(:,:,:,:) = 0.0d+00
 
 ! select the directional flux to compute
 !
