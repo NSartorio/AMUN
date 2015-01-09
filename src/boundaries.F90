@@ -326,6 +326,7 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : ndims
+    use coordinates    , only : minlev, maxlev
 
 ! local variables are not implicit by default
 !
@@ -361,45 +362,51 @@ module boundaries
 !
     call boundaries_corner_copy()
 
+! do prolongation and restriction only if blocks are at different levels
+!
+    if (minlev /= maxlev) then
+
 #if NDIMS == 3
 ! restrict face boundaries from higher level blocks
 !
-    do idir = 1, ndims
-      call boundaries_face_restrict(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_face_restrict(idir)
+      end do ! idir
 #endif /* NDIMS == 3 */
 
 ! restricts edge boundaries from block at higher level
 !
-    do idir = 1, ndims
-      call boundaries_edge_restrict(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_edge_restrict(idir)
+      end do ! idir
 
 ! restricts corner boundaries from blocks at higher levels
 !
-    call boundaries_corner_restrict()
+      call boundaries_corner_restrict()
 
 ! update specific boundaries
 !
-    call boundaries_specific()
+      call boundaries_specific()
 
 #if NDIMS == 3
 ! prolong face boundaries from lower level blocks
 !
-    do idir = 1, ndims
-      call boundaries_face_prolong(idir)
-    end do ! idir
+       do idir = 1, ndims
+        call boundaries_face_prolong(idir)
+       end do ! idir
 #endif /* NDIMS == 3 */
 
 ! prolongs edge boundaries from block at lower level
 !
-    do idir = 1, ndims
-      call boundaries_edge_prolong(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_edge_prolong(idir)
+      end do ! idir
 
 ! prolong corner boundaries from blocks at lower levels
 !
-    call boundaries_corner_prolong()
+      call boundaries_corner_prolong()
+
+    end if ! minlev /= maxlev
 
 ! update specific boundaries
 !
