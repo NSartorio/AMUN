@@ -1229,22 +1229,22 @@ module schemes
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for Riemann solver
+! start accounting time for the Riemann solver
 !
     call start_timer(imr)
 #endif /* PROFILE */
 
-! calculate corresponding conserved variables of the left and right states
+! calculate the conserved variables of the left and right states
 !
-    call prim2cons(n, ql(:,:), ul(:,:))
-    call prim2cons(n, qr(:,:), ur(:,:))
+    call prim2cons(n, ql(1:nv,1:n), ul(1:nv,1:n))
+    call prim2cons(n, qr(1:nv,1:n), ur(1:nv,1:n))
 
-! calculate the physical fluxes and speeds at the states
+! calculate the physical fluxes and speeds at both states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(1:nv,1:n), ul(1:nv,1:n), fl(1:nv,1:n), cl(1:n))
+    call fluxspeed(n, qr(1:nv,1:n), ur(1:nv,1:n), fr(1:nv,1:n), cr(1:n))
 
-! iterate over all points
+! iterate over all position
 !
     do i = 1, n
 
@@ -1257,33 +1257,33 @@ module schemes
 !
       if (sl >= 0.0d+00) then
 
-        f(:,i) = fl(:,i)
+        f(1:nv,i) = fl(1:nv,i)
 
       else if (sr <= 0.0d+00) then
 
-        f(:,i) = fr(:,i)
+        f(1:nv,i) = fr(1:nv,i)
 
       else ! sl < 0 < sr
 
-! calculate speed difference
+! calculate the inverse of speed difference
 !
-        srml = sr - sl
+        srml = 1.0d+00 / (sr - sl)
 
 ! calculate vectors of the left and right-going waves
 !
-        wl(:)  = sl * ul(:,i) - fl(:,i)
-        wr(:)  = sr * ur(:,i) - fr(:,i)
+        wl(1:nv)  = sl * ul(1:nv,i) - fl(1:nv,i)
+        wr(1:nv)  = sr * ur(1:nv,i) - fr(1:nv,i)
 
-! calculate the fluxes for the intermediate state
+! calculate fluxes for the intermediate state
 !
-        f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+        f(1:nv,i) = (sl * wr(1:nv) - sr * wl(1:nv)) * srml
 
       end if ! sl < 0 < sr
 
     end do ! i = 1, n
 
 #ifdef PROFILE
-! stop accounting time for Riemann solver
+! stop accounting time for the Riemann solver
 !
     call stop_timer(imr)
 #endif /* PROFILE */
