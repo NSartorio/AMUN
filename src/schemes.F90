@@ -1337,8 +1337,8 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm
-    real(kind=8)                  :: srml, slmm, srmm
-    real(kind=8)                  :: dn, pr
+    real(kind=8)                  :: slmm, srmm
+    real(kind=8)                  :: di, pr
 
 ! local arrays to store the states
 !
@@ -1354,15 +1354,15 @@ module schemes
     call start_timer(imr)
 #endif /* PROFILE */
 
-! calculate corresponding conserved variables of the left and right states
+! calculate the conserved variables of the left and right states
 !
-    call prim2cons(n, ql(:,:), ul(:,:))
-    call prim2cons(n, qr(:,:), ur(:,:))
+    call prim2cons(n, ql(1:nv,1:n), ul(1:nv,1:n))
+    call prim2cons(n, qr(1:nv,1:n), ur(1:nv,1:n))
 
-! calculate the physical fluxes and speeds at the states
+! calculate the physical fluxes and speeds at both states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(1:nv,1:n), ul(1:nv,1:n), fl(1:nv,1:n), cl(1:n))
+    call fluxspeed(n, qr(1:nv,1:n), ur(1:nv,1:n), fr(1:nv,1:n), cr(1:n))
 
 ! iterate over all points
 !
@@ -1377,31 +1377,27 @@ module schemes
 !
       if (sl >= 0.0d+00) then
 
-        f(:,i) = fl(:,i)
+        f(1:nv,i) = fl(1:nv,i)
 
       else if (sr <= 0.0d+00) then
 
-        f(:,i) = fr(:,i)
+        f(1:nv,i) = fr(1:nv,i)
 
       else ! sl < 0 < sr
 
-! calculate speed difference
-!
-        srml  = sr - sl
-
 ! calculate vectors of the left and right-going waves
 !
-        wl(:) = sl * ul(:,i) - fl(:,i)
-        wr(:) = sr * ur(:,i) - fr(:,i)
+        wl(1:nv) = sl * ul(1:nv,i) - fl(1:nv,i)
+        wr(1:nv) = sr * ur(1:nv,i) - fr(1:nv,i)
 
 ! the speed of contact discontinuity
 !
-        dn    =  wr(idn) - wl(idn)
-        sm    = (wr(imx) - wl(imx)) / dn
+        di = 1.0d+00 / (wr(idn) - wl(idn))
+        sm = (wr(imx) - wl(imx)) * di
 
-! calculate the pressure if the intermediate state
+! calculate the pressure of the intermediate state
 !
-        pr    = 0.5d+00 * ((wr(idn) * sm - wr(imx)) + (wl(idn) * sm - wl(imx)))
+        pr = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) * di
 
 ! separate intermediate states depending on the sign of the advection speed
 !
@@ -1421,7 +1417,7 @@ module schemes
 
 ! the left intermediate flux
 !
-          f(:,i)  = sl * ui(:) - wl(:)
+          f(1:nv,i)  = sl * ui(1:nv) - wl(1:nv)
 
         else if (sm < 0.0d+00) then ! sm < 0
 
@@ -1439,7 +1435,7 @@ module schemes
 
 ! the right intermediate flux
 !
-          f(:,i)  = sr * ui(:) - wr(:)
+          f(1:nv,i)  = sr * ui(1:nv) - wr(1:nv)
 
         else ! sm = 0
 
@@ -1447,7 +1443,7 @@ module schemes
 ! the parallel momentum flux are zero
 !
           f(idn,i) =   0.0d+00
-          f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
+          f(imx,i) = - wl(imx)
           f(imy,i) =   0.0d+00
           f(imz,i) =   0.0d+00
           f(ien,i) =   0.0d+00
