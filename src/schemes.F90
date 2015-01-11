@@ -1267,7 +1267,7 @@ module schemes
 
 ! calculate the inverse of speed difference
 !
-        srml = 1.0d+00 / (sr - sl)
+        srml = sr - sl
 
 ! calculate vectors of the left and right-going waves
 !
@@ -1276,7 +1276,7 @@ module schemes
 
 ! calculate fluxes for the intermediate state
 !
-        f(1:nv,i) = (sl * wr(1:nv) - sr * wl(1:nv)) * srml
+        f(1:nv,i) = (sl * wr(1:nv) - sr * wl(1:nv)) / srml
 
       end if ! sl < 0 < sr
 
@@ -1338,7 +1338,7 @@ module schemes
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm
     real(kind=8)                  :: slmm, srmm
-    real(kind=8)                  :: di, pr
+    real(kind=8)                  :: dn, pr
 
 ! local arrays to store the states
 !
@@ -1392,12 +1392,12 @@ module schemes
 
 ! the speed of contact discontinuity
 !
-        di = 1.0d+00 / (wr(idn) - wl(idn))
-        sm = (wr(imx) - wl(imx)) * di
+        dn =  wr(idn) - wl(idn)
+        sm = (wr(imx) - wl(imx)) / dn
 
 ! calculate the pressure of the intermediate state
 !
-        pr = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) * di
+        pr = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn
 
 ! separate intermediate states depending on the sign of the advection speed
 !
