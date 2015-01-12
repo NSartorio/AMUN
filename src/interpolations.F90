@@ -111,7 +111,6 @@ module interpolations
 ! local variables
 !
     character(len=255) :: sreconstruction = "tvd"
-    character(len=255) :: sweights        = "yc"
     character(len=255) :: slimiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
@@ -136,7 +135,6 @@ module interpolations
 ! obtain the user defined interpolation methods and coefficients
 !
     call get_parameter_string ("reconstruction" , sreconstruction)
-    call get_parameter_string ("stencil_weights", sweights       )
     call get_parameter_string ("limiter"        , slimiter       )
     call get_parameter_string ("fix_positivity" , positivity_fix )
     call get_parameter_string ("clip_extrema"   , clip_extrema   )
