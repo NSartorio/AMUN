@@ -256,7 +256,9 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : ndims, block_meta, list_meta
+    use blocks         , only : block_meta, block_leaf
+    use blocks         , only : list_meta, list_leaf
+    use blocks         , only : ndims
     use blocks         , only : get_mblocks, get_nleafs
     use coordinates    , only : ng, nd, in, jn, kn, im, jm, km, ir, jr, kr, toplev
     use mpitools       , only : master, nprocs
@@ -278,6 +280,7 @@ module mesh
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+    type(block_leaf), pointer :: pleaf
 
 ! local saved variables
 !
@@ -373,33 +376,30 @@ module mesh
         cdist(:) = 0
 #endif /* MPI */
 
-! set the pointer to the first block on the meta block list
+! associate pleaf with the first block on the leaf list
 !
-        pmeta => list_meta
+        pleaf => list_leaf
 
-! scan all meta blocks and prepare get the block level and process
-! distributions
+! scan all leaf meta blocks in the list
 !
-        do while(associated(pmeta))
+        do while(associated(pleaf))
 
-! process only leafs
+! get the associated meta block
 !
-          if (pmeta%leaf) then
+          pmeta => pleaf%meta
 
 ! increase the block level and process counts
 !
-            ldist(pmeta%level)     = ldist(pmeta%level)     + 1
+          ldist(pmeta%level)     = ldist(pmeta%level)     + 1
 #ifdef MPI
-            cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
+          cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
 #endif /* MPI */
 
-          end if ! the leaf
-
-! associate the pointer with the next block
+! associate pleaf with the next leaf on the list
 !
-          pmeta => pmeta%next
+          pleaf => pleaf%next
 
-        end do ! pmeta
+        end do ! over leaf blocks
 
 ! write down the block statistics
 !
