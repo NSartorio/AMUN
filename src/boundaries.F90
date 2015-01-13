@@ -1934,9 +1934,7 @@ module boundaries
 ! subroutine BOUNDARIES_FACE_PROLONG:
 ! ----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find face neighbors which
-!   are on different levels, and perform the update of face boundaries of
-!   higher blocks by prolongating them from lower level neighbors.
+!   Subroutine updates the face boundaries from blocks on lower level.
 !
 !   Arguments:
 !
@@ -1949,8 +1947,8 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
@@ -1973,6 +1971,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -2014,127 +2013,122 @@ module boundaries
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
-        do k = 1, nsides
-          kc = k
-          do j = 1, nsides
-            jc = j
-            do i = 1, nsides
-              ic = i
+      do k = 1, nsides
+        kc = k
+        do j = 1, nsides
+          jc = j
+          do i = 1, nsides
+            ic = i
 
 ! associate pneigh with the current neighbor
 !
-              pneigh => pmeta%faces(i,j,k,idir)%ptr
+            pneigh => pmeta%faces(i,j,k,idir)%ptr
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare indices of the region in which the boundaries should be updated
 !
-                        select case(idir)
-                        case(1)
-                          jc = pmeta%pos(2) + 1
-                          kc = pmeta%pos(3) + 1
-                          il = faces_gp(i ,jc,kc,idir)%l(1)
-                          jl = faces_gp(i ,jc,kc,idir)%l(2)
-                          kl = faces_gp(i ,jc,kc,idir)%l(3)
-                          iu = faces_gp(i ,jc,kc,idir)%u(1)
-                          ju = faces_gp(i ,jc,kc,idir)%u(2)
-                          ku = faces_gp(i ,jc,kc,idir)%u(3)
+                      select case(idir)
+                      case(1)
+                        jc = pmeta%pos(2) + 1
+                        kc = pmeta%pos(3) + 1
+                        il = faces_gp(i ,jc,kc,idir)%l(1)
+                        jl = faces_gp(i ,jc,kc,idir)%l(2)
+                        kl = faces_gp(i ,jc,kc,idir)%l(3)
+                        iu = faces_gp(i ,jc,kc,idir)%u(1)
+                        ju = faces_gp(i ,jc,kc,idir)%u(2)
+                        ku = faces_gp(i ,jc,kc,idir)%u(3)
 
-                        case(2)
-                          ic = pmeta%pos(1) + 1
-                          kc = pmeta%pos(3) + 1
-                          il = faces_gp(ic,j ,kc,idir)%l(1)
-                          jl = faces_gp(ic,j ,kc,idir)%l(2)
-                          kl = faces_gp(ic,j ,kc,idir)%l(3)
-                          iu = faces_gp(ic,j ,kc,idir)%u(1)
-                          ju = faces_gp(ic,j ,kc,idir)%u(2)
-                          ku = faces_gp(ic,j ,kc,idir)%u(3)
+                      case(2)
+                        ic = pmeta%pos(1) + 1
+                        kc = pmeta%pos(3) + 1
+                        il = faces_gp(ic,j ,kc,idir)%l(1)
+                        jl = faces_gp(ic,j ,kc,idir)%l(2)
+                        kl = faces_gp(ic,j ,kc,idir)%l(3)
+                        iu = faces_gp(ic,j ,kc,idir)%u(1)
+                        ju = faces_gp(ic,j ,kc,idir)%u(2)
+                        ku = faces_gp(ic,j ,kc,idir)%u(3)
 
-                        case(3)
-                          ic = pmeta%pos(1) + 1
-                          jc = pmeta%pos(2) + 1
-                          il = faces_gp(ic,jc,k ,idir)%l(1)
-                          jl = faces_gp(ic,jc,k ,idir)%l(2)
-                          kl = faces_gp(ic,jc,k ,idir)%l(3)
-                          iu = faces_gp(ic,jc,k ,idir)%u(1)
-                          ju = faces_gp(ic,jc,k ,idir)%u(2)
-                          ku = faces_gp(ic,jc,k ,idir)%u(3)
-                        end select
+                      case(3)
+                        ic = pmeta%pos(1) + 1
+                        jc = pmeta%pos(2) + 1
+                        il = faces_gp(ic,jc,k ,idir)%l(1)
+                        jl = faces_gp(ic,jc,k ,idir)%l(2)
+                        kl = faces_gp(ic,jc,k ,idir)%l(3)
+                        iu = faces_gp(ic,jc,k ,idir)%u(1)
+                        ju = faces_gp(ic,jc,k ,idir)%u(2)
+                        ku = faces_gp(ic,jc,k ,idir)%u(3)
+                      end select
 
 ! take the neighbor volume, extract the corresponding face region and insert
 ! it in the current data block
 !
-                        call block_face_prolong(idir, ic, jc, kc               &
+                      call block_face_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
+                end if ! pmeta and pneigh marked for update
 
-                  end if ! pmeta and pneigh marked for update
+              end if ! neighbor at lower level
 
-                end if ! neighbor at lower level
+            end if ! neighbor associated
 
-              end if ! neighbor associated
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+      end do ! k = 1, nsides
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
-        end do ! k = 1, nsides
-
-      end if ! leaf
-
-! associate pmeta with the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
