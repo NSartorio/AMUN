@@ -1265,9 +1265,7 @@ module boundaries
     kh = kn / 2
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
@@ -1647,9 +1645,7 @@ module boundaries
     kh = kn / 2
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
@@ -2021,9 +2017,7 @@ module boundaries
     kh = kn + ng
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
@@ -2463,9 +2457,7 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
@@ -2930,9 +2922,7 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
@@ -3381,9 +3371,7 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
