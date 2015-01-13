@@ -227,6 +227,20 @@ module blocks
 
   end type block_meta
 
+! define the LEAF structure; this is a simple structure used to keep the leaf
+! list; it contains the pointer to the next leaf block and the pointer to
+! the meta block which is leaf;
+!
+  type block_leaf
+                                 ! pointer to the next leaf block
+                                 !
+    type(block_leaf), pointer :: next
+                                 ! pointer to the leaf meta block
+                                 !
+    type(block_meta), pointer :: meta
+
+  end type block_leaf
+
 ! define the DATA block structure; all data blocks are divided between
 ! processes, therefore the same data block cannot be associated with two
 ! different processes, but they can be moved from one process to another;
