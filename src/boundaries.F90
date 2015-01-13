@@ -1204,8 +1204,8 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
@@ -1228,6 +1228,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -1270,106 +1271,102 @@ module boundaries
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
-        do k = 1, nsides
-          do j = 1, nsides
-            do i = 1, nsides
+      do k = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! associate pneigh with the current neighbor
 !
-              pneigh => pmeta%faces(i,j,k,idir)%ptr
+            pneigh => pmeta%faces(i,j,k,idir)%ptr
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at the same level
 !
-                if (pneigh%level == pmeta%level) then
+              if (pneigh%level == pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare region indices of the block and its neighbor for the face boundary
 ! update
 !
-                        il = faces_gc(i,j,k,idir)%l(1)
-                        jl = faces_gc(i,j,k,idir)%l(2)
-                        kl = faces_gc(i,j,k,idir)%l(3)
-                        iu = faces_gc(i,j,k,idir)%u(1)
-                        ju = faces_gc(i,j,k,idir)%u(2)
-                        ku = faces_gc(i,j,k,idir)%u(3)
+                      il = faces_gc(i,j,k,idir)%l(1)
+                      jl = faces_gc(i,j,k,idir)%l(2)
+                      kl = faces_gc(i,j,k,idir)%l(3)
+                      iu = faces_gc(i,j,k,idir)%u(1)
+                      ju = faces_gc(i,j,k,idir)%u(2)
+                      ku = faces_gc(i,j,k,idir)%u(3)
 
-                        is = faces_dc(i,j,k,idir)%l(1)
-                        js = faces_dc(i,j,k,idir)%l(2)
-                        ks = faces_dc(i,j,k,idir)%l(3)
-                        it = faces_dc(i,j,k,idir)%u(1)
-                        jt = faces_dc(i,j,k,idir)%u(2)
-                        kt = faces_dc(i,j,k,idir)%u(3)
+                      is = faces_dc(i,j,k,idir)%l(1)
+                      js = faces_dc(i,j,k,idir)%l(2)
+                      ks = faces_dc(i,j,k,idir)%l(3)
+                      it = faces_dc(i,j,k,idir)%u(1)
+                      jt = faces_dc(i,j,k,idir)%u(2)
+                      kt = faces_dc(i,j,k,idir)%u(3)
 
 ! copy the corresponding face region from the neighbor to the current data
 ! block
 !
-                        pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                 &
+                      pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                   &
                                          pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
-        end do ! k = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+      end do ! k = 1, nsides
 
-      end if ! leaf
-
-! associate pmeta with the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
