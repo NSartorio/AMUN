@@ -312,10 +312,12 @@ module blocks
 ! POINTERS TO THE FIST AND LAST BLOCKS IN THE LISTS:
 ! =================================================
 !
-! these pointers construct the lists of meta and data blocks;
+! these pointers construct the lists of meta and data blocks, and the list of
+! leaf blocks;
 !
   type(block_meta), pointer, save :: list_meta, last_meta
   type(block_data), pointer, save :: list_data, last_data
+  type(block_leaf), pointer, save :: list_leaf
 
 ! all variables and subroutines are private by default
 !
@@ -325,7 +327,7 @@ module blocks
 !
   public :: pointer_meta, pointer_info
   public :: block_meta, block_data, block_info
-  public :: list_meta, list_data
+  public :: list_meta, list_data, list_leaf
   public :: ndims, nsides, nchildren
 
 ! declare public subroutines
@@ -433,6 +435,7 @@ module blocks
     nullify(list_data)
     nullify(last_meta)
     nullify(last_data)
+    nullify(list_leaf)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -504,6 +507,7 @@ module blocks
     nullify(list_data)
     nullify(last_meta)
     nullify(last_data)
+    nullify(list_leaf)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
