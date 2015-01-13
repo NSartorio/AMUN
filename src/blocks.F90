@@ -348,6 +348,7 @@ module blocks
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
   public :: metablock_set_bounds, metablock_set_leaf, metablock_unset_leaf
+  public :: build_leaf_list
 #ifdef DEBUG
   public :: check_neighbors
 #endif /* DEBUG */
@@ -3717,6 +3718,70 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine metablock_unset_update
+!
+!===============================================================================
+!
+! subroutine BUILD_LEAF_LIST:
+! ---------------------------
+!
+!   Subroutine builds the list of leaf blocks.
+!
+!
+!===============================================================================
+!
+  subroutine build_leaf_list()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer  :: pmeta
+    type(block_leaf), pointer  :: pleaf
+!
+!-------------------------------------------------------------------------------
+!
+! if the list_leaf is associated, wipe it out
+!
+    if (associated(list_leaf)) call wipe_leaf_list()
+
+! associate pmeta with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all meta blocks in the list
+!
+    do while (associated(pmeta))
+
+! check if the block is the leaf
+!
+      if (pmeta%leaf) then
+
+! allocate new leaf structure
+!
+        allocate(pleaf)
+
+! associate its pointers
+!
+        pleaf%next => list_leaf
+        pleaf%meta => pmeta
+
+! associate list_leaf to the allocated structure
+!
+        list_leaf  => pleaf
+
+      end if ! leaf
+
+! associate pmeta with the next meta block
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine build_leaf_list
 !
 !===============================================================================
 !
