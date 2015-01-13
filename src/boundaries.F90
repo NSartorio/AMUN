@@ -45,7 +45,8 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer                , save :: imi, imv, imf, ims, imc, imr, imp, imu
+  integer                , save :: imi, imv, imf, ims, imu
+  integer                , save :: ifc, ifr, ifp, iec, ier, iep, icc, icr, icp
 #endif /* PROFILE */
 
 ! parameters corresponding to the boundary type
@@ -133,14 +134,20 @@ module boundaries
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('boundaries:: initialization', imi)
-    call set_timer('boundaries:: variables'     , imv)
-    call set_timer('boundaries:: fluxes'        , imf)
-    call set_timer('boundaries:: specific'      , ims)
-    call set_timer('boundaries:: copy'          , imc)
-    call set_timer('boundaries:: restrict'      , imr)
-    call set_timer('boundaries:: prolong'       , imp)
-    call set_timer('boundaries:: update ghosts' , imu)
+    call set_timer('boundaries:: initialization' , imi)
+    call set_timer('boundaries:: variables'      , imv)
+    call set_timer('boundaries:: fluxes'         , imf)
+    call set_timer('boundaries:: specific'       , ims)
+    call set_timer('boundaries:: face copy'      , ifc)
+    call set_timer('boundaries:: face restrict'  , ifr)
+    call set_timer('boundaries:: face prolong'   , ifp)
+    call set_timer('boundaries:: edge copy'      , iec)
+    call set_timer('boundaries:: edge restrict'  , ier)
+    call set_timer('boundaries:: edge prolong'   , iep)
+    call set_timer('boundaries:: corner copy'    , icc)
+    call set_timer('boundaries:: corner restrict', icr)
+    call set_timer('boundaries:: corner prolong' , icp)
+    call set_timer('boundaries:: update ghosts'  , imu)
 
 ! start accounting time for module initialization/finalization
 !
@@ -1184,9 +1191,7 @@ module boundaries
 ! subroutine BOUNDARIES_FACE_COPY:
 ! -------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find face neighbors which
-!   are the same level, and perform the update of the face boundaries between
-!   them.
+!   Subroutine updates the face boundaries between blocks on the same level.
 !
 !   Arguments:
 !
@@ -1248,9 +1253,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the face boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(ifc)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -1554,9 +1559,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the face boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(ifc)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -1630,9 +1635,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the face boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(ifr)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -1927,9 +1932,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the face boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(ifr)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -2004,9 +2009,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the face boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(ifp)
 #endif /* PROFILE */
 
 ! calculate the sizes
@@ -2359,9 +2364,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the face boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(ifp)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -2444,9 +2449,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the edge boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(iec)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -2835,9 +2840,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the edge boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(iec)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -2911,9 +2916,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the edge boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(ier)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -3285,9 +3290,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the edge boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(ier)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -3362,9 +3367,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the edge boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(iep)
 #endif /* PROFILE */
 
 ! calculate the sizes
@@ -3804,9 +3809,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the edge boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(iep)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -3879,9 +3884,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the corner boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(icc)
 #endif /* PROFILE */
 
 #ifdef MPI
@@ -4215,9 +4220,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the corner boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(icc)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -4282,9 +4287,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the corner boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(icr)
 #endif /* PROFILE */
 
 #ifdef MPI
@@ -4595,9 +4600,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the corner boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(icr)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -4662,9 +4667,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the corner boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(icp)
 #endif /* PROFILE */
 
 #ifdef MPI
@@ -4975,9 +4980,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the corner boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(icp)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
