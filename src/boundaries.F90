@@ -3270,9 +3270,7 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_PROLONG:
 ! ----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors which
-!   are on different levels, and perform the update of edge boundaries of
-!   higher blocks by prolongating them from lower level neighbors.
+!   Subroutine updates the edge boundaries from blocks on lower level.
 !
 !   Arguments:
 !
@@ -3285,8 +3283,8 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
@@ -3309,6 +3307,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -3352,160 +3351,156 @@ module boundaries
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE EDGE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
-          kc = k
+      do k = 1, nsides
+        kc = k
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            jc = j
-            do i = 1, nsides
-              ic = i
+        do j = 1, nsides
+          jc = j
+          do i = 1, nsides
+            ic = i
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%edges(i,j,idir)%ptr
+            pneigh => pmeta%edges(i,j,idir)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%edges(i,j,k,idir)%ptr
+            pneigh => pmeta%edges(i,j,k,idir)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
 !
-                        select case(idir)
-                        case(1)
+                      select case(idir)
+                      case(1)
 
-                          ic = pmeta%pos(1) + 1
-
-#if NDIMS == 2
-                          il = edges_gp(ic,j  ,idir)%l(1)
-                          iu = edges_gp(ic,j  ,idir)%u(1)
-                          jl = edges_gp(i ,j  ,idir)%l(2)
-                          ju = edges_gp(i ,j  ,idir)%u(2)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-                          il = edges_gp(ic,j,k,idir)%l(1)
-                          iu = edges_gp(ic,j,k,idir)%u(1)
-                          jl = edges_gp(i ,j,k,idir)%l(2)
-                          ju = edges_gp(i ,j,k,idir)%u(2)
-                          kl = edges_gp(i ,j,k,idir)%l(3)
-                          ku = edges_gp(i ,j,k,idir)%u(3)
-#endif /* NDIMS == 3 */
-                        case(2)
-
-                          jc = pmeta%pos(2) + 1
+                        ic = pmeta%pos(1) + 1
 
 #if NDIMS == 2
-                          il = edges_gp(i,j   ,idir)%l(1)
-                          iu = edges_gp(i,j   ,idir)%u(1)
-                          jl = edges_gp(i,jc  ,idir)%l(2)
-                          ju = edges_gp(i,jc  ,idir)%u(2)
+                        il = edges_gp(ic,j  ,idir)%l(1)
+                        iu = edges_gp(ic,j  ,idir)%u(1)
+                        jl = edges_gp(i ,j  ,idir)%l(2)
+                        ju = edges_gp(i ,j  ,idir)%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                          il = edges_gp(i,j ,k,idir)%l(1)
-                          iu = edges_gp(i,j ,k,idir)%u(1)
-                          jl = edges_gp(i,jc,k,idir)%l(2)
-                          ju = edges_gp(i,jc,k,idir)%u(2)
-                          kl = edges_gp(i,j ,k,idir)%l(3)
-                          ku = edges_gp(i,j ,k,idir)%u(3)
-                        case(3)
-
-                          kc = pmeta%pos(3) + 1
-
-                          il = edges_gp(i,j,k ,idir)%l(1)
-                          iu = edges_gp(i,j,k ,idir)%u(1)
-                          jl = edges_gp(i,j,k ,idir)%l(2)
-                          ju = edges_gp(i,j,k ,idir)%u(2)
-                          kl = edges_gp(i,j,kc,idir)%l(3)
-                          ku = edges_gp(i,j,kc,idir)%u(3)
+                        il = edges_gp(ic,j,k,idir)%l(1)
+                        iu = edges_gp(ic,j,k,idir)%u(1)
+                        jl = edges_gp(i ,j,k,idir)%l(2)
+                        ju = edges_gp(i ,j,k,idir)%u(2)
+                        kl = edges_gp(i ,j,k,idir)%l(3)
+                        ku = edges_gp(i ,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
-                        end select
+                      case(2)
+
+                        jc = pmeta%pos(2) + 1
+
+#if NDIMS == 2
+                        il = edges_gp(i,j   ,idir)%l(1)
+                        iu = edges_gp(i,j   ,idir)%u(1)
+                        jl = edges_gp(i,jc  ,idir)%l(2)
+                        ju = edges_gp(i,jc  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                        il = edges_gp(i,j ,k,idir)%l(1)
+                        iu = edges_gp(i,j ,k,idir)%u(1)
+                        jl = edges_gp(i,jc,k,idir)%l(2)
+                        ju = edges_gp(i,jc,k,idir)%u(2)
+                        kl = edges_gp(i,j ,k,idir)%l(3)
+                        ku = edges_gp(i,j ,k,idir)%u(3)
+                      case(3)
+
+                        kc = pmeta%pos(3) + 1
+
+                        il = edges_gp(i,j,k ,idir)%l(1)
+                        iu = edges_gp(i,j,k ,idir)%u(1)
+                        jl = edges_gp(i,j,k ,idir)%l(2)
+                        ju = edges_gp(i,j,k ,idir)%u(2)
+                        kl = edges_gp(i,j,kc,idir)%l(3)
+                        ku = edges_gp(i,j,kc,idir)%u(3)
+#endif /* NDIMS == 3 */
+                      end select
 
 ! extract the corresponding edge region from the neighbor and insert it in
 ! the current data block
 !
 #if NDIMS == 2
-                        call block_edge_prolong(idir, ic, jc, kc               &
+                      call block_edge_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_edge_prolong(idir, ic, jc, kc               &
+                      call block_edge_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at lower level
+              end if ! neighbor at lower level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! associate the pointer to the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
