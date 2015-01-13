@@ -326,7 +326,7 @@ module blocks
 ! declare public pointers, structures, and variables
 !
   public :: pointer_meta, pointer_info
-  public :: block_meta, block_data, block_info
+  public :: block_meta, block_data, block_info, block_leaf
   public :: list_meta, list_data, list_leaf
   public :: ndims, nsides, nchildren
 
