@@ -4559,9 +4559,7 @@ module boundaries
 ! subroutine BOUNDARIES_CORNER_PROLONG:
 ! ------------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors at
-!   different levels, and update the corner boundaries of blocks at higher
-!   levels by prolongating variables from lower level blocks.
+!   Subroutine updates the corner boundaries from blocks on lower level.
 !
 !
 !===============================================================================
@@ -4571,8 +4569,8 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : im , jm , km
@@ -4590,6 +4588,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -4618,129 +4617,123 @@ module boundaries
 #endif /* PROFILE */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE CORNER BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%corners(i,j)%ptr
+            pneigh => pmeta%corners(i,j)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%corners(i,j,k)%ptr
+            pneigh => pmeta%corners(i,j,k)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! skip if the block and its neighbor are not marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
 !
 #if NDIMS == 2
-                        il = corners_gp(i,j  )%l(1)
-                        jl = corners_gp(i,j  )%l(2)
-                        iu = corners_gp(i,j  )%u(1)
-                        ju = corners_gp(i,j  )%u(2)
+                      il = corners_gp(i,j  )%l(1)
+                      jl = corners_gp(i,j  )%l(2)
+                      iu = corners_gp(i,j  )%u(1)
+                      ju = corners_gp(i,j  )%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        il = corners_gp(i,j,k)%l(1)
-                        jl = corners_gp(i,j,k)%l(2)
-                        kl = corners_gp(i,j,k)%l(3)
-                        iu = corners_gp(i,j,k)%u(1)
-                        ju = corners_gp(i,j,k)%u(2)
-                        ku = corners_gp(i,j,k)%u(3)
+                      il = corners_gp(i,j,k)%l(1)
+                      jl = corners_gp(i,j,k)%l(2)
+                      kl = corners_gp(i,j,k)%l(3)
+                      iu = corners_gp(i,j,k)%u(1)
+                      ju = corners_gp(i,j,k)%u(2)
+                      ku = corners_gp(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! restrict and extract the corresponding corner region from the neighbor and
 ! insert it in the current data block
 !
 #if NDIMS == 2
-                        call block_corner_prolong(i, j, k                      &
+                      call block_corner_prolong(i, j, k                        &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_corner_prolong(i, j, k                      &
+                      call block_corner_prolong(i, j, k                        &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! block on the current processor
+                    end if ! block on the current processor
 
-                    else ! block and neighbor on different processors
+                  else ! block and neighbor on different processors
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, -1, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, -1, i, j, k)
 
-                    end if ! block and neighbor on different processors
+                  end if ! block and neighbor on different processors
 #endif /* MPI */
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at lower level
+              end if ! neighbor at lower level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! assign the pointer to the next block on the list
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
