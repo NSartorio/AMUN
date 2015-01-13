@@ -501,6 +501,10 @@ module blocks
 
     end do ! meta blocks
 
+! wipe the leaf list out
+!
+    call wipe_leaf_list()
+
 ! nullify pointers defining the meta and data lists
 !
     nullify(list_meta)
@@ -4018,6 +4022,54 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine insert_metablock_before
+!
+!===============================================================================
+!
+! subroutine WIPE_LEAF_LIST:
+! --------------------------
+!
+!   Subroutine releases the memory used by the leaf block list.
+!
+!
+!===============================================================================
+!
+  subroutine wipe_leaf_list()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_leaf), pointer  :: pleaf
+!
+!-------------------------------------------------------------------------------
+!
+! associate pleaf with the first pointer on the leaf list
+!
+    pleaf => list_leaf
+
+! iterate over all leafs in the list
+!
+    do while (associated(pleaf))
+
+! associate the list pointer to the next leaf block
+!
+      list_leaf => pleaf%next
+
+! deallocate the current leaf block
+!
+      deallocate(pleaf)
+
+! associate pleaf with the first pointer on the leaf list
+!
+      pleaf => list_leaf
+
+    end do ! leaf list
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine wipe_leaf_list
 !
 !===============================================================================
 !
