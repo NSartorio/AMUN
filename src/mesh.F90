@@ -462,6 +462,7 @@ module mesh
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
     use blocks         , only : set_neighbors_refine
+    use blocks         , only : build_leaf_list
 #ifdef DEBUG
     use blocks         , only : check_neighbors
 #endif /* DEBUG */
@@ -738,6 +739,10 @@ module mesh
 
     end do ! pmeta
 
+! update the list of leafs
+!
+    call build_leaf_list()
+
 #ifdef DEBUG
 ! check if neighbors are consistent after mesh generation
 !
@@ -771,6 +776,7 @@ module mesh
 
 ! import external procedures and variables
 !
+    use blocks         , only : build_leaf_list
 #ifdef DEBUG
     use blocks         , only : check_neighbors
 #endif /* DEBUG */
@@ -806,6 +812,10 @@ module mesh
 ! prolong selected blocks
 !
     call refine_selected_blocks()
+
+! update the list of leafs
+!
+    call build_leaf_list()
 
 #ifdef MPI
 ! redistribute blocks equally among all processors
