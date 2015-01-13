@@ -495,7 +495,7 @@ module boundaries
     if (minlev == maxlev) return
 
 #ifdef PROFILE
-! start accounting time for flux boundary update
+! start accounting time for the flux boundary update
 !
     call start_timer(imf)
 #endif /* PROFILE */
@@ -998,7 +998,7 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for flux boundary update
+! stop accounting time for the flux boundary update
 !
     call stop_timer(imf)
 #endif /* PROFILE */
@@ -1025,7 +1025,8 @@ module boundaries
 ! ------------------------------
 !
 !   Subroutine scans over all leaf blocks in order to find blocks without
-!   neighbors, then updates its boundaries for selected type.
+!   neighbors and update the corresponding boundaries for the selected
+!   boundary type.
 !
 !
 !===============================================================================
@@ -1034,7 +1035,8 @@ module boundaries
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, list_meta
+    use blocks         , only : block_meta, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : ndims, nsides
     use coordinates    , only : im, jm, km
     use equations      , only : nv
@@ -1050,6 +1052,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 
 ! local variables
 !
@@ -1058,51 +1061,51 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for specific boundary update
+! start accounting time for the specific boundary update
 !
     call start_timer(ims)
 #endif /* PROFILE */
 
-! associate pmeta with the first block on the meta list
+! associate pleaf with the first block on the leaf list
 !
-    pmeta => list_meta
+    pleaf => list_leaf
 
-! scan all blocks on meta block list
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the current meta block is a leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! process only if this block is marked for update
 !
-        if (pmeta%update) then
+      if (pmeta%update) then
 
 #ifdef MPI
-! check if the current block belongs to the local process
+! check if the block belongs to the local process
 !
-          if (pmeta%process == nproc) then
+        if (pmeta%process == nproc) then
 #endif /* MPI */
 
 #if NDIMS == 2
 ! iterate over all directions
 !
-            do n = 1, ndims
+          do n = 1, ndims
 
-! process boundaries only if they are not periodic in a given direction
+! process boundaries only if they are not periodic along the given direction
 !
-              if (.not. periodic(n)) then
+            if (.not. periodic(n)) then
 
 ! calculate the edge direction (in 2D we don't have face neighbors, so we have
 ! to use edge neighbors)
 !
-                m = 3 - n
+              m = 3 - n
 
 ! iterate over all corners
 !
-                do j = 1, nsides
-                  do i = 1, nsides
+              do j = 1, nsides
+                do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -1110,27 +1113,27 @@ module boundaries
                             call block_boundary_specific(i, j, k, n            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                  end do ! i = 1, sides
-                end do ! j = 1, sides
+                end do ! i = 1, sides
+              end do ! j = 1, sides
 
-              end if ! not periodic
+            end if ! not periodic
 
-            end do ! n = 1, ndims
+          end do ! n = 1, ndims
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
 ! iterate over all directions
 !
-            do n = 1, ndims
+          do n = 1, ndims
 
-! process boundaries only if they are not periodic in a given direction
+! process boundaries only if they are not periodic along the given direction
 !
-              if (.not. periodic(n)) then
+            if (.not. periodic(n)) then
 
 ! iterate over all corners
 !
-                do k = 1, nsides
-                  do j = 1, nsides
-                    do i = 1, nsides
+              do k = 1, nsides
+                do j = 1, nsides
+                  do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -1138,31 +1141,29 @@ module boundaries
                             call block_boundary_specific(i, j, k, n            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                    end do ! i = 1, sides
-                  end do ! j = 1, sides
-                end do ! k = 1, sides
+                  end do ! i = 1, sides
+                end do ! j = 1, sides
+              end do ! k = 1, sides
 
-              end if ! not periodic
+            end if ! not periodic
 
-            end do ! n = 1, ndims
+          end do ! n = 1, ndims
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-          end if ! block belong to the local process
+        end if ! block belongs to the local process
 #endif /* MPI */
 
-        end if ! pmeta is marked for update
+      end if ! if pmeta marked for update
 
-      end if ! leaf
-
-! associate pmeta with the next block on the list
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef PROFILE
-! stop accounting time for specific boundary update
+! stop accounting time for the specific boundary update
 !
     call stop_timer(ims)
 #endif /* PROFILE */
