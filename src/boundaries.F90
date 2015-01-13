@@ -431,10 +431,10 @@ module boundaries
 ! subroutine BOUNDARY_FLUXES:
 ! --------------------------
 !
-!   Subroutine updates the numerical fluxes for blocks which have neighbors
-!   at higher level. The fluxes of neighbors at higher level are calulated
-!   with smaller error, therefore they are restricted down and the flux
-!   of lower level meta block is updated.
+!   Subroutine updates the numerical fluxes from neighbors which lay on
+!   higher level. At higher levels the numerical fluxes are calculated with
+!   smaller error, since the resolution is higher, therefore we take those
+!   fluxes and restrict them down to the level of the updated block.
 !
 !
 !===============================================================================
@@ -443,7 +443,8 @@ module boundaries
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, block_data, list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
 #ifdef MPI
     use blocks         , only : block_info, pointer_info
 #endif /* MPI */
@@ -466,6 +467,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -488,9 +490,15 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! do not correct fluxes if we do not use adaptive mesh
+! quit if all blocks are at the same level
 !
     if (minlev == maxlev) return
+
+#ifdef PROFILE
+! start accounting time for flux boundary update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
 
 ! calculate half sizes
 !
@@ -505,220 +513,206 @@ module boundaries
     kh = kn / 2
 #endif /* NDIMS == 3 */
 
-#ifdef PROFILE
-! start accounting time for flux boundary update
-!
-    call start_timer(imf)
-#endif /* PROFILE */
-
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE THE FLUX BOUNDARIES BETWEEN LOCAL BLOCKS
-!!
-! associate pmeta with the first block on the meta list
+! update the fluxes between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks in the list
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the meta block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! iterate over all dimensions
 !
-        do n = 1, ndims
+      do n = 1, ndims
 #if NDIMS == 2
-          m = 3 - n
+        m = 3 - n
 #endif /* NDIMS == 2 */
 
 ! iterate over all corners
 !
 #if NDIMS == 3
-          do k = 1, nsides
+        do k = 1, nsides
 #endif /* NDIMS == 3 */
-            do j = 1, nsides
-              do i = 1, nsides
+          do j = 1, nsides
+            do i = 1, nsides
 
-! associate pneigh with the current neighbor
+! associate pneigh with the neighbor
 !
 #if NDIMS == 2
-                pneigh => pmeta%edges(i,j,m)%ptr
+              pneigh => pmeta%edges(i,j,m)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                pneigh => pmeta%faces(i,j,k,n)%ptr
+              pneigh => pmeta%faces(i,j,k,n)%ptr
 #endif /* NDIMS == 3 */
 
-! check if the neighbor is associated
+! process only if the neighbor is associated
 !
-                if (associated(pneigh)) then
+              if (associated(pneigh)) then
 
-! check if the neighbor is at highed level than the current block
+! check if the neighbor lays at higher level
 !
-                  if (pneigh%level > pmeta%level) then
+                if (pneigh%level > pmeta%level) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! update directional flux from the neighbor
+! update the flux depending on the direction
 !
-                        select case(n)
-                        case(1)
+                      select case(n)
+                      case(1)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for X-direction flux
 !
-                          if (i == 1) then
-                            is = ie
-                            it = ibl
-                          else
-                            is = ibl
-                            it = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
+                        if (i == 1) then
+                          is = ie
+                          it = ibl
+                        else
+                          is = ibl
+                          it = ie
+                        end if
+                        if (j == 1) then
+                          jl = jb
+                          ju = jb + jh - 1
+                        else
+                          jl = je - jh + 1
+                          ju = je
+                        end if
 #if NDIMS == 3
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
+                        if (k == 1) then
+                          kl = kb
+                          ku = kb + kh - 1
+                        else
+                          kl = ke - kh + 1
+                          ku = ke
+                        end if
 #endif /* NDIMS == 3 */
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the X-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,is,jb:je,kb:ke)  &
                                        ,  pmeta%data%f(n,1:nv,it,jl:ju,kl:ku))
 
-                        case(2)
+                      case(2)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for Y-direction flux
 !
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            js = je
-                            jt = jbl
-                          else
-                           js = jbl
-                            jt = je
-                          end if
+                        if (i == 1) then
+                          il = ib
+                          iu = ib + ih - 1
+                        else
+                          il = ie - ih + 1
+                          iu = ie
+                        end if
+                        if (j == 1) then
+                          js = je
+                          jt = jbl
+                        else
+                         js = jbl
+                          jt = je
+                        end if
 #if NDIMS == 3
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
+                        if (k == 1) then
+                          kl = kb
+                          ku = kb + kh - 1
+                        else
+                          kl = ke - kh + 1
+                          ku = ke
+                        end if
 #endif /* NDIMS == 3 */
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the Y-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,ib:ie,js,kb:ke)  &
                                        ,  pmeta%data%f(n,1:nv,il:iu,jt,kl:ku))
 
 #if NDIMS == 3
-                        case(3)
+                      case(3)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for Z-direction flux
 !
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            ks = ke
-                            kt = kbl
-                          else
-                            ks = kbl
-                            kt = ke
-                          end if
+                        if (i == 1) then
+                          il = ib
+                          iu = ib + ih - 1
+                        else
+                          il = ie - ih + 1
+                          iu = ie
+                        end if
+                        if (j == 1) then
+                          jl = jb
+                          ju = jb + jh - 1
+                        else
+                          jl = je - jh + 1
+                          ju = je
+                        end if
+                        if (k == 1) then
+                          ks = ke
+                          kt = kbl
+                        else
+                          ks = kbl
+                          kt = ke
+                        end if
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the Z-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,ib:ie,jb:je,ks)  &
                                        ,  pmeta%data%f(n,1:nv,il:iu,jl:ju,kt))
 #endif /* NDIMS == 3 */
 
-                        end select
+                      end select
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-! blocks belong to different processes, therefore prepare the block exchange
-! object
-!
-                    else
+                  else ! pneigh%proc /= pmeta%proc
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, n, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, n, i, j, k)
 
-                    end if ! pmeta and pneigh on local process
+                  end if ! pneigh%proc /= pmeta%proc
 #endif /* MPI */
+                end if ! pmeta level < pneigh level
 
-                  end if ! pmeta level < pneigh level
+              end if ! pneigh associated
 
-                end if ! pneigh associated
-
-              end do ! i = 1, nsides
-            end do ! j = 1, nsides
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
 #if NDIMS == 3
-          end do ! k = 1, nsides
+        end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
-        end do ! n = 1, ndims
+      end do ! n = 1, ndims
 
-      end if ! leaf
-
-! associate pmeta with the next block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next ! assign pointer to the next meta block in the list
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
-!! 3. UPDATE FLUX BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
-!!
+! update flux boundaries between neighbors laying on different processes
+!
 ! iterate over all process pairs
 !
     do p = 1, npairs
@@ -849,7 +843,7 @@ module boundaries
 
           end do ! %ptr blocks
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
