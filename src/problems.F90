@@ -140,6 +140,11 @@ module problems
     case("current_sheet")
       setup_problem => setup_problem_current_sheet
 
+! research problems
+!
+    case("binaries")
+      setup_problem => setup_problem_binaries
+
     case default
       call print_error("problems::initialize_problems()"                       &
                      , "Setup subroutine is not implemented for this problem!")
@@ -1245,6 +1250,279 @@ module problems
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_current_sheet
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_BINARIES:
+! ---------------------------------
+!
+!   Subroutine sets the initial conditions for the wind interaction in
+!   the binary star problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_binaries(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use constants  , only : d2r, pi2
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az, adx, ady, adz, advol
+    use equations  , only : prim2cons
+    use equations  , only : gamma
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real, get_parameter_integer
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: rstar    = 5.00d-02
+    real(kind=8), save :: rcomp    = 5.00d-02
+    real(kind=8), save :: dnstar   = 1.00d+06
+    real(kind=8), save :: dratio   = 1.00d+02
+    real(kind=8), save :: msstar   = 3.00d+00
+    real(kind=8), save :: mscomp   = 1.50d+01
+    real(kind=8), save :: vstar    = 5.00d-01
+    real(kind=8), save :: vcomp    = 2.50d+00
+    real(kind=8), save :: dcomp    = 2.00d-01
+    real(kind=8), save :: ecomp    = 9.00d-01
+    real(kind=8), save :: tcomp    = 1.00d+02
+    real(kind=8), save :: buni     = 1.00d-03
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: dncomp, prstar, prcomp
+    real(kind=8), save :: r2star, r2comp
+    real(kind=8), save :: acomp , bcomp
+    real(kind=8), save :: om, xsh, xst, yvl
+
+! local variables
+!
+    integer       :: i, j, k, ic, jc, kc
+    real(kind=8)  :: xs, ys, zs
+    real(kind=8)  :: xc, yc, zc
+    real(kind=8)  :: rs2, rc2, rs, rc, rd
+    real(kind=8)  :: dns, prs, vxs, vys, vzs
+    real(kind=8)  :: dnc, prc, vxc, vyc, vzc
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("rstar"   , rstar )
+      call get_parameter_real("rcomp"   , rcomp )
+      call get_parameter_real("dn_star" , dnstar)
+      call get_parameter_real("dn_ratio", dratio)
+      call get_parameter_real("ms_star" , msstar)
+      call get_parameter_real("ms_comp" , mscomp)
+      call get_parameter_real("vstar"   , vstar )
+      call get_parameter_real("vcomp"   , vcomp )
+      call get_parameter_real("dcomp"   , dcomp )
+      call get_parameter_real("ecomp"   , ecomp )
+      call get_parameter_real("tcomp"   , tcomp )
+      call get_parameter_real("buni"    , buni  )
+
+! calculate the square of radia
+!
+      r2star = rstar * rstar
+      r2comp = rcomp * rcomp
+
+! calculate densities and pressures of the companion star
+!
+      dncomp = dnstar / dratio
+      if (ipr > 0) then
+        prstar = (vstar / msstar)**2 * dnstar / gamma
+        prcomp = (vcomp / mscomp)**2 * dncomp / gamma
+      end if
+
+! calculate orbit parameters
+!
+      acomp  = dcomp / (1.0d+00 - ecomp)
+      bcomp  = acomp * sqrt(1.0d+00 - ecomp * ecomp)
+
+! angular speed and triginometric functions
+!
+      om     = pi2 / tcomp / (1.0d+00 - ecomp)
+
+! calculate the initial position and velocity of the companion star
+!
+      xsh    = acomp
+      xst    = acomp - dcomp
+      yvl    = bcomp * om
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+#endif /* NDIMS == 3 */
+
+! set magnetic field components
+!
+    if (ibx > 0) then
+
+      q(ibx,1:im) = 0.0d+00
+      q(iby,1:im) = 0.0d+00
+      q(ibz,1:im) = buni
+      q(ibp,1:im) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+
+! calculate the Z coordinates of the central and companion stars
+!
+      zs = z(k)
+      zc = z(k)
+
+      do j = 1, jm
+
+! calculate the Y coordinates of the central and companion stars
+!
+        ys = y(j)
+        yc = y(j)
+
+! sweep along the X coordinate
+!
+        do i = 1, im
+
+! calculate the X coordinates of the central and companion stars
+!
+          xs = x(i) - xst
+          xc = x(i) - xsh
+
+! calculate the distances from the centers of the central and companion stars
+!
+          rs2 = max(xs * xs + ys * ys + zs * zs, 1.0d-08)
+          rc2 = max(xc * xc + yc * yc + zc * zc, 1.0d-08)
+          rs  = sqrt(rs2)
+          rc  = sqrt(rc2)
+
+! calculate profiles from the central star
+!
+#if NDIMS == 3
+          rd = max(r2star, rs2) / r2star
+#else /* NDIMS == 3 */
+          rd = max(rstar , rs ) / rstar
+#endif /* NDIMS == 3 */
+
+          dns = dnstar / rd
+          if (ipr > 0) prs = prstar / rd
+
+! set the central star wind velocity
+!
+          vxs = vstar * xs / rs
+          vys = vstar * ys / rs
+          vzs = vstar * zs / rs
+
+! calculate profiles from the companion star
+!
+#if NDIMS == 3
+          rd = max(r2comp, rc2) / r2comp
+#else /* NDIMS == 3 */
+          rd = max(rcomp , rc ) / rcomp
+#endif /* NDIMS == 3 */
+
+          dnc = dncomp / rd
+          if (ipr > 0) prc = prcomp / rd
+
+! set the companion star wind velocity
+!
+          vxc = vcomp * xc / rc
+          vyc = vcomp * yc / rc
+          vzc = vcomp * zc / rc
+
+! set the variables
+!
+          if (rs2 <= r2star) then
+            q(idn,i) = dns
+            q(ivx,i) = vxs
+            q(ivy,i) = vys
+            q(ivz,i) = vzs
+            if (ipr > 0) q(ipr,i) = prs
+          else if (rc2 <= r2comp) then
+            q(idn,i) = dnc
+            q(ivx,i) = vxc
+            q(ivy,i) = vyc + yvl
+            q(ivz,i) = vzc
+            if (ipr > 0) q(ipr,i) = prc
+          else
+            q(idn,i) = min(dnstar, dns + dnc)
+            q(ivx,i) = vxs + vxc
+            q(ivy,i) = vys + vyc
+            q(ivz,i) = vzs + vzc
+            if (ipr > 0) q(ipr,i) = min(prstar, prs + prc)
+          end if
+
+        end do ! i = 1, im
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_binaries
 
 !===============================================================================
 !
