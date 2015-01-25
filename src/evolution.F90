@@ -2003,7 +2003,7 @@ module evolution
 !
       if (pmeta%update) then
         call update_primitive_variables(pdata%u, pdata%q)
-        call update_shapes(pdata)
+        call update_shapes(pdata, time)
       end if
 
 ! assign pointer to the next block
