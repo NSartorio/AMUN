@@ -467,9 +467,7 @@ module schemes
 !
     real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
     real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-#if NDIMS == 3
     real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
-#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -546,7 +544,6 @@ module schemes
         end do ! i = ibl, ieu
       end do ! k = kbl, keu
 
-#if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
@@ -578,7 +575,6 @@ module schemes
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
 
     end select
 
@@ -974,9 +970,7 @@ module schemes
 !
     real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
     real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-#if NDIMS == 3
     real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
-#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1057,7 +1051,6 @@ module schemes
         end do ! i = ibl, ieu
       end do ! k = kbl, keu
 
-#if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
@@ -1091,7 +1084,6 @@ module schemes
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
 
     end select
 
@@ -1663,9 +1655,7 @@ module schemes
 !
     real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
     real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-#if NDIMS == 3
     real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
-#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -1758,7 +1748,6 @@ module schemes
         end do ! i = ibl, ieu
       end do ! k = kbl, keu
 
-#if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
@@ -1798,7 +1787,6 @@ module schemes
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
 
     end select
 
@@ -2980,9 +2968,7 @@ module schemes
 !
     real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
     real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-#if NDIMS == 3
     real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
-#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -3079,7 +3065,6 @@ module schemes
         end do ! i = ibl, ieu
       end do ! k = kbl, keu
 
-#if NDIMS == 3
     case(3)
 
 !  calculate the flux along the Z direction
@@ -3121,7 +3106,6 @@ module schemes
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
 
     end select
 
