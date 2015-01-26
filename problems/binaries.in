@@ -1,0 +1,70 @@
+# problem name and parameters
+#
+problem           = "binaries"
+gamma             =  1.1d+00
+rstar             =  5.0d-02
+rcomp             =  5.0d-02
+dn_star           =  1.0d+07
+dn_ratio          =  1.0d+02
+ms_star           =  3.0d+00
+ms_comp           =  1.5d+01
+vstar             =  5.0d-01
+vcomp             =  2.5d+00
+dcomp             =  2.0d-01
+ecomp             =  0.9d+00
+tcomp             =  1.0d+02
+buni              =  1.0d-03
+
+# physics
+#
+equation_system   = "mhd"
+equation_of_state = "adi"
+
+# numerical methods
+#
+time_advance      = "ssprk(m,2)"
+stages            = 4
+riemann_solver    = "hlld"
+reconstruction    = "tvd"
+limiter           = "mc"
+fix_positivity    = "off"
+clip_extrema      = "off"
+
+# mesh parameters
+#
+xblocks           =  3
+yblocks           =  2
+zblocks           =  1
+xmin              = -4.5d+00
+xmax              =  4.5d+00
+ymin              = -3.0d+00
+ymax              =  3.0d+00
+zmin              = -1.5d+00
+zmax              =  1.5d+00
+
+# refinement control
+#
+ncells            = 16
+nghosts           = 2
+minlev            = 1
+maxlev            = 5
+
+# boundary conditions
+#
+xlbndry           = "open"
+xubndry           = "open"
+ylbndry           = "open"
+yubndry           = "open"
+zlbndry           = "open"
+zubndry           = "open"
+enable_shapes     = "on"
+
+# runtime control parameters
+#
+tmax              = 1.2d+02
+cfl               = 3.0d-01
+
+# data output control
+#
+precise_snapshots = "on"
+snapshot_interval = 1.0d-01
