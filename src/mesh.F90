@@ -345,10 +345,10 @@ module mesh
 !
           ff  = 2**(toplev - 1)
           fcv = 1.0d+00 / n
-          fef = 1.0d+00 * im / (ir * in * ff + nd)
-          fef =     fef * jm / (jr * jn * ff + nd)
+          fef = 1.0d+00 * (ir * in * ff + nd) / im
+          fef =     fef * (jr * jn * ff + nd) / jm
 #if NDIMS == 3
-          fef =     fef * km / (kr * kn * ff + nd)
+          fef =     fef * (kr * kn * ff + nd) / km
 #endif /* NDIMS == 3 */
 
 ! reset the first execution flag
@@ -363,11 +363,11 @@ module mesh
         nl = get_nleafs()
 
 ! calculate the coverage (the number of leafs divided by the maximum
-! block number) and the efficiency (the cells count for adaptive mesh
-! divided by the cell count for corresponding uniform mesh)
+! block number) and the efficiency (the cells count for corresponding uniform
+! mesh divided by the cell count for adaptive mesh)
 !
         cv = fcv * nl
-        ef = fef * nl
+        ef = fef / nl
 
 ! initialize the level and process block counter
 !
