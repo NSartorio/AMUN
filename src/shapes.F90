@@ -581,13 +581,12 @@ module shapes
 
 ! default parameter values
 !
-    real(kind=8), save :: dens  = 1.00d-01
-    real(kind=8), save :: drat  = 1.00d+02
+    real(kind=8), save :: djet  = 1.00d-01
     real(kind=8), save :: pres  = 1.00d-02
     real(kind=8), save :: vjet  = 0.99d+00
+    real(kind=8), save :: ljet  = 1.00d+00
     real(kind=8), save :: rjet  = 1.00d+00
     real(kind=8), save :: rjet2 = 1.00d+00
-    real(kind=8), save :: ljet  = 0.00d+00
 
 ! local saved parameters
 !
@@ -620,12 +619,11 @@ module shapes
 
 ! get problem parameters
 !
-      call get_parameter_real("dens"  , dens)
-      call get_parameter_real("drat"  , drat)
+      call get_parameter_real("djet"  , djet)
       call get_parameter_real("pres"  , pres)
+      call get_parameter_real("ljet"  , ljet)
       call get_parameter_real("vjet"  , vjet)
       call get_parameter_real("rjet"  , rjet)
-      call get_parameter_real("ljet"  , ljet)
 
 ! calculate Rjet²
 !
@@ -639,7 +637,7 @@ module shapes
 
 ! set the conditions inside the jet radius
 !
-    qj(idn) = dens
+    qj(idn) = djet
     if (ipr > 0) qj(ipr) = pres
     qj(ivx) = vjet
     qj(ivy) = 0.0d+00
