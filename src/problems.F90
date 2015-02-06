@@ -1288,7 +1288,7 @@ module problems
 !
     real(kind=8), save :: dens  = 1.00d-01
     real(kind=8), save :: drat  = 1.00d+02
-    real(kind=8), save :: djet  = 1.00d+01
+    real(kind=8), save :: damb  = 1.00d+01
     real(kind=8), save :: pres  = 1.00d-02
     real(kind=8), save :: vjet  = 0.99d+00
     real(kind=8), save :: rjet  = 1.00d+00
@@ -1334,7 +1334,7 @@ module problems
 
 ! calculate jet density
 !
-      djet  = dens * drat
+      damb  = dens * drat
 
 ! calculate Rjet²
 !
@@ -1372,7 +1372,7 @@ module problems
 
 ! set the ambient density, pressure, and velocity
 !
-        q(idn,1:im) = dens
+        q(idn,1:im) = damb
         if (ipr > 0) q(ipr,1:im) = pres
         q(ivx,1:im) = 0.0d+00
         q(ivy,1:im) = 0.0d+00
@@ -1383,7 +1383,7 @@ module problems
         if (rr <= max(rm, rjet2)) then
           do i = 1, im
             if (x(i) <= max(dx, ljet)) then
-              q(idn,i) = djet
+              q(idn,i) = dens
               q(ivx,i) = vjet
             end if
           end do ! i = 1, im
