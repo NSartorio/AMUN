@@ -78,11 +78,18 @@ module equations
 !
   procedure(esystem_roe_hd_iso), pointer, save :: eigensystem_roe => null()
 
+! pointer to the variable conversion method
+!
+  procedure(nr_iterate_srhd_adi_1dw), pointer, save :: nr_iterate => null()
 
 ! the system of equations and the equation of state
 !
   character(len=32), save :: eqsys = "hydrodynamic"
   character(len=32), save :: eos   = "adiabatic"
+
+! the variable conversion method
+!
+  character(len=32), save :: c2p   = "1Dw"
 
 ! the number of independent variables
 !
@@ -116,6 +123,7 @@ module equations
 ! additional adiabatic parameters
 !
   real(kind=8)     , save :: gammam1 = 2.0d+00 / 3.0d+00, gammam1i = 1.5d+00
+  real(kind=8)     , save :: gammaxi = 2.0d+00 / 5.0d+00
 
 ! isothermal speed of sound and its second power
 !
@@ -125,10 +133,18 @@ module equations
 !
   real(kind=8)     , save :: cmax    = 0.0d+00, cmax2   = 0.0d+00
 
+! the lower limits for density and pressure to be treated as physical
+!
+  real(kind=8)     , save :: dmin    = 1.0d-08, pmin    = 1.0d-08
+
 ! the upper bound for the sonic Mach number
 !
   real(kind=8)     , save :: msmax   = 1.0d+03
   real(kind=8)     , save :: msfac   = 3.0d-06 / 5.0d+00
+
+! the tolerance for Newton-Raphson interative method
+!
+  real(kind=8)     , save :: tol     = 1.0d-10
 
 ! flags for reconstruction corrections
 !
@@ -196,8 +212,10 @@ module equations
 
 ! local variables
 !
+    logical                :: relativistic   = .false.
     character(len=255)     :: name_eqsys     = ""
     character(len=255)     :: name_eos       = ""
+    character(len=255)     :: name_c2p       = ""
     character(len=255)     :: positivity_fix = "off"
 !
 !-------------------------------------------------------------------------------
@@ -432,6 +450,120 @@ module equations
       cvars(ibp) = 'bpsi'
       if (ien > 0) cvars(ien) = 'ener'
 
+!--- SPECIAL RELATIVITY HYDRODYNAMICS ---
+!
+    case("srhd", "SRHD")
+
+! the name of equation system
+!
+      name_eqsys = "Special Relativity HD"
+
+! set relativistic flag
+!
+      relativistic = .true.
+
+! initialize the number of variables (density + 3 components of velocity)
+!
+      nv  = 4
+
+! initialize the variable indices
+!
+      idn = 1
+      ivx = 2
+      ivy = 3
+      ivz = 4
+      imx = 2
+      imy = 3
+      imz = 4
+
+! depending on the equation of state complete the initialization
+!
+      select case(trim(eos))
+
+      case("adi", "ADI", "adiabatic", "ADIABATIC")
+
+! the type of equation of state
+!
+        name_eos  = "adiabatic"
+
+! include the pressure/energy in the number of variables
+!
+        nv  = nv + 1
+
+! initialize the pressure and energy indices
+!
+        ipr = nv
+        ien = nv
+
+! set pointers to subroutines
+!
+        prim2cons       => prim2cons_srhd_adi
+        cons2prim       => cons2prim_srhd_adi
+        fluxspeed       => fluxspeed_srhd_adi
+        maxspeed        => maxspeed_srhd_adi
+
+! warn about the unimplemented equation of state
+!
+      case default
+
+        if (verbose) then
+          write (*,"(1x,a)") "The selected equation of state is not " //       &
+                             "implemented: " // trim(eos)
+          write (*,*)
+        end if
+        iret = 110
+        return
+
+      end select
+
+! choose the conserved to primitive variable conversion method
+!
+      select case(trim(c2p))
+
+      case("1Dw", "1dw", "1DW")
+
+! the type of equation of state
+!
+        name_c2p  = "1Dw"
+
+! set pointer to the conversion method
+!
+        nr_iterate => nr_iterate_srhd_adi_1dw
+
+! warn about the unimplemented method
+!
+      case default
+
+        if (verbose) then
+          write (*,"(1x,a)") "The selected conversion method is not " //       &
+                             "implemented: " // trim(c2p)
+          write (*,*)
+        end if
+        iret = 110
+        return
+
+      end select
+
+! allocate arrays for variable names
+!
+      allocate(pvars(nv), cvars(nv))
+
+! fill in the primitive variable names
+!
+      pvars(idn) = 'dens'
+      pvars(ivx) = 'velx'
+      pvars(ivy) = 'vely'
+      pvars(ivz) = 'velz'
+      if (ipr > 0) pvars(ipr) = 'pres'
+
+! fill in the conservative variable names
+!
+      cvars(idn) = 'dens'
+      cvars(imx) = 'momx'
+      cvars(imy) = 'momy'
+      cvars(imz) = 'momz'
+      if (ien > 0) cvars(ien) = 'ener'
+
 !--- EQUATION SYSTEM NOT IMPLEMENTED ---
 !
     case default
@@ -454,6 +586,7 @@ module equations
 !
     gammam1  = gamma - 1.0d+00
     gammam1i = 1.0d+00 / gammam1
+    gammaxi  = gammam1 / gamma
 
 ! obtain the isothermal sound speed
 !
@@ -466,6 +599,11 @@ module equations
 ! allocate space for Roe eigenvectors
 !
     allocate(evroe(2,nv,nv))
+
+! get the minimum allowed density and pressure in the system
+!
+    call get_parameter_real("dmin"  , dmin  )
+    call get_parameter_real("pmin"  , pmin  )
 
 ! get the upper bound for the sonic Mach number
 !
@@ -494,6 +632,9 @@ module equations
 
       write (*,"(4x,a,1x,a)"    ) "equation system        =", trim(name_eqsys)
       write (*,"(4x,a,1x,a)"    ) "equation of state      =", trim(name_eos)
+      if (relativistic) then
+        write (*,"(4x,a,1x,a)"    ) "variable conversion    =", trim(name_c2p)
+      end if
 
     end if
 
@@ -2807,6 +2948,598 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine esystem_roe_mhd_adi
+!
+!*******************************************************************************
+!
+! ADIABATIC SPECIAL RELATIVITY HYDRODYNAMIC EQUATIONS
+!
+!*******************************************************************************
+!
+!===============================================================================
+!
+! subroutine PRIM2CONS_SRHD_ADI:
+! -----------------------------
+!
+!   Subroutine converts primitive variables to their corresponding
+!   conservative representation.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     q - the input array of primitive variables;
+!     u - the output array of conservative variables;
+!
+!===============================================================================
+!
+  subroutine prim2cons_srhd_adi(n, q, u)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: u
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: vv, vm, vs, ww, ek, ei
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
+    do i = 1, n
+
+! calculate the square of velocity, the Lorentz factor and specific enthalpy
+!
+      vv  = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
+      vm  = 1.0d+00 - vv
+      vs  = sqrt(vm)
+      ww  = (q(idn,i) + q(ipr,i) / gammaxi) / vm
+
+! calculate conservative variables
+!
+      u(idn,i) =      q(idn,i) / vs
+      u(imx,i) = ww * q(ivx,i)
+      u(imy,i) = ww * q(ivy,i)
+      u(imz,i) = ww * q(ivz,i)
+      u(ien,i) = ww - q(ipr,i) - u(idn,i)
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prim2cons_srhd_adi
+!
+!===============================================================================
+!
+! subroutine CONS2PRIM_SRHD_ADI:
+! -----------------------------
+!
+!   Subroutine converts conservative variables to their corresponding
+!   primitive representation using an interative method.
+!
+!   Arguments:
+!
+!     n - the length of input and output vectors;
+!     u - the input array of conservative variables;
+!     q - the output array of primitive variables;
+!
+!===============================================================================
+!
+  subroutine cons2prim_srhd_adi(n, u, q)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: u
+    real(kind=8), dimension(nv,n), intent(out) :: q
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: mm, en, dn
+    real(kind=8) :: em, w, wm
+    real(kind=8) :: vv, vm, vs
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for variable conversion
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
+    do i = 1, n
+
+! prepare variables which do not change during the Newton-Ralphson iterations
+!
+      mm  = sum(u(imx:imz,i) * u(imx:imz,i))
+      en  = u(ien,i) + u(idn,i)
+      dn  = u(idn,i)
+
+! get the lower bound for W updated by the minimum pressure with assumed Γ = 1
+!
+      wm = sqrt(dn * dn + mm) + pmin / gammaxi
+
+! calculate V² corresponding to the minimum W
+!
+      call w_to_vv_srhd_adi(mm, wm, vv)
+
+! estimate the total energy corresponding to the minimum of W
+!
+      em = wm - dn - pmin
+
+! set the initial W to the minimum value
+!
+      w  = wm
+
+! find the exact W using an Newton-Ralphson interative method
+!
+      call nr_iterate(mm, en, dn, wm, w, vv)
+
+! prepare coefficients
+!
+      vm = 1.0d+00 - vv
+      vs = sqrt(vm)
+
+! calculate the primitive variables
+!
+      q(idn,i) = dn * vs
+      q(ivx,i) = u(imx,i) / w
+      q(ivy,i) = u(imy,i) / w
+      q(ivz,i) = u(imz,i) / w
+      q(ipr,i) = gammaxi * (w - dn / vs) * vm
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for variable conversion
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine cons2prim_srhd_adi
+!
+!===============================================================================
+!
+! subroutine FLUXSPEED_SRHD_ADI:
+! -----------------------------
+!
+!   Subroutine calculates physical fluxes and characteristic speeds from a
+!   given equation system.
+!
+!   Arguments:
+!
+!     n      - the length of input and output vectors;
+!     q      - the input array of primitive variables;
+!     u      - the input array of conservative variables;
+!     f      - the output vector of fluxes;
+!     cm, cp - the output vector of left- and right-going characteristic speeds;
+!
+!   References:
+!
+!     [1] Mignone, A., Bodo, G.,
+!         "An HLLC Riemann solver for relativistic flows - I. Hydrodynamics",
+!         Monthly Notices of the Royal Astronomical Society, 2005, 364, 126-136
+!
+!===============================================================================
+!
+  subroutine fluxspeed_srhd_adi(n, q, u, f, cm, cp)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                                , intent(in)  :: n
+    real(kind=8), dimension(nv,n)          , intent(in)  :: q, u
+    real(kind=8), dimension(nv,n)          , intent(out) :: f
+    real(kind=8), dimension(n)   , optional, intent(out) :: cm, cp
+
+! local variables
+!
+    integer      :: i
+    real(kind=8) :: vv, ww, c2, ss, cc, fc
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for flux calculation
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! iterate over all positions
+!
+    do i = 1, n
+
+! calculate the relativistic hydrodynamic fluxes (eq. 2 in [1])
+!
+      f(idn,i) = u(idn,i) * q(ivx,i)
+      f(imx,i) = u(imx,i) * q(ivx,i) + q(ipr,i)
+      f(imy,i) = u(imx,i) * q(ivy,i)
+      f(imz,i) = u(imx,i) * q(ivz,i)
+      f(ien,i) = u(imx,i) - f(idn,i)
+
+! calculate the relativistic speed of sound (eqs. 4, 22 and 23 in [1])
+!
+      ww       = q(idn,i) + q(ipr,i) / gammaxi
+      c2       = gamma * q(ipr,i) / ww
+      vv       = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
+      ss       = c2 * (1.0d+00 - vv) / (1.0d+00 - c2)
+      fc       = 1.0d+00 + ss
+      cc       = sqrt(ss * (fc - q(ivx,i)**2))
+
+! calculate characteristic speeds (eq. 23 in [1])
+!
+      cm(i)    = (q(ivx,i) - cc) / fc
+      cp(i)    = (q(ivx,i) + cc) / fc
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for flux calculation
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine fluxspeed_srhd_adi
+!
+!===============================================================================
+!
+! function MAXSPEED_SRHD_ADI:
+! --------------------------
+!
+!   Function scans the variable array and returns the maximum speed in within.
+!
+!   Arguments:
+!
+!     q - the array of primitive variables;
+!
+!===============================================================================
+!
+  function maxspeed_srhd_adi(qq) result(maxspeed)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km, ib, ie, jb, je, kb, ke
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
+
+! return value
+!
+    real(kind=8) :: maxspeed
+
+! local variables
+!
+    integer      :: i, j, k
+    real(kind=8) :: vv, v, cc, ww, c2, ss, fc
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the maximum speed estimation
+!
+    call start_timer(imm)
+#endif /* PROFILE */
+
+! reset the maximum speed
+!
+    maxspeed = 0.0d+00
+
+! iterate over all positions
+!
+    do k = kb, ke
+      do j = jb, je
+        do i = ib, ie
+
+! calculate the velocity amplitude
+!
+          vv = sum(qq(ivx:ivz,i,j,k) * qq(ivx:ivz,i,j,k))
+          v  = sqrt(vv)
+
+! calculate the square of the sound speed
+!
+          ww = qq(idn,i,j,k) + qq(ipr,i,j,k) / gammaxi
+          c2 = gamma * qq(ipr,i,j,k) / ww
+          ss = c2 * (1.0d+00 - vv) / (1.0d+00 - c2)
+          fc = 1.0d+00 + ss
+          cc = sqrt(ss * (fc - vv))
+
+! calculate the maximum of speed
+!
+          maxspeed = max(maxspeed, (v + cc) / fc)
+
+        end do ! i = ib, ie
+      end do ! j = jb, je
+    end do ! k = kb, ke
+
+#ifdef PROFILE
+! stop accounting time for the maximum speed estimation
+!
+    call stop_timer(imm)
+#endif /* PROFILE */
+
+! return the value
+!
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function maxspeed_srhd_adi
+!
+!===============================================================================
+!
+! subroutine NR_FUNCTION_SRHD_ADI:
+! -------------------------------
+!
+!   Subroutine calculates the value of function
+!
+!     F(W)     = W - P - E
+!
+!   and its derivative
+!
+!     dF(W)/dW = 1 - dP/dW
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E;
+!     w      - input coefficients W;
+!     f, df  - output values of the function F(W) and its derivative,
+!              respectively;
+!
+!   References:
+!
+!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
+!     "Primitive Variable Solvers for Conservative General Relativistic
+!      Magnetohydrodynamics",
+!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
+!
+!===============================================================================
+!
+  subroutine nr_function_srhd_adi(mm, en, dn, w, f, df)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, en, dn, w
+    real(kind=8), intent(out)   :: f, df
+
+! local variables
+!
+    real(kind=8) :: w2, tm, vv, vm, gm, pr, dv, dg, dp
+!
+!-------------------------------------------------------------------------------
+!
+! prepare W multiplications
+!
+    w2 = w * w
+
+! calculate the velocity and its derivative
+!
+    call w_to_vv_srhd_adi(mm, w, vv, dv)
+
+! calculate 1 - |V|²
+!
+    vm = 1.0d+00 - vv
+
+! calculate Lorentz factor and its derivative
+!
+!  Γ(|V|²) = 1 / sqrt(1 - |V|²)
+! dΓ/dW    = ½ Γ³ d|V|²/dW
+!
+    gm = 1.0d+00 / sqrt(vm)
+    dg = 0.5d+00 * gm**3 * dv
+
+! calculate the thermal pressure and its derivative
+!
+!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
+! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
+!
+    tm = w - dn * gm
+    pr = gammaxi * tm * vm
+    dp = gammaxi * ((1.0d+00 - dn * dg) * vm - tm * dv)
+
+! calculate F(W)
+!
+    f  = w - pr - en
+
+! calculate dF(W)/dW
+!
+! dF(W)/dW = 1 - dP/dW
+!
+    df = 1.0d+00 - dp
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_function_srhd_adi
+!
+!===============================================================================
+!
+! subroutine NR_ITERATE_SRHD_ADI_1DW:
+! ----------------------------------
+!
+!   Subroutine finds a root W of equation
+!
+!     F(W) = W - P - E = 0
+!
+!   using the Newton-Raphson 1Dw iterative method.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     w, vv  - input/output coefficients W and |V|²;
+!
+!   References:
+!
+!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
+!     "Primitive Variable Solvers for Conservative General Relativistic
+!      Magnetohydrodynamics",
+!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
+!
+!===============================================================================
+!
+  subroutine nr_iterate_srhd_adi_1dw(mm, en, dn, wm, w, vv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, en, dn, wm
+    real(kind=8), intent(inout) :: w, vv
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, cn
+    real(kind=8) :: f, df, dw
+    real(kind=8) :: er
+!
+!-------------------------------------------------------------------------------
+!
+! initialize iteration parameters
+!
+    keep = .true.
+    it   = 100
+    cn   = 2
+
+! iterate using the Newton-Raphson method in order to find a root w of the
+! function
+!
+! F(W) = W - P - E = 0
+!
+    do while(keep)
+
+! calculate F(W) and dF(W)/dW
+!
+      call nr_function_srhd_adi(mm, en, dn, w, f, df)
+
+! calculate the increment dW
+!
+      dw = - f / df
+
+! correct W
+!
+      w  = max(wm, w + dw)
+
+! calculate the normalized error
+!
+      er = abs(dw / w)
+
+! check the convergence
+!
+      if (er < tol) then
+        if (cn <= 0) keep = .false.
+        cn  = cn - 1
+      end if
+
+! break if the number of iterations exceeded the maximum value
+!
+      if (it <= 0) keep = .false.
+
+! decrease the number of remaining iterations
+!
+      it = it - 1
+
+    end do
+
+! calculate |V|² from W
+!
+    call w_to_vv_srhd_adi(mm, w, vv)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_iterate_srhd_adi_1dw
+!
+!===============================================================================
+!
+! subroutine W_TO_VV_SRHD_ADI:
+! ---------------------------
+!
+!   Subroutine calculates the squared velocity and its W derivative from W
+!   and other parameters.
+!
+!     |V|²(W) =     [|M|² W² + S² (2 W + |B|²)]            / [W (W + |B|²)]²
+!    d|V|²/dW = - 2 {|M|² W³ + S² [3 W (W + |B|²) + |B|⁴]} / [W (W + |B|²)]³
+!
+!   Arguments:
+!
+!     mm - input coefficients for |M|²;
+!     w  - input coefficient W;
+!     vv - output value of |V|²;
+!
+!   References:
+!
+!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
+!     "Primitive Variable Solvers for Conservative General Relativistic
+!      Magnetohydrodynamics",
+!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
+!
+!===============================================================================
+!
+  subroutine w_to_vv_srhd_adi(mm, w, vv, dv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8)          , intent(in)  :: mm, w
+    real(kind=8)          , intent(out) :: vv
+    real(kind=8), optional, intent(out) :: dv
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the squared velocity and its derivative
+!
+    vv = mm / w**2
+    if (present(dv)) then
+      dv = - 2.0d+00 * vv / w
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine w_to_vv_srhd_adi
 
 !===============================================================================
 !
