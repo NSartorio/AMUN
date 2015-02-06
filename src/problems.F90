@@ -140,6 +140,9 @@ module problems
     case("current_sheet")
       setup_problem => setup_problem_current_sheet
 
+    case("jet")
+      setup_problem => setup_problem_jet
+
     case default
       call print_error("problems::initialize_problems()"                       &
                      , "Setup subroutine is not implemented for this problem!")
@@ -1245,6 +1248,171 @@ module problems
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_current_sheet
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_JET:
+! ----------------------------
+!
+!   Subroutine sets the initial conditions for the relativistic jet
+!   problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_jet(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr
+    use parameters , only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: dens  = 1.00d-01
+    real(kind=8), save :: drat  = 1.00d+02
+    real(kind=8), save :: djet  = 1.00d+01
+    real(kind=8), save :: pres  = 1.00d-02
+    real(kind=8), save :: vjet  = 0.99d+00
+    real(kind=8), save :: rjet  = 1.00d+00
+    real(kind=8), save :: rjet2 = 1.00d+00
+    real(kind=8), save :: ljet  = 0.00d-00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: dx, dy, dz, rm, rr
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("dens"  , dens)
+      call get_parameter_real("drat"  , drat)
+      call get_parameter_real("pres"  , pres)
+      call get_parameter_real("vjet"  , vjet)
+      call get_parameter_real("rjet"  , rjet)
+      call get_parameter_real("ljet"  , ljet)
+
+! calculate jet density
+!
+      djet  = dens * drat
+
+! calculate Rjet²
+!
+      rjet2 = rjet * rjet
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    dx = x(2) - x(1)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+    dy = y(2) - y(1)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+    dz = z(2) - z(1)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+    dz      = 0.0d+00
+#endif /* NDIMS == 3 */
+    rm = dy * dy + dz * dz
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! calculate radius
+!
+        rr = y(j) * y(j) + z(k) * z(k)
+
+! set the ambient density, pressure, and velocity
+!
+        q(idn,1:im) = dens
+        if (ipr > 0) q(ipr,1:im) = pres
+        q(ivx,1:im) = 0.0d+00
+        q(ivy,1:im) = 0.0d+00
+        q(ivz,1:im) = 0.0d+00
+
+! set the jet injection
+!
+        if (rr <= max(rm, rjet2)) then
+          do i = 1, im
+            if (x(i) <= max(dx, ljet)) then
+              q(idn,i) = djet
+              q(ivx,i) = vjet
+            end if
+          end do ! i = 1, im
+        end if ! R < Rjet
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_jet
 
 !===============================================================================
 !
