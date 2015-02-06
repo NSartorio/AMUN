@@ -347,6 +347,41 @@ module schemes
 
       end select
 
+!--- SPECIAL RELATIVITY HYDRODYNAMICS ---
+!
+    case("srhd", "SRHD")
+
+! depending on the equation of state complete the initialization
+!
+      select case(trim(eos))
+
+      case("adi", "ADI", "adiabatic", "ADIABATIC")
+
+! set pointers to subroutines
+!
+        update_flux => update_flux_srhd_adi
+        states      => states_srhd_adi
+
+! select the Riemann solver
+!
+        select case(trim(solver))
+
+! in the case of unknown Riemann solver, revert to HLL
+!
+        case default
+
+! set the solver name
+!
+          name_sol =  "HLL"
+
+! set pointers to subroutines
+!
+          riemann => riemann_srhd_adi_hll
+
+        end select
+
+      end select
+
     end select
 
 ! print information about the Riemann solver
@@ -4363,6 +4398,369 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_mhd_adi_roe
+!
+!===============================================================================
+!
+!***** ADIABATIC SPECIAL RELATIVITY HYDRODYNAMICS *****
+!
+!===============================================================================
+!
+! subroutine UPDATE_FLUX_SRHD_ADI:
+! -------------------------------
+!
+!   Subroutine solves the Riemann problem along each direction and calculates
+!   the numerical fluxes, which are used later to calculate the conserved
+!   variable increment.
+!
+!   Arguments:
+!
+!     idir - direction along which the flux is calculated;
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     f    - the array of numerical fluxes;
+!
+!===============================================================================
+!
+  subroutine update_flux_srhd_adi(idir, dx, q, f)
+
+! include external variables
+!
+    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ipr, ien
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    integer                             , intent(in)    :: idir
+    real(kind=8)                        , intent(in)    :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+
+! local variables
+!
+    integer                        :: i, j, k
+
+! local temporary arrays
+!
+    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
+    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
+    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for flux update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
+
+! select the directional flux to compute
+!
+    select case(idir)
+    case(1)
+
+!  calculate the flux along the X-direction
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qx(idn,1:im) = q(idn,1:im,j,k)
+          qx(ivx,1:im) = q(ivx,1:im,j,k)
+          qx(ivy,1:im) = q(ivy,1:im,j,k)
+          qx(ivz,1:im) = q(ivz,1:im,j,k)
+          qx(ipr,1:im) = q(ipr,1:im,j,k)
+
+! reconstruct Riemann states
+!
+          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+
+! update the array of fluxes
+!
+          f(idn,1:im,j,k) = fx(idn,1:im)
+          f(imx,1:im,j,k) = fx(imx,1:im)
+          f(imy,1:im,j,k) = fx(imy,1:im)
+          f(imz,1:im,j,k) = fx(imz,1:im)
+          f(ien,1:im,j,k) = fx(ien,1:im)
+
+        end do ! j = jbl, jeu
+      end do ! k = kbl, keu
+
+    case(2)
+
+!  calculate the flux along the Y direction
+!
+      do k = kbl, keu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qy(idn,1:jm) = q(idn,i,1:jm,k)
+          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
+          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
+          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
+          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
+
+! reconstruct Riemann states
+!
+          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+
+! update the array of fluxes
+!
+          f(idn,i,1:jm,k) = fy(idn,1:jm)
+          f(imx,i,1:jm,k) = fy(imz,1:jm)
+          f(imy,i,1:jm,k) = fy(imx,1:jm)
+          f(imz,i,1:jm,k) = fy(imy,1:jm)
+          f(ien,i,1:jm,k) = fy(ien,1:jm)
+
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
+
+    case(3)
+
+!  calculate the flux along the Z direction
+!
+      do j = jbl, jeu
+        do i = ibl, ieu
+
+! copy directional variable vectors to pass to the one dimensional solver
+!
+          qz(idn,1:km) = q(idn,i,j,1:km)
+          qz(ivx,1:km) = q(ivz,i,j,1:km)
+          qz(ivy,1:km) = q(ivx,i,j,1:km)
+          qz(ivz,1:km) = q(ivy,i,j,1:km)
+          qz(ipr,1:km) = q(ipr,i,j,1:km)
+
+! reconstruct Riemann states
+!
+          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+
+! call one dimensional Riemann solver in order to obtain numerical fluxes
+!
+          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+
+! update the array of fluxes
+!
+          f(idn,i,j,1:km) = fz(idn,1:km)
+          f(imx,i,j,1:km) = fz(imy,1:km)
+          f(imy,i,j,1:km) = fz(imz,1:km)
+          f(imz,i,j,1:km) = fz(imx,1:km)
+          f(ien,i,j,1:km) = fz(ien,1:km)
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+
+    end select
+
+#ifdef PROFILE
+! stop accounting time for flux update
+!
+    call stop_timer(imf)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_flux_srhd_adi
+!
+!===============================================================================
+!
+! subroutine STATES_SRHD_ADI:
+! --------------------------
+!
+!   Subroutine reconstructs the Riemann states.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
+!
+!===============================================================================
+!
+  subroutine states_srhd_adi(n, h, q, ql, qr)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : idn, ipr
+    use interpolations , only : reconstruct, fix_positivity
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8)                 , intent(in)  :: h
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
+
+! local variables
+!
+    integer :: p
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the state reconstruction
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
+    end do
+
+! check if the reconstruction gives negative values of density or pressure,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_srhd_adi
+!
+!===============================================================================
+!
+! subroutine RIEMANN_SRHD_ADI_HLL:
+! -------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLL) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Harten, A., Lax, P. D. & Van Leer, B.
+!         "On Upstream Differencing and Godunov-Type Schemes for Hyperbolic
+!          Conservation Laws",
+!         SIAM Review, 1983, Volume 25, Number 1, pp. 35-61
+!
+!===============================================================================
+!
+  subroutine riemann_srhd_adi_hll(n, ql, qr, f)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : ivx
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                       :: i
+    real(kind=8)                  :: sl, sr, srml
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: wl, wr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
+! calculate the conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at both states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
+
+! iterate over all position
+!
+    do i = 1, n
+
+! estimate the minimum and maximum speeds
+!
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
+
+! calculate the HLL flux
+!
+      if (sl >= 0.0d+00) then
+
+        f(1:nv,i) = fl(1:nv,i)
+
+      else if (sr <= 0.0d+00) then
+
+        f(1:nv,i) = fr(1:nv,i)
+
+      else ! sl < 0 < sr
+
+! calculate the inverse of speed difference
+!
+        srml = sr - sl
+
+! calculate vectors of the left and right-going waves
+!
+        wl(1:nv)  = sl * ul(1:nv,i) - fl(1:nv,i)
+        wr(1:nv)  = sr * ur(1:nv,i) - fr(1:nv,i)
+
+! calculate fluxes for the intermediate state
+!
+        f(1:nv,i) = (sl * wr(1:nv) - sr * wl(1:nv)) / srml
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for the Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_srhd_adi_hll
 
 !===============================================================================
 !
