@@ -706,7 +706,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -723,8 +723,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -732,8 +732,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -827,7 +827,6 @@ module schemes
 ! local arrays to store the states
 !
     real(kind=8), dimension(nv,n)  :: ul, ur, fl, fr
-    real(kind=8), dimension(n)     :: cl, cr
     real(kind=8), dimension(nv)    :: qi, ci, al
     real(kind=8), dimension(nv,nv) :: li, ri
 !
@@ -846,8 +845,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:))
 
 ! iterate over all points
 !
@@ -1216,7 +1215,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -1228,13 +1227,13 @@ module schemes
 
 ! calculate the conserved variables of the left and right states
 !
-    call prim2cons(n, ql(1:nv,1:n), ul(1:nv,1:n))
-    call prim2cons(n, qr(1:nv,1:n), ur(1:nv,1:n))
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
 
 ! calculate the physical fluxes and speeds at both states
 !
-    call fluxspeed(n, ql(1:nv,1:n), ul(1:nv,1:n), fl(1:nv,1:n), cl(1:n))
-    call fluxspeed(n, qr(1:nv,1:n), ur(1:nv,1:n), fr(1:nv,1:n), cr(1:n))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all position
 !
@@ -1242,8 +1241,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -1336,7 +1335,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, ui
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -1348,13 +1347,13 @@ module schemes
 
 ! calculate the conserved variables of the left and right states
 !
-    call prim2cons(n, ql(1:nv,1:n), ul(1:nv,1:n))
-    call prim2cons(n, qr(1:nv,1:n), ur(1:nv,1:n))
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
 
 ! calculate the physical fluxes and speeds at both states
 !
-    call fluxspeed(n, ql(1:nv,1:n), ul(1:nv,1:n), fl(1:nv,1:n), cl(1:n))
-    call fluxspeed(n, qr(1:nv,1:n), ur(1:nv,1:n), fr(1:nv,1:n), cr(1:n))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -1362,8 +1361,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -1509,7 +1508,6 @@ module schemes
 ! local arrays to store the states
 !
     real(kind=8), dimension(nv,n)  :: ul, ur, fl, fr
-    real(kind=8), dimension(n)     :: cl, cr
     real(kind=8), dimension(nv)    :: qi, ci, al
     real(kind=8), dimension(nv,nv) :: li, ri
 !
@@ -1528,8 +1526,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:))
 
 ! iterate over all points
 !
@@ -1936,7 +1934,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -1953,8 +1951,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -1962,8 +1960,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -2055,7 +2053,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -2072,8 +2070,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -2081,8 +2079,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -2423,7 +2421,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -2440,8 +2438,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -2449,8 +2447,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -2792,7 +2790,6 @@ module schemes
 ! local arrays to store the states
 !
     real(kind=8), dimension(nv,n)  :: ul, ur, fl, fr
-    real(kind=8), dimension(n)     :: cl, cr
     real(kind=8), dimension(nv)    :: qi, ci, al
     real(kind=8), dimension(nv,nv) :: li, ri
 !
@@ -2811,8 +2808,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:))
 
 ! iterate over all points
 !
@@ -3256,7 +3253,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -3273,8 +3270,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -3282,8 +3279,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLL flux
 !
@@ -3382,7 +3379,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, ui
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -3399,8 +3396,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -3408,8 +3405,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLLC flux
 !
@@ -3658,7 +3655,7 @@ module schemes
 !
     real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
     real(kind=8), dimension(nv)   :: wl, wr, wcl, wcr, ui
-    real(kind=8), dimension(n)    :: cl, cr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
 !
 !-------------------------------------------------------------------------------
 !
@@ -3675,8 +3672,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
 
 ! iterate over all points
 !
@@ -3684,8 +3681,8 @@ module schemes
 
 ! estimate the minimum and maximum speeds
 !
-      sl = min(ql(ivx,i) - cl(i), qr(ivx,i) - cr(i))
-      sr = max(ql(ivx,i) + cl(i), qr(ivx,i) + cr(i))
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
 
 ! calculate the HLLC flux
 !
@@ -4232,7 +4229,6 @@ module schemes
 ! local arrays to store the states
 !
     real(kind=8), dimension(nv,n)  :: ul, ur, fl, fr
-    real(kind=8), dimension(n)     :: cl, cr
     real(kind=8), dimension(nv)    :: qi, ci, al
     real(kind=8), dimension(nv,nv) :: li, ri
 !
@@ -4251,8 +4247,8 @@ module schemes
 
 ! calculate the physical fluxes and speeds at the states
 !
-    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), cl(:))
-    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), cr(:))
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:))
 
 ! iterate over all points
 !
