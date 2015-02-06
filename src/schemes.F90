@@ -112,7 +112,9 @@ module schemes
 ! local variables
 !
     character(len=64)      :: solver   = "HLL"
+    character(len=64)      :: statev   = "primitive"
     character(len=255)     :: name_sol = ""
+    character(len=255)     :: name_sts = ""
 !
 !-------------------------------------------------------------------------------
 !
@@ -131,7 +133,8 @@ module schemes
 
 ! get the Riemann solver
 !
-    call get_parameter_string("riemann_solver", solver)
+    call get_parameter_string("riemann_solver" , solver)
+    call get_parameter_string("state_variables", statev)
 
 ! depending on the system of equations initialize the module variables
 !
@@ -360,7 +363,34 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_srhd_adi
-        states      => states_srhd_adi
+
+! select the state reconstruction method
+!
+        select case(trim(statev))
+
+        case("4vec", "4-vector", "4VEC", "4-VECTOR")
+
+! set the state reconstruction name
+!
+          name_sts =  "4-vector"
+
+! set pointers to subroutines
+!
+          states   => states_srhd_adi_4vec
+
+! in the case of state variables, revert to primitive
+!
+        case default
+
+! set the state reconstruction name
+!
+          name_sts =  "primitive"
+
+! set pointers to subroutines
+!
+          states   => states_srhd_adi
+
+        end select
 
 ! select the Riemann solver
 !
@@ -389,6 +419,7 @@ module schemes
     if (verbose) then
 
       write (*,"(4x,a,1x,a)"    ) "Riemann solver         =", trim(name_sol)
+      write (*,"(4x,a,1x,a)"    ) "state variables        =", trim(name_sts)
 
     end if
 
@@ -4643,6 +4674,114 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine states_srhd_adi
+!
+!===============================================================================
+!
+! subroutine STATES_SRHD_ADI_4VEC:
+! -------------------------------
+!
+!   Subroutine reconstructs the Riemann states using the 4-velocity vector.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     h      - the spatial step;
+!     q      - the input array of primitive variables;
+!     ql, qr - the reconstructed Riemann states;
+!
+!===============================================================================
+!
+  subroutine states_srhd_adi_4vec(n, h, q, ql, qr)
+
+! include external procedures
+!
+    use equations      , only : nv
+    use equations      , only : idn, ipr, ivx, ivy, ivz
+    use interpolations , only : reconstruct, fix_positivity
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8)                 , intent(in)  :: h
+    real(kind=8), dimension(nv,n), intent(in)  :: q
+    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
+
+! local variables
+!
+    integer      :: p, i
+    real(kind=8) :: vm
+
+! local arrays
+!
+    real(kind=8), dimension(nv,n) :: qq
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the state reconstruction
+!
+    call start_timer(ims)
+#endif /* PROFILE */
+
+! convert velocities to four-velocities for physical reconstruction
+!
+    do i = 1, n
+
+      vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i)**2))
+
+      qq(idn,i) = q(idn,i) / vm
+      qq(ivx,i) = q(ivx,i) / vm
+      qq(ivy,i) = q(ivy,i) / vm
+      qq(ivz,i) = q(ivz,i) / vm
+      qq(ipr,i) = q(ipr,i)
+
+    end do ! i = 1, n
+
+! reconstruct the left and right states of primitive variables
+!
+    do p = 1, nv
+      call reconstruct(n, h, qq(p,:), ql(p,:), qr(p,:))
+    end do
+
+! convert state four-velocities back to velocities
+!
+    do i = 1, n
+
+      vm = sqrt(1.0d+00 + sum(ql(ivx:ivz,i)**2))
+
+      ql(idn,i) = ql(idn,i) / vm
+      ql(ivx,i) = ql(ivx,i) / vm
+      ql(ivy,i) = ql(ivy,i) / vm
+      ql(ivz,i) = ql(ivz,i) / vm
+
+      vm = sqrt(1.0d+00 + sum(qr(ivx:ivz,i)**2))
+
+      qr(idn,i) = qr(idn,i) / vm
+      qr(ivx,i) = qr(ivx,i) / vm
+      qr(ivy,i) = qr(ivy,i) / vm
+      qr(ivz,i) = qr(ivz,i) / vm
+
+    end do ! i = 1, n
+
+! check if the reconstruction gives negative values of density or pressure,
+! if so, correct the states
+!
+    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
+    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
+
+#ifdef PROFILE
+! stop accounting time for the state reconstruction
+!
+    call stop_timer(ims)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine states_srhd_adi_4vec
 !
 !===============================================================================
 !
