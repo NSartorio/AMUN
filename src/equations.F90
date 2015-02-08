@@ -3183,8 +3183,8 @@ module equations
 !
       f(idn,i) = u(idn,i) * q(ivx,i)
       f(imx,i) = u(imx,i) * q(ivx,i) + q(ipr,i)
-      f(imy,i) = u(imx,i) * q(ivy,i)
-      f(imz,i) = u(imx,i) * q(ivz,i)
+      f(imy,i) = u(imy,i) * q(ivx,i)
+      f(imz,i) = u(imz,i) * q(ivx,i)
       f(ien,i) = u(imx,i) - f(idn,i)
 
 ! calculate the relativistic speed of sound (eqs. 4, 22 and 23 in [1])
