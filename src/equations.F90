@@ -851,15 +851,15 @@ module equations
 !
 !   Arguments:
 !
-!     n - the length of input and output vectors;
-!     q - the input array of primitive variables;
-!     u - the input array of conservative variables;
-!     f - the output vector of fluxes;
-!     c - the output vector of characteristic speeds;
+!     n      - the length of input and output vectors;
+!     q      - the input array of primitive variables;
+!     u      - the input array of conservative variables;
+!     f      - the output vector of fluxes;
+!     cm, cp - the output vector of left- and right-going characteristic speeds;
 !
 !===============================================================================
 !
-  subroutine fluxspeed_hd_iso(n, q, u, f, c)
+  subroutine fluxspeed_hd_iso(n, q, u, f, cm, cp)
 
 ! local variables are not implicit by default
 !
@@ -867,10 +867,10 @@ module equations
 
 ! input/output arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: q, u
-    real(kind=8), dimension(nv,n), intent(out) :: f
-    real(kind=8), dimension(n)   , intent(out) :: c
+    integer                                , intent(in)  :: n
+    real(kind=8), dimension(nv,n)          , intent(in)  :: q, u
+    real(kind=8), dimension(nv,n)          , intent(out) :: f
+    real(kind=8), dimension(n)   , optional, intent(out) :: cm, cp
 
 ! local variables
 !
@@ -896,9 +896,10 @@ module equations
       f(imz,i) = q(ivx,i) * u(imz,i)
       f(imx,i) = f(imx,i) + csnd2 * q(idn,i)
 
-! calculate the speed of sound
+! calculate characteristic speeds
 !
-      c(i) = csnd
+      cm(i)    = q(ivx,i) - csnd
+      cp(i)    = q(ivx,i) + csnd
 
     end do ! i = 1, n
 
@@ -1256,15 +1257,15 @@ module equations
 !
 !   Arguments:
 !
-!     n - the length of input and output vectors;
-!     q - the input array of primitive variables;
-!     u - the input array of conservative variables;
-!     f - the output vector of fluxes;
-!     c - the output vector of characteristic speeds;
+!     n      - the length of input and output vectors;
+!     q      - the input array of primitive variables;
+!     u      - the input array of conservative variables;
+!     f      - the output vector of fluxes;
+!     cm, cp - the output vector of left- and right-going characteristic speeds;
 !
 !===============================================================================
 !
-  subroutine fluxspeed_hd_adi(n, q, u, f, c)
+  subroutine fluxspeed_hd_adi(n, q, u, f, cm, cp)
 
 ! local variables are not implicit by default
 !
@@ -1272,14 +1273,15 @@ module equations
 
 ! input/output arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: q, u
-    real(kind=8), dimension(nv,n), intent(out) :: f
-    real(kind=8), dimension(n)   , intent(out) :: c
+    integer                                , intent(in)  :: n
+    real(kind=8), dimension(nv,n)          , intent(in)  :: q, u
+    real(kind=8), dimension(nv,n)          , intent(out) :: f
+    real(kind=8), dimension(n)   , optional, intent(out) :: cm, cp
 
 ! local variables
 !
-    integer :: i
+    integer      :: i
+    real(kind=8) :: cs
 !
 !-------------------------------------------------------------------------------
 !
@@ -1302,9 +1304,11 @@ module equations
       f(imx,i) = f(imx,i) + q(ipr,i)
       f(ien,i) = q(ivx,i) * (u(ien,i) + q(ipr,i))
 
-! calculate the speed of sound
+! calculate characteristic speeds
 !
-      c(i) = sqrt(gamma * q(ipr,i) / q(idn,i))
+      cs       = sqrt(gamma * q(ipr,i) / q(idn,i))
+      cm(i)    = q(ivx,i) - cs
+      cp(i)    = q(ivx,i) + cs
 
     end do ! i = 1, n
 
@@ -1702,15 +1706,15 @@ module equations
 !
 !   Arguments:
 !
-!     n - the length of input and output vectors;
-!     q - the input array of primitive variables;
-!     u - the input array of conservative variables;
-!     f - the output vector of fluxes;
-!     c - the output vector of characteristic speeds;
+!     n      - the length of input and output vectors;
+!     q      - the input array of primitive variables;
+!     u      - the input array of conservative variables;
+!     f      - the output vector of fluxes;
+!     cm, cp - the output vector of left- and right-going characteristic speeds;
 !
 !===============================================================================
 !
-  subroutine fluxspeed_mhd_iso(n, q, u, f, c)
+  subroutine fluxspeed_mhd_iso(n, q, u, f, cm, cp)
 
 ! local variables are not implicit by default
 !
@@ -1718,16 +1722,16 @@ module equations
 
 ! input/output arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: q, u
-    real(kind=8), dimension(nv,n), intent(out) :: f
-    real(kind=8), dimension(n)   , intent(out) :: c
+    integer                                , intent(in)  :: n
+    real(kind=8), dimension(nv,n)          , intent(in)  :: q, u
+    real(kind=8), dimension(nv,n)          , intent(out) :: f
+    real(kind=8), dimension(n)   , optional, intent(out) :: cm, cp
 
 ! local variables
 !
     integer      :: i
     real(kind=8) :: bx2, by2, bz2, bb, pr, pt
-    real(kind=8) :: fa, fb, fc
+    real(kind=8) :: fa, fb, fc, cf
 !
 !-------------------------------------------------------------------------------
 !
@@ -1764,14 +1768,19 @@ module equations
 
 ! calculate the fast magnetosonic speed
 !
-      fa   = csnd2 * q(idn,i)
-      fb   = fa + bb
-      fc   = fb * fb - 4.0d+00 * fa * bx2
+      fa       = csnd2 * q(idn,i)
+      fb       = fa + bb
+      fc       = fb * fb - 4.0d+00 * fa * bx2
       if (fc > 0.0d+00) then
-        c(i) = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+        cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
       else
-        c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
+        cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
       end if
+
+! calculate characteristic speeds
+!
+      cm(i)    = q(ivx,i) - cf
+      cp(i)    = q(ivx,i) + cf
 
     end do ! i = 1, n
 
@@ -2299,15 +2308,15 @@ module equations
 !
 !   Arguments:
 !
-!     n - the length of input and output vectors;
-!     q - the input array of primitive variables;
-!     u - the input array of conservative variables;
-!     f - the output vector of fluxes;
-!     c - the output vector of characteristic speeds;
+!     n      - the length of input and output vectors;
+!     q      - the input array of primitive variables;
+!     u      - the input array of conservative variables;
+!     f      - the output vector of fluxes;
+!     cm, cp - the output vector of left- and right-going characteristic speeds;
 !
 !===============================================================================
 !
-  subroutine fluxspeed_mhd_adi(n, q, u, f, c)
+  subroutine fluxspeed_mhd_adi(n, q, u, f, cm, cp)
 
 ! local variables are not implicit by default
 !
@@ -2315,17 +2324,17 @@ module equations
 
 ! input/output arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: q, u
-    real(kind=8), dimension(nv,n), intent(out) :: f
-    real(kind=8), dimension(n)   , intent(out) :: c
+    integer                                , intent(in)  :: n
+    real(kind=8), dimension(nv,n)          , intent(in)  :: q, u
+    real(kind=8), dimension(nv,n)          , intent(out) :: f
+    real(kind=8), dimension(n)   , optional, intent(out) :: cm, cp
 
 ! local variables
 !
     integer      :: i
     real(kind=8) :: bx2, by2, bz2, bb, pr, pt
     real(kind=8) :: vb
-    real(kind=8) :: fa, fb, fc
+    real(kind=8) :: fa, fb, fc, cf
 !
 !-------------------------------------------------------------------------------
 !
@@ -2364,14 +2373,19 @@ module equations
 
 ! calculate the fast magnetosonic speed
 !
-      fa   = gamma * q(ipr,i)
-      fb   = fa + bb
-      fc   = fb * fb - 4.0d+00 * fa * bx2
+      fa       = gamma * q(ipr,i)
+      fb       = fa + bb
+      fc       = fb * fb - 4.0d+00 * fa * bx2
       if (fc > 0.0d+00) then
-        c(i) = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+        cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
       else
-        c(i) = sqrt(0.5d+00 *  fb             / q(idn,i))
+        cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
       end if
+
+! calculate characteristic speeds
+!
+      cm(i)    = q(ivx,i) - cf
+      cp(i)    = q(ivx,i) + cf
 
     end do ! i = 1, n
 
