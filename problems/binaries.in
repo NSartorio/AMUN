@@ -2,17 +2,21 @@
 #
 problem           = "binaries"
 gamma             =  1.1d+00
+mstar             =  2.0d+00
+mcomp             =  1.0d+00
 rstar             =  5.0d-02
 rcomp             =  5.0d-02
-dn_star           =  1.0d+07
-dn_ratio          =  1.0d+02
-ms_star           =  3.0d+00
-ms_comp           =  1.5d+01
+dstar             =  1.0d+07
+dratio            =  1.0d+02
+msstar            =  3.0d+00
+mscomp            =  1.5d+01
+tstar             =  2.0d+01
+tcomp             =  1.0d+01
 vstar             =  5.0d-01
 vcomp             =  2.5d+00
-dcomp             =  2.0d-01
-ecomp             =  0.9d+00
-tcomp             =  1.0d+02
+distance          =  2.0d-01
+eccentricity      =  0.9d+00
+period            =  1.0d+02
 buni              =  1.0d-03
 
 # physics
