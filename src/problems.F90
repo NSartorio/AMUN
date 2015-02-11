@@ -1290,26 +1290,33 @@ module problems
 
 ! default parameter values
 !
+    real(kind=8), save :: mstar    = 2.00d+00
+    real(kind=8), save :: mcomp    = 1.00d+00
     real(kind=8), save :: rstar    = 5.00d-02
     real(kind=8), save :: rcomp    = 5.00d-02
-    real(kind=8), save :: dnstar   = 1.00d+06
+    real(kind=8), save :: dstar    = 1.00d+06
     real(kind=8), save :: dratio   = 1.00d+02
     real(kind=8), save :: msstar   = 3.00d+00
     real(kind=8), save :: mscomp   = 1.50d+01
+    real(kind=8), save :: tstar    = 0.00d+00
+    real(kind=8), save :: tcomp    = 0.00d+00
+    real(kind=8), save :: omstar   = 0.00d+00
+    real(kind=8), save :: omcomp   = 0.00d+00
     real(kind=8), save :: vstar    = 5.00d-01
     real(kind=8), save :: vcomp    = 2.50d+00
-    real(kind=8), save :: dcomp    = 2.00d-01
-    real(kind=8), save :: ecomp    = 9.00d-01
-    real(kind=8), save :: tcomp    = 1.00d+02
+    real(kind=8), save :: dist     = 2.00d-01
+    real(kind=8), save :: period   = 1.00d+02
+    real(kind=8), save :: ecc      = 9.00d-01
     real(kind=8), save :: buni     = 1.00d-03
 
 ! local saved parameters
 !
     logical     , save :: first = .true.
-    real(kind=8), save :: dncomp, prstar, prcomp
+    real(kind=8), save :: dcomp, pstar, pcomp
     real(kind=8), save :: r2star, r2comp
     real(kind=8), save :: acomp , bcomp
-    real(kind=8), save :: om, xsh, xst, yvl
+    real(kind=8), save :: xps, xpc, uys, uyc
+    real(kind=8), save :: om
 
 ! local variables
 !
@@ -1339,48 +1346,67 @@ module problems
 !
     if (first) then
 
-! get problem parameters
+! star masses, radia, densities and sonic Mach numbers
 !
-      call get_parameter_real("rstar"   , rstar )
-      call get_parameter_real("rcomp"   , rcomp )
-      call get_parameter_real("dn_star" , dnstar)
-      call get_parameter_real("dn_ratio", dratio)
-      call get_parameter_real("ms_star" , msstar)
-      call get_parameter_real("ms_comp" , mscomp)
-      call get_parameter_real("vstar"   , vstar )
-      call get_parameter_real("vcomp"   , vcomp )
-      call get_parameter_real("dcomp"   , dcomp )
-      call get_parameter_real("ecomp"   , ecomp )
-      call get_parameter_real("tcomp"   , tcomp )
-      call get_parameter_real("buni"    , buni  )
+      call get_parameter_real("mstar"       , mstar )
+      call get_parameter_real("mcomp"       , mcomp )
+      call get_parameter_real("rstar"       , rstar )
+      call get_parameter_real("rcomp"       , rcomp )
+      call get_parameter_real("dstar"       , dstar )
+      call get_parameter_real("dratio"      , dratio)
+      call get_parameter_real("msstar"      , msstar)
+      call get_parameter_real("mscomp"      , mscomp)
+
+! wind speeds
+!
+      call get_parameter_real("vstar"       , vstar )
+      call get_parameter_real("vcomp"       , vcomp )
+
+! orbit parameters
+!
+      call get_parameter_real("distance"    , dist  )
+      call get_parameter_real("period"      , period)
+      call get_parameter_real("eccentricity", ecc   )
+
+! star rotation periods
+!
+      call get_parameter_real("tstar"       , tstar )
+      call get_parameter_real("tcomp"       , tcomp )
+
+! magnetic field profile parameters
+!
+      call get_parameter_real("buni"        , buni  )
 
 ! calculate the square of radia
 !
       r2star = rstar * rstar
       r2comp = rcomp * rcomp
 
-! calculate densities and pressures of the companion star
+! calculate densities and pressures
 !
-      dncomp = dnstar / dratio
+      dcomp = dstar / dratio
       if (ipr > 0) then
-        prstar = (vstar / msstar)**2 * dnstar / gamma
-        prcomp = (vcomp / mscomp)**2 * dncomp / gamma
+        pstar = (vstar / msstar)**2 * dstar / gamma
+        pcomp = (vcomp / mscomp)**2 * dcomp / gamma
       end if
 
 ! calculate orbit parameters
 !
-      acomp  = dcomp / (1.0d+00 - ecomp)
-      bcomp  = acomp * sqrt(1.0d+00 - ecomp * ecomp)
+      acomp  = dist / (1.0d+00 - ecc)
+      bcomp  = acomp * sqrt(1.0d+00 - ecc * ecc)
+      om     = (pi2 / period) / (1.0d+00 - ecc)
 
-! angular speed and triginometric functions
+! calculate initial positions and velocities
 !
-      om     = pi2 / tcomp / (1.0d+00 - ecomp)
+      xps    = - mcomp / (mstar + mcomp) * dist
+      xpc    =   mstar / (mstar + mcomp) * dist
+      uys    = - xps * om
+      uyc    =   xpc * om
 
-! calculate the initial position and velocity of the companion star
+! calculate the rotation speeds
 !
-      xsh    = acomp
-      xst    = acomp - dcomp
-      yvl    = bcomp * om
+      if (tstar > 0.0d+00) omstar = 1.0d+00 / tstar
+      if (tcomp > 0.0d+00) omcomp = 1.0d+00 / tcomp
 
 ! reset the first execution flag
 !
@@ -1431,13 +1457,13 @@ module problems
 
 ! calculate the X coordinates of the central and companion stars
 !
-          xs = x(i) - xst
-          xc = x(i) - xsh
+          xs = x(i) - xps
+          xc = x(i) - xpc
 
 ! calculate the distances from the centers of the central and companion stars
 !
-          rs2 = max(xs * xs + ys * ys + zs * zs, 1.0d-08)
-          rc2 = max(xc * xc + yc * yc + zc * zc, 1.0d-08)
+          rs2 = max(xs * xs + ys * ys + zs * zs, 1.0d-16)
+          rc2 = max(xc * xc + yc * yc + zc * zc, 1.0d-16)
           rs  = sqrt(rs2)
           rc  = sqrt(rc2)
 
@@ -1449,8 +1475,8 @@ module problems
           rd = max(rstar , rs ) / rstar
 #endif /* NDIMS == 3 */
 
-          dns = dnstar / rd
-          if (ipr > 0) prs = prstar / rd
+          dns = dstar / rd
+          if (ipr > 0) prs = pstar / rd
 
 ! set the central star wind velocity
 !
@@ -1466,8 +1492,8 @@ module problems
           rd = max(rcomp , rc ) / rcomp
 #endif /* NDIMS == 3 */
 
-          dnc = dncomp / rd
-          if (ipr > 0) prc = prcomp / rd
+          dnc = dcomp / rd
+          if (ipr > 0) prc = pcomp / rd
 
 ! set the companion star wind velocity
 !
@@ -1479,22 +1505,22 @@ module problems
 !
           if (rs2 <= r2star) then
             q(idn,i) = dns
-            q(ivx,i) = vxs
-            q(ivy,i) = vys
+            q(ivx,i) = vxs - omstar * ys
+            q(ivy,i) = vys + omstar * xs + uys
             q(ivz,i) = vzs
             if (ipr > 0) q(ipr,i) = prs
           else if (rc2 <= r2comp) then
             q(idn,i) = dnc
-            q(ivx,i) = vxc
-            q(ivy,i) = vyc + yvl
+            q(ivx,i) = vxc - omcomp * yc
+            q(ivy,i) = vyc + omcomp * xc + uyc
             q(ivz,i) = vzc
             if (ipr > 0) q(ipr,i) = prc
           else
-            q(idn,i) = min(dnstar, dns + dnc)
+            q(idn,i) = min(dstar, dns + dnc)
             q(ivx,i) = vxs + vxc
             q(ivy,i) = vys + vyc
             q(ivz,i) = vzs + vzc
-            if (ipr > 0) q(ipr,i) = min(prstar, prs + prc)
+            if (ipr > 0) q(ipr,i) = min(pstar, prs + prc)
           end if
 
         end do ! i = 1, im
