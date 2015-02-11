@@ -613,11 +613,11 @@ module shapes
 !
     logical     , save :: first = .true.
     real(kind=8), save :: ms, mc
-    real(kind=8), save :: dcomp, pstar, pcomp
     real(kind=8), save :: r2star, r2comp
-    real(kind=8), save :: acomp , bcomp
-    real(kind=8), save :: omega, man, ean, vs, vc
-    real(kind=8), save :: xps, yps, xpc, ypc, uxs, uys, uxc, uyc
+    real(kind=8), save :: dcomp, pstar, pcomp
+    real(kind=8), save :: asemi, omega, ean
+    real(kind=8), save :: xps, yps, xpc, ypc, xrs, yrs, xrc, yrc
+    real(kind=8), save :: uxs, uys, uxc, uyc
     real(kind=8), save :: tprev
 
 ! local variables
@@ -625,8 +625,8 @@ module shapes
     integer       :: i, j, k
     real(kind=8)  :: xs, ys, zs
     real(kind=8)  :: xc, yc, zc
-    real(kind=8)  :: dv
-    real(kind=8)  :: sn, cs, res, om
+    real(kind=8)  :: dv, dt
+    real(kind=8)  :: sn, cs, man, res
     real(kind=8)  :: rs2, rc2, rs, rc, rd
     real(kind=8)  :: dns, prs, vxs, vys, vzs
     real(kind=8)  :: dnc, prc, vxc, vyc, vzc
@@ -706,8 +706,7 @@ module shapes
 
 ! calculate orbit parameters
 !
-      acomp  = dist / (1.0d+00 - ecc)
-      bcomp  = acomp * sqrt(1.0d+00 - ecc * ecc)
+      asemi  = dist / (1.0d+00 - ecc)
       omega  = pi2 / period
       ean    = 0.0d+00
 
@@ -716,9 +715,16 @@ module shapes
       if (tstar > 0.0d+00) omstar = 1.0d+00 / tstar
       if (tcomp > 0.0d+00) omcomp = 1.0d+00 / tcomp
 
+! set the initial positions
+!
+      xrs = - ms * dist
+      yrs =   0.0d+00
+      xrc =   mc * dist
+      yrc =   0.0d+00
+
 ! set the previous time
 !
-      tprev  = -1.0d+00
+      tprev  = 0.0d+00
 
 ! reset the first execution flag
 !
@@ -752,29 +758,28 @@ module shapes
       sn = sqrt(1.0d+00 - ecc**2) * sin(ean) / dv
       cs = (cos(ean) - ecc) / dv
 
-! calculate the angular velocity
-!
-      om = omega / (1.0d+00 - ecc * cs)
-
 ! calculate the position and velocity of the companion star
 !
-      rd  =   acomp * dv
+      rd  =   asemi * dv
       rs  =   ms * rd
       rc  =   mc * rd
-      vs  =   rs * om
-      vc  =   rc * om
       xps = - rs * cs
       yps = - rs * sn
       xpc =   rc * cs
       ypc =   rc * sn
-      uxs =   vs * sn
-      uys = - vs * cs
-      uxc = - vc * sn
-      uyc =   vc * cs
+      dt  = time - tprev
+      uxs = (xps - xrs) / dt
+      uys = (yps - yrs) / dt
+      uxc = (xpc - xrc) / dt
+      uyc = (ypc - yrc) / dt
 
-! update tprev
+! update tprev, previous positions
 !
       tprev = time
+      xrs   = xps
+      yrs   = yps
+      xrc   = xpc
+      yrc   = ypc
 
     end if ! time /= tprev
 
