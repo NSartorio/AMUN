@@ -142,9 +142,12 @@ module equations
   real(kind=8)     , save :: msmax   = 1.0d+03
   real(kind=8)     , save :: msfac   = 3.0d-06 / 5.0d+00
 
-! the tolerance for Newton-Raphson interative method
+! the tolerance for Newton-Raphson interative method, the maximum number of
+! iterations and the number of extra iterations for polishing
 !
   real(kind=8)     , save :: tol     = 1.0d-10
+  integer          , save :: nmax    = 100
+  integer          , save :: next    = 2
 
 ! flags for reconstruction corrections
 !
@@ -199,7 +202,8 @@ module equations
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_string, get_parameter_real
+    use parameters, only : get_parameter_string, get_parameter_real            &
+                         , get_parameter_integer
 
 ! local variables are not implicit by default
 !
@@ -240,6 +244,19 @@ module equations
 ! get the equation of state
 !
     call get_parameter_string("equation_of_state" , eos  )
+
+! get the primitive variable solver
+!
+    call get_parameter_string("primitive_solver"  , c2p  )
+
+! get the tolerance
+!
+    call get_parameter_real   ("tolerance"         , tol )
+
+! get the maximum number of Newton-Raphson method iterations
+!
+    call get_parameter_integer("maximum_iterations", nmax)
+    call get_parameter_integer("extra_iterations"  , next)
 
 ! depending on the system of equations initialize the module variables
 !
@@ -529,6 +546,16 @@ module equations
 ! set pointer to the conversion method
 !
         nr_iterate => nr_iterate_srhd_adi_1dw
+
+      case("2D", "2d")
+
+! the type of equation of state
+!
+        name_c2p  = "2D"
+
+! set pointer to the conversion method
+!
+        nr_iterate => nr_iterate_srhd_adi_2d
 
 ! warn about the unimplemented method
 !
@@ -3489,6 +3516,164 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srhd_adi_1dw
+!
+!===============================================================================
+!
+! subroutine NR_ITERATE_SRHD_ADI_2D:
+! ---------------------------------
+!
+!   Subroutine finds a root W of equation
+!
+!     F(W) = W - P - E = 0
+!
+!   using the Newton-Raphson 2D iterative method.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     w, vv  - input/output coefficients W and |V|²;
+!
+!   References:
+!
+!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
+!     "Primitive Variable Solvers for Conservative General Relativistic
+!      Magnetohydrodynamics",
+!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
+!
+!===============================================================================
+!
+  subroutine nr_iterate_srhd_adi_2d(mm, en, dn, wm, w, vv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, en, dn, wm
+    real(kind=8), intent(inout) :: w, vv
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, cn
+    real(kind=8) :: ww, vm, gm
+    real(kind=8) :: pr, dpw, dpv
+    real(kind=8) :: f, dfw, dfv, df
+    real(kind=8) :: g, dgw, dgv, dg
+    real(kind=8) :: det, jfw, jfv, jgw, jgv
+    real(kind=8) :: dw, dv
+    real(kind=8) :: err
+!
+!-------------------------------------------------------------------------------
+!
+! initialize iteration parameters
+!
+    keep = .true.
+    it   = nmax
+    cn   = next
+
+! calculate the initial |V|² from the guess of W
+!
+!  |V|²(W) = |M|² / W²
+!
+    vv = mm / (w * w)
+
+! iterate using the Newton-Raphson method in order to find the roots W and |V|²
+! of functions
+!
+! F(W,|V|²) = W - P - E = 0
+! G(W,|V|²) = |V|² W² - |M|² = 0
+!
+    do while(keep)
+
+! calculate W², (1 - |V|²), and the Lorentz factor
+!
+      ww  = w * w
+      vm  = 1.0d+00 - vv
+      gm  = 1.0d+00 / sqrt(vm)
+
+! calculate the thermal pressure and its derivatives
+!
+!  P(W,|V|²) = (γ - 1)/γ (W - D Γ) (1 - |V|²)
+! dP/dW      = (γ - 1)/γ (1 - |V|²)
+! dP/d|V|²   = (γ - 1)/γ (- W - 1/2 D Γ)
+!
+      pr  = gammaxi * (w - dn * gm) * vm
+      dpw = gammaxi * vm
+      dpv = gammaxi * (- w + 0.5d+00 * dn * gm)
+
+! calculate F(W,|V|²) and G(W,|V|²)
+!
+      f   = w - pr - en
+      g   = vv * ww  - mm
+
+! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
+!
+      dfw = 1.0d+00 - dpw
+      dfv =         - dpv
+
+! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
+!
+      dgw = 2.0d+00 * vv * w
+      dgv = ww
+
+! invert the Jacobian J = | dF/dW, dF/d|V|² |
+!                         | dG/dW, dG/d|V|² |
+!
+      det = dfw * dgv - dfv * dgw
+
+      jfw =   dgv / det
+      jgw = - dfv / det
+      jfv = - dgw / det
+      jgv =   dfw / det
+
+! calculate increments dW and d|V|²
+!
+      dw  = f * jfw + g * jgw
+      dv  = f * jfv + g * jgv
+
+! correct W and |V|²
+!
+      w   = w  - dw
+      vv  = vv - dv
+
+! calculate the normalized error
+!
+      err = max(abs(dw / w), abs(dv))
+
+! check the convergence
+!
+      if (err < tol) then
+        if (cn <= 0) keep = .false.
+        cn  = cn - 1
+      end if
+
+! break if the number of iterations exceeded the maximum value
+!
+      if (it <= 0) keep = .false.
+
+! decrease the number of remaining iterations
+!
+      it = it - 1
+
+    end do ! continue interations
+
+! print information about failed convergence
+!
+    if (err >= tol) then
+      print *, '[SRHD, 2D ] Convergence not reached: ', err
+    end if
+    if (vv  >= 1.0d+00) then
+      print *, '[SRHD, 2D ] Unphysical speed: ', vv
+    end if
+    if (w   <= 0.0d+00) then
+      print *, '[SRHD, 2D ] Unphysical enthalpy: ', w
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_iterate_srhd_adi_2d
 !
 !===============================================================================
 !
