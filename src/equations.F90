@@ -58,7 +58,7 @@ module equations
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imc, imf, imm
+  integer            , save :: imi, imc, imf, imm, imp
 #endif /* PROFILE */
 
 ! pointers to the conversion procedures
@@ -229,6 +229,7 @@ module equations
 !
     call set_timer('equations:: initialization'     , imi)
     call set_timer('equations:: variable conversion', imc)
+    call set_timer('equations:: variable solver'    , imp)
     call set_timer('equations:: flux calculation'   , imf)
     call set_timer('equations:: speed estimation'   , imm)
 
@@ -3368,6 +3369,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable solver
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 ! initialize iteration parameters
 !
     keep = .true.
@@ -3449,6 +3456,12 @@ module equations
       print *, '[SRHD, 1Dw] Unphysical speed: ', vv
     end if
 
+#ifdef PROFILE
+! stop accounting time for variable solver
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srhd_adi_1dw
@@ -3503,6 +3516,12 @@ module equations
 !
 !-------------------------------------------------------------------------------
 !
+#ifdef PROFILE
+! start accounting time for variable solver
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
 ! initialize iteration parameters
 !
     keep = .true.
@@ -3606,6 +3625,12 @@ module equations
     if (vv  >= 1.0d+00) then
       print *, '[SRHD, 2D ] Unphysical speed: ', vv
     end if
+
+#ifdef PROFILE
+! stop accounting time for variable solver
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
 !
