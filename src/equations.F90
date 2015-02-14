@@ -3086,7 +3086,7 @@ module equations
 !
     integer      :: i
     real(kind=8) :: mm, en, dn
-    real(kind=8) :: em, w, wm
+    real(kind=8) :: wm, w
     real(kind=8) :: vv, vm, vs
 !
 !-------------------------------------------------------------------------------
@@ -3111,14 +3111,6 @@ module equations
 !
       wm = sqrt(dn * dn + mm) + pmin / gammaxi
 
-! calculate V² corresponding to the minimum W
-!
-      call w_to_vv_srhd_adi(mm, wm, vv)
-
-! estimate the total energy corresponding to the minimum of W
-!
-      em = wm - dn - pmin
-
 ! set the initial W to the minimum value
 !
       w  = wm
@@ -3138,7 +3130,7 @@ module equations
       q(ivx,i) = u(imx,i) / w
       q(ivy,i) = u(imy,i) / w
       q(ivz,i) = u(imz,i) / w
-      q(ipr,i) = gammaxi * (w - dn / vs) * vm
+      q(ipr,i) = gammaxi * (w * vs - dn) * vs
 
     end do ! i = 1, n
 
@@ -3331,95 +3323,6 @@ module equations
 !
 !===============================================================================
 !
-! subroutine NR_FUNCTION_SRHD_ADI:
-! -------------------------------
-!
-!   Subroutine calculates the value of function
-!
-!     F(W)     = W - P - E
-!
-!   and its derivative
-!
-!     dF(W)/dW = 1 - dP/dW
-!
-!   Arguments:
-!
-!     mm, en - input coefficients for |M|² and E;
-!     w      - input coefficients W;
-!     f, df  - output values of the function F(W) and its derivative,
-!              respectively;
-!
-!   References:
-!
-!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
-!     "Primitive Variable Solvers for Conservative General Relativistic
-!      Magnetohydrodynamics",
-!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
-!
-!===============================================================================
-!
-  subroutine nr_function_srhd_adi(mm, en, dn, w, f, df)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    real(kind=8), intent(in)    :: mm, en, dn, w
-    real(kind=8), intent(out)   :: f, df
-
-! local variables
-!
-    real(kind=8) :: w2, tm, vv, vm, gm, pr, dv, dg, dp
-!
-!-------------------------------------------------------------------------------
-!
-! prepare W multiplications
-!
-    w2 = w * w
-
-! calculate the velocity and its derivative
-!
-    call w_to_vv_srhd_adi(mm, w, vv, dv)
-
-! calculate 1 - |V|²
-!
-    vm = 1.0d+00 - vv
-
-! calculate Lorentz factor and its derivative
-!
-!  Γ(|V|²) = 1 / sqrt(1 - |V|²)
-! dΓ/dW    = ½ Γ³ d|V|²/dW
-!
-    gm = 1.0d+00 / sqrt(vm)
-    dg = 0.5d+00 * gm**3 * dv
-
-! calculate the thermal pressure and its derivative
-!
-!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
-! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
-!
-    tm = w - dn * gm
-    pr = gammaxi * tm * vm
-    dp = gammaxi * ((1.0d+00 - dn * dg) * vm - tm * dv)
-
-! calculate F(W)
-!
-    f  = w - pr - en
-
-! calculate dF(W)/dW
-!
-! dF(W)/dW = 1 - dP/dW
-!
-    df = 1.0d+00 - dp
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine nr_function_srhd_adi
-!
-!===============================================================================
-!
 ! subroutine NR_ITERATE_SRHD_ADI_1DW:
 ! ----------------------------------
 !
@@ -3458,16 +3361,18 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
+    real(kind=8) :: vm, gm, tm
+    real(kind=8) :: pr, dpw
     real(kind=8) :: f, df, dw
-    real(kind=8) :: er
+    real(kind=8) :: err
 !
 !-------------------------------------------------------------------------------
 !
 ! initialize iteration parameters
 !
     keep = .true.
-    it   = 100
-    cn   = 2
+    it   = nmax
+    cn   = next
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
@@ -3476,25 +3381,44 @@ module equations
 !
     do while(keep)
 
+! calculate |V|², (1 - |V|²), and the Lorentz factor
+!
+      vv = mm / (w * w)
+      vm = 1.0d+00 - vv
+      gm = 1.0d+00 / sqrt(vm)
+
+! calculate the thermal pressure and its derivative
+!
+!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
+! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
+!
+      tm  = w - dn * gm
+      pr  = gammaxi * tm * vm
+      dpw = gammaxi * (1.0d+00 + tm * vv / w)
+
 ! calculate F(W) and dF(W)/dW
 !
-      call nr_function_srhd_adi(mm, en, dn, w, f, df)
+!  F(W)    = W - P - E
+! dF(W)/dW = 1 - dP/dW
+!
+      f  = w - pr - en
+      df = 1.0d+00 - dpw
 
 ! calculate the increment dW
 !
-      dw = - f / df
+      dw = f / df
 
 ! correct W
 !
-      w  = max(wm, w + dw)
+      w  = w - dw
 
 ! calculate the normalized error
 !
-      er = abs(dw / w)
+      err = abs(dw / w)
 
 ! check the convergence
 !
-      if (er < tol) then
+      if (err < tol) then
         if (cn <= 0) keep = .false.
         cn  = cn - 1
       end if
@@ -3507,11 +3431,23 @@ module equations
 !
       it = it - 1
 
-    end do
+    end do ! continue interations
 
 ! calculate |V|² from W
 !
-    call w_to_vv_srhd_adi(mm, w, vv)
+    vv = mm / (w * w)
+
+! print information about failed convergence
+!
+    if (err >= tol) then
+      print *, '[SRHD, 1Dw] Convergence not reached: ', err
+    end if
+    if (w   <= 0.0d+00) then
+      print *, '[SRHD, 1Dw] Unphysical enthalpy: ', w
+    end if
+    if (vv  >= 1.0d+00) then
+      print *, '[SRHD, 1Dw] Unphysical speed: ', vv
+    end if
 
 !-------------------------------------------------------------------------------
 !
@@ -3664,67 +3600,16 @@ module equations
     if (err >= tol) then
       print *, '[SRHD, 2D ] Convergence not reached: ', err
     end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 2D ] Unphysical speed: ', vv
-    end if
     if (w   <= 0.0d+00) then
       print *, '[SRHD, 2D ] Unphysical enthalpy: ', w
+    end if
+    if (vv  >= 1.0d+00) then
+      print *, '[SRHD, 2D ] Unphysical speed: ', vv
     end if
 
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srhd_adi_2d
-!
-!===============================================================================
-!
-! subroutine W_TO_VV_SRHD_ADI:
-! ---------------------------
-!
-!   Subroutine calculates the squared velocity and its W derivative from W
-!   and other parameters.
-!
-!     |V|²(W) =     [|M|² W² + S² (2 W + |B|²)]            / [W (W + |B|²)]²
-!    d|V|²/dW = - 2 {|M|² W³ + S² [3 W (W + |B|²) + |B|⁴]} / [W (W + |B|²)]³
-!
-!   Arguments:
-!
-!     mm - input coefficients for |M|²;
-!     w  - input coefficient W;
-!     vv - output value of |V|²;
-!
-!   References:
-!
-!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
-!     "Primitive Variable Solvers for Conservative General Relativistic
-!      Magnetohydrodynamics",
-!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
-!
-!===============================================================================
-!
-  subroutine w_to_vv_srhd_adi(mm, w, vv, dv)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    real(kind=8)          , intent(in)  :: mm, w
-    real(kind=8)          , intent(out) :: vv
-    real(kind=8), optional, intent(out) :: dv
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the squared velocity and its derivative
-!
-    vv = mm / w**2
-    if (present(dv)) then
-      dv = - 2.0d+00 * vv / w
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine w_to_vv_srhd_adi
 
 !===============================================================================
 !
