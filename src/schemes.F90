@@ -396,6 +396,16 @@ module schemes
 !
         select case(trim(solver))
 
+        case("hllc", "HLLC")
+
+! set the solver name
+!
+          name_sol =  "HLLC"
+
+! set pointers to subroutines
+!
+          riemann => riemann_srhd_adi_hllc
+
 ! in the case of unknown Riemann solver, revert to HLL
 !
         case default
@@ -4900,6 +4910,222 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_srhd_adi_hll
+!
+!===============================================================================
+!
+! subroutine RIEMANN_SRHD_ADI_HLLC:
+! --------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer (HLLC) method.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Mignone, A. & Bodo, G.
+!         "An HLLC Riemann solver for relativistic flows - I. Hydrodynamics",
+!         Monthly Notices of the Royal Astronomical Society,
+!         2005, Volume 364, Pages 126-136
+!
+!===============================================================================
+!
+  subroutine riemann_srhd_adi_hllc(n, ql, qr, f)
+
+! include external procedures
+!
+    use algebra        , only : quadratic
+    use equations      , only : nv
+    use equations      , only : ivx, idn, imx, imy, imz, ien
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out) :: f
+
+! local variables
+!
+    integer                       :: i, nr
+    real(kind=8)                  :: sl, sr, srml, sm
+    real(kind=8)                  :: pr, dv, fc
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: uh, us, fh, wl, wr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
+    real(kind=8), dimension(3)    :: a
+    real(kind=8), dimension(2)    :: x
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
+! calculate the conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at both states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
+
+! iterate over all position
+!
+    do i = 1, n
+
+! estimate the minimum and maximum speeds
+!
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
+
+! calculate the HLL flux
+!
+      if (sl >= 0.0d+00) then
+
+        f(1:nv,i) = fl(1:nv,i)
+
+      else if (sr <= 0.0d+00) then
+
+        f(1:nv,i) = fr(1:nv,i)
+
+      else ! sl < 0 < sr
+
+! calculate the inverse of speed difference
+!
+        srml = sr - sl
+
+! calculate vectors of the left and right-going waves
+!
+        wl(1:nv)  = sl * ul(1:nv,i) - fl(1:nv,i)
+        wr(1:nv)  = sr * ur(1:nv,i) - fr(1:nv,i)
+
+! calculate fluxes for the intermediate state
+!
+        uh(1:nv)  = (     wr(1:nv) -      wl(1:nv)) / srml
+        fh(1:nv)  = (sl * wr(1:nv) - sr * wl(1:nv)) / srml
+
+! prepare the quadratic coefficients (eq. 18 in [1])
+!
+        a(1) = uh(imx)
+        a(2) = - (fh(imx) + uh(ien) + uh(idn))
+        a(3) = fh(ien) + fh(idn)
+
+! solve the quadratic equation
+!
+        nr   = quadratic(a(1:3), x(1:2))
+
+! if Δ < 0, just use the HLL flux
+!
+        if (nr < 1) then
+          f(1:nv,i) = fh(1:nv)
+        else
+
+! get the contact dicontinuity speed
+!
+          sm = x(1)
+          if ((sm <= sl) .or. (sm >= sr)) sm = x(2)
+
+! if the contact discontinuity speed exceeds the sonic speeds, use the HLL flux
+!
+          if ((sm <= sl) .or. (sm >= sr)) then
+            f(1:nv,i) = fh(1:nv)
+          else
+
+! calculate total pressure (eq. 17 in [1])
+!
+            pr = fh(imx) - (fh(ien) + fh(idn)) * sm
+
+! if the pressure is negative, use the HLL flux
+!
+            if (pr <= 0.0d+00) then
+              f(1:nv,i) = fh(1:nv)
+            else
+
+! depending in the sign of the contact dicontinuity speed, calculate the proper
+! state and corresponding flux
+!
+              if (sm > 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 16 in [1])
+!
+                dv      = (sl - sm)
+                fc      = (sl - ql(ivx,i)) / dv
+                us(idn) = fc * ul(idn,i)
+                us(imy) = fc * ul(imy,i)
+                us(imz) = fc * ul(imz,i)
+                us(ien) = (wl(ien) + wl(idn) + pr * sm) / dv
+                us(imx) = (us(ien) + pr) * sm
+                us(ien) = us(ien) - us(idn)
+
+! calculate the flux (eq. 14 in [1])
+!
+                f(1:nv,i) = fl(1:nv,i) + sl * (us(1:nv) - ul(1:nv,i))
+
+              else if (sm < 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 16 in [1])
+!
+                dv      = (sr - sm)
+                fc      = (sr - qr(ivx,i)) / dv
+                us(idn) = fc * ur(idn,i)
+                us(imy) = fc * ur(imy,i)
+                us(imz) = fc * ur(imz,i)
+                us(ien) = (wr(ien) + wr(idn) + pr * sm) / dv
+                us(imx) = (us(ien) + pr) * sm
+                us(ien) = us(ien) - us(idn)
+
+! calculate the flux (eq. 14 in [1])
+!
+                f(1:nv,i) = fr(1:nv,i) + sr * (us(1:nv) - ur(1:nv,i))
+
+              else
+
+! intermediate flux is constant across the contact discontinuity and all except
+! the parallel momentum flux are zero
+!
+                f(idn,i) = 0.0d+00
+                f(imx,i) = fh(imx)
+                f(imy,i) = 0.0d+00
+                f(imz,i) = 0.0d+00
+                f(ien,i) = uh(imx)
+
+              end if ! sm == 0
+
+            end if ! p* < 0
+
+          end if ! sl < sm < sr
+
+        end if ! nr < 1
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for the Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_srhd_adi_hllc
 
 !===============================================================================
 !
