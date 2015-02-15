@@ -3110,11 +3110,11 @@ module equations
 
 ! get the lower bound for W updated by the minimum pressure with assumed Γ = 1
 !
-      wm = sqrt(dn * dn + mm) + pmin / gammaxi
+      wm  = en + pmin
 
 ! set the initial W to the minimum value
 !
-      w  = wm
+      w   = wm
 
 ! find the exact W using an Newton-Ralphson interative method
 !
@@ -3131,7 +3131,7 @@ module equations
       q(ivx,i) = u(imx,i) / w
       q(ivy,i) = u(imy,i) / w
       q(ivz,i) = u(imz,i) / w
-      q(ipr,i) = gammaxi * (w * vs - dn) * vs
+      q(ipr,i) = w - en
 
     end do ! i = 1, n
 
