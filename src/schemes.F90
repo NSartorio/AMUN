@@ -396,15 +396,15 @@ module schemes
 !
         select case(trim(solver))
 
-        case("hllcm", "HLLCM", "hllc-m", "HLLC-M")
+        case("hllc", "HLLC", "hllcm", "HLLCM", "hllc-m", "HLLC-M")
 
 ! set the solver name
 !
-          name_sol =  "HLLC by Mognone & Bodo"
+          name_sol =  "HLLC by Mignone & Bodo"
 
 ! set pointers to subroutines
 !
-          riemann => riemann_srhd_adi_hllcm
+          riemann => riemann_srhd_adi_hllc
 
 ! in the case of unknown Riemann solver, revert to HLL
 !
@@ -4913,8 +4913,8 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_SRHD_ADI_HLLCM:
-! ---------------------------------
+! subroutine RIEMANN_SRHD_ADI_HLLC:
+! --------------------------------
 !
 !   Subroutine solves one dimensional Riemann problem using
 !   the Harten-Lax-van Leer method with contact discontinuity resolution (HLLC)
@@ -4935,7 +4935,7 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_srhd_adi_hllcm(n, ql, qr, f)
+  subroutine riemann_srhd_adi_hllc(n, ql, qr, f)
 
 ! include external procedures
 !
@@ -5021,6 +5021,11 @@ module schemes
         uh(1:nv)  = (     wr(1:nv) -      wl(1:nv)) / srml
         fh(1:nv)  = (sl * wr(1:nv) - sr * wl(1:nv)) / srml
 
+! correct the energy waves
+!
+        wl(ien)   = wl(ien) + wl(idn)
+        wr(ien)   = wr(ien) + wr(idn)
+
 ! prepare the quadratic coefficients (eq. 18 in [1])
 !
         a(1) = uh(imx)
@@ -5039,8 +5044,11 @@ module schemes
 
 ! get the contact dicontinuity speed
 !
-          sm = x(1)
-          if ((sm <= sl) .or. (sm >= sr)) sm = x(2)
+          if (a(3) >= 0.0d+00) then
+            sm = x(1)
+          else
+            sm = x(2)
+          end if
 
 ! if the contact discontinuity speed exceeds the sonic speeds, use the HLL flux
 !
@@ -5065,12 +5073,11 @@ module schemes
 
 ! calculate the conserved variable vector (eqs. 16 in [1])
 !
-                dv      = (sl - sm)
-                fc      = (sl - ql(ivx,i)) / dv
-                us(idn) = fc * ul(idn,i)
-                us(imy) = fc * ul(imy,i)
-                us(imz) = fc * ul(imz,i)
-                us(ien) = (wl(ien) + wl(idn) + pr * sm) / dv
+                dv      = sl - sm
+                us(idn) = wl(idn) / dv
+                us(imy) = wl(imy) / dv
+                us(imz) = wl(imz) / dv
+                us(ien) = (wl(ien) + pr * sm) / dv
                 us(imx) = (us(ien) + pr) * sm
                 us(ien) = us(ien) - us(idn)
 
@@ -5082,12 +5089,11 @@ module schemes
 
 ! calculate the conserved variable vector (eqs. 16 in [1])
 !
-                dv      = (sr - sm)
-                fc      = (sr - qr(ivx,i)) / dv
-                us(idn) = fc * ur(idn,i)
-                us(imy) = fc * ur(imy,i)
-                us(imz) = fc * ur(imz,i)
-                us(ien) = (wr(ien) + wr(idn) + pr * sm) / dv
+                dv      = sr - sm
+                us(idn) = wr(idn) / dv
+                us(imy) = wr(imy) / dv
+                us(imz) = wr(imz) / dv
+                us(ien) = (wr(ien) + pr * sm) / dv
                 us(imx) = (us(ien) + pr) * sm
                 us(ien) = us(ien) - us(idn)
 
@@ -5097,14 +5103,14 @@ module schemes
 
               else
 
-! intermediate flux is constant across the contact discontinuity and all except
-! the parallel momentum flux are zero
+! intermediate flux is constant across the contact discontinuity and all fluxes
+! except the parallel momentum one are zero
 !
                 f(idn,i) = 0.0d+00
-                f(imx,i) = fh(imx)
+                f(imx,i) = pr
                 f(imy,i) = 0.0d+00
                 f(imz,i) = 0.0d+00
-                f(ien,i) = uh(imx)
+                f(ien,i) = 0.0d+00
 
               end if ! sm == 0
 
@@ -5126,7 +5132,7 @@ module schemes
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine riemann_srhd_adi_hllcm
+  end subroutine riemann_srhd_adi_hllc
 
 !===============================================================================
 !
