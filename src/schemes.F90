@@ -396,15 +396,15 @@ module schemes
 !
         select case(trim(solver))
 
-        case("hllc", "HLLC")
+        case("hllcm", "HLLCM", "hllc-m", "HLLC-M")
 
 ! set the solver name
 !
-          name_sol =  "HLLC"
+          name_sol =  "HLLC by Mognone & Bodo"
 
 ! set pointers to subroutines
 !
-          riemann => riemann_srhd_adi_hllc
+          riemann => riemann_srhd_adi_hllcm
 
 ! in the case of unknown Riemann solver, revert to HLL
 !
@@ -4913,11 +4913,12 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RIEMANN_SRHD_ADI_HLLC:
-! --------------------------------
+! subroutine RIEMANN_SRHD_ADI_HLLCM:
+! ---------------------------------
 !
 !   Subroutine solves one dimensional Riemann problem using
-!   the Harten-Lax-van Leer (HLLC) method.
+!   the Harten-Lax-van Leer method with contact discontinuity resolution (HLLC)
+!   by Mignone & Bodo.
 !
 !   Arguments:
 !
@@ -4934,7 +4935,7 @@ module schemes
 !
 !===============================================================================
 !
-  subroutine riemann_srhd_adi_hllc(n, ql, qr, f)
+  subroutine riemann_srhd_adi_hllcm(n, ql, qr, f)
 
 ! include external procedures
 !
@@ -5125,7 +5126,7 @@ module schemes
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine riemann_srhd_adi_hllc
+  end subroutine riemann_srhd_adi_hllcm
 
 !===============================================================================
 !
