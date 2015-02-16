@@ -400,7 +400,7 @@ module schemes
 
 ! set the solver name
 !
-          name_sol =  "HLLC by Mignone & Bodo"
+          name_sol =  "HLLC (Mignone & Bodo 2005)"
 
 ! set pointers to subroutines
 !
