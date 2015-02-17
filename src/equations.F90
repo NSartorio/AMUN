@@ -3855,8 +3855,8 @@ module equations
 !
 !===============================================================================
 !
-! subroutine CONS2PRIM_SRHD_ADI:
-! -----------------------------
+! subroutine CONS2PRIM_SRMHD_ADI:
+! ------------------------------
 !
 !   Subroutine converts conservative variables to their corresponding
 !   primitive representation using an interative method.
@@ -4238,8 +4238,8 @@ module equations
 !
 !===============================================================================
 !
-! function MAXSPEED_SRHD_ADI:
-! --------------------------
+! function MAXSPEED_SRMHD_ADI:
+! ---------------------------
 !
 !   Function scans the variable array and returns the maximum speed in within.
 !
