@@ -4387,25 +4387,20 @@ module equations
 ! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
 !
       pr = gammaxi * (w * vm - dn * vs)
-      dp = gammaxi * ((1.0d+00 - dn * 0.5d+00 * dv / vm / vs) * vm - (w - dn / vs) * dv)
+      dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
 
-! calculate F(W)
+! calculate F(W) and dF(W)/dW
 !
-      f  = w - pr + 0.5d+00 * ((1.0d+00 + vv) * bb - mw) - en
-
-! calculate dF(W)/dW
-!
-! dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
-!
+      f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
       df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
 
 ! calculate the increment dW
 !
-      dw  = - f / df
+      dw  = f / df
 
 ! correct W
 !
-      w   = w + dw
+      w   = w - dw
 
 ! calculate the normalized error
 !
