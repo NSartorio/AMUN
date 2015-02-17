@@ -124,7 +124,7 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 #-------------------------------------------------------------------------------
 
-algebra.o        : algebra.F90
+algebra.o        : algebra.F90 constants.o
 blocks.o         : blocks.F90 error.o timers.o
 boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
                    interpolations.o mpitools.o timers.o
