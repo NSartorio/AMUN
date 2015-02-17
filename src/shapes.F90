@@ -600,8 +600,8 @@ module shapes
 
 ! local arrays
 !
-    real(kind=8), dimension(nv)    :: qj
     real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(nv)    :: qj
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
