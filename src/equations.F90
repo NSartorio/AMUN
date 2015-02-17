@@ -4371,11 +4371,11 @@ module equations
 
 ! calculate the increment dW
 !
-      dw = - f / df
+      dw  = - f / df
 
 ! correct W
 !
-      w  = max(wm, w + dw)
+      w   = w + dw
 
 ! calculate the normalized error
 !
