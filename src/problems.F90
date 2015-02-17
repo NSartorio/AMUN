@@ -1288,9 +1288,10 @@ module problems
 !
     real(kind=8), save :: djet  = 1.00d-01
     real(kind=8), save :: damb  = 1.00d+01
+    real(kind=8), save :: bamb  = 1.00d-08
     real(kind=8), save :: pres  = 1.00d-02
-    real(kind=8), save :: bphi  = 1.00d-03
     real(kind=8), save :: vjet  = 0.99d+00
+    real(kind=8), save :: bjet  = 1.00d-03
     real(kind=8), save :: ljet  = 1.00d-00
     real(kind=8), save :: rjet  = 1.00d+00
     real(kind=8), save :: rjet2 = 1.00d+00
@@ -1307,6 +1308,7 @@ module problems
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(nv)    :: qj
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -1328,7 +1330,8 @@ module problems
       call get_parameter_real("djet"  , djet)
       call get_parameter_real("damb"  , damb)
       call get_parameter_real("pres"  , pres)
-      call get_parameter_real("bphi"  , bphi)
+      call get_parameter_real("bamb"  , bamb)
+      call get_parameter_real("bjet"  , bjet)
       call get_parameter_real("vjet"  , vjet)
       call get_parameter_real("ljet"  , ljet)
       call get_parameter_real("rjet"  , rjet)
@@ -1342,6 +1345,20 @@ module problems
       first = .false.
 
     end if ! first call
+
+! set the conditions inside the jet radius
+!
+    qj(idn) = djet
+    if (ipr > 0) qj(ipr) = pres
+    qj(ivx) = vjet
+    qj(ivy) = 0.0d+00
+    qj(ivz) = 0.0d+00
+    if (ibx > 0) then
+      qj(ibx) = 0.0d+00
+      qj(iby) = 0.0d+00
+      qj(ibz) = bjet
+      qj(ibp) = 0.0d+00
+    end if ! ibx > 0
 
 ! prepare block coordinates
 !
@@ -1381,7 +1398,7 @@ module problems
         if (ibx > 0) then
           q(ibx,1:im) = 0.0d+00
           q(iby,1:im) = 0.0d+00
-          q(ibz,1:im) = bphi
+          q(ibz,1:im) = bamb
           q(ibp,1:im) = 0.0d+00
         end if ! ibx > 0
 
@@ -1390,8 +1407,7 @@ module problems
         if (rr <= max(rm, rjet2)) then
           do i = 1, im
             if (x(i) <= max(dx, ljet)) then
-              q(idn,i) = djet
-              q(ivx,i) = vjet
+              q(1:nv,i) = qj(1:nv)
             end if
           end do ! i = 1, im
         end if ! R < Rjet
