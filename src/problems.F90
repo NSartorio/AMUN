@@ -1273,7 +1273,7 @@ module problems
     use coordinates, only : ax, ay, az
     use equations  , only : prim2cons
     use equations  , only : nv
-    use equations  , only : idn, ivx, ivy, ivz, ipr
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use parameters , only : get_parameter_real
 
 ! local variables are not implicit by default
@@ -1289,6 +1289,7 @@ module problems
     real(kind=8), save :: djet  = 1.00d-01
     real(kind=8), save :: damb  = 1.00d+01
     real(kind=8), save :: pres  = 1.00d-02
+    real(kind=8), save :: bphi  = 1.00d-03
     real(kind=8), save :: vjet  = 0.99d+00
     real(kind=8), save :: ljet  = 1.00d-00
     real(kind=8), save :: rjet  = 1.00d+00
@@ -1327,6 +1328,7 @@ module problems
       call get_parameter_real("djet"  , djet)
       call get_parameter_real("damb"  , damb)
       call get_parameter_real("pres"  , pres)
+      call get_parameter_real("bphi"  , bphi)
       call get_parameter_real("vjet"  , vjet)
       call get_parameter_real("ljet"  , ljet)
       call get_parameter_real("rjet"  , rjet)
@@ -1372,6 +1374,16 @@ module problems
         q(ivx,1:im) = 0.0d+00
         q(ivy,1:im) = 0.0d+00
         q(ivz,1:im) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+        if (ibx > 0) then
+          q(ibx,1:im) = 0.0d+00
+          q(iby,1:im) = 0.0d+00
+          q(ibz,1:im) = bphi
+          q(ibp,1:im) = 0.0d+00
+        end if ! ibx > 0
 
 ! set the jet injection
 !
