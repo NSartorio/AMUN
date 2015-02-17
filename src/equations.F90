@@ -4339,7 +4339,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: vm, gm, tm
+    real(kind=8) :: vm, gm, wt
     real(kind=8) :: pr, dpw
     real(kind=8) :: f, df, dw
     real(kind=8) :: err
@@ -4400,7 +4400,8 @@ module equations
 
 ! calculate |V|² from W
 !
-    call w_to_vv(mm, bb, mb, w, vv)
+    wt = w + bb
+    vv = (mm + (w + wt) * (mb / w)**2) / wt**2
 
 ! print information about failed convergence
 !
@@ -4467,7 +4468,7 @@ module equations
 
 ! local variables
 !
-    real(kind=8)    :: mb2, bb2, w2, w3, tm, vv, vm, gm, pr, dv, dg, dp
+    real(kind=8)    :: mb2, bb2, w2, w3, tm, vv, vm, vs, pr, dv, dg, dp, wt
 !
 !-------------------------------------------------------------------------------
 !
@@ -4483,26 +4484,28 @@ module equations
 
 ! calculate the velocity and its derivative
 !
-    call w_to_vv(mm, bb, mb, w, vv, dv)
+    wt = w + bb
+    vv = (mm + (w + wt) * (mb / w)**2) / wt**2
+    dv = - 2.0d+00 * (mm + (3.0d+00 * wt + bb**2 / w) * (mb / w)**2) / wt**3
 
 ! calculate 1 - |V|²
 !
     vm = 1.0d+00 - vv
+    vs = sqrt(vm)
 
 ! calculate Lorentz factor and its derivative
 !
 !  Γ(|V|²) = 1 / sqrt(1 - |V|²)
 ! dΓ/dW    = ½ Γ³ d|V|²/dW
 !
-    gm = 1.0d+00 / sqrt(vm)
-    dg = 0.5d+00 * gm**3 * dv
+    dg = 0.5d+00 * dv / vm / vs
 
 ! calculate the thermal pressure and its derivative
 !
 !  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
 ! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
 !
-    tm = w - dn * gm
+    tm = w - dn / vs
     pr = gammaxi * tm * vm
     dp = gammaxi * ((1.0d+00 - dn * dg) * vm - tm * dv)
 
@@ -4519,64 +4522,6 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_function
-!
-!===============================================================================
-!
-! subroutine W_TO_VV:
-! ------------------
-!
-!   Subroutine calculates the squared velocity and its W derivative from W
-!   and other parameters.
-!
-!     |V|²(W) =     [|M|² W² + S² (2 W + |B|²)]            / [W (W + |B|²)]²
-!    d|V|²/dW = - 2 {|M|² W³ + S² [3 W (W + |B|²) + |B|⁴]} / [W (W + |B|²)]³
-!
-!   Arguments:
-!
-!     mm, bb, mb - input coefficients for |M|², |B|², S, respectively;
-!     w          - input coefficient W;
-!     vv         - output value of |V|²;
-!
-!   References:
-!
-!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
-!     "Primitive Variable Solvers for Conservative General Relativistic
-!      Magnetohydrodynamics",
-!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
-!
-!===============================================================================
-!
-  subroutine w_to_vv(mm, bb, mb, w, vv, dv)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    real(kind=8)          , intent(in)  :: mm, bb, mb, w
-    real(kind=8)          , intent(out) :: vv
-    real(kind=8), optional, intent(out) :: dv
-
-! local variables
-!
-    real(kind=8) :: ts, tw
-!
-!-------------------------------------------------------------------------------
-!
-! calculate the squared velocity and its derivative
-!
-    ts = (mb / w)**2
-    tw = w + bb
-    vv = (mm + (w + tw) * ts) / tw**2
-
-    if (present(dv)) then
-      dv = - 2.0d+00 * (mm + (3.0d+00 * tw + bb**2 / w) * ts) / tw**3
-    end if
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine w_to_vv
 
 !===============================================================================
 !
