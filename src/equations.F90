@@ -4309,6 +4309,10 @@ module equations
 !
 !   using the Newton-Raphson 1Dw iterative method.
 !
+!   The derivative dF(W)/dW is
+!
+!     dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
+!
 !   Arguments:
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
@@ -4339,8 +4343,8 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: vm, gm, wt
-    real(kind=8) :: pr, dpw
+    real(kind=8) :: vm, vs, dv, wt, mw
+    real(kind=8) :: pr, dp
     real(kind=8) :: f, df, dw
     real(kind=8) :: err
 !
@@ -4365,9 +4369,35 @@ module equations
 !
     do while(keep)
 
-! calculate F(W) and dF(W)/dW
+! calculate the velocity and its derivative
 !
-      call nr_function(mm, bb, mb, en, dn, w, f, df)
+      mw = (mb / w)**2
+      wt = w + bb
+      vv = (mm + (w + wt) * mw) / wt**2
+      dv = - 2.0d+00 * (mm + (3.0d+00 * wt + bb**2 / w) * mw) / wt**3
+
+! calculate 1 - |V|²
+!
+      vm = 1.0d+00 - vv
+      vs = sqrt(vm)
+
+! calculate the thermal pressure and its derivative
+!
+!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
+! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
+!
+      pr = gammaxi * (w * vm - dn * vs)
+      dp = gammaxi * ((1.0d+00 - dn * 0.5d+00 * dv / vm / vs) * vm - (w - dn / vs) * dv)
+
+! calculate F(W)
+!
+      f  = w - pr + 0.5d+00 * ((1.0d+00 + vv) * bb - mw) - en
+
+! calculate dF(W)/dW
+!
+! dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
+!
+      df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
 
 ! calculate the increment dW
 !
@@ -4424,104 +4454,6 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srmhd_adi_1dw
-!
-!===============================================================================
-!
-! subroutine NR_FUNCTION:
-! ----------------------
-!
-!   Subroutine calculates the value of function
-!
-!     F(W)     = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E
-!
-!   and its derivative
-!
-!     dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
-!
-!   Arguments:
-!
-!     mm, bb, mb, en - input coefficients for |M|², |B|², S, and E,
-!                      respectively;
-!     w              - input coefficients W;
-!     f, df          - output values of the function F(W) and its derivative,
-!                      respectively;
-!
-!   References:
-!
-!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
-!     "Primitive Variable Solvers for Conservative General Relativistic
-!      Magnetohydrodynamics",
-!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
-!
-!===============================================================================
-!
-  subroutine nr_function(mm, bb, mb, en, dn, w, f, df)
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input/output arguments
-!
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, w
-    real(kind=8), intent(out)   :: f, df
-
-! local variables
-!
-    real(kind=8)    :: mb2, bb2, w2, w3, tm, vv, vm, vs, pr, dv, dg, dp, wt
-!
-!-------------------------------------------------------------------------------
-!
-! prepare some parameters, which do not change
-!
-    mb2 = mb * mb
-    bb2 = bb * bb
-
-! prepare W multiplications
-!
-    w2 = w * w
-    w3 = w * w2
-
-! calculate the velocity and its derivative
-!
-    wt = w + bb
-    vv = (mm + (w + wt) * (mb / w)**2) / wt**2
-    dv = - 2.0d+00 * (mm + (3.0d+00 * wt + bb**2 / w) * (mb / w)**2) / wt**3
-
-! calculate 1 - |V|²
-!
-    vm = 1.0d+00 - vv
-    vs = sqrt(vm)
-
-! calculate Lorentz factor and its derivative
-!
-!  Γ(|V|²) = 1 / sqrt(1 - |V|²)
-! dΓ/dW    = ½ Γ³ d|V|²/dW
-!
-    dg = 0.5d+00 * dv / vm / vs
-
-! calculate the thermal pressure and its derivative
-!
-!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
-! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
-!
-    tm = w - dn / vs
-    pr = gammaxi * tm * vm
-    dp = gammaxi * ((1.0d+00 - dn * dg) * vm - tm * dv)
-
-! calculate F(W)
-!
-    f  = w - pr + 0.5d+00 * ((1.0d+00 + vv) * bb - mb2 / w2) - en
-
-! calculate dF(W)/dW
-!
-! dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
-!
-    df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mb2 / w3
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine nr_function
 
 !===============================================================================
 !
