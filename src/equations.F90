@@ -3246,9 +3246,9 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! get the lower bound for W updated by the minimum pressure with assumed Γ = 1
+! prepare the initial guess using pressure from the previous step
 !
-      wm  = en + pmin
+      wm  = en + q(ipr,i)
 
 ! set the initial W to the minimum value
 !
@@ -3896,7 +3896,7 @@ module equations
     integer      :: i
     real(kind=8) :: mm, mb, bb, en, dn
     real(kind=8) :: wm, w, wt
-    real(kind=8) :: vv, vm, vs
+    real(kind=8) :: vv, vm, vs, vb
     real(kind=8) :: fc
 !
 !-------------------------------------------------------------------------------
@@ -3920,9 +3920,12 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! get the lower bound for W updated by the minimum pressure with assumed Γ = 1
+! prepare the initial guess using velocity and pressure from the previous step
 !
-      wm  = en + pmin - 0.5d+00 * bb
+      vv  = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
+      vb  = sum(q(ivx:ivz,i) * u(ibx:ibz,i))
+      vm  = 1.0d+00 + vv
+      wm  = en + 0.5d+00 * (vb * vb - vm * bb) + q(ipr,i)
 
 ! set the initial W to the minimum value
 !
