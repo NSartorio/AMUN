@@ -538,7 +538,7 @@ module equations
 !
       select case(trim(c2p))
 
-      case("1Dw", "1dw", "1DW")
+      case("1Dw", "1dw", "1DW", "1D(w)", "1D(W)")
 
 ! the type of equation of state
 !
@@ -558,7 +558,7 @@ module equations
 !
         nr_iterate => nr_iterate_srhd_adi_2dwv
 
-      case("2Dwu", "2dwu")
+      case("2dwu", "2Dwu", "2D(w,u)", "2D(W,u)")
 
 ! the type of equation of state
 !
