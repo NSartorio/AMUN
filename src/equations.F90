@@ -3641,9 +3641,22 @@ module equations
 !
       dw  = f / df
 
-! correct W
+! correct W (apply the bisection method if the new W is out of brackets)
 !
-      w   = w - dw
+      if (w >= wl .and. w <= wu) then
+        w   = w - dw
+      else
+        if (f * fl > 0.0d+00) then
+          wl = w
+          fl = f
+          w  = 0.5d+00 * (wl + wu)
+        end if
+        if (f * fu > 0.0d+00) then
+          wu = w
+          fu = f
+          w  = 0.5d+00 * (wl + wu)
+        end if
+      end if
 
 ! calculate |V|² from W
 !
@@ -3655,7 +3668,7 @@ module equations
 
 ! check the convergence
 !
-      if (err < tol) then
+      if (err < tol .or. f == 0.0d+00) then
         if (cn <= 0) keep = .false.
         cn  = cn - 1
       end if
