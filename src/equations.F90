@@ -3646,7 +3646,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: ww, vm, gm
+    real(kind=8) :: ww, vm, vs
     real(kind=8) :: pr, dpw, dpv
     real(kind=8) :: f, dfw, dfv, df
     real(kind=8) :: g, dgw, dgv, dg
@@ -3686,7 +3686,7 @@ module equations
 !
       ww  = w * w
       vm  = 1.0d+00 - vv
-      gm  = 1.0d+00 / sqrt(vm)
+      vs  = sqrt(vm)
 
 ! calculate the thermal pressure and its derivatives
 !
@@ -3694,13 +3694,13 @@ module equations
 ! dP/dW      = (γ - 1)/γ (1 - |V|²)
 ! dP/d|V|²   = (γ - 1)/γ (- W - 1/2 D Γ)
 !
-      pr  = gammaxi * (w - dn * gm) * vm
+      pr  = gammaxi * (w * vm - dn * vs)
       dpw = gammaxi * vm
-      dpv = gammaxi * (- w + 0.5d+00 * dn * gm)
+      dpv = gammaxi * (- w + 0.5d+00 * dn / vs)
 
 ! calculate F(W,|V|²) and G(W,|V|²)
 !
-      f   = w - pr - en
+      f   = w - en - pr
       g   = vv * ww  - mm
 
 ! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
