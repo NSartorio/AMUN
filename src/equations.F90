@@ -3246,13 +3246,10 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! prepare the initial guess using pressure from the previous step
+! prepare the initial guess
 !
-      wm  = en + q(ipr,i)
-
-! set the initial W to the minimum value
-!
-      w   = wm
+      w   = en + pmin
+      vv  = mm / (w * w)
 
 ! find the exact W using an Newton-Ralphson interative method
 !
@@ -3501,7 +3498,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: vm, gm, tm
+    real(kind=8) :: vm, vs
     real(kind=8) :: pr, dpw
     real(kind=8) :: f, df, dw
     real(kind=8) :: err
@@ -3527,36 +3524,38 @@ module equations
 !
     do while(keep)
 
-! calculate |V|², (1 - |V|²), and the Lorentz factor
+! calculate (1 - |V|²) the square root of it
 !
-      vv = mm / (w * w)
       vm = 1.0d+00 - vv
-      gm = 1.0d+00 / sqrt(vm)
+      vs = sqrt(vm)
 
 ! calculate the thermal pressure and its derivative
 !
 !  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
 ! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
 !
-      tm  = w - dn * gm
-      pr  = gammaxi * tm * vm
-      dpw = gammaxi * (1.0d+00 + tm * vv / w)
+      pr  = gammaxi * (w * vm - dn * vs)
+      dpw = gammaxi * (1.0d+00 + (w - dn / vs) * vv / w)
 
 ! calculate F(W) and dF(W)/dW
 !
 !  F(W)    = W - P - E
 ! dF(W)/dW = 1 - dP/dW
 !
-      f  = w - pr - en
-      df = 1.0d+00 - dpw
+      f   = w - en - pr
+      df  = 1.0d+00 - dpw
 
 ! calculate the increment dW
 !
-      dw = f / df
+      dw  = f / df
 
 ! correct W
 !
-      w  = w - dw
+      w   = w - dw
+
+! calculate |V|² from W
+!
+      vv  = mm / (w * w)
 
 ! calculate the normalized error
 !
@@ -3578,10 +3577,6 @@ module equations
       it = it - 1
 
     end do ! continue interations
-
-! calculate |V|² from W
-!
-    vv = mm / (w * w)
 
 ! print information about failed convergence
 !
@@ -3667,12 +3662,6 @@ module equations
     keep = .true.
     it   = nmax
     cn   = next
-
-! calculate the initial |V|² from the guess of W
-!
-!  |V|²(W) = |M|² / W²
-!
-    vv = mm / (w * w)
 
 ! iterate using the Newton-Raphson method in order to find the roots W and |V|²
 ! of functions
