@@ -548,7 +548,7 @@ module equations
 !
         nr_iterate => nr_iterate_srhd_adi_1dw
 
-      case("2D", "2d", "2Dwv", "2dwv")
+      case("2dwv", "2Dwv", "2D(w,v)", "2D(W,v)")
 
 ! the type of equation of state
 !
@@ -3687,15 +3687,11 @@ module equations
       vm  = 1.0d+00 - vv
       vs  = sqrt(vm)
 
-! calculate the thermal pressure and its derivatives
+! calculate the thermal pressure
 !
 !  P(W,|V|²) = (γ - 1)/γ (W - D Γ) (1 - |V|²)
-! dP/dW      = (γ - 1)/γ (1 - |V|²)
-! dP/d|V|²   = (γ - 1)/γ (- W - 1/2 D Γ)
 !
       pr  = gammaxi * (w * vm - dn * vs)
-      dpw = gammaxi * vm
-      dpv = gammaxi * (- w + 0.5d+00 * dn / vs)
 
 ! calculate F(W,|V|²) and G(W,|V|²)
 !
@@ -3704,8 +3700,8 @@ module equations
 
 ! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
 !
-      dfw = 1.0d+00 - dpw
-      dfv =         - dpv
+      dfw = 1.0d+00 - gammaxi * vm
+      dfv = 0.5d+00 * (pr / vm + gammaxi * w)
 
 ! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
 !
