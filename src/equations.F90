@@ -542,21 +542,21 @@ module equations
 
 ! the type of equation of state
 !
-        name_c2p  = "1Dw"
+        name_c2p  = "1D(W)"
 
 ! set pointer to the conversion method
 !
         nr_iterate => nr_iterate_srhd_adi_1dw
 
-      case("2D", "2d")
+      case("2D", "2d", "2Dwv", "2dwv")
 
 ! the type of equation of state
 !
-        name_c2p  = "2D"
+        name_c2p  = "2D(W,v²)"
 
 ! set pointer to the conversion method
 !
-        nr_iterate => nr_iterate_srhd_adi_2d
+        nr_iterate => nr_iterate_srhd_adi_2dwv
 
 ! warn about the unimplemented method
 !
@@ -3602,8 +3602,8 @@ module equations
 !
 !===============================================================================
 !
-! subroutine NR_ITERATE_SRHD_ADI_2D:
-! ---------------------------------
+! subroutine NR_ITERATE_SRHD_ADI_2DWV:
+! -----------------------------------
 !
 !   Subroutine finds a root W of equation
 !
@@ -3626,7 +3626,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_2d(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srhd_adi_2dwv(mm, bb, mb, en, dn, wm, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -3763,7 +3763,7 @@ module equations
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine nr_iterate_srhd_adi_2d
+  end subroutine nr_iterate_srhd_adi_2dwv
 !
 !*******************************************************************************
 !
