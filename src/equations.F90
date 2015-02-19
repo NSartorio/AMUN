@@ -558,6 +558,16 @@ module equations
 !
         nr_iterate => nr_iterate_srhd_adi_2dwv
 
+      case("2Dwu", "2dwu")
+
+! the type of equation of state
+!
+        name_c2p  = "2D(W,u²)"
+
+! set pointer to the conversion method
+!
+        nr_iterate => nr_iterate_srhd_adi_2dwu
+
 ! warn about the unimplemented method
 !
       case default
@@ -3764,6 +3774,182 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srhd_adi_2dwv
+!
+!===============================================================================
+!
+! subroutine NR_ITERATE_SRHD_ADI_2DWU:
+! -----------------------------------
+!
+!   Subroutine finds a root (W,u²) of 2D equations
+!
+!     F(W,u²) = (W - E - P(W,u²)) (u² + 1) = 0
+!     G(W,u²) = W² u² - (u² + 1) m²        = 0
+!
+!   using the Newton-Raphson 2D iterative method.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     bb, bm - input coefficients for |B|² and B.M, respectively;
+!     w, vv  - input/output coefficients W and |V|²;
+!
+!   References:
+!
+!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
+!     "Primitive Variable Solvers for Conservative General Relativistic
+!      Magnetohydrodynamics",
+!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
+!
+!===============================================================================
+!
+  subroutine nr_iterate_srhd_adi_2dwu(mm, bb, mb, en, dn, wm, w, vv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(inout) :: w, vv
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, cn
+    real(kind=8) :: ww, uu, up, gm, tm
+    real(kind=8) :: pr, dpw, dpu
+    real(kind=8) :: f, dfw, dfu, df
+    real(kind=8) :: g, dgw, dgu, dg
+    real(kind=8) :: det, jfw, jfu, jgw, jgu
+    real(kind=8) :: dw, du
+    real(kind=8) :: err
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for variable solver
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
+! initialize iteration parameters
+!
+    keep = .true.
+    it   = nmax
+    cn   = next
+
+! calculate the initial u²
+!
+    uu   = vv / (1.0d+00 - vv)
+
+! iterate using the Newton-Raphson method in order to find the roots W and |V|²
+! of functions
+!
+! F(W,|V|²) = W - P - E = 0
+! G(W,|V|²) = |V|² W² - |M|² = 0
+!
+    do while(keep)
+
+! calculate W², (1 - |V|²), and the Lorentz factor
+!
+      ww  = w * w
+      up  = 1.0d+00 + uu
+      gm  = sqrt(up)
+
+! calculate the thermal pressure and its derivatives
+!
+!  P(W,|V|²) = (γ - 1)/γ (W - D Γ) / (1 + |u|²)
+! dP/dW      = (γ - 1)/γ / (1 + |u|²)
+! dP/d|V|²   = (γ - 1)/γ (½ D Γ - W) / (1 + |u|²)²
+!
+      tm  = dn * gm
+      pr  = gammaxi * (w - tm) / up
+      dpw = gammaxi / up
+      dpu = gammaxi * (0.5d+00 * tm - w) / up**2
+      dw  = w - en - pr
+
+! calculate F(W,|V|²) and G(W,|V|²)
+!
+      f   = dw * up
+      g   = ww * uu - mm * up
+
+! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
+!
+      dfw = up * (1.0d+00 - dpw)
+      dfu = dw - dpu
+
+! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
+!
+      dgw = 2.0d+00 * uu * w
+      dgu = ww - mm
+
+! invert the Jacobian J = | dF/dW, dF/d|u|² |
+!                         | dG/dW, dG/d|u|² |
+!
+      det = dfw * dgu - dfu * dgw
+
+      jfw =   dgu / det
+      jgw = - dfu / det
+      jfu = - dgw / det
+      jgu =   dfw / det
+
+! calculate increments dW and d|V|²
+!
+      dw  = f * jfw + g * jgw
+      du  = f * jfu + g * jgu
+
+! correct W and |V|²
+!
+      w   = w  - dw
+      uu  = uu - du
+
+! calculate the normalized error
+!
+      err = max(abs(dw / w), abs(du))
+
+! check the convergence
+!
+      if (err < tol) then
+        if (cn <= 0) keep = .false.
+        cn  = cn - 1
+      end if
+
+! break if the number of iterations exceeded the maximum value
+!
+      if (it <= 0) keep = .false.
+
+! decrease the number of remaining iterations
+!
+      it = it - 1
+
+    end do ! continue interations
+
+! calculate v² from u²
+!
+    vv = uu / (1.0d+00 + uu)
+
+! print information about failed convergence
+!
+    if (err >= tol) then
+      print *, '[SRHD, 2D(W,u²)] Convergence not reached: ', err
+    end if
+    if (w   <= 0.0d+00) then
+      print *, '[SRHD, 2D(W,u²)] Unphysical enthalpy: ', w
+    end if
+    if (vv  >= 1.0d+00) then
+      print *, '[SRHD, 2D(W,u²)] Unphysical speed: ', vv
+    end if
+
+#ifdef PROFILE
+! stop accounting time for variable solver
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_iterate_srhd_adi_2dwu
 !
 !*******************************************************************************
 !
