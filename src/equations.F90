@@ -3267,11 +3267,6 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! prepare the initial guess
-!
-      w   = en + pmin
-      vv  = mm / (w * w)
-
 ! find the exact W using an Newton-Ralphson interative method
 !
       call nr_iterate(mm, bb, mb, en, dn, wm, w, vv)
@@ -3480,6 +3475,51 @@ module equations
 !
 !===============================================================================
 !
+! subroutine NR_FUNCTION_SRHD_ADI_1D:
+! ----------------------------------
+!
+!   Subroutine calculate the value of function
+!
+!     F(W) = W - P - E
+!
+!   for a given enthalpy W. It is used to estimate the initial guess.
+!
+!   Arguments:
+!
+!     mm, en, dn, w - input coefficients for |M|² E, D, and W, respectively;
+!     f             - the value of function F(W);
+!
+!===============================================================================
+!
+  subroutine nr_function_srhd_adi_1d(mm, en, dn, w, f)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, en, dn, w
+    real(kind=8), intent(out)   :: f
+
+! local variables
+!
+    real(kind=8) :: vv, vm, vs, pr
+!
+!-------------------------------------------------------------------------------
+!
+    vv = mm / (w * w)
+    vm = 1.0d+00 - vv
+    vs = sqrt(vm)
+    pr = gammaxi * (w * vm - dn * vs)
+    f  = w - en - pr
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_function_srhd_adi_1d
+!
+!===============================================================================
+!
 ! subroutine NR_ITERATE_SRHD_ADI_1DW:
 ! ----------------------------------
 !
@@ -3519,6 +3559,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
+    real(kind=8) :: wl, wu, fl, fu
     real(kind=8) :: vm, vs
     real(kind=8) :: pr, dpw
     real(kind=8) :: f, df, dw
@@ -3531,6 +3572,36 @@ module equations
 !
     call start_timer(imp)
 #endif /* PROFILE */
+
+! prepare the initial brackets
+!
+    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wu   = en + pmin
+
+! check if the brackets bound the root region
+!
+    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+    call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+    keep = (fl * fu > 0.0d+00)
+    it   = nmax
+
+    do while (keep)
+
+      wl = wu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+      call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+      it   = it - 1
+    end do
+    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+
+! estimate the value of enthalpy close to the root and corresponding v²
+!
+    w  = wl - fl * (wu - wl) / (fu - fl)
+    vv = mm / (w * w)
 
 ! initialize iteration parameters
 !
@@ -3662,6 +3733,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
+    real(kind=8) :: wl, wu, fl, fu
     real(kind=8) :: ww, vm, vs
     real(kind=8) :: pr, dpw, dpv
     real(kind=8) :: f, dfw, dfv, df
@@ -3677,6 +3749,36 @@ module equations
 !
     call start_timer(imp)
 #endif /* PROFILE */
+
+! prepare the initial brackets
+!
+    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wu   = en + pmin
+
+! check if the brackets bound the root region
+!
+    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+    call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+    keep = (fl * fu > 0.0d+00)
+    it   = nmax
+
+    do while (keep)
+
+      wl = wu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+      call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+      it   = it - 1
+    end do
+    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+
+! estimate the value of enthalpy close to the root and corresponding v²
+!
+    w  = wl - fl * (wu - wl) / (fu - fl)
+    vv = mm / (w * w)
 
 ! initialize iteration parameters
 !
@@ -3824,7 +3926,8 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: ww, uu, up, gm
+    real(kind=8) :: wl, wu, fl, fu
+    real(kind=8) :: ww, uu, up, gm, tm
     real(kind=8) :: pr, dpw, dpu
     real(kind=8) :: f, dfw, dfu, df
     real(kind=8) :: g, dgw, dgu, dg
@@ -3840,15 +3943,41 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
+! prepare the initial brackets
+!
+    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wu   = en + pmin
+
+! check if the brackets bound the root region
+!
+    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+    call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+    keep = (fl * fu > 0.0d+00)
+    it   = nmax
+
+    do while (keep)
+
+      wl = wu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+      call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+      it   = it - 1
+    end do
+    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+
+! estimate the value of enthalpy close to the root and corresponding u²
+!
+    w  = wl - fl * (wu - wl) / (fu - fl)
+    uu = mm / ((w * w) - mm)
+
 ! initialize iteration parameters
 !
     keep = .true.
     it   = nmax
     cn   = next
-
-! calculate the initial u²
-!
-    uu   = vv / (1.0d+00 - vv)
 
 ! iterate using the Newton-Raphson method in order to find the roots W and |V|²
 ! of functions
@@ -3868,7 +3997,7 @@ module equations
 !
 !  P(W,|V|²) = (γ - 1)/γ (W - D Γ) / (1 + |u|²)
 !
-      pr  = gammaxi * (w / up - dn / gm)
+      pr  = gammaxi * (w - dn * gm) / up
 
 ! calculate F(W,|V|²) and G(W,|V|²)
 !
