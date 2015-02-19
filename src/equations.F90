@@ -137,6 +137,11 @@ module equations
 !
   real(kind=8)     , save :: dmin    = 1.0d-08, pmin    = 1.0d-08
 
+! the upper limits for the Lorentz factor and corresponding |v|²
+!
+  real(kind=8)     , save :: lmax    = 1.0d+08
+  real(kind=8)     , save :: vmax    = 0.9999999999999999d+00
+
 ! the upper bound for the sonic Mach number
 !
   real(kind=8)     , save :: msmax   = 1.0d+03
@@ -776,10 +781,16 @@ module equations
 !
     allocate(evroe(2,nv,nv))
 
-! get the minimum allowed density and pressure in the system
+! get the minimum allowed density and pressure in the system, and the maximum
+! Lorentz factor for special relativity
 !
     call get_parameter_real("dmin"  , dmin  )
     call get_parameter_real("pmin"  , pmin  )
+    call get_parameter_real("lmax"  , lmax  )
+
+! calculate the maximum speed corresponding to the maximum Lorentz factor
+!
+    vmax = 1.0d+00 - 1.0d+00 / lmax**2
 
 ! get the upper bound for the sonic Mach number
 !
