@@ -3905,7 +3905,7 @@ module equations
 !   Subroutine finds a root (W,u²) of 2D equations
 !
 !     F(W,u²) = (W - E - P(W,u²)) (u² + 1) = 0
-!     G(W,u²) = W² u² - (u² + 1) m²        = 0
+!     G(W,u²) =  W² u² - (u² + 1) m²       = 0
 !
 !   using the Newton-Raphson 2D iterative method.
 !
@@ -3914,13 +3914,6 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w, vv  - input/output coefficients W and |V|²;
-!
-!   References:
-!
-!     Noble, S. C., Gammie, C. F., McKinney, J. C, Del Zanna, L.,
-!     "Primitive Variable Solvers for Conservative General Relativistic
-!      Magnetohydrodynamics",
-!     The Astrophysical Journal, 2006, vol. 641, pp. 626-637
 !
 !===============================================================================
 !
@@ -3940,8 +3933,7 @@ module equations
     logical      :: keep
     integer      :: it, cn
     real(kind=8) :: wl, wu, fl, fu
-    real(kind=8) :: ww, uu, up, gm, tm
-    real(kind=8) :: pr, dpw, dpu
+    real(kind=8) :: ww, uu, up, gm, dm, pr
     real(kind=8) :: f, dfw, dfu, df
     real(kind=8) :: g, dgw, dgu, dg
     real(kind=8) :: det, jfw, jfu, jgw, jgu
@@ -3984,7 +3976,7 @@ module equations
 ! estimate the value of enthalpy close to the root and corresponding u²
 !
     w  = wl - fl * (wu - wl) / (fu - fl)
-    uu = mm / ((w * w) - mm)
+    uu = mm / (w * w - mm)
 
 ! initialize iteration parameters
 !
@@ -3995,34 +3987,32 @@ module equations
 ! iterate using the Newton-Raphson method in order to find the roots W and |V|²
 ! of functions
 !
-! F(W,|V|²) = W - P - E = 0
-! G(W,|V|²) = |V|² W² - |M|² = 0
-!
     do while(keep)
 
-! calculate W², (1 - |V|²), and the Lorentz factor
+! calculate W², (1 + |u|²), and the Lorentz factor
 !
       ww  = w * w
       up  = 1.0d+00 + uu
       gm  = sqrt(up)
+      dm  = gm * dn
 
 ! calculate the thermal pressure
 !
 !  P(W,|V|²) = (γ - 1)/γ (W - D Γ) / (1 + |u|²)
 !
-      pr  = gammaxi * (w - dn * gm) / up
+      pr  = gammaxi * (w - dm) / up
 
 ! calculate F(W,|V|²) and G(W,|V|²)
 !
       f   = (w - en - pr) * up
-      g   = ww * uu - mm * up
+      g   = uu * ww - up * mm
 
-! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
+! calculate dF(W,|u|²)/dW and dF(W,|u|²)/d|u|²
 !
       dfw = up - gammaxi
-      dfu = w - en + 0.5d+00 * gammaxi * dn / gm
+      dfu = w - en - pr + gammaxi * (w - 0.5d+00 * dm) / up
 
-! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
+! calculate dG(W,|u|²)/dW and dG(W,|u|²)/d|u|²
 !
       dgw = 2.0d+00 * uu * w
       dgu = ww - mm
@@ -4037,7 +4027,7 @@ module equations
       jfu = - dgw / det
       jgu =   dfw / det
 
-! calculate increments dW and d|V|²
+! calculate increments dW and d|u|²
 !
       dw  = f * jfw + g * jgw
       du  = f * jfu + g * jgu
