@@ -3909,6 +3909,12 @@ module equations
 !
 !   using the Newton-Raphson 2D iterative method.
 !
+!   All evaluated equations incorporate already the pressure of the form
+!
+!     P(W,|V|²) = (γ - 1)/γ (W - Γ D) / (1 + |u|²)
+!
+!   in order to optimize calculations.
+!
 !   Arguments:
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
@@ -3933,7 +3939,7 @@ module equations
     logical      :: keep
     integer      :: it, cn
     real(kind=8) :: wl, wu, fl, fu
-    real(kind=8) :: ww, uu, up, gm, dm, pr
+    real(kind=8) :: ww, uu, up, gm, gd
     real(kind=8) :: f, dfw, dfu, df
     real(kind=8) :: g, dgw, dgu, dg
     real(kind=8) :: det, jfw, jfu, jgw, jgu
@@ -3989,28 +3995,23 @@ module equations
 !
     do while(keep)
 
-! calculate W², (1 + |u|²), and the Lorentz factor
+! calculate W², (1 + |u|²), and the Lorentz factor, and some repeated
+! expressions
 !
       ww  = w * w
       up  = 1.0d+00 + uu
       gm  = sqrt(up)
-      dm  = gm * dn
-
-! calculate the thermal pressure
-!
-!  P(W,|V|²) = (γ - 1)/γ (W - D Γ) / (1 + |u|²)
-!
-      pr  = gammaxi * (w - dm) / up
+      gd  = gammaxi * dn
 
 ! calculate F(W,|V|²) and G(W,|V|²)
 !
-      f   = (w - en - pr) * up
+      f   = (up - gammaxi) * w - up * en + gm * gd
       g   = uu * ww - up * mm
 
 ! calculate dF(W,|u|²)/dW and dF(W,|u|²)/d|u|²
 !
       dfw = up - gammaxi
-      dfu = w - en - pr + gammaxi * (w - 0.5d+00 * dm) / up
+      dfu = w - en + 0.5d+00 * gd / gm
 
 ! calculate dG(W,|u|²)/dW and dG(W,|u|²)/d|u|²
 !
