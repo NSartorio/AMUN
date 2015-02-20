@@ -151,8 +151,8 @@ module equations
 ! iterations and the number of extra iterations for polishing
 !
   real(kind=8)     , save :: tol     = 1.0d-10
-  integer          , save :: nmax    = 100
-  integer          , save :: next    = 2
+  integer          , save :: nrmax   = 100
+  integer          , save :: nrext   = 2
 
 ! flags for reconstruction corrections
 !
@@ -257,12 +257,12 @@ module equations
 
 ! get the tolerance
 !
-    call get_parameter_real   ("tolerance"         , tol )
+    call get_parameter_real   ("tolerance"        , tol  )
 
 ! get the maximum number of Newton-Raphson method iterations
 !
-    call get_parameter_integer("maximum_iterations", nmax)
-    call get_parameter_integer("extra_iterations"  , next)
+    call get_parameter_integer("nr_maxit"         , nrmax)
+    call get_parameter_integer("nr_extra"         , nrext)
 
 ! depending on the system of equations initialize the module variables
 !
@@ -3590,7 +3590,7 @@ module equations
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
     keep = (fl * fu > 0.0d+00)
-    it   = nmax
+    it   = nrmax
 
     do while (keep)
 
@@ -3613,8 +3613,8 @@ module equations
 ! initialize iteration parameters
 !
     keep = .true.
-    it   = nmax
-    cn   = next
+    it   = nrmax
+    cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
@@ -3786,7 +3786,7 @@ module equations
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
     keep = (fl * fu > 0.0d+00)
-    it   = nmax
+    it   = nrmax
 
     do while (keep)
 
@@ -3809,8 +3809,8 @@ module equations
 ! initialize iteration parameters
 !
     keep = .true.
-    it   = nmax
-    cn   = next
+    it   = nrmax
+    cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find the roots W and |v|²
 ! of functions
@@ -3970,7 +3970,7 @@ module equations
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
     keep = (fl * fu > 0.0d+00)
-    it   = nmax
+    it   = nrmax
 
     do while (keep)
 
@@ -3993,8 +3993,8 @@ module equations
 ! initialize iteration parameters
 !
     keep = .true.
-    it   = nmax
-    cn   = next
+    it   = nrmax
+    cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find the roots W and |u|²
 ! of functions
@@ -4686,8 +4686,8 @@ module equations
 ! initialize iteration parameters
 !
     keep = .true.
-    it   = nmax
-    cn   = next
+    it   = nrmax
+    cn   = nrext
 
 ! get the initial guess
 !
@@ -4838,8 +4838,8 @@ module equations
 !
     keep  = .true.
     first = .true.
-    it    = nmax
-    cn    = next
+    it    = nrmax
+    cn    = nrext
 
 ! get the initial guess
 !
