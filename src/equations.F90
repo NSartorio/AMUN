@@ -3533,7 +3533,7 @@ module equations
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
-!     w, vv  - input/output coefficients W and |V|²;
+!     w, vv  - input/output coefficients W and |v|²;
 !
 !   References:
 !
@@ -3616,15 +3616,15 @@ module equations
 !
     do while(keep)
 
-! calculate (1 - |V|²) the square root of it
+! calculate (1 - |v|²) the square root of it
 !
       vm = 1.0d+00 - vv
       vs = sqrt(vm)
 
 ! calculate the thermal pressure and its derivative
 !
-!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
-! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
+!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |v|²)
+! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |v|²) - (W - DΓ) d|v|²/dW]
 !
       pr  = gammaxi * (w * vm - dn * vs)
       dpw = gammaxi * (1.0d+00 + (w - dn / vs) * vv / w)
@@ -3658,7 +3658,7 @@ module equations
         end if
       end if
 
-! calculate |V|² from W
+! calculate |v|² from W
 !
       vv  = mm / (w * w)
 
@@ -3710,17 +3710,24 @@ module equations
 ! subroutine NR_ITERATE_SRHD_ADI_2DWV:
 ! -----------------------------------
 !
-!   Subroutine finds a root W of equation
+!   Subroutine finds a root (W,v²) of 2D equations
 !
-!     F(W) = W - P - E = 0
+!     F(W,v²) = W - E - P(W,v²) = 0
+!     G(W,v²) = W² v² - m²      = 0
 !
 !   using the Newton-Raphson 2D iterative method.
+!
+!   All evaluated equations incorporate already the pressure of the form
+!
+!     P(W,|v|²) = (γ - 1)/γ (W - Γ D) (1 - |v|²)
+!
+!   in order to optimize calculations.
 !
 !   Arguments:
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
-!     w, vv  - input/output coefficients W and |V|²;
+!     w, vv  - input/output coefficients W and |v|²;
 !
 !   References:
 !
@@ -3799,15 +3806,12 @@ module equations
     it   = nmax
     cn   = next
 
-! iterate using the Newton-Raphson method in order to find the roots W and |V|²
+! iterate using the Newton-Raphson method in order to find the roots W and |v|²
 ! of functions
-!
-! F(W,|V|²) = W - P - E = 0
-! G(W,|V|²) = |V|² W² - |M|² = 0
 !
     do while(keep)
 
-! calculate W², (1 - |V|²), and the Lorentz factor
+! calculate W², (1 - |v|²), and the Lorentz factor
 !
       ww  = w * w
       vm  = 1.0d+00 - vv
@@ -3815,27 +3819,26 @@ module equations
 
 ! calculate the thermal pressure
 !
-!  P(W,|V|²) = (γ - 1)/γ (W - D Γ) (1 - |V|²)
 !
       pr  = gammaxi * (w * vm - dn * vs)
 
-! calculate F(W,|V|²) and G(W,|V|²)
+! calculate F(W,|v|²) and G(W,|v|²)
 !
       f   = w - en - pr
       g   = vv * ww  - mm
 
-! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
+! calculate dF(W,|v|²)/dW and dF(W,|v|²)/d|v|²
 !
       dfw = 1.0d+00 - gammaxi * vm
       dfv = 0.5d+00 * (pr / vm + gammaxi * w)
 
-! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
+! calculate dG(W,|v|²)/dW and dG(W,|v|²)/d|v|²
 !
       dgw = 2.0d+00 * vv * w
       dgv = ww
 
-! invert the Jacobian J = | dF/dW, dF/d|V|² |
-!                         | dG/dW, dG/d|V|² |
+! invert the Jacobian J = | dF/dW, dF/d|v|² |
+!                         | dG/dW, dG/d|v|² |
 !
       det = dfw * dgv - dfv * dgw
 
@@ -3844,12 +3847,12 @@ module equations
       jfv = - dgw / det
       jgv =   dfw / det
 
-! calculate increments dW and d|V|²
+! calculate increments dW and d|v|²
 !
       dw  = f * jfw + g * jgw
       dv  = f * jfv + g * jgv
 
-! correct W and |V|²
+! correct W and |v|²
 !
       w   = w  - dw
       vv  = vv - dv
@@ -3911,7 +3914,7 @@ module equations
 !
 !   All evaluated equations incorporate already the pressure of the form
 !
-!     P(W,|V|²) = (γ - 1)/γ (W - Γ D) / (1 + |u|²)
+!     P(W,|u|²) = (γ - 1)/γ (W - Γ D) / (1 + |u|²)
 !
 !   in order to optimize calculations.
 !
@@ -3919,7 +3922,7 @@ module equations
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
-!     w, vv  - input/output coefficients W and |V|²;
+!     w, vv  - input/output coefficients W and |v|²;
 !
 !===============================================================================
 !
@@ -3990,7 +3993,7 @@ module equations
     it   = nmax
     cn   = next
 
-! iterate using the Newton-Raphson method in order to find the roots W and |V|²
+! iterate using the Newton-Raphson method in order to find the roots W and |u|²
 ! of functions
 !
     do while(keep)
@@ -4003,7 +4006,7 @@ module equations
       gm  = sqrt(up)
       gd  = gammaxi * dn
 
-! calculate F(W,|V|²) and G(W,|V|²)
+! calculate F(W,|u|²) and G(W,|u|²)
 !
       f   = (up - gammaxi) * w - up * en + gm * gd
       g   = uu * ww - up * mm
@@ -4033,7 +4036,7 @@ module equations
       dw  = f * jfw + g * jgw
       du  = f * jfu + g * jgu
 
-! correct W and |V|²
+! correct W and |u|²
 !
       w   = w  - dw
       uu  = uu - du
@@ -4059,7 +4062,7 @@ module equations
 
     end do ! continue interations
 
-! calculate v² from u²
+! calculate |v|² from |u|²
 !
     vv = uu / (1.0d+00 + uu)
 
