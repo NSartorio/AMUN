@@ -139,8 +139,8 @@ module equations
 
 ! the upper limits for the Lorentz factor and corresponding |v|²
 !
-  real(kind=8)     , save :: lmax    = 1.0d+08
-  real(kind=8)     , save :: vmax    = 0.9999999999999999d+00
+  real(kind=8)     , save :: lmax    = 1.0d+06
+  real(kind=8)     , save :: vmax    = 0.999999999999d+00
 
 ! the upper bound for the sonic Mach number
 !
