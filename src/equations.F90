@@ -3525,9 +3525,16 @@ module equations
 !
 !   Subroutine finds a root W of equation
 !
-!     F(W) = W - P - E = 0
+!     F(W) = W - P(W) - E = 0
 !
 !   using the Newton-Raphson 1Dw iterative method.
+!   The pressure is
+!
+!     P(W) = (γ - 1)/γ (W - D / sqrt(1 - |v|²(W))) (1 - |v|²(W))
+!
+!   and the squared velocity is
+!
+!     |v|²(W) = |m|² / W²
 !
 !   Arguments:
 !
