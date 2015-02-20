@@ -3686,13 +3686,13 @@ module equations
 ! print information about failed convergence
 !
     if (err >= tol) then
-      print *, '[SRHD, 1Dw] Convergence not reached: ', err
+      print *, '[SRHD, 1D(w)] Convergence not reached: ', err
     end if
     if (w   <= 0.0d+00) then
-      print *, '[SRHD, 1Dw] Unphysical enthalpy: ', w
+      print *, '[SRHD, 1D(w)] Unphysical enthalpy: ', w
     end if
     if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 1Dw] Unphysical speed: ', vv
+      print *, '[SRHD, 1D(w)] Unphysical speed: ', vv
     end if
 
 #ifdef PROFILE
@@ -3878,13 +3878,13 @@ module equations
 ! print information about failed convergence
 !
     if (err >= tol) then
-      print *, '[SRHD, 2D ] Convergence not reached: ', err
+      print *, '[SRHD, 2D(W,v²)] Convergence not reached: ', err
     end if
     if (w   <= 0.0d+00) then
-      print *, '[SRHD, 2D ] Unphysical enthalpy: ', w
+      print *, '[SRHD, 2D(W,v²)] Unphysical enthalpy: ', w
     end if
     if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 2D ] Unphysical speed: ', vv
+      print *, '[SRHD, 2D(W,v²)] Unphysical speed: ', vv
     end if
 
 #ifdef PROFILE
