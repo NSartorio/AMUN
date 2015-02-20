@@ -4633,19 +4633,29 @@ module equations
 !
 !   Subroutine finds a root W of equation
 !
-!     F(W) = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E = 0
+!     F(W) = W - P + ½ [(1 + |v|²) |B|² - S² / W²] - E = 0
 !
 !   using the Newton-Raphson 1Dw iterative method.
 !
 !   The derivative dF(W)/dW is
 !
-!     dF(W)/dW = 1 - dP/dW + ½ |B|² d|V|²/dW + S² / W³
+!     dF(W)/dW = 1 - dP/dW + ½ |B|² d|v|²/dW + S² / W³
+!
+!   The pressure and its derivative are
+!
+!     P(W)     = (γ - 1)/γ (W - D / sqrt(1 - |v|²(W))) (1 - |v|²(W))
+!     dP(W)/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
+!
+!
+!   and the squared velocity is
+!
+!     |v|²(W)     = (|m|² W² + S² (2 W + |B|²)) / (W² (W² + |B|²)²)
 !
 !   Arguments:
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
-!     w , vv - input/output coefficients W and |V|²;
+!     w , vv - input/output coefficients W and |v|²;
 !
 !   References:
 !
@@ -4693,8 +4703,6 @@ module equations
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
 !
-! F(W) = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E = 0
-!
     do while(keep)
 
 ! calculate the velocity and its derivative
@@ -4710,9 +4718,6 @@ module equations
       vs = sqrt(vm)
 
 ! calculate the thermal pressure and its derivative
-!
-!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |V|²)
-! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
 !
       pr = gammaxi * (w * vm - dn * vs)
       dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
@@ -4751,7 +4756,7 @@ module equations
 
     end do
 
-! calculate |V|² from W
+! calculate |v|² from W
 !
     wt = w + bb
     vv = (mm + (w + wt) * (mb / w)**2) / wt**2
