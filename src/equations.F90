@@ -683,25 +683,25 @@ module equations
 !
       select case(trim(c2p))
 
-      case("1Dw", "1dw", "1DW")
+      case("1Dw", "1dw", "1DW", "1D(w)", "1D(W)")
 
 ! the type of equation of state
 !
-        name_c2p  = "1Dw"
+        name_c2p  = "1D(W)"
 
 ! set pointer to the conversion method
 !
         nr_iterate => nr_iterate_srmhd_adi_1dw
 
-      case("2D", "2d")
+      case("2dwv", "2Dwv", "2D(w,v)", "2D(W,v)")
 
 ! the type of equation of state
 !
-        name_c2p  = "2D"
+        name_c2p  = "2D(W,v²)"
 
 ! set pointer to the conversion method
 !
-        nr_iterate => nr_iterate_srmhd_adi_2d
+        nr_iterate => nr_iterate_srmhd_adi_2dwv
 
 ! warn about the unimplemented method
 !
@@ -4778,8 +4778,8 @@ module equations
 !
 !===============================================================================
 !
-! subroutine NR_ITERATE_SRMHD_ADI_2D:
-! ----------------------------------
+! subroutine NR_ITERATE_SRMHD_ADI_2DWV:
+! ------------------------------------
 !
 !   Subroutine finds a root (W, |V|²) of equations
 !
@@ -4803,7 +4803,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srmhd_adi_2d(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srmhd_adi_2dwv(mm, bb, mb, en, dn, wm, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -4956,7 +4956,7 @@ module equations
 
 !-------------------------------------------------------------------------------
 !
-  end subroutine nr_iterate_srmhd_adi_2d
+  end subroutine nr_iterate_srmhd_adi_2dwv
 
 !===============================================================================
 !
