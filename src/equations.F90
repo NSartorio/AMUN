@@ -4235,17 +4235,6 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! prepare the initial guess using velocity and pressure from the previous step
-!
-      vv  = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
-      vb  = sum(q(ivx:ivz,i) * u(ibx:ibz,i))
-      vm  = 1.0d+00 + vv
-      wm  = en + 0.5d+00 * (vb * vb - vm * bb) + q(ipr,i)
-
-! set the initial W to the minimum value
-!
-      w   = wm
-
 ! find the exact W using an Newton-Ralphson interative method
 !
       call nr_iterate(mm, bb, mb, en, dn, wm, w, vv)
@@ -4700,6 +4689,10 @@ module equations
     it   = nmax
     cn   = next
 
+! get the initial guess
+!
+    w    = en + pmin
+
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
 !
@@ -4847,6 +4840,10 @@ module equations
     first = .true.
     it    = nmax
     cn    = next
+
+! get the initial guess
+!
+    w    = en + pmin
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
