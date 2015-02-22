@@ -3624,13 +3624,15 @@ module equations
     do while (keep)
 
       wl = wu
+      fl = fu
       wu = 2.0d+00 * wu
 
-      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
       call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
 
-      keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
     end do
     if (it <= 0) then
       print *, 'no initial brackets found', wl, wu, fl, fu
@@ -3819,13 +3821,15 @@ module equations
     do while (keep)
 
       wl = wu
+      fl = fu
       wu = 2.0d+00 * wu
 
-      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
       call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
 
-      keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
     end do
     if (it <= 0) then
       print *, ''
@@ -4034,13 +4038,15 @@ module equations
     do while (keep)
 
       wl = wu
+      fl = fu
       wu = 2.0d+00 * wu
 
-      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
       call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
 
-      keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
+
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
     end do
     if (it <= 0) then
       print *, ''
