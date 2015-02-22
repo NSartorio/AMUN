@@ -3582,8 +3582,14 @@ module equations
 
 ! prepare the initial brackets
 !
-    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
+
+! make sure the upper bracket is not smaller than the lower one
+!
+    do while(wl >= wu)
+      wu = 2.0d+00 * wu
+    end do
 
 ! check if the brackets bound the root region
 !
@@ -3778,8 +3784,14 @@ module equations
 
 ! prepare the initial brackets
 !
-    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
+
+! make sure the upper bracket is not smaller than the lower one
+!
+    do while(wl >= wu)
+      wu = 2.0d+00 * wu
+    end do
 
 ! check if the brackets bound the root region
 !
@@ -3962,8 +3974,14 @@ module equations
 
 ! prepare the initial brackets
 !
-    wl   = max(dn + gammaxi * pmin, sqrt(mm / vmax))
+    wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
+
+! make sure the upper bracket is not smaller than the lower one
+!
+    do while(wl >= wu)
+      wu = 2.0d+00 * wu
+    end do
 
 ! check if the brackets bound the root region
 !
