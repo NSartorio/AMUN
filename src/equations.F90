@@ -3290,10 +3290,11 @@ module equations
 
       else ! unphysical state
 
-        write(*,*)
         write(*,"(a,1x,a)"           ) "ERROR in"                              &
                                      , "EQUATIONS::cons2prim_srhd_adi()"
         write(*,"(a,5(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
+        write(*,"(a,3(1x,1e24.16e3))") "            D, |m|², E = ", dn, mm, en
+        stop
 
       end if ! unphysical state
 
@@ -3614,10 +3615,12 @@ module equations
       wu = 2.0d+00 * wu
     end do
 
-! check if the brackets bound the root region
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
 !
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
     keep = (fl * fu > 0.0d+00)
     it   = nrmax
 
@@ -3635,7 +3638,10 @@ module equations
 
     end do
     if (it <= 0) then
-      print *, 'no initial brackets found', wl, wu, fl, fu
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
+      write(*,"(a)"     ) "No initial brackets found!"
       info = .false.
       return
     end if
@@ -3708,18 +3714,13 @@ module equations
 !
     vv  = mm / (w * w)
 
-! print information about failed convergence
+! print information about failed convergence or unphysical variables
 !
     if (err >= tol) then
-      print *, '[SRHD, 1D(w)] Convergence not reached: ', err
-      info = .false.
-    end if
-    if (w   <= 0.0d+00) then
-      print *, '[SRHD, 1D(w)] Unphysical enthalpy: ', w
-      info = .false.
-    end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 1D(w)] Unphysical speed: ', vv
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
       info = .false.
     end if
 
@@ -3811,10 +3812,12 @@ module equations
       wu = 2.0d+00 * wu
     end do
 
-! check if the brackets bound the root region
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
 !
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
     keep = (fl * fu > 0.0d+00)
     it   = nrmax
 
@@ -3832,8 +3835,10 @@ module equations
 
     end do
     if (it <= 0) then
-      print *, ''
-      print *, 'no initial brackets found', wl, wu, fl, fu
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+      write(*,"(a)"     ) "No initial brackets found!"
       info = .false.
       return
     end if
@@ -3901,12 +3906,18 @@ module equations
 ! check if the new enthalpy gives physical pressure and velocity
 !
       if (w < wl) then
-        print *, '[SRHD, 2D(W,v²)] Enthalpy too small: ', w, wl
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (vv < 0.0d+00 .or. vv >= 1.0d+00) then
-        print *, '[SRHD, 2D(W,v²)] Unphysical velocity |v|²: ', vv
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |v|²: ", vv
         info = .false.
         return
       end if
@@ -3932,18 +3943,13 @@ module equations
 
     end do ! continue interations
 
-! print information about failed convergence
+! print information about failed convergence or unphysical variables
 !
     if (err >= tol) then
-      print *, '[SRHD, 2D(W,v²)] Convergence not reached: ', err
-      info = .false.
-    end if
-    if (w   <= 0.0d+00) then
-      print *, '[SRHD, 2D(W,v²)] Unphysical enthalpy: ', w
-      info = .false.
-    end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 2D(W,v²)] Unphysical speed: ', vv
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
       info = .false.
     end if
 
@@ -4028,10 +4034,12 @@ module equations
       wu = 2.0d+00 * wu
     end do
 
-! check if the brackets bound the root region
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
 !
     call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
     call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+
     keep = (fl * fu > 0.0d+00)
     it   = nrmax
 
@@ -4049,8 +4057,10 @@ module equations
 
     end do
     if (it <= 0) then
-      print *, ''
-      print *, 'no initial brackets found', wl, wu, fl, fu
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+      write(*,"(a)"     ) "No initial brackets found!"
       info = .false.
       return
     end if
@@ -4115,15 +4125,21 @@ module equations
       w   = w  - dw
       uu  = uu - du
 
-! check if the new enthalpy gives physical pressure
+! check if the new enthalpy gives physical pressure and velocity
 !
       if (w < wl) then
-        print *, '[SRHD, 2D(W,u²)] Enthalpy too small: ', w, wl
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (uu < 0.0d+00) then
-        print *, '[SRHD, 2D(W,u²)] Unphysical velocity |u|²: ', uu
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |u|²: ", uu
         info = .false.
         return
       end if
@@ -4153,18 +4169,13 @@ module equations
 !
     vv = uu / (1.0d+00 + uu)
 
-! print information about failed convergence
+! print information about failed convergence or unphysical variables
 !
     if (err >= tol) then
-      print *, '[SRHD, 2D(W,u²)] Convergence not reached: ', err
-      info = .false.
-    end if
-    if (w   <= 0.0d+00) then
-      print *, '[SRHD, 2D(W,u²)] Unphysical enthalpy: ', w
-      info = .false.
-    end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRHD, 2D(W,u²)] Unphysical speed: ', vv
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
       info = .false.
     end if
 
@@ -4350,10 +4361,11 @@ module equations
 
       else ! unphysical state
 
-        write(*,*)
         write(*,"(a,1x,a)"           ) "ERROR in"                              &
                                      , "EQUATIONS::cons2prim_srmhd_adi()"
         write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
+        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = ", dn, mm, mb &
+                                                                  , bb, en
 
       end if ! unphysical state
 
