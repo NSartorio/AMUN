@@ -3288,7 +3288,14 @@ module equations
         q(ivz,i) = u(imz,i) / w
         q(ipr,i) = w - en
 
-      end if ! info = .true.
+      else ! unphysical state
+
+        write(*,*)
+        write(*,"(a,1x,a)"           ) "ERROR in"                              &
+                                     , "EQUATIONS::cons2prim_srhd_adi()"
+        write(*,"(a,5(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
+
+      end if ! unphysical state
 
     end do ! i = 1, n
 
@@ -4335,7 +4342,14 @@ module equations
         q(ibp,i) = u(ibp,i)
         q(ipr,i) = gammaxi * (w - dn / vs) * vm
 
-      end if ! info = .true.
+      else ! unphysical state
+
+        write(*,*)
+        write(*,"(a,1x,a)"           ) "ERROR in"                              &
+                                     , "EQUATIONS::cons2prim_srmhd_adi()"
+        write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
+
+      end if ! unphysical state
 
     end do ! i = 1, n
 
