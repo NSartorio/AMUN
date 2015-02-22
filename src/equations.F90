@@ -3244,6 +3244,7 @@ module equations
 
 ! local variables
 !
+    logical      :: info
     integer      :: i
     real(kind=8) :: mm, bb, mb, en, dn
     real(kind=8) :: w , vv, vm, vs
@@ -3268,20 +3269,26 @@ module equations
 
 ! find the exact W using an Newton-Ralphson interative method
 !
-      call nr_iterate(mm, bb, mb, en, dn, w, vv)
+      call nr_iterate(mm, bb, mb, en, dn, w, vv, info)
+
+! if info is .true., the solution was found
+!
+      if (info) then
 
 ! prepare coefficients
 !
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
+        vm = 1.0d+00 - vv
+        vs = sqrt(vm)
 
 ! calculate the primitive variables
 !
-      q(idn,i) = dn * vs
-      q(ivx,i) = u(imx,i) / w
-      q(ivy,i) = u(imy,i) / w
-      q(ivz,i) = u(imz,i) / w
-      q(ipr,i) = w - en
+        q(idn,i) = dn * vs
+        q(ivx,i) = u(imx,i) / w
+        q(ivy,i) = u(imy,i) / w
+        q(ivz,i) = u(imz,i) / w
+        q(ipr,i) = w - en
+
+      end if ! info = .true.
 
     end do ! i = 1, n
 
@@ -3549,6 +3556,8 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w, vv  - input/output coefficients W and |v|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
 !
 !   References:
 !
@@ -3559,7 +3568,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_1dw(mm, bb, mb, en, dn, w, vv)
+  subroutine nr_iterate_srhd_adi_1dw(mm, bb, mb, en, dn, w, vv, info)
 
 ! local variables are not implicit by default
 !
@@ -3569,6 +3578,7 @@ module equations
 !
     real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
 
 ! local variables
 !
@@ -3615,7 +3625,11 @@ module equations
       keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
     end do
-    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+    if (it <= 0) then
+      print *, 'no initial brackets found', wl, wu, fl, fu
+      info = .false.
+      return
+    end if
 
 ! estimate the value of enthalpy close to the root and corresponding v²
 !
@@ -3623,6 +3637,7 @@ module equations
 
 ! initialize iteration parameters
 !
+    info = .true.
     keep = .true.
     it   = nrmax
     cn   = nrext
@@ -3688,12 +3703,15 @@ module equations
 !
     if (err >= tol) then
       print *, '[SRHD, 1D(w)] Convergence not reached: ', err
+      info = .false.
     end if
     if (w   <= 0.0d+00) then
       print *, '[SRHD, 1D(w)] Unphysical enthalpy: ', w
+      info = .false.
     end if
     if (vv  >= 1.0d+00) then
       print *, '[SRHD, 1D(w)] Unphysical speed: ', vv
+      info = .false.
     end if
 
 #ifdef PROFILE
@@ -3729,6 +3747,8 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w, vv  - input/output coefficients W and |v|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
 !
 !   References:
 !
@@ -3739,7 +3759,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_2dwv(mm, bb, mb, en, dn, w, vv)
+  subroutine nr_iterate_srhd_adi_2dwv(mm, bb, mb, en, dn, w, vv, info)
 
 ! local variables are not implicit by default
 !
@@ -3749,6 +3769,7 @@ module equations
 !
     real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
 
 ! local variables
 !
@@ -3799,7 +3820,11 @@ module equations
       keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
     end do
-    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+    if (it <= 0) then
+      print *, 'no initial brackets found', wl, wu, fl, fu
+      info = .false.
+      return
+    end if
 
 ! estimate the value of enthalpy close to the root and corresponding v²
 !
@@ -3808,6 +3833,7 @@ module equations
 
 ! initialize iteration parameters
 !
+    info = .true.
     keep = .true.
     it   = nrmax
     cn   = nrext
@@ -3885,12 +3911,15 @@ module equations
 !
     if (err >= tol) then
       print *, '[SRHD, 2D(W,v²)] Convergence not reached: ', err
+      info = .false.
     end if
     if (w   <= 0.0d+00) then
       print *, '[SRHD, 2D(W,v²)] Unphysical enthalpy: ', w
+      info = .false.
     end if
     if (vv  >= 1.0d+00) then
       print *, '[SRHD, 2D(W,v²)] Unphysical speed: ', vv
+      info = .false.
     end if
 
 #ifdef PROFILE
@@ -3926,10 +3955,12 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w, vv  - input/output coefficients W and |v|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_2dwu(mm, bb, mb, en, dn, w, vv)
+  subroutine nr_iterate_srhd_adi_2dwu(mm, bb, mb, en, dn, w, vv, info)
 
 ! local variables are not implicit by default
 !
@@ -3939,6 +3970,7 @@ module equations
 !
     real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
 
 ! local variables
 !
@@ -3989,7 +4021,11 @@ module equations
       keep = (fl * fu > 0.0d+00) .and. it > 0
       it   = it - 1
     end do
-    if (it <= 0) print *, 'no initial brackets found', wl, wu, fl, fu
+    if (it <= 0) then
+      print *, 'no initial brackets found', wl, wu, fl, fu
+      info = .false.
+      return
+    end if
 
 ! estimate the value of enthalpy close to the root and corresponding u²
 !
@@ -3998,6 +4034,7 @@ module equations
 
 ! initialize iteration parameters
 !
+    info = .true.
     keep = .true.
     it   = nrmax
     cn   = nrext
@@ -4079,12 +4116,15 @@ module equations
 !
     if (err >= tol) then
       print *, '[SRHD, 2D(W,u²)] Convergence not reached: ', err
+      info = .false.
     end if
     if (w   <= 0.0d+00) then
       print *, '[SRHD, 2D(W,u²)] Unphysical enthalpy: ', w
+      info = .false.
     end if
     if (vv  >= 1.0d+00) then
       print *, '[SRHD, 2D(W,u²)] Unphysical speed: ', vv
+      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4214,6 +4254,7 @@ module equations
 
 ! local variables
 !
+    logical      :: info
     integer      :: i
     real(kind=8) :: mm, mb, bb, en, dn
     real(kind=8) :: w, wt, vv, vm, vs, vb, fc
@@ -4241,26 +4282,32 @@ module equations
 
 ! find the exact W using an Newton-Ralphson interative method
 !
-      call nr_iterate(mm, bb, mb, en, dn, w, vv)
+      call nr_iterate(mm, bb, mb, en, dn, w, vv, info)
+
+! if info is .true., the solution was found
+!
+      if (info) then
 
 ! prepare coefficients
 !
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-      wt = w + bb
-      fc = mb / w
+        vm = 1.0d+00 - vv
+        vs = sqrt(vm)
+        wt = w + bb
+        fc = mb / w
 
 ! calculate the primitive variables
 !
-      q(idn,i) = dn * vs
-      q(ivx,i) = (u(imx,i) + fc * u(ibx,i)) / wt
-      q(ivy,i) = (u(imy,i) + fc * u(iby,i)) / wt
-      q(ivz,i) = (u(imz,i) + fc * u(ibz,i)) / wt
-      q(ibx,i) = u(ibx,i)
-      q(iby,i) = u(iby,i)
-      q(ibz,i) = u(ibz,i)
-      q(ibp,i) = u(ibp,i)
-      q(ipr,i) = gammaxi * (w - dn / vs) * vm
+        q(idn,i) = dn * vs
+        q(ivx,i) = (u(imx,i) + fc * u(ibx,i)) / wt
+        q(ivy,i) = (u(imy,i) + fc * u(iby,i)) / wt
+        q(ivz,i) = (u(imz,i) + fc * u(ibz,i)) / wt
+        q(ibx,i) = u(ibx,i)
+        q(iby,i) = u(iby,i)
+        q(ibz,i) = u(ibz,i)
+        q(ibp,i) = u(ibp,i)
+        q(ipr,i) = gammaxi * (w - dn / vs) * vm
+
+      end if ! info = .true.
 
     end do ! i = 1, n
 
@@ -4649,6 +4696,8 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w , vv - input/output coefficients W and |v|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
 !
 !   References:
 !
@@ -4659,7 +4708,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srmhd_adi_1dw(mm, bb, mb, en, dn, w, vv)
+  subroutine nr_iterate_srmhd_adi_1dw(mm, bb, mb, en, dn, w, vv, info)
 
 ! local variables are not implicit by default
 !
@@ -4669,6 +4718,7 @@ module equations
 !
     real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
 
 ! local variables
 !
@@ -4687,15 +4737,16 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! initialize iteration parameters
-!
-    keep = .true.
-    it   = nrmax
-    cn   = nrext
-
 ! get the initial guess
 !
     w    = en + pmin
+
+! initialize iteration parameters
+!
+    info = .true.
+    keep = .true.
+    it   = nrmax
+    cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
@@ -4762,12 +4813,15 @@ module equations
 !
     if (err >= tol) then
       print *, '[SRMHD, 1D(w)] Convergence not reached: ', err
+      info  = .false.
     end if
     if (w   <= 0.0d+00) then
       print *, '[SRMHD, 1D(w)] Unphysical enthalpy: ', w
+      info  = .false.
     end if
     if (vv  >= 1.0d+00) then
       print *, '[SRMHD, 1D(w)] Unphysical speed: ', vv
+      info  = .false.
     end if
 
 #ifdef PROFILE
@@ -4797,6 +4851,8 @@ module equations
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
 !     w , vv - input/output coefficients W and |V|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
 !
 !   References:
 !
@@ -4807,7 +4863,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srmhd_adi_2dwv(mm, bb, mb, en, dn, w, vv)
+  subroutine nr_iterate_srmhd_adi_2dwv(mm, bb, mb, en, dn, w, vv, info)
 
 ! local variables are not implicit by default
 !
@@ -4817,6 +4873,7 @@ module equations
 !
     real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
 
 ! local variables
 !
@@ -4838,16 +4895,17 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
+! get the initial guess
+!
+    w     = en + pmin
+
 ! initialize iteration parameters
 !
+    info  = .true.
     keep  = .true.
     first = .true.
     it    = nrmax
     cn    = nrext
-
-! get the initial guess
-!
-    w    = en + pmin
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
@@ -4944,12 +5002,15 @@ module equations
 !
     if (err >= tol) then
       print *, '[SRMHD, 2D(W,v²)] Convergence not reached: ', err
+      info  = .false.
     end if
     if (w   <= 0.0d+00) then
       print *, '[SRMHD, 2D(W,v²)] Unphysical enthalpy: ', w
+      info  = .false.
     end if
     if (vv  >= 1.0d+00) then
       print *, '[SRMHD, 2D(W,v²)] Unphysical speed: ', vv
+      info  = .false.
     end if
 
 #ifdef PROFILE
