@@ -3821,6 +3821,7 @@ module equations
       it   = it - 1
     end do
     if (it <= 0) then
+      print *, ''
       print *, 'no initial brackets found', wl, wu, fl, fu
       info = .false.
       return
@@ -3885,6 +3886,19 @@ module equations
 !
       w   = w  - dw
       vv  = vv - dv
+
+! check if the new enthalpy gives physical pressure and velocity
+!
+      if (w < wl) then
+        print *, '[SRHD, 2D(W,v²)] Enthalpy too small: ', w, wl
+        info = .false.
+        return
+      end if
+      if (vv < 0.0d+00 .or. vv >= 1.0d+00) then
+        print *, '[SRHD, 2D(W,v²)] Unphysical velocity |v|²: ', vv
+        info = .false.
+        return
+      end if
 
 ! calculate the normalized error
 !
@@ -4022,6 +4036,7 @@ module equations
       it   = it - 1
     end do
     if (it <= 0) then
+      print *, ''
       print *, 'no initial brackets found', wl, wu, fl, fu
       info = .false.
       return
@@ -4086,6 +4101,19 @@ module equations
 !
       w   = w  - dw
       uu  = uu - du
+
+! check if the new enthalpy gives physical pressure
+!
+      if (w < wl) then
+        print *, '[SRHD, 2D(W,u²)] Enthalpy too small: ', w, wl
+        info = .false.
+        return
+      end if
+      if (uu < 0.0d+00) then
+        print *, '[SRHD, 2D(W,u²)] Unphysical velocity |u|²: ', uu
+        info = .false.
+        return
+      end if
 
 ! calculate the normalized error
 !
