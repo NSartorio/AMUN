@@ -3246,8 +3246,7 @@ module equations
 !
     integer      :: i
     real(kind=8) :: mm, bb, mb, en, dn
-    real(kind=8) :: wm, w
-    real(kind=8) :: vv, vm, vs
+    real(kind=8) :: w , vv, vm, vs
 !
 !-------------------------------------------------------------------------------
 !
@@ -3269,7 +3268,7 @@ module equations
 
 ! find the exact W using an Newton-Ralphson interative method
 !
-      call nr_iterate(mm, bb, mb, en, dn, wm, w, vv)
+      call nr_iterate(mm, bb, mb, en, dn, w, vv)
 
 ! prepare coefficients
 !
@@ -3560,7 +3559,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_1dw(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srhd_adi_1dw(mm, bb, mb, en, dn, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -3568,7 +3567,7 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
 
 ! local variables
@@ -3740,7 +3739,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_2dwv(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srhd_adi_2dwv(mm, bb, mb, en, dn, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -3748,7 +3747,7 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
 
 ! local variables
@@ -3930,7 +3929,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srhd_adi_2dwu(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srhd_adi_2dwu(mm, bb, mb, en, dn, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -3938,7 +3937,7 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
 
 ! local variables
@@ -4217,9 +4216,7 @@ module equations
 !
     integer      :: i
     real(kind=8) :: mm, mb, bb, en, dn
-    real(kind=8) :: wm, w, wt
-    real(kind=8) :: vv, vm, vs, vb
-    real(kind=8) :: fc
+    real(kind=8) :: w, wt, vv, vm, vs, vb, fc
 !
 !-------------------------------------------------------------------------------
 !
@@ -4244,7 +4241,7 @@ module equations
 
 ! find the exact W using an Newton-Ralphson interative method
 !
-      call nr_iterate(mm, bb, mb, en, dn, wm, w, vv)
+      call nr_iterate(mm, bb, mb, en, dn, w, vv)
 
 ! prepare coefficients
 !
@@ -4662,7 +4659,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srmhd_adi_1dw(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srmhd_adi_1dw(mm, bb, mb, en, dn, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -4670,7 +4667,7 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
 
 ! local variables
@@ -4810,7 +4807,7 @@ module equations
 !
 !===============================================================================
 !
-  subroutine nr_iterate_srmhd_adi_2dwv(mm, bb, mb, en, dn, wm, w, vv)
+  subroutine nr_iterate_srmhd_adi_2dwv(mm, bb, mb, en, dn, w, vv)
 
 ! local variables are not implicit by default
 !
@@ -4818,7 +4815,7 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, bb, mb, en, dn, wm
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
     real(kind=8), intent(inout) :: w, vv
 
 ! local variables
