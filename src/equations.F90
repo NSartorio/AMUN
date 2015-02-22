@@ -3480,18 +3480,31 @@ module equations
 !
 !   Subroutine calculate the value of function
 !
-!     F(W) = W - P - E
+!     F(W) = W - P(W) - E
 !
 !   for a given enthalpy W. It is used to estimate the initial guess.
+!
+!   The pressure is
+!
+!     P(W) = (γ - 1)/γ (W - D / sqrt(1 - |v|²(W))) (1 - |v|²(W))
+!
+!   and the squared velocity is
+!
+!     |v|²(W) = |m|² / W²
+!
+!   Optional derivative is returned
+!
+!     dF(W)/dW = 1 - dP(W)/dW
 !
 !   Arguments:
 !
 !     mm, en, dn, w - input coefficients for |M|² E, D, and W, respectively;
 !     f             - the value of function F(W);
+!     df            - optional derivative F'(W);
 !
 !===============================================================================
 !
-  subroutine nr_function_srhd_adi_1d(mm, en, dn, w, f)
+  subroutine nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
 
 ! local variables are not implicit by default
 !
@@ -3499,8 +3512,9 @@ module equations
 
 ! input/output arguments
 !
-    real(kind=8), intent(in)    :: mm, en, dn, w
-    real(kind=8), intent(out)   :: f
+    real(kind=8)          , intent(in)    :: mm, en, dn, w
+    real(kind=8)          , intent(out)   :: f
+    real(kind=8), optional, intent(out)   :: df
 
 ! local variables
 !
@@ -3511,8 +3525,10 @@ module equations
     vv = mm / (w * w)
     vm = 1.0d+00 - vv
     vs = sqrt(vm)
-    pr = gammaxi * (w * vm - dn * vs)
-    f  = w - en - pr
+    f  = (1.0d+00 - gammaxi * vm) * w + gammaxi * dn * vs - en
+    if (present(df)) then
+      df  = 1.0d+00 - gammaxi * (1.0d+00 + (1.0d+00 - dn / (vs * w)) * vv)
+    end if
 
 !-------------------------------------------------------------------------------
 !
@@ -3528,13 +3544,6 @@ module equations
 !     F(W) = W - P(W) - E = 0
 !
 !   using the Newton-Raphson 1Dw iterative method.
-!   The pressure is
-!
-!     P(W) = (γ - 1)/γ (W - D / sqrt(1 - |v|²(W))) (1 - |v|²(W))
-!
-!   and the squared velocity is
-!
-!     |v|²(W) = |m|² / W²
 !
 !   Arguments:
 !
@@ -3567,8 +3576,6 @@ module equations
     logical      :: keep
     integer      :: it, cn
     real(kind=8) :: wl, wu, fl, fu
-    real(kind=8) :: vm, vs
-    real(kind=8) :: pr, dpw
     real(kind=8) :: f, df, dw
     real(kind=8) :: err
 !
@@ -3613,8 +3620,7 @@ module equations
 
 ! estimate the value of enthalpy close to the root and corresponding v²
 !
-    w  = wl - fl * (wu - wl) / (fu - fl)
-    vv = mm / (w * w)
+    w    = wl - fl * (wu - wl) / (fu - fl)
 
 ! initialize iteration parameters
 !
@@ -3629,26 +3635,9 @@ module equations
 !
     do while(keep)
 
-! calculate (1 - |v|²) the square root of it
-!
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-
-! calculate the thermal pressure and its derivative
-!
-!  P(W) = (γ - 1)/γ (W - DΓ) (1 - |v|²)
-! dP/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |v|²) - (W - DΓ) d|v|²/dW]
-!
-      pr  = gammaxi * (w * vm - dn * vs)
-      dpw = gammaxi * (1.0d+00 + (w - dn / vs) * vv / w)
-
 ! calculate F(W) and dF(W)/dW
 !
-!  F(W)    = W - P - E
-! dF(W)/dW = 1 - dP/dW
-!
-      f   = w - en - pr
-      df  = 1.0d+00 - dpw
+      call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
 
 ! calculate the increment dW
 !
@@ -3671,10 +3660,6 @@ module equations
         end if
       end if
 
-! calculate |v|² from W
-!
-      vv  = mm / (w * w)
-
 ! calculate the normalized error
 !
       err = abs(dw / w)
@@ -3695,6 +3680,10 @@ module equations
       it = it - 1
 
     end do ! continue interations
+
+! calculate |v|² from W
+!
+    vv  = mm / (w * w)
 
 ! print information about failed convergence
 !
