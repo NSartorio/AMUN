@@ -4728,34 +4728,208 @@ module equations
 !
 !===============================================================================
 !
+! subroutine NR_POSITIVITY_SRMHD_ADI_1D:
+! -------------------------------------
+!
+!   Subroutine calculates the function
+!
+!     Q(W)  = W² - D² - [|m|² W² + (2 W + |B|²) S²] / (W + |B|²)²
+!
+!   and its derivative
+!
+!     Q'(W) = 2 W [ 1 - (|m|² |B|² - S²) / (W + |B|²)³]
+!
+!   for a given enthalpy W.
+!
+!   This subroutine is used to find the minimum enthalpy for which the velocity
+!   is physical and the pressure is positive.
+!
+!   Arguments:
+!
+!     mm, bb, mb, dn, w - input coefficients for |M|², |B|², M.B, D, and W,
+!                         respectively;
+!     q, dq             - the values for the function Q(W) and its
+!                         derivative Q'(W);
+!
+!===============================================================================
+!
+  subroutine nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, w, q, dq)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)  :: mm, bb, mb, dn, w
+    real(kind=8), intent(out) :: q, dq
+
+! local variables
+!
+    real(kind=8) :: dd, ss, ww, wt
+!
+!-------------------------------------------------------------------------------
+!
+! temporary variables
+!
+    dd = dn * dn
+    ss = mb * mb
+    ww = w * w
+    wt = w + bb
+
+! the function and its derivative
+!
+    q  = ww - dd - (mm * ww + (w + wt) * ss) / wt**2
+    dq = 2.0d+00 * w * (1.0d+00 - (mm * bb - ss) / wt**3)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_positivity_srmhd_adi_1d
+!
+!===============================================================================
+!
+! subroutine NR_VELOCITY_SRMHD_ADI_1D:
+! -----------------------------------
+!
+!   Subroutine calculates the squared velocity
+!
+!     |V|²(W)  = (|m|² W² + S² (2 W + |B|²)) / (W² (W² + |B|²)²)
+!
+!   and its derivative
+!
+!     |V|²'(W) = - 2 (|m|² W³ + 3 S² W² + 3 S² |B|² W + S² |B|⁴)
+!                                                           / (W³ (W² + |B|²)³)
+!
+!   for a given enthalpy W.
+!
+!   Arguments:
+!
+!     mm, bb, mb, w - input coefficients for |M|², |B|², M.B, and W,
+!                     respectively;
+!     vv, dv        - the values of squared velocity |V|² and its derivative;
+!
+!===============================================================================
+!
+  subroutine nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv, dv)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8),           intent(in)  :: mm, bb, mb, w
+    real(kind=8),           intent(out) :: vv
+    real(kind=8), optional, intent(out) :: dv
+
+! local variables
+!
+    real(kind=8) :: ss, ww, www, wt, wt2
+!
+!-------------------------------------------------------------------------------
+!
+! temporary variables
+!
+    ss  = mb * mb
+    ww  = w * w
+    www = ww * w
+    wt  = w + bb
+    wt2 = wt * wt
+
+! the function and its derivative
+!
+    vv = (mm * ww + (w + wt) * ss) / (ww * wt2)
+    if (present(dv)) then
+      dv = - 2.0d+00 * (mm * www + (3.0d+00 * ww                               &
+                           + (2.0d+00 * w + wt) * bb) * ss) / (www * wt2 * wt)
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_velocity_srmhd_adi_1d
+!
+!===============================================================================
+!
+! subroutine NR_FUNCTION_SRMHD_ADI_1D:
+! -----------------------------------
+!
+!   Subroutine calculates the energy function
+!
+!     F(W)  = W - P(W) + ½ [(1 + |V|²) |B|² - S² / W²] - E
+!
+!   and its derivative
+!
+!     F'(W) = 1 - dP(W)/dW + ½ |B|² d|V|²/dW + S² / W³
+!
+!   for a given enthalpy W. It is used to estimate the initial guess.
+!
+!   Arguments:
+!
+!     mm, bb, mb, en, dn, w - input coefficients for |M|², |B|², M.B, E, D,
+!                             and W, respectively;
+!     f, df                 - the values of F(W) and its derivative;
+!
+!===============================================================================
+!
+  subroutine nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, w, f, df)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8),           intent(in)  :: mm, bb, mb, en, dn, w
+    real(kind=8),           intent(out) :: f
+    real(kind=8), optional, intent(out) :: df
+
+! local variables
+!
+    real(kind=8) :: mw, vv, dv, vm, vs, pr, dp
+!
+!-------------------------------------------------------------------------------
+!
+! temporary variables
+!
+    mw = (mb / w)**2
+
+! the function and its derivative if necessary
+!
+    if (present(df)) then
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv, dv)
+      vm = 1.0d+00 - vv
+      vs = sqrt(vm)
+      pr = gammaxi * (w * vm - dn * vs)
+      dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
+      df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
+    else
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+      vm = 1.0d+00 - vv
+      vs = sqrt(vm)
+      pr = gammaxi * (w * vm - dn * vs)
+    end if
+    f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_function_srmhd_adi_1d
+!
+!===============================================================================
+!
 ! subroutine NR_ITERATE_SRMHD_ADI_1DW:
 ! -----------------------------------
 !
 !   Subroutine finds a root W of equation
 !
-!     F(W) = W - P + ½ [(1 + |v|²) |B|² - S² / W²] - E = 0
+!     F(W) = W - P(W) + ½ [(1 + |V|²) |B|² - S² / W²] - E = 0
 !
 !   using the Newton-Raphson 1Dw iterative method.
-!
-!   The derivative dF(W)/dW is
-!
-!     dF(W)/dW = 1 - dP/dW + ½ |B|² d|v|²/dW + S² / W³
-!
-!   The pressure and its derivative are
-!
-!     P(W)     = (γ - 1)/γ (W - D / sqrt(1 - |v|²(W))) (1 - |v|²(W))
-!     dP(W)/dW = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
-!
-!
-!   and the squared velocity is
-!
-!     |v|²(W)     = (|m|² W² + S² (2 W + |B|²)) / (W² (W² + |B|²)²)
 !
 !   Arguments:
 !
 !     mm, en - input coefficients for |M|² and E, respectively;
 !     bb, bm - input coefficients for |B|² and B.M, respectively;
-!     w , vv - input/output coefficients W and |v|²;
+!     w , vv - input/output coefficients W and |V|²;
 !     info   - the flag is .true. if the solution was found, otherwise
 !              it is .false.;
 !
@@ -4784,6 +4958,7 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
+    real(kind=8) :: wl, wu, wn, fl, fu
     real(kind=8) :: vm, vs, dv, wt, mw
     real(kind=8) :: pr, dp
     real(kind=8) :: f, df, dw
@@ -4797,9 +4972,93 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! get the initial guess
+! prepare the initial brackets
 !
-    w    = en + pmin
+    wl   = dn
+    wu   = en + pmin
+
+! check, if the velocity corresponding to the lower bracket is physical, if not
+! find the minimum enthalphy which corresponds to physical velocity
+!
+    keep = .true.
+    it   = nrmax
+
+    do while(keep)
+
+      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
+
+      dw   = f / df
+      wl   = wl - dw
+
+      err  = abs(dw / wl)
+      it   = it - 1
+      keep = (err > tol) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! add the minimum pressure contribution to enthalpy
+!
+    wl   = wl + gammaxi * pmin
+
+! make sure that the upper bracket is larger than the lower one
+!
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+    keep = (fl * fu > 0.0d+00)
+    it   = nrmax
+
+    do while (keep)
+
+      wl = wu
+      fl = fu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+      it   = it - 1
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "No initial brackets found!"
+      info = .false.
+      return
+    end if
+
+! estimate the value of enthalpy close to the root
+!
+    w    = wl - fl * (wu - wl) / (fu - fl)
 
 ! initialize iteration parameters
 !
@@ -4813,75 +5072,64 @@ module equations
 !
     do while(keep)
 
-! calculate the velocity and its derivative
-!
-      mw = (mb / w)**2
-      wt = w + bb
-      vv = (mm + (w + wt) * mw) / wt**2
-      dv = - 2.0d+00 * (mm + (3.0d+00 * wt + bb**2 / w) * mw) / wt**3
-
-! calculate 1 - |V|²
-!
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-
-! calculate the thermal pressure and its derivative
-!
-      pr = gammaxi * (w * vm - dn * vs)
-      dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
-
 ! calculate F(W) and dF(W)/dW
 !
-      f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
-      df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, w, f, df)
+
+! update brackets
+!
+      if (f * fl > 0.0d+00) then
+        wl = w
+        fl = f
+      end if
+      if (f * fu > 0.0d+00) then
+        wu = w
+        fu = f
+      end if
 
 ! calculate the increment dW
 !
       dw  = f / df
 
-! correct W
+! update the solution
 !
       w   = w - dw
 
-! calculate the normalized error
+! if new W lays within the brackets, calculate the error and convergence,
+! otherwise use the bisection method to estimate the new guess
 !
-      err = abs(dw / w)
+      if (w >= wl .and. w <= wu) then
+        err = abs(dw / w)
 
-! check the convergence
-!
-      if (err < tol) then
-        if (cn <= 0) keep = .false.
-        cn  = cn - 1
+        if (err < tol) then
+          keep = cn > 0
+          cn   = cn - 1
+        else
+          keep = it > 0
+        end if
+      else
+        w    = 0.5d+00 * (wl + wu)
+        keep = it > 0
       end if
-
-! break if the number of iterations exceeded the maximum value
-!
-      if (it <= 0) keep = .false.
 
 ! decrease the number of remaining iterations
 !
       it = it - 1
 
-    end do
+    end do ! NR iterations
 
-! calculate |v|² from W
+! calculate |V|² from W
 !
-    wt = w + bb
-    vv = (mm + (w + wt) * (mb / w)**2) / wt**2
+    call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
 
-! print information about failed convergence
+! let know the user if the convergence failed
 !
     if (err >= tol) then
-      print *, '[SRMHD, 1D(w)] Convergence not reached: ', err
-      info  = .false.
-    end if
-    if (w   <= 0.0d+00) then
-      print *, '[SRMHD, 1D(w)] Unphysical enthalpy: ', w
-      info  = .false.
-    end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRMHD, 1D(w)] Unphysical speed: ', vv
-      info  = .false.
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4901,7 +5149,7 @@ module equations
 !
 !   Subroutine finds a root (W, |V|²) of equations
 !
-!     F(W,|V|²) = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E = 0
+!     F(W,|V|²) = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E     = 0
 !     G(W,|V|²) = |V|² (|B|² + W)² - S² (|B|² + 2W) / W² - |M|² = 0
 !
 !   using the Newton-Raphson 2D iterative method.
@@ -4937,9 +5185,10 @@ module equations
 
 ! local variables
 !
-    logical      :: keep, first
+    logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: vm, vs, wt, mw
+    real(kind=8) :: wl, wu, fl, fu
+    real(kind=8) :: vm, vs, wt, mw, wt2
     real(kind=8) :: pr, dpw, dpv
     real(kind=8) :: f, df, dfw, dfv
     real(kind=8) :: g, dg, dgw, dgv
@@ -4955,67 +5204,135 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! get the initial guess
+! prepare the initial brackets
 !
-    w     = en + pmin
+    wl   = dn
+    wu   = en + pmin
+
+! check, if the velocity corresponding to the lower bracket is physical, if not
+! find the minimum enthalphy which corresponds to physical velocity
+!
+    keep = .true.
+    it   = nrmax
+
+    do while(keep)
+
+      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
+
+      dw   = f / df
+      wl   = wl - dw
+
+      err  = abs(dw / wl)
+      it   = it - 1
+      keep = (err > tol) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! add the minimum pressure contribution to enthalpy
+!
+    wl   = wl + gammaxi * pmin
+
+! make sure that the upper bracket is larger than the lower one
+!
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+    keep = (fl * fu > 0.0d+00)
+    it   = nrmax
+
+    do while (keep)
+
+      wl = wu
+      fl = fu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+      it   = it - 1
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+      write(*,"(a)"     ) "No initial brackets found!"
+      info = .false.
+      return
+    end if
+
+! estimate the value of enthalpy close to the root...
+!
+    w    = wl - fl * (wu - wl) / (fu - fl)
+
+! and the corresponding |V|²
+!
+    call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
 
 ! initialize iteration parameters
 !
     info  = .true.
     keep  = .true.
-    first = .true.
     it    = nrmax
     cn    = nrext
 
-! iterate using the Newton-Raphson method in order to find a root w of the
-! function
-!
-! F(W) = W - P + ½ [(1 + |V|²) |B|² - S² / W²] - E = 0
+! find root with the help of the Newton-Raphson method
 !
     do while(keep)
 
-! calculate S² / W², Wt
+! calculate (S/W)², Wt, Wt²
 !
-      mw = (mb / w)**2
-      wt = w + bb
-
-! calculate the initial |V|² from the guess of W
-!
-!  |V|²(W) = [|M|² W² + S² (2 W + |B|²)] / [W (W + |B|²)]²
-!
-      if (first) then
-        vv    = (mm + (w + wt) * mw) / wt**2
-        first = .false.
-      end if
+      mw  = (mb / w)**2
+      wt  = w + bb
+      wt2 = wt * wt
 
 ! prepare (1 - |V|²) and sqrt(1 - |V|²)
 !
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
+      vm  = 1.0d+00 - vv
+      vs  = sqrt(vm)
 
-! calculate the thermal pressure and its derivative
+! calculate functions F(W,|V|²) and G(W,|V|²)
 !
-!  P(W,|V|²) = (γ - 1)/γ (W - D Γ) (1 - |V|²)
-! dP/dW      = (γ - 1)/γ [(1 - D dΓ/dW) (1 - |V|²) - (W - DΓ) d|V|²/dW]
-!
-      pr  = gammaxi * (w * vm - dn * vs)
-      dpw = gammaxi * vm
-      dpv = gammaxi * (0.5d+00 * dn / vs - w)
+      f   = w - en - gammaxi * (w * vm - dn * vs)                              &
+                                        + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
+      g   = vv * wt2 - (wt + w) * mw  - mm
 
-! calculate F(W,|V|²) and G(W,|V|²)
+! calculate derivatives dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
 !
-      f   = w - en - pr + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
-      g   = vv * wt**2 - (wt + w) * mw  - mm
+      dfw = 1.0d+00 - gammaxi * vm + mw / w
+      dfv = - gammaxi * (0.5d+00 * dn / vs - w) + 0.5d+00 * bb
 
-! calculate dF(W,|V|²)/dW and dF(W,|V|²)/d|V|²
-!
-      dfw = 1.0d+00 - dpw + mw / w
-      dfv = - dpv + 0.5d+00 * bb
-
-! calculate dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
+! calculate derivatives dG(W,|V|²)/dW and dG(W,|V|²)/d|V|²
 !
       dgw = 2.0d+00 * wt * (vv + mw / w)
-      dgv = wt**2
+      dgv = wt2
 
 ! invert the Jacobian J = | dF/dW, dF/d|V|² |
 !                         | dG/dW, dG/d|V|² |
@@ -5037,40 +5354,53 @@ module equations
       w   = w  - dw
       vv  = vv - dv
 
-! calculate the normalized error
+! check if the new enthalpy and velocity are physical
+!
+      if (w < wl) then
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        info = .false.
+        return
+      end if
+      if (vv < 0.0d+00 .or. vv >= 1.0d+00) then
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |v|²: ", vv
+        info = .false.
+        return
+      end if
+
+! calculate the error
 !
       err = max(abs(dw / w), abs(dv))
 
-! check the convergence
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
 !
       if (err < tol) then
-        if (cn <= 0) keep = .false.
-        cn  = cn - 1
+        keep = cn > 0
+        cn   = cn - 1
+      else
+        keep = it > 0
       end if
-
-! break if the number of iterations exceeded the maximum value
-!
-      if (it <= 0) keep = .false.
 
 ! decrease the number of remaining iterations
 !
       it = it - 1
 
-    end do
+    end do ! NR iterations
 
-! print information about failed convergence
+! let know the user if the convergence failed
 !
     if (err >= tol) then
-      print *, '[SRMHD, 2D(W,v²)] Convergence not reached: ', err
-      info  = .false.
-    end if
-    if (w   <= 0.0d+00) then
-      print *, '[SRMHD, 2D(W,v²)] Unphysical enthalpy: ', w
-      info  = .false.
-    end if
-    if (vv  >= 1.0d+00) then
-      print *, '[SRMHD, 2D(W,v²)] Unphysical speed: ', vv
-      info  = .false.
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      info = .false.
     end if
 
 #ifdef PROFILE
