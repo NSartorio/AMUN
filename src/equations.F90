@@ -3609,11 +3609,23 @@ module equations
     wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
 
-! make sure the upper bracket is not smaller than the lower one
+! make sure that the upper bracket is larger than the lower one
 !
-    do while(wl >= wu)
-      wu = 2.0d+00 * wu
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
     end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
@@ -3660,57 +3672,59 @@ module equations
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
 !
-! F(W) = W - P - E = 0
-!
     do while(keep)
 
 ! calculate F(W) and dF(W)/dW
 !
       call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
 
+! update brackets
+!
+      if (f > fl .and. f < 0.0d+00) then
+        wl = w
+        fl = f
+      end if
+      if (f < fu .and. f > 0.0d+00) then
+        wu = w
+        fu = f
+      end if
+
 ! calculate the increment dW
 !
       dw  = f / df
 
-! correct W (apply the bisection method if the new W is out of brackets)
+! update the solution
 !
-      if (w >= wl .and. w <= wu) then
-        w   = w - dw
-      else
-        if (f * fl > 0.0d+00) then
-          wl = w
-          fl = f
-          w  = 0.5d+00 * (wl + wu)
-        end if
-        if (f * fu > 0.0d+00) then
-          wu = w
-          fu = f
-          w  = 0.5d+00 * (wl + wu)
-        end if
-      end if
+      w   = w - dw
 
-! calculate the normalized error
+! calculate the error
 !
       err = abs(dw / w)
 
-! check the convergence
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
 !
-      if (err < tol .or. f == 0.0d+00) then
-        if (cn <= 0) keep = .false.
-        cn  = cn - 1
+      if (err < tol) then
+        keep = cn > 0
+        cn   = cn - 1
+      else
+        keep = it > 0
       end if
 
-! break if the number of iterations exceeded the maximum value
+! if new W lays out of the brackets, use the bisection method to estimate
+! the new guess
 !
-      if (it <= 0) keep = .false.
+      if (w < wl .or. w > wu) then
+        w = 0.5d+00 * (wl + wu)
+      end if
 
 ! decrease the number of remaining iterations
 !
       it = it - 1
 
-    end do ! continue interations
+    end do ! NR iterations
 
-! calculate |v|² from W
+! calculate |V|² from W
 !
     vv  = mm / (w * w)
 
@@ -3806,11 +3820,23 @@ module equations
     wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
 
-! make sure the upper bracket is not smaller than the lower one
+! make sure that the upper bracket is larger than the lower one
 !
-    do while(wl >= wu)
-      wu = 2.0d+00 * wu
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
     end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
@@ -3903,7 +3929,7 @@ module equations
       w   = w  - dw
       vv  = vv - dv
 
-! check if the new enthalpy gives physical pressure and velocity
+! check if the new enthalpy and velocity are physical
 !
       if (w < wl) then
         write(*,*)
@@ -3922,26 +3948,25 @@ module equations
         return
       end if
 
-! calculate the normalized error
+! calculate the error
 !
       err = max(abs(dw / w), abs(dv))
 
-! check the convergence
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
 !
       if (err < tol) then
-        if (cn <= 0) keep = .false.
-        cn  = cn - 1
+        keep = cn > 0
+        cn   = cn - 1
+      else
+        keep = it > 0
       end if
-
-! break if the number of iterations exceeded the maximum value
-!
-      if (it <= 0) keep = .false.
 
 ! decrease the number of remaining iterations
 !
       it = it - 1
 
-    end do ! continue interations
+    end do ! NR iterations
 
 ! print information about failed convergence or unphysical variables
 !
@@ -4028,11 +4053,23 @@ module equations
     wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
 
-! make sure the upper bracket is not smaller than the lower one
+! make sure that the upper bracket is larger than the lower one
 !
-    do while(wl >= wu)
-      wu = 2.0d+00 * wu
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
     end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
@@ -4144,26 +4181,25 @@ module equations
         return
       end if
 
-! calculate the normalized error
+! calculate the error
 !
       err = max(abs(dw / w), abs(du))
 
-! check the convergence
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
 !
       if (err < tol) then
-        if (cn <= 0) keep = .false.
-        cn  = cn - 1
+        keep = cn > 0
+        cn   = cn - 1
+      else
+        keep = it > 0
       end if
-
-! break if the number of iterations exceeded the maximum value
-!
-      if (it <= 0) keep = .false.
 
 ! decrease the number of remaining iterations
 !
       it = it - 1
 
-    end do ! continue interations
+    end do ! NR iterations
 
 ! calculate |v|² from |u|²
 !
