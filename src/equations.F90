@@ -4899,15 +4899,14 @@ module equations
       call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv, dv)
       vm = 1.0d+00 - vv
       vs = sqrt(vm)
-      pr = gammaxi * (w * vm - dn * vs)
       dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
       df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
     else
       call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
       vm = 1.0d+00 - vv
       vs = sqrt(vm)
-      pr = gammaxi * (w * vm - dn * vs)
     end if
+    pr = gammaxi * (w * vm - dn * vs)
     f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
 
 !-------------------------------------------------------------------------------
@@ -5078,11 +5077,11 @@ module equations
 
 ! update brackets
 !
-      if (f * fl > 0.0d+00) then
+      if (f > fl .and. f < 0.0d+00) then
         wl = w
         fl = f
       end if
-      if (f * fu > 0.0d+00) then
+      if (f < fu .and. f > 0.0d+00) then
         wu = w
         fu = f
       end if
@@ -5095,21 +5094,25 @@ module equations
 !
       w   = w - dw
 
-! if new W lays within the brackets, calculate the error and convergence,
-! otherwise use the bisection method to estimate the new guess
+! calculate the error
 !
-      if (w >= wl .and. w <= wu) then
-        err = abs(dw / w)
+      err = abs(dw / w)
 
-        if (err < tol) then
-          keep = cn > 0
-          cn   = cn - 1
-        else
-          keep = it > 0
-        end if
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
+!
+      if (err < tol) then
+        keep = cn > 0
+        cn   = cn - 1
       else
-        w    = 0.5d+00 * (wl + wu)
         keep = it > 0
+      end if
+
+! if new W lays out of the brackets, use the bisection method to estimate
+! the new guess
+!
+      if (w < wl .or. w > wu) then
+        w = 0.5d+00 * (wl + wu)
       end if
 
 ! decrease the number of remaining iterations
