@@ -703,6 +703,16 @@ module equations
 !
         nr_iterate => nr_iterate_srmhd_adi_2dwv
 
+      case("2dwu", "2Dwu", "2D(w,u)", "2D(W,u)")
+
+! the type of equation of state
+!
+        name_c2p  = "2D(W,u²)"
+
+! set pointer to the conversion method
+!
+        nr_iterate => nr_iterate_srmhd_adi_2dwu
+
 ! warn about the unimplemented method
 !
       case default
@@ -3897,7 +3907,7 @@ module equations
 ! calculate F(W,|v|²) and G(W,|v|²)
 !
       f   = gv * w - en + gd * vs
-      g   = vv * ww  - mm
+      g   = vv * ww - mm
 
 ! calculate dF(W,|v|²)/dW and dF(W,|v|²)/d|v|²
 !
@@ -5451,6 +5461,278 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_iterate_srmhd_adi_2dwv
+!
+!===============================================================================
+!
+! subroutine NR_ITERATE_SRMHD_ADI_2DWU:
+! ------------------------------------
+!
+!   Subroutine finds a root (W, |u|²) of equations
+!
+!     F(W,|u|²) = W - E - P + ½ [(1 + |u|² / (1 + |u|²)) |B|² - S² / W²]     = 0
+!     G(W,|u|²) = (|B|² + W)² |u|² / (1 + |u|²) - (2W + |B|²) S² / W² - |M|² = 0
+!
+!   using the Newton-Raphson 2D iterative method.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     bb, bm - input coefficients for |B|² and B.M, respectively;
+!     w , vv - input/output coefficients W and |v|²;
+!     info   - the flag is .true. if the solution was found, otherwise
+!              it is .false.;
+!
+!===============================================================================
+!
+  subroutine nr_iterate_srmhd_adi_2dwu(mm, bb, mb, en, dn, w, vv, info)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)    :: mm, bb, mb, en, dn
+    real(kind=8), intent(inout) :: w, vv
+    logical     , intent(out)   :: info
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, cn
+    real(kind=8) :: wl, wu, fl, fu
+    real(kind=8) :: uu, up, gm
+    real(kind=8) :: ss, ww, wt, wt2, wd, wp
+    real(kind=8) :: f, df, dfw, dfu
+    real(kind=8) :: g, dg, dgw, dgu
+    real(kind=8) :: det, jfw, jfu, jgw, jgu
+    real(kind=8) :: dw, du
+    real(kind=8) :: err
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for variable solver
+!
+    call start_timer(imp)
+#endif /* PROFILE */
+
+! prepare the initial brackets
+!
+    wl   = dn
+    wu   = en + pmin
+
+! check, if the velocity corresponding to the lower bracket is physical, if not
+! find the minimum enthalphy which corresponds to physical velocity
+!
+    keep = .true.
+    it   = nrmax
+
+    do while(keep)
+
+      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
+
+      dw   = f / df
+      wl   = wl - dw
+
+      err  = abs(dw / wl)
+      it   = it - 1
+      keep = (err > tol) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! add the minimum pressure contribution to enthalpy
+!
+    wl   = wl + gammaxi * pmin
+
+! make sure that the upper bracket is larger than the lower one
+!
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+    keep = (fl * fu > 0.0d+00)
+    it   = nrmax
+
+    do while (keep)
+
+      wl = wu
+      fl = fu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+      it   = it - 1
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+      write(*,"(a)"     ) "No initial brackets found!"
+      info = .false.
+      return
+    end if
+
+! estimate the value of enthalpy close to the root...
+!
+    w    = wl - fl * (wu - wl) / (fu - fl)
+
+! and the corresponding |u|²
+!
+    call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+    uu = vv / (1.0d+00 - vv)
+
+! initialize iteration parameters
+!
+    info  = .true.
+    keep  = .true.
+    it    = nrmax
+    cn    = nrext
+
+! find root with the help of the Newton-Raphson method
+!
+    do while(keep)
+
+! prepare (1 + |u|²) and the Lorentz factor
+!
+      up  = 1.0d+00 + uu
+      gm  = sqrt(up)
+
+! calculate temporary variables
+!
+      ss  = mb * mb
+      ww  = w  * w
+      wt  = w + bb
+      wt2 = wt * wt
+      wd  = w - gm * dn
+      wp  = wt / up
+
+! calculate functions F(W,|u|²) and G(W,|u|²)
+!
+      f   = w - en - gammaxi * wd / up                                         &
+                              + 0.5d+00 * (bb * (1.0d+00 + uu / up) - ss / ww)
+      g   = wp * wt * uu - (w + wt) * ss / ww - mm
+
+! calculate derivatives dF(W,|u|²)/dW and dF(W,|u|²)/d|u|²
+!
+      dfw = 1.0d+00 - gammaxi / up + ss / ww / w
+      dfu = 0.5d+00 * (gammaxi * (w + wd) + bb) / up**2
+
+! calculate derivatives dG(W,|u|²)/dW and dG(W,|u|²)/d|u|²
+!
+      dgw = 2.0d+00 * wt * (uu / up + ss / ww / w)
+      dgu = wp * wp
+
+! invert the Jacobian J = | dF/dW, dF/d|u|² |
+!                         | dG/dW, dG/d|u|² |
+!
+      det = dfw * dgu - dfu * dgw
+
+      jfw =   dgu / det
+      jgw = - dfu / det
+      jfu = - dgw / det
+      jgu =   dfw / det
+
+! calculate increments dW and d|u|²
+!
+      dw  = f * jfw + g * jgw
+      du  = f * jfu + g * jgu
+
+! correct W and |u|²
+!
+      w   = w  - dw
+      uu  = uu - du
+
+! check if the new enthalpy and velocity are physical
+!
+      if (w < wl) then
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        info = .false.
+        return
+      end if
+      if (uu < 0.0d+00) then
+        write(*,*)
+        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
+                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |u|²: ", uu
+        info = .false.
+        return
+      end if
+
+! calculate the error
+!
+      err = max(abs(dw / w), abs(du))
+
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
+!
+      if (err < tol) then
+        keep = cn > 0
+        cn   = cn - 1
+      else
+        keep = it > 0
+      end if
+
+! decrease the number of remaining iterations
+!
+      it = it - 1
+
+    end do ! NR iterations
+
+! calculate |v|² from |u|²
+!
+    vv = uu / (1.0d+00 + uu)
+
+! let know the user if the convergence failed
+!
+    if (err >= tol) then
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      info = .false.
+    end if
+
+#ifdef PROFILE
+! stop accounting time for variable solver
+!
+    call stop_timer(imp)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_iterate_srmhd_adi_2dwu
 
 !===============================================================================
 !
