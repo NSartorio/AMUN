@@ -91,13 +91,9 @@ objects = algebra.o blocks.o boundaries.o constants.o coordinates.o domains.o  \
           interpolations.o io.o mesh.o mpitools.o operators.o parameters.o     \
           problems.o random.o refinement.o schemes.o shapes.o sources.o        \
           timers.o
-files   = $(sources) makefile make.default license.txt hosts
 
 $(name).x: $(objects)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(name).x
-
-arch: $(files)
-	tar czvf $(name)-$(DATE).tar.gz $(files)
 
 clean-bak:
 	rm -rf *.bak *~
