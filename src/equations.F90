@@ -227,6 +227,7 @@ module equations
 ! local variables
 !
     logical                :: relativistic   = .false.
+    integer                :: p
     character(len=255)     :: name_eqsys     = ""
     character(len=255)     :: name_eos       = ""
     character(len=255)     :: name_c2p       = ""
@@ -795,6 +796,29 @@ module equations
 ! allocate array for the boundary values
 !
     allocate(qpbnd(nv,3,2))
+
+! set the boundary values
+!
+    do p = 1, nv
+
+! set the initial boundary values (1.0 for density and pressure, 0.0 otherwise)
+!
+      if (pvars(p) == "dens" .or. pvars(p) == "pres") then
+        qpbnd(p,:,:) = 1.0d+00
+      else
+        qpbnd(p,:,:) = 0.0d+00
+      end if
+
+! read the boundary values from the parameter file
+!
+      call get_parameter_real(pvars(p) // "_bnd_xl", qpbnd(p,1,1))
+      call get_parameter_real(pvars(p) // "_bnd_xr", qpbnd(p,1,2))
+      call get_parameter_real(pvars(p) // "_bnd_yl", qpbnd(p,2,1))
+      call get_parameter_real(pvars(p) // "_bnd_yr", qpbnd(p,2,2))
+      call get_parameter_real(pvars(p) // "_bnd_zl", qpbnd(p,3,1))
+      call get_parameter_real(pvars(p) // "_bnd_zr", qpbnd(p,3,2))
+
+    end do ! over all variables
 
 ! allocate space for Roe eigenvectors
 !
