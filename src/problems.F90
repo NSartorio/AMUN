@@ -281,11 +281,11 @@ module problems
       xl = x(i) - dxh
       xr = x(i) + dxh
 
-      if (xl < 0.0d+00) then
+      if (xr <= 0.0d+00) then
         do p = 1, nv
           q(p,i) = qpbnd(p,1,1)
         end do
-      else if (xr > 0.0d+00) then
+      else if (xl >= 0.0d+00) then
         do p = 1, nv
           q(p,i) = qpbnd(p,1,2)
         end do
