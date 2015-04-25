@@ -112,6 +112,10 @@ module equations
 !
   character(len=4), dimension(:), allocatable, save :: pvars, cvars
 
+! variable boundary values
+!
+  real(kind=8), dimension(:,:,:), allocatable, save :: qpbnd
+
 ! eigenvectors
 !
   real(kind=8), dimension(:,:,:), allocatable, save :: evroe
@@ -179,6 +183,7 @@ module equations
   public :: ibx, iby, ibz, ibp, ipr, ien
   public :: eqsys, eos
   public :: pvars, cvars
+  public :: qpbnd
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -787,6 +792,10 @@ module equations
 !
     csnd2 = csnd * csnd
 
+! allocate array for the boundary values
+!
+    allocate(qpbnd(nv,3,2))
+
 ! allocate space for Roe eigenvectors
 !
     allocate(evroe(2,nv,nv))
@@ -880,6 +889,10 @@ module equations
 !
     if (allocated(pvars)) deallocate(pvars)
     if (allocated(cvars)) deallocate(cvars)
+
+! deallocate boundary values array
+!
+    if (allocated(qpbnd)) deallocate(qpbnd)
 
 ! deallocate Roe eigenvectors
 !
