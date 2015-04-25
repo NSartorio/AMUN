@@ -4482,7 +4482,12 @@ module equations
 !
 !   References:
 !
-!     [1] van der Holst, B., Keppens, R., Meliani, Z.
+!     [1] Mignone, A., Bodo, G.,
+!         "An HLLC Riemann solver for relativistic flows -
+!          II. Magnetohydrodynamics",
+!         Monthly Notices of the Royal Astronomical Society,
+!         2006, Volume 368, Pages 1040-1054
+!     [2] van der Holst, B., Keppens, R., Meliani, Z.
 !         "A multidimentional grid-adaptive relativistic magnetofluid code",
 !         Computer Physics Communications, 2008, Volume 179, Pages 617-627
 !
@@ -4509,7 +4514,8 @@ module equations
 !
     integer      :: i, nr
     real(kind=8) :: vv, bb, vb, vm, vs
-    real(kind=8) :: rh, ww, wt, b2, pm, pt, bx, v1, v2
+    real(kind=8) :: bx, by, bz, b2, pm, pt
+    real(kind=8) :: rh, v1, v2
     real(kind=8) :: ca, cc, c2, gn, rt, zm, zp
     real(kind=8) :: fa, fb, fc, fd, fe, ff, fg
 
@@ -4536,38 +4542,29 @@ module equations
       bb  = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       vb  = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
 
-! calculate the Lorentz factor
+! calculate (1 - |V|²)
 !
       vm  = 1.0d+00 - vv
-      vs  = sqrt(vm)
 
-! calculate specific and total enthalpies
+! calculate magnetic field components of the magnetic four-vector divided by
+! the Lorentz factor (eq. 3 in [1])
 !
-      rh  = q(idn,i) + q(ipr,i) / gammaxi
-      ww  = rh / vm
-      wt  = ww + bb
+      bx  = q(ibx,i) * vm + vb * q(ivx,i)
+      by  = q(iby,i) * vm + vb * q(ivy,i)
+      bz  = q(ibz,i) * vm + vb * q(ivz,i)
 
-! calculate magnetic and total pressures
+! calculate magnetic and total pressures (eq. 6 in [1])
 !
       b2  = bb * vm + vb * vb
       pm  = 0.5d+00 * b2
       pt  = q(ipr,i) + pm
 
-! calculate additional coefficients
-!
-      rt  = rh + b2
-
-! calculate temporary variables
-!
-      bx  = q(ibx,i) * vs + vb * q(ivx,i) / vs
-      fc  = bx * vs
-
-! calculate the relativistic hydrodynamic fluxes (eq. 2 in [1])
+! calculate the relativistic hydrodynamic fluxes (eq. 13 in [1])
 !
       f(idn,i) = u(idn,i) * q(ivx,i)
-      f(imx,i) = u(imx,i) * q(ivx,i) - fc * q(ibx,i) + pt
-      f(imy,i) = u(imy,i) * q(ivx,i) - fc * q(iby,i)
-      f(imz,i) = u(imz,i) * q(ivx,i) - fc * q(ibz,i)
+      f(imx,i) = u(imx,i) * q(ivx,i) - q(ibx,i) * bx + pt
+      f(imy,i) = u(imy,i) * q(ivx,i) - q(ibx,i) * by
+      f(imz,i) = u(imz,i) * q(ivx,i) - q(ibx,i) * bz
       f(ibx,i) = q(ibp,i)
       f(ibp,i) = cmax2 * q(ibx,i)
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
@@ -4580,9 +4577,14 @@ module equations
 !
       if (vv > 0.0d+00) then
 
-! check if the normal component of magnetic field Bx is larger than zero
+! calculate additional coefficients
 !
-        if (q(ibx,i) /= 0.0d+00) then ! Bx ≠ 0
+        rh  = q(idn,i) + q(ipr,i) / gammaxi
+        vs  = sqrt(vm)
+
+! check if the normal component of magnetic field Bₓ is larger than zero
+!
+        if (q(ibx,i) /= 0.0d+00) then ! Bₓ ≠ 0
 
 ! prepare parameters for this case
 !
@@ -4614,9 +4616,9 @@ module equations
 !
           x(1:nr) = sign(1.0d+00, q(ivx,i)) * (abs(v1) + x(1:nr) * vs)
 
-        else ! Bx ≠ 0
+        else ! Bₓ ≠ 0
 
-! special case when Bx = 0, then the quartic equation reduces to quadratic one
+! special case when Bₓ = 0, then the quartic equation reduces to quadratic one
 !
 ! prepare parameters for this case
 !
@@ -4643,6 +4645,10 @@ module equations
 !
 ! prepare parameters for this case
 !
+        rh  = q(idn,i) + q(ipr,i) / gammaxi
+        vs  = sqrt(vm)
+        bx  = q(ibx,i) * vs + vb * q(ivx,i) / vs
+        rt  = rh + b2
         c2 = gamma * q(ipr,i) / rh
         ca = bx * bx
 
