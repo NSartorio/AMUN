@@ -58,7 +58,7 @@ module equations
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imc, imf, imm, imp
+  integer            , save :: imi, imc, imf, imm, imp, imb
 #endif /* PROFILE */
 
 ! pointers to the conversion procedures
@@ -243,6 +243,7 @@ module equations
     call set_timer('equations:: variable solver'    , imp)
     call set_timer('equations:: flux calculation'   , imf)
     call set_timer('equations:: speed estimation'   , imm)
+    call set_timer('equations:: initial brackets'   , imb)
 
 ! start accounting time for module initialization/finalization
 !
@@ -5001,6 +5002,208 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_function_srmhd_adi_1d
+!
+!===============================================================================
+!
+! subroutine NR_INITIAL_BRACKETS_SRMHD_ADI:
+! ----------------------------------------
+!
+!   Subroutine finds the initial brackets and initial guess from
+!   the positivity condition
+!
+!     W⁴ + 2 |B|² W³ - (|m|² + D² - |B|⁴) W²
+!                    - (2 S² + D² |B|²) W - (S² + D² |B|²) |B|² > 0
+!
+!   using analytical, of it fails, the Newton-Raphson iterative method.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     bb, mb - input coefficients for |B|² and m.B, respectively;
+!     wl, wu - the lower and upper limits for the enthalpy;
+!     wc     - the initial root guess;
+!     info   - the flag is .true. if the initial brackets and guess were found,
+!              otherwise it is .false.;
+!
+!===============================================================================
+!
+  subroutine nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                  &
+                                                     , wl, wu, wc, fl, fu, info)
+
+! include external procedures
+!
+    use algebra        , only : quartic
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)  :: mm, bb, mb, en, dn
+    real(kind=8), intent(out) :: wl, wu, wc, fl, fu
+    logical     , intent(out) :: info
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, nr
+    real(kind=8) :: dd, ss
+    real(kind=8) :: f , df
+    real(kind=8) :: dw, err
+
+! local vectors
+!
+    real(kind=8), dimension(5) :: a
+    real(kind=8), dimension(4) :: x
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for initial bracket solver
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
+! calculate temporary variables
+!
+    dd   = dn * dn
+    ss   = mb * mb
+
+! set the initial upper bracket
+!
+    wu   = en + pmin
+
+! calculate the quartic equation coefficients for the positivity condition
+!
+    a(5) = 1.0d+00
+    a(4) = 2.0d+00 * bb
+    a(3) = - (mm + dd - bb * bb)
+    a(2) = - (2.0d+00 * ss + dd * bb)
+    a(1) = - (ss + dd * bb) * bb
+
+! solve the quartic equation
+!
+    nr = quartic(a(1:5), x(1:4))
+
+! if solution was found, use the maximum root as the lower bracket
+!
+    if (nr > 0) then
+
+      wl = x(nr)
+
+    else ! nr = 0
+
+! the root could not be found analytically, so use the iterative solver
+! to find the lower bracket; as the initial guess use the initial upper bracket
+!
+      keep = .true.
+      it   = nrmax
+      wl   = wu
+
+      do while(keep)
+
+        call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
+
+        dw   = f / df
+        wl   = wl - dw
+
+        err  = abs(dw / wl)
+        it   = it - 1
+        keep = (err > tol) .and. it > 0
+
+      end do
+
+      if (it <= 0) then
+        write(*,*)
+        write(*,"(a,1x,a)") "ERROR in"                                         &
+                          , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
+        write(*,"(a)"     ) "Could not find the lower limit for the enthalpy!"
+        info = .false.
+        return
+      end if
+
+    end if ! nr > 0
+
+! add the minimum pressure contribution to the lower limit of the enthalpy
+!
+    wl   = wl + gammaxi * pmin
+
+! check if the energy function is negative for the lower limit
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+
+    if (fl > 0.0d+00) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
+      write(*,"(a)"     ) "Lower limit positive!"
+      print *, wl, fl
+      info = .false.
+      return
+    end if
+
+! make sure that the upper limit is larger than the lower one
+!
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      info = .false.
+      return
+    end if
+
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+    keep = (fl * fu > 0.0d+00)
+    it   = nrmax
+
+    do while (keep)
+
+      wl = wu
+      fl = fu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+      it   = it - 1
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "No initial brackets found!"
+      info = .false.
+      return
+    end if
+
+! estimate the enthalpy value close to the root
+!
+    wc   = wl - fl * (wu - wl) / (fu - fl)
+
+#ifdef PROFILE
+! stop accounting time for the initial brackets
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_initial_brackets_srmhd_adi
 !
 !===============================================================================
 !
