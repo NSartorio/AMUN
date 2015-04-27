@@ -3780,10 +3780,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4020,10 +4019,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4257,10 +4255,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -5336,10 +5333,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -5523,10 +5519,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -5712,10 +5707,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
