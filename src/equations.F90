@@ -5249,10 +5249,8 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: wl, wu, wn, fl, fu
-    real(kind=8) :: vm, vs, dv, wt, mw
-    real(kind=8) :: pr, dp
-    real(kind=8) :: f, df, dw
+    real(kind=8) :: wl, wu, fl, fu
+    real(kind=8) :: f , df, dw
     real(kind=8) :: err
 !
 !-------------------------------------------------------------------------------
@@ -5263,93 +5261,10 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! prepare the initial brackets
+! find the initial brackets and estimate the initial enthalpy
 !
-    wl   = dn
-    wu   = en + pmin
-
-! check, if the velocity corresponding to the lower bracket is physical, if not
-! find the minimum enthalphy which corresponds to physical velocity
-!
-    keep = .true.
-    it   = nrmax
-
-    do while(keep)
-
-      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
-
-      dw   = f / df
-      wl   = wl - dw
-
-      err  = abs(dw / wl)
-      it   = it - 1
-      keep = (err > tol) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
-      info = .false.
-      return
-    end if
-
-! add the minimum pressure contribution to enthalpy
-!
-    wl   = wl + gammaxi * pmin
-
-! make sure that the upper bracket is larger than the lower one
-!
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      info = .false.
-      return
-    end if
-
-! check if the brackets bound the root region, if not proceed until
-! opposite function signs are found for the brackets
-!
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
-      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-      it   = it - 1
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      info = .false.
-      return
-    end if
-
-! estimate the value of enthalpy close to the root
-!
-    w    = wl - fl * (wu - wl) / (fu - fl)
+    call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
+                                                     , wl, wu, w, fl, fu, info)
 
 ! initialize iteration parameters
 !
