@@ -5263,6 +5263,28 @@ module equations
     call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
                                                      , wl, wu, w, fl, fu, info)
 
+! if the brackets could not be found, return the lower bracket as the solution
+!
+    if (.not. info) then
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
+      return
+
+    end if
+
 ! initialize iteration parameters
 !
     info = .true.
@@ -5413,6 +5435,28 @@ module equations
 !
     call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
                                                      , wl, wu, w, fl, fu, info)
+
+! if the brackets could not be found, return the lower bracket as the solution
+!
+    if (.not. info) then
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
+      return
+
+    end if
 
 ! and the corresponding |V|²
 !
@@ -5593,6 +5637,28 @@ module equations
 !
     call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
                                                      , wl, wu, w, fl, fu, info)
+
+! if the brackets could not be found, return the lower bracket as the solution
+!
+    if (.not. info) then
+      write(*,*)
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
+      return
+
+    end if
 
 ! and the corresponding |u|²
 !
