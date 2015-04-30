@@ -5088,8 +5088,8 @@ module equations
 !
     a(5) = 1.0d+00
     a(4) = 2.0d+00 * bb
-    a(3) = - (mm + dd - bb * bb)
-    a(2) = - (2.0d+00 * ss + dd * bb)
+    a(3) = bb * bb - dd - mm
+    a(2) = - 2.0d+00 * (ss + dd * bb)
     a(1) = - (ss + dd * bb) * bb
 
 ! solve the quartic equation
