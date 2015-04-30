@@ -4942,11 +4942,11 @@ module equations
 !
 !   Subroutine calculates the energy function
 !
-!     F(W)  = W - P(W) + ½ [(1 + |V|²) |B|² - S² / W²] - E
+!     F(W)  = W - P(W) + ½ |B|² + ½ (|m|² |B|² - S²) / (W + |B|²)² - E
 !
 !   and its derivative
 !
-!     F'(W) = 1 - dP(W)/dW + ½ |B|² d|V|²/dW + S² / W³
+!     F'(W) = 1 - dP(W)/dW - (|m|² |B|² - S²) / (W + |B|²)³
 !
 !   for a given enthalpy W. It is used to estimate the initial guess.
 !
@@ -4972,29 +4972,42 @@ module equations
 
 ! local variables
 !
-    real(kind=8) :: mw, vv, dv, vm, vs, pr, dp
+    real(kind=8) :: pr, dp, gm2, gm, dg
+    real(kind=8) :: ww, wt, wd, ss, sw, ws, fn, dv, ds
 !
 !-------------------------------------------------------------------------------
 !
 ! temporary variables
 !
-    mw = (mb / w)**2
+    ww  = w * w
+    wt  = w + bb
+    wd  = wt * wt
+    ss  = mb * mb
+    sw  = ss / ww
+    ws  = (w + wt) * sw
+    fn  = (mm * bb - ss) / wd
+    dv  = wd - mm - ws
+    ds  = sqrt(dv)
 
-! the function and its derivative if necessary
+! calculate the Lorentz factor
+!
+    gm2 = wd / dv
+    gm  = wt / ds
+
+! calculate the pressure P(W) and energy function F(W)
+!
+    pr  = gammaxi * (w - gm * dn) / gm2
+    f   = w - pr - en + 0.5d+00 * (bb + fn)
+
+! if desired, calculate the derivatives dP(W)/dW and dF(W)/dW
 !
     if (present(df)) then
-      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv, dv)
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-      dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
-      df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
-    else
-      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-    end if
-    pr = gammaxi * (w * vm - dn * vs)
-    f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
+
+      dg  = (1.0d+00 - wt * (wt - sw + ws / w) / dv) / ds
+      dp  = gammaxi * (1.0d+00 - (2.0d+00 * w / gm - dn) * dg) / gm2
+      df  = 1.0d+00 - dp - fn / wt
+
+    end if ! df present
 
 !-------------------------------------------------------------------------------
 !
