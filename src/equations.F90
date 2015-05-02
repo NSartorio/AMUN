@@ -5038,10 +5038,10 @@ module equations
 !   Subroutine finds the initial brackets and initial guess from
 !   the positivity condition
 !
-!     W⁴ + 2 |B|² W³ - (|m|² + D² - |B|⁴) W²
-!                    - (2 S² + D² |B|²) W - (S² + D² |B|²) |B|² > 0
+!     W³ + (5/2 |B|² - E) W² + 2 (|B|² - E) |B|² W
+!                          + 1/2 [(|B|⁴ - 2 |B|² E + |m|²) |B|² - S²] > 0
 !
-!   using analytical, of it fails, the Newton-Raphson iterative method.
+!   using analytical, or if it fails, the Newton-Raphson iterative method.
 !
 !   Arguments:
 !
@@ -5059,7 +5059,7 @@ module equations
 
 ! include external procedures
 !
-    use algebra        , only : quartic
+    use algebra        , only : cubic_normalized
 
 ! local variables are not implicit by default
 !
@@ -5075,14 +5075,13 @@ module equations
 !
     logical      :: keep
     integer      :: it, nr
-    real(kind=8) :: dd, ss
+    real(kind=8) :: dd, ss, ec
     real(kind=8) :: f , df
     real(kind=8) :: dw, err
 
 ! local vectors
 !
-    real(kind=8), dimension(5) :: a
-    real(kind=8), dimension(4) :: x
+    real(kind=8), dimension(3) :: a, x
 !
 !-------------------------------------------------------------------------------
 !
@@ -5096,22 +5095,23 @@ module equations
 !
     dd   = dn * dn
     ss   = mb * mb
+    ec   = en + pmin
 
 ! set the initial upper bracket
 !
     wu   = en + pmin
 
-! calculate the quartic equation coefficients for the positivity condition
+! calculate the cubic equation coefficients for the positivity condition
+! coming from the energy equation; the condition, in fact, find the minimum
+! enthalphy for which the pressure is equal to pmin
 !
-    a(5) = 1.0d+00
-    a(4) = 2.0d+00 * bb
-    a(3) = bb * bb - dd - mm
-    a(2) = - 2.0d+00 * (ss + dd * bb)
-    a(1) = - (ss + dd * bb) * bb
+    a(3) = 2.5d+00 * bb - ec
+    a(2) = 2.0d+00 * (bb - ec) * bb
+    a(1) = 0.5d+00 * (((bb - 2.0d+00 * ec) * bb + mm) * bb - ss)
 
-! solve the quartic equation
+! solve the cubic equation
 !
-    nr = quartic(a(1:5), x(1:4))
+    nr = cubic_normalized(a(1:3), x(1:3))
 
 ! if solution was found, use the maximum root as the lower bracket
 !
