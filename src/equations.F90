@@ -5146,6 +5146,8 @@ module equations
         write(*,"(a,1x,a)") "ERROR in"                                         &
                           , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
         write(*,"(a)"     ) "Could not find the lower limit for the enthalpy!"
+        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
+                                                          , dn, mm, mb, bb, en
         info = .false.
         return
       end if
@@ -5165,7 +5167,8 @@ module equations
       write(*,"(a,1x,a)") "ERROR in"                                           &
                         , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
       write(*,"(a)"     ) "Lower limit positive!"
-      print *, wl, fl
+      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
+                                                      , dn, mm, mb, bb, en, wl
       info = .false.
       return
     end if
@@ -5184,6 +5187,8 @@ module equations
       write(*,"(a,1x,a)") "ERROR in"                                           &
                         , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
       write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
+                                                      , dn, mm, mb, bb, en, wl
       info = .false.
       return
     end if
@@ -5214,6 +5219,8 @@ module equations
       write(*,"(a,1x,a)") "ERROR in"                                           &
                         , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
       write(*,"(a)"     ) "No initial brackets found!"
+      write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "               &
+                                                          , dn, mm, mb, bb, en
       info = .false.
       return
     end if
