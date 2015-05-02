@@ -4438,7 +4438,7 @@ module equations
         q(iby,i) = u(iby,i)
         q(ibz,i) = u(ibz,i)
         q(ibp,i) = u(ibp,i)
-        q(ipr,i) = gammaxi * (w - dn / vs) * vm
+        q(ipr,i) = w - en + 0.5d+00 * (bb + (bb * mm - mb * mb) / wt**2)
 
 ! check if the pressure is positive, if not, print a warning and replace it
 ! with the minimum allowed value pmin
