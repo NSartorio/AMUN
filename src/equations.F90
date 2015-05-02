@@ -4440,8 +4440,25 @@ module equations
         q(ibp,i) = u(ibp,i)
         q(ipr,i) = gammaxi * (w - dn / vs) * vm
 
+! check if the pressure is positive, if not, print a warning and replace it
+! with the minimum allowed value pmin
+!
+        if (q(ipr,i) <= 0.0d+00) then
+
+          write(*,*)
+          write(*,"(a,1x,a)"           ) "WARNING in"                          &
+                                       , "EQUATIONS::cons2prim_srmhd_adi()"
+          write(*,"(a,9(1x,1e24.16e3))") "Negative pressure for U = ", u(1:nv,i)
+          write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
+                                                       , dn, mm, mb, bb, en, w
+          write(*,"(a,1(1x,1e24.16e3))") "Pressure corrected to ", pmin
+          q(ipr,i) = pmin
+
+        end if ! p <= 0
+
       else ! unphysical state
 
+        write(*,*)
         write(*,"(a,1x,a)"           ) "ERROR in"                              &
                                      , "EQUATIONS::cons2prim_srmhd_adi()"
         write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
