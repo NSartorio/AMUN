@@ -4954,6 +4954,67 @@ module equations
 !
 !===============================================================================
 !
+! subroutine NR_PRESSURE_SRMHD_ADI_1D:
+! -----------------------------------
+!
+!   Subroutine calculates the pressure function
+!
+!     P(W)  = W  - E + ½ |B|² + ½ (|m|² |B|² - S²) / (W + |B|²)²
+!
+!   and its derivative
+!
+!     P'(W) = 1 - (|m|² |B|² - S²) / (W + |B|²)³
+!
+!   for a given enthalpy W.
+!
+!   This subroutine is used to find the minimum enthalpy for which the velocity
+!   is physical and the pressure is positive.
+!
+!   Arguments:
+!
+!     mm, bb, mb, dn, en, w - input coefficients for |M|², |B|², M.B, D, E,
+!                             and W, respectively;
+!     p, dp                 - the values for the function P(W) and its
+!                             derivative P'(W);
+!
+!===============================================================================
+!
+  subroutine nr_pressure_srmhd_adi_1d(mm, bb, mb, en, dn, w, p, dp)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8)          , intent(in)  :: mm, bb, mb, en, dn, w
+    real(kind=8)          , intent(out) :: p
+    real(kind=8), optional, intent(out) :: dp
+
+! local variables
+!
+    real(kind=8) :: wt, wd, ss, fn
+!
+!-------------------------------------------------------------------------------
+!
+! temporary variables
+!
+    wt = w  + bb
+    wd = wt * wt
+    ss = mb * mb
+    fn = (mm * bb - ss) / wd
+
+! the pressure function and its derivative
+!
+    p  = w - en + 0.5d+00 * (bb + fn)
+    if (present(dp)) dp = 1.0d+00 - fn / wt
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_pressure_srmhd_adi_1d
+!
+!===============================================================================
+!
 ! subroutine NR_FUNCTION_SRMHD_ADI_1D:
 ! -----------------------------------
 !
@@ -5158,7 +5219,7 @@ module equations
 
       do while(keep)
 
-        call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
+        call nr_pressure_srmhd_adi_1d(mm, bb, mb, ec, dn, wl, f, df)
 
         dw   = f / df
         wl   = wl - dw
@@ -5181,10 +5242,6 @@ module equations
       end if
 
     end if ! nr > 0
-
-! add the minimum pressure contribution to the lower limit of the enthalpy
-!
-    wl   = wl + gammaxi * pmin
 
 ! check if the energy function is negative for the lower limit
 !
@@ -5224,7 +5281,6 @@ module equations
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
 !
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
     call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
 
     keep = (fl * fu > 0.0d+00)
