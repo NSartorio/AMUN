@@ -5041,7 +5041,16 @@ module equations
 !     W³ + (5/2 |B|² - E) W² + 2 (|B|² - E) |B|² W
 !                          + 1/2 [(|B|⁴ - 2 |B|² E + |m|²) |B|² - S²] > 0
 !
-!   using analytical, or if it fails, the Newton-Raphson iterative method.
+!   coming from the energy equation and
+!
+!     W⁴ + 2 |B|² W³ - (|m|² + D² - |B|⁴) W²
+!                    - (2 S² + D² |B|²) W - (S² + D² |B|²) |B|² > 0
+!
+!   coming from the equation of state
+!
+!   using analytical. It takes the maximum estimated root as the lower bracket.
+!   If the analytical estimation fails, the Newton-Raphson iterative method
+!   is used.
 !
 !   Arguments:
 !
@@ -5059,7 +5068,7 @@ module equations
 
 ! include external procedures
 !
-    use algebra        , only : cubic_normalized
+    use algebra        , only : cubic_normalized, quartic
 
 ! local variables are not implicit by default
 !
@@ -5081,7 +5090,8 @@ module equations
 
 ! local vectors
 !
-    real(kind=8), dimension(3) :: a, x
+    real(kind=8), dimension(5) :: a
+    real(kind=8), dimension(4) :: x
 !
 !-------------------------------------------------------------------------------
 !
@@ -5102,7 +5112,7 @@ module equations
     wu   = en + pmin
 
 ! calculate the cubic equation coefficients for the positivity condition
-! coming from the energy equation; the condition, in fact, find the minimum
+! coming from the energy equation; the condition, in fact, finds the minimum
 ! enthalphy for which the pressure is equal to pmin
 !
     a(3) = 2.5d+00 * bb - ec
@@ -5118,6 +5128,24 @@ module equations
     if (nr > 0) then
 
       wl = x(nr)
+
+! calculate the quartic equation coefficients for the positivity condition
+! coming from the pressure equation
+!
+      a(5) = 1.0d+00
+      a(4) = 2.0d+00 * bb
+      a(3) = bb * bb - dd - mm
+      a(2) = - 2.0d+00 * (ss + dd * bb)
+      a(1) = - (ss + dd * bb) * bb
+
+! solve the quartic equation
+!
+      nr = quartic(a(1:5), x(1:4))
+
+! take the maximum ethalpy from both conditions to guarantee that the pressure
+! obtains from any of those equations is positive
+!
+      if (nr > 0) wl = max(wl, x(nr))
 
     else ! nr = 0
 
