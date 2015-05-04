@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ module evolution
 #ifdef PROFILE
 ! timer indices
 !
-  integer     , save :: imi, ima, imt, imu, imf, imn, imv
+  integer     , save :: imi, ima, imt, imu, imf, iui, imv
 #endif /* PROFILE */
 
 ! pointer to the temporal integration subroutine
@@ -136,7 +136,7 @@ module evolution
     call set_timer('evolution:: new time step'   , imt)
     call set_timer('evolution:: solution update' , imu)
     call set_timer('evolution:: flux update'     , imf)
-    call set_timer('evolution:: increment update', imn)
+    call set_timer('evolution:: increment update', iui)
     call set_timer('evolution:: variable update' , imv)
 
 ! start accounting time for module initialization/finalization
@@ -1859,13 +1859,13 @@ module evolution
 ! subroutine UPDATE_INCREMENT:
 ! ---------------------------
 !
-!   Subroutine calculate the conservative variable increment from the fluxes.
+!   Subroutine calculates the conservative variable increment from
+!   directional fluxes.
 !
 !   Arguments:
 !
-!     dh   - the ratio of the time step to the spatial step;
-!     f    - the array of numerical fluxes;
-!     du   - the array of variable increment;
+!     pdata - the point to data block storing the directional fluxes;
+!     du    - the array of the conservative variable increment;
 !
 !===============================================================================
 !
@@ -1874,7 +1874,9 @@ module evolution
 ! include external variables
 !
     use blocks         , only : block_data
-    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ibl, jbl, kbl
+    use coordinates    , only : ieu, jeu, keu
     use coordinates    , only : adxi, adyi, adzi
     use equations      , only : nv
 
@@ -1890,21 +1892,18 @@ module evolution
 ! local variables
 !
     integer      :: i  , j  , k
+    integer      :: im1, jm1, km1
     real(kind=8) :: dxi, dyi, dzi
 !
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for increment update
+! start accounting time for the increment update
 !
-    call start_timer(imn)
+    call start_timer(iui)
 #endif /* PROFILE */
 
-! reset the increment array du
-!
-    du(:,:,:,:) = 0.0d+00
-
-! prepare coordinate intervals
+! prepare the coordinate intervals
 !
     dxi = adxi(pdata%meta%level)
     dyi = adyi(pdata%meta%level)
@@ -1912,33 +1911,35 @@ module evolution
     dzi = adzi(pdata%meta%level)
 #endif /* NDIMS == 3 */
 
-! perform update along the X direction
-!
-    do i = ibl, ieu
-      du(:,i,:,:) = du(:,i,:,:)                                                &
-                           - dxi * (pdata%f(1,:,i,:,:) - pdata%f(1,:,i-1,:,:))
-    end do
-
-! perform update along the Y direction
-!
-    do j = jbl, jeu
-      du(:,:,j,:) = du(:,:,j,:)                                                &
-                           - dyi * (pdata%f(2,:,:,j,:) - pdata%f(2,:,:,j-1,:))
-    end do
-
-#if NDIMS == 3
-! perform update along the Z direction
+! calculate the variable update from the directional fluxes
 !
     do k = kbl, keu
-      du(:,:,:,k) = du(:,:,:,k)                                                &
-                           - dzi * (pdata%f(3,:,:,:,k) - pdata%f(3,:,:,:,k-1))
-    end do
+#if NDIMS == 3
+      km1 = k - 1
 #endif /* NDIMS == 3 */
+      do j = jbl, jeu
+        jm1 = j - 1
+        do i = ibl, ieu
+          im1 = i - 1
+
+#if NDIMS == 3
+          du(1:nv,i,j,k) =                                                     &
+                     - dxi * (pdata%f(1,1:nv,i,j,k) - pdata%f(1,1:nv,im1,j,k)) &
+                     - dyi * (pdata%f(2,1:nv,i,j,k) - pdata%f(2,1:nv,i,jm1,k)) &
+                     - dzi * (pdata%f(3,1:nv,i,j,k) - pdata%f(3,1:nv,i,j,km1))
+#else /* NDIMS == 3 */
+          du(1:nv,i,j,k) = &
+                     - dxi * (pdata%f(1,1:nv,i,j,k) - pdata%f(1,1:nv,im1,j,k)) &
+                     - dyi * (pdata%f(2,1:nv,i,j,k) - pdata%f(2,1:nv,i,jm1,k))
+#endif /* NDIMS == 3 */
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 #ifdef PROFILE
-! stop accounting time for increment update
+! stop accounting time for the increment update
 !
-    call stop_timer(imn)
+    call stop_timer(iui)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------

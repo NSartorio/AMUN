@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,8 @@ module boundaries
 #ifdef PROFILE
 ! timer indices
 !
-  integer                , save :: imi, imv, imf, ims, imc, imr, imp, imu
+  integer                , save :: imi, imv, imf, ims, imu
+  integer                , save :: ifc, ifr, ifp, iec, ier, iep, icc, icr, icp
 #endif /* PROFILE */
 
 ! parameters corresponding to the boundary type
@@ -134,14 +135,20 @@ module boundaries
 #ifdef PROFILE
 ! set timer descriptions
 !
-    call set_timer('boundaries:: initialization', imi)
-    call set_timer('boundaries:: variables'     , imv)
-    call set_timer('boundaries:: fluxes'        , imf)
-    call set_timer('boundaries:: specific'      , ims)
-    call set_timer('boundaries:: copy'          , imc)
-    call set_timer('boundaries:: restrict'      , imr)
-    call set_timer('boundaries:: prolong'       , imp)
-    call set_timer('boundaries:: update ghosts' , imu)
+    call set_timer('boundaries:: initialization' , imi)
+    call set_timer('boundaries:: variables'      , imv)
+    call set_timer('boundaries:: fluxes'         , imf)
+    call set_timer('boundaries:: specific'       , ims)
+    call set_timer('boundaries:: face copy'      , ifc)
+    call set_timer('boundaries:: face restrict'  , ifr)
+    call set_timer('boundaries:: face prolong'   , ifp)
+    call set_timer('boundaries:: edge copy'      , iec)
+    call set_timer('boundaries:: edge restrict'  , ier)
+    call set_timer('boundaries:: edge prolong'   , iep)
+    call set_timer('boundaries:: corner copy'    , icc)
+    call set_timer('boundaries:: corner restrict', icr)
+    call set_timer('boundaries:: corner prolong' , icp)
+    call set_timer('boundaries:: update ghosts'  , imu)
 
 ! start accounting time for module initialization/finalization
 !
@@ -335,6 +342,7 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : ndims
+    use coordinates    , only : minlev, maxlev
 
 ! local variables are not implicit by default
 !
@@ -370,45 +378,51 @@ module boundaries
 !
     call boundaries_corner_copy()
 
+! do prolongation and restriction only if blocks are at different levels
+!
+    if (minlev /= maxlev) then
+
 #if NDIMS == 3
 ! restrict face boundaries from higher level blocks
 !
-    do idir = 1, ndims
-      call boundaries_face_restrict(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_face_restrict(idir)
+      end do ! idir
 #endif /* NDIMS == 3 */
 
 ! restricts edge boundaries from block at higher level
 !
-    do idir = 1, ndims
-      call boundaries_edge_restrict(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_edge_restrict(idir)
+      end do ! idir
 
 ! restricts corner boundaries from blocks at higher levels
 !
-    call boundaries_corner_restrict()
+      call boundaries_corner_restrict()
 
 ! update specific boundaries
 !
-    call boundaries_specific()
+      call boundaries_specific()
 
 #if NDIMS == 3
 ! prolong face boundaries from lower level blocks
 !
-    do idir = 1, ndims
-      call boundaries_face_prolong(idir)
-    end do ! idir
+       do idir = 1, ndims
+        call boundaries_face_prolong(idir)
+       end do ! idir
 #endif /* NDIMS == 3 */
 
 ! prolongs edge boundaries from block at lower level
 !
-    do idir = 1, ndims
-      call boundaries_edge_prolong(idir)
-    end do ! idir
+      do idir = 1, ndims
+        call boundaries_edge_prolong(idir)
+      end do ! idir
 
 ! prolong corner boundaries from blocks at lower levels
 !
-    call boundaries_corner_prolong()
+      call boundaries_corner_prolong()
+
+    end if ! minlev /= maxlev
 
 ! update specific boundaries
 !
@@ -433,10 +447,10 @@ module boundaries
 ! subroutine BOUNDARY_FLUXES:
 ! --------------------------
 !
-!   Subroutine updates the numerical fluxes for blocks which have neighbors
-!   at higher level. The fluxes of neighbors at higher level are calulated
-!   with smaller error, therefore they are restricted down and the flux
-!   of lower level meta block is updated.
+!   Subroutine updates the numerical fluxes from neighbors which lay on
+!   higher level. At higher levels the numerical fluxes are calculated with
+!   smaller error, since the resolution is higher, therefore we take those
+!   fluxes and restrict them down to the level of the updated block.
 !
 !
 !===============================================================================
@@ -445,7 +459,8 @@ module boundaries
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, block_data, list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
 #ifdef MPI
     use blocks         , only : block_info, pointer_info
 #endif /* MPI */
@@ -468,6 +483,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -490,9 +506,15 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! do not correct fluxes if we do not use adaptive mesh
+! quit if all blocks are at the same level
 !
     if (minlev == maxlev) return
+
+#ifdef PROFILE
+! start accounting time for the flux boundary update
+!
+    call start_timer(imf)
+#endif /* PROFILE */
 
 ! calculate half sizes
 !
@@ -507,220 +529,206 @@ module boundaries
     kh = kn / 2
 #endif /* NDIMS == 3 */
 
-#ifdef PROFILE
-! start accounting time for flux boundary update
-!
-    call start_timer(imf)
-#endif /* PROFILE */
-
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE THE FLUX BOUNDARIES BETWEEN LOCAL BLOCKS
-!!
-! associate pmeta with the first block on the meta list
+! update the fluxes between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks in the list
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the meta block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! iterate over all dimensions
 !
-        do n = 1, ndims
+      do n = 1, ndims
 #if NDIMS == 2
-          m = 3 - n
+        m = 3 - n
 #endif /* NDIMS == 2 */
 
 ! iterate over all corners
 !
 #if NDIMS == 3
-          do k = 1, nsides
+        do k = 1, nsides
 #endif /* NDIMS == 3 */
-            do j = 1, nsides
-              do i = 1, nsides
+          do j = 1, nsides
+            do i = 1, nsides
 
-! associate pneigh with the current neighbor
+! associate pneigh with the neighbor
 !
 #if NDIMS == 2
-                pneigh => pmeta%edges(i,j,m)%ptr
+              pneigh => pmeta%edges(i,j,m)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                pneigh => pmeta%faces(i,j,k,n)%ptr
+              pneigh => pmeta%faces(i,j,k,n)%ptr
 #endif /* NDIMS == 3 */
 
-! check if the neighbor is associated
+! process only if the neighbor is associated
 !
-                if (associated(pneigh)) then
+              if (associated(pneigh)) then
 
-! check if the neighbor is at highed level than the current block
+! check if the neighbor lays at higher level
 !
-                  if (pneigh%level > pmeta%level) then
+                if (pneigh%level > pmeta%level) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! update directional flux from the neighbor
+! update the flux depending on the direction
 !
-                        select case(n)
-                        case(1)
+                      select case(n)
+                      case(1)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for X-direction flux
 !
-                          if (i == 1) then
-                            is = ie
-                            it = ibl
-                          else
-                            is = ibl
-                            it = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
+                        if (i == 1) then
+                          is = ie
+                          it = ibl
+                        else
+                          is = ibl
+                          it = ie
+                        end if
+                        if (j == 1) then
+                          jl = jb
+                          ju = jb + jh - 1
+                        else
+                          jl = je - jh + 1
+                          ju = je
+                        end if
 #if NDIMS == 3
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
+                        if (k == 1) then
+                          kl = kb
+                          ku = kb + kh - 1
+                        else
+                          kl = ke - kh + 1
+                          ku = ke
+                        end if
 #endif /* NDIMS == 3 */
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the X-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,is,jb:je,kb:ke)  &
                                        ,  pmeta%data%f(n,1:nv,it,jl:ju,kl:ku))
 
-                        case(2)
+                      case(2)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for Y-direction flux
 !
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            js = je
-                            jt = jbl
-                          else
-                           js = jbl
-                            jt = je
-                          end if
+                        if (i == 1) then
+                          il = ib
+                          iu = ib + ih - 1
+                        else
+                          il = ie - ih + 1
+                          iu = ie
+                        end if
+                        if (j == 1) then
+                          js = je
+                          jt = jbl
+                        else
+                         js = jbl
+                          jt = je
+                        end if
 #if NDIMS == 3
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
+                        if (k == 1) then
+                          kl = kb
+                          ku = kb + kh - 1
+                        else
+                          kl = ke - kh + 1
+                          ku = ke
+                        end if
 #endif /* NDIMS == 3 */
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the Y-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,ib:ie,js,kb:ke)  &
                                        ,  pmeta%data%f(n,1:nv,il:iu,jt,kl:ku))
 
 #if NDIMS == 3
-                        case(3)
+                      case(3)
 
-! prepare the boundary layer indices depending on the corner position
+! prepare the boundary layer indices for Z-direction flux
 !
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            ks = ke
-                            kt = kbl
-                          else
-                            ks = kbl
-                            kt = ke
-                          end if
+                        if (i == 1) then
+                          il = ib
+                          iu = ib + ih - 1
+                        else
+                          il = ie - ih + 1
+                          iu = ie
+                        end if
+                        if (j == 1) then
+                          jl = jb
+                          ju = jb + jh - 1
+                        else
+                          jl = je - jh + 1
+                          ju = je
+                        end if
+                        if (k == 1) then
+                          ks = ke
+                          kt = kbl
+                        else
+                          ks = kbl
+                          kt = ke
+                        end if
 
-! update the flux edge from the neighbor at higher level
+! update the flux at the Z-face of the block
 !
-                          call block_update_flux(i, j, k, n                    &
+                        call block_update_flux(i, j, k, n                      &
                                        , pneigh%data%f(n,1:nv,ib:ie,jb:je,ks)  &
                                        ,  pmeta%data%f(n,1:nv,il:iu,jl:ju,kt))
 #endif /* NDIMS == 3 */
 
-                        end select
+                      end select
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-! blocks belong to different processes, therefore prepare the block exchange
-! object
-!
-                    else
+                  else ! pneigh%proc /= pmeta%proc
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, n, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, n, i, j, k)
 
-                    end if ! pmeta and pneigh on local process
+                  end if ! pneigh%proc /= pmeta%proc
 #endif /* MPI */
+                end if ! pmeta level < pneigh level
 
-                  end if ! pmeta level < pneigh level
+              end if ! pneigh associated
 
-                end if ! pneigh associated
-
-              end do ! i = 1, nsides
-            end do ! j = 1, nsides
+            end do ! i = 1, nsides
+          end do ! j = 1, nsides
 #if NDIMS == 3
-          end do ! k = 1, nsides
+        end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
-        end do ! n = 1, ndims
+      end do ! n = 1, ndims
 
-      end if ! leaf
-
-! associate pmeta with the next block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next ! assign pointer to the next meta block in the list
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
-!! 3. UPDATE FLUX BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
-!!
+! update flux boundaries between neighbors laying on different processes
+!
 ! iterate over all process pairs
 !
     do p = 1, npairs
@@ -851,7 +859,7 @@ module boundaries
 
           end do ! %ptr blocks
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -1006,7 +1014,7 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for flux boundary update
+! stop accounting time for the flux boundary update
 !
     call stop_timer(imf)
 #endif /* PROFILE */
@@ -1033,7 +1041,8 @@ module boundaries
 ! ------------------------------
 !
 !   Subroutine scans over all leaf blocks in order to find blocks without
-!   neighbors, then updates its boundaries for selected type.
+!   neighbors and update the corresponding boundaries for the selected
+!   boundary type.
 !
 !
 !===============================================================================
@@ -1042,7 +1051,8 @@ module boundaries
 
 ! import external procedures and variables
 !
-    use blocks         , only : block_meta, list_meta
+    use blocks         , only : block_meta, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : ndims, nsides
     use coordinates    , only : im, jm, km
     use equations      , only : nv
@@ -1058,6 +1068,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 
 ! local variables
 !
@@ -1066,51 +1077,51 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for specific boundary update
+! start accounting time for the specific boundary update
 !
     call start_timer(ims)
 #endif /* PROFILE */
 
-! associate pmeta with the first block on the meta list
+! associate pleaf with the first block on the leaf list
 !
-    pmeta => list_meta
+    pleaf => list_leaf
 
-! scan all blocks on meta block list
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the current meta block is a leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! process only if this block is marked for update
 !
-        if (pmeta%update) then
+      if (pmeta%update) then
 
 #ifdef MPI
-! check if the current block belongs to the local process
+! check if the block belongs to the local process
 !
-          if (pmeta%process == nproc) then
+        if (pmeta%process == nproc) then
 #endif /* MPI */
 
 #if NDIMS == 2
 ! iterate over all directions
 !
-            do n = 1, ndims
+          do n = 1, ndims
 
-! process boundaries only if they are not periodic in a given direction
+! process boundaries only if they are not periodic along the given direction
 !
-              if (.not. periodic(n)) then
+            if (.not. periodic(n)) then
 
 ! calculate the edge direction (in 2D we don't have face neighbors, so we have
 ! to use edge neighbors)
 !
-                m = 3 - n
+              m = 3 - n
 
 ! iterate over all corners
 !
-                do j = 1, nsides
-                  do i = 1, nsides
+              do j = 1, nsides
+                do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -1119,27 +1130,27 @@ module boundaries
                                           , pmeta%level                        &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                  end do ! i = 1, sides
-                end do ! j = 1, sides
+                end do ! i = 1, sides
+              end do ! j = 1, sides
 
-              end if ! not periodic
+            end if ! not periodic
 
-            end do ! n = 1, ndims
+          end do ! n = 1, ndims
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
 ! iterate over all directions
 !
-            do n = 1, ndims
+          do n = 1, ndims
 
-! process boundaries only if they are not periodic in a given direction
+! process boundaries only if they are not periodic along the given direction
 !
-              if (.not. periodic(n)) then
+            if (.not. periodic(n)) then
 
 ! iterate over all corners
 !
-                do k = 1, nsides
-                  do j = 1, nsides
-                    do i = 1, nsides
+              do k = 1, nsides
+                do j = 1, nsides
+                  do i = 1, nsides
 
 ! if the face neighbor is not associated, apply specific boundaries
 !
@@ -1148,31 +1159,29 @@ module boundaries
                                           , pmeta%level                        &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
-                    end do ! i = 1, sides
-                  end do ! j = 1, sides
-                end do ! k = 1, sides
+                  end do ! i = 1, sides
+                end do ! j = 1, sides
+              end do ! k = 1, sides
 
-              end if ! not periodic
+            end if ! not periodic
 
-            end do ! n = 1, ndims
+          end do ! n = 1, ndims
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-          end if ! block belong to the local process
+        end if ! block belongs to the local process
 #endif /* MPI */
 
-        end if ! pmeta is marked for update
+      end if ! if pmeta marked for update
 
-      end if ! leaf
-
-! associate pmeta with the next block on the list
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef PROFILE
-! stop accounting time for specific boundary update
+! stop accounting time for the specific boundary update
 !
     call stop_timer(ims)
 #endif /* PROFILE */
@@ -1193,9 +1202,7 @@ module boundaries
 ! subroutine BOUNDARIES_FACE_COPY:
 ! -------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find face neighbors which
-!   are the same level, and perform the update of the face boundaries between
-!   them.
+!   Subroutine updates the face boundaries between blocks on the same level.
 !
 !   Arguments:
 !
@@ -1208,16 +1215,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : faces_gc, faces_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -1235,6 +1239,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -1245,6 +1250,8 @@ module boundaries
     integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -1258,9 +1265,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the face boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(ifc)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -1270,168 +1277,107 @@ module boundaries
     kh = kn / 2
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
-        do k = 1, nsides
-          do j = 1, nsides
-            do i = 1, nsides
+      do k = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! associate pneigh with the current neighbor
 !
-              pneigh => pmeta%faces(i,j,k,idir)%ptr
+            pneigh => pmeta%faces(i,j,k,idir)%ptr
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at the same level
 !
-                if (pneigh%level == pmeta%level) then
+              if (pneigh%level == pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare region indices for the face boundary update
+! prepare region indices of the block and its neighbor for the face boundary
+! update
 !
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = 1
-                            iu = ibl
-                          else
-                            il = ieu
-                            iu = im
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(2)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = 1
-                            ju = jbl
-                          else
-                            jl = jeu
-                            ju = jm
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(3)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = 1
-                            ku = kbl
-                          else
-                            kl = keu
-                            ku = km
-                          end if
-                        end select
+                      il = faces_gc(i,j,k,idir)%l(1)
+                      jl = faces_gc(i,j,k,idir)%l(2)
+                      kl = faces_gc(i,j,k,idir)%l(3)
+                      iu = faces_gc(i,j,k,idir)%u(1)
+                      ju = faces_gc(i,j,k,idir)%u(2)
+                      ku = faces_gc(i,j,k,idir)%u(3)
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+                      is = faces_dc(i,j,k,idir)%l(1)
+                      js = faces_dc(i,j,k,idir)%l(2)
+                      ks = faces_dc(i,j,k,idir)%l(3)
+                      it = faces_dc(i,j,k,idir)%u(1)
+                      jt = faces_dc(i,j,k,idir)%u(2)
+                      kt = faces_dc(i,j,k,idir)%u(3)
+
+! copy the corresponding face region from the neighbor to the current data
+! block
 !
-                        call block_face_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                      pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                   &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
-        end do ! k = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+      end do ! k = 1, nsides
 
-      end if ! leaf
-
-! associate pmeta with the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -1511,22 +1457,28 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
-! extract the corresponding face region from the neighbor and insert it
-! to the buffer
+! prepare region indices for the face boundary update
+!
+            is = faces_dc(i,j,k,idir)%l(1)
+            js = faces_dc(i,j,k,idir)%l(2)
+            ks = faces_dc(i,j,k,idir)%l(3)
+            it = faces_dc(i,j,k,idir)%u(1)
+            jt = faces_dc(i,j,k,idir)%u(2)
+            kt = faces_dc(i,j,k,idir)%u(3)
+
+! copy the corresponding face region from the neighbor and insert it to
+! the buffer
 !
             select case(idir)
             case(1)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:kh))
+              sbuf(l,1:nv,1:ng,1:jh,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             case(2)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:kh))
+              sbuf(l,1:nv,1:ih,1:ng,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             case(3)
-              call block_face_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:jh,1:ng))
+              sbuf(l,1:nv,1:ih,1:jh,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
             end select
 
 ! associate the pointer with the next block
@@ -1535,7 +1487,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -1571,77 +1523,23 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
+! prepare region indices for the face boundary update
+!
+            il = faces_gc(i,j,k,idir)%l(1)
+            jl = faces_gc(i,j,k,idir)%l(2)
+            kl = faces_gc(i,j,k,idir)%l(3)
+            iu = faces_gc(i,j,k,idir)%u(1)
+            ju = faces_gc(i,j,k,idir)%u(2)
+            ku = faces_gc(i,j,k,idir)%u(3)
+
 ! update the corresponding face region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = 1
-                iu = ibl
-              else
-                il = ieu
-                iu = im
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:kh)
             case(2)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = 1
-                ju = jbl
-              else
-                jl = jeu
-                ju = jm
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:kh)
             case(3)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = 1
-                ku = kbl
-              else
-                kl = keu
-                ku = km
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:jh,1:ng)
             end select
 
@@ -1667,9 +1565,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the face boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(ifc)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -1681,9 +1579,7 @@ module boundaries
 ! subroutine BOUNDARIES_FACE_RESTRICT:
 ! -----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find face neighbors which
-!   are on different levels, and perform the update of face boundaries of
-!   lower blocks by restricting them from higher level neighbors.
+!   Subroutine updates the face boundaries from blocks on higher level.
 !
 !   Arguments:
 !
@@ -1696,16 +1592,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : faces_gr
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -1723,6 +1616,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -1746,9 +1640,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the face boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(ifr)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -1758,168 +1652,101 @@ module boundaries
     kh = kn / 2
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
-        do k = 1, nsides
-          do j = 1, nsides
-            do i = 1, nsides
+      do k = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! associate pneigh with the current neighbor
 !
-              pneigh => pmeta%faces(i,j,k,idir)%ptr
+            pneigh => pmeta%faces(i,j,k,idir)%ptr
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at higher level
 !
-                if (pneigh%level > pmeta%level) then
+              if (pneigh%level > pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare the region indices for face boundary update
+! prepare region indices of the block and its neighbor for the face boundary
+! update
 !
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = 1
-                            iu = ibl
-                          else
-                            il = ieu
-                            iu = im
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(2)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = 1
-                            ju = jbl
-                          else
-                            jl = jeu
-                            ju = jm
-                          end if
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-                        case(3)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = 1
-                            ku = kbl
-                          else
-                            kl = keu
-                            ku = km
-                          end if
-                        end select
+                      il = faces_gr(i,j,k,idir)%l(1)
+                      jl = faces_gr(i,j,k,idir)%l(2)
+                      kl = faces_gr(i,j,k,idir)%l(3)
+                      iu = faces_gr(i,j,k,idir)%u(1)
+                      ju = faces_gr(i,j,k,idir)%u(2)
+                      ku = faces_gr(i,j,k,idir)%u(3)
 
 ! extract the corresponding face region from the neighbor and insert it in
 ! the current data block
 !
-                        call block_face_restrict(idir, i, j, k                 &
+                      call block_face_restrict(idir, i, j, k                   &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
-        end do ! k = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+      end do ! k = 1, nsides
 
-      end if ! leaf
-
-! associate pmeta with the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -2023,7 +1850,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -2059,79 +1886,25 @@ module boundaries
             j = pinfo%corner(2)
             k = pinfo%corner(3)
 
+! prepare region indices for the face boundary update
+!
+            il = faces_gr(i,j,k,idir)%l(1)
+            jl = faces_gr(i,j,k,idir)%l(2)
+            kl = faces_gr(i,j,k,idir)%l(3)
+            iu = faces_gr(i,j,k,idir)%u(1)
+            ju = faces_gr(i,j,k,idir)%u(2)
+            ku = faces_gr(i,j,k,idir)%u(3)
+
 ! update the corresponding face region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = 1
-                iu = ibl
-              else
-                il = ieu
-                iu = im
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ng,1:jh,1:kh)
             case(2)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = 1
-                ju = jbl
-              else
-                jl = jeu
-                ju = jm
-              end if
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ih,1:ng,1:kh)
             case(3)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
-              if (k == 1) then
-                kl = 1
-                ku = kbl
-              else
-                kl = keu
-                ku = km
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ih,1:jh,1:ng)
             end select
@@ -2158,9 +1931,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the face boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(ifr)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -2172,9 +1945,7 @@ module boundaries
 ! subroutine BOUNDARIES_FACE_PROLONG:
 ! ----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find face neighbors which
-!   are on different levels, and perform the update of face boundaries of
-!   higher blocks by prolongating them from lower level neighbors.
+!   Subroutine updates the face boundaries from blocks on lower level.
 !
 !   Arguments:
 !
@@ -2187,16 +1958,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : faces_gp
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -2214,6 +1982,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -2238,9 +2007,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the face boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(ifp)
 #endif /* PROFILE */
 
 ! calculate the sizes
@@ -2250,180 +2019,127 @@ module boundaries
     kh = kn + ng
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE FACE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
-        do k = 1, nsides
-          kc = k
-          do j = 1, nsides
-            jc = j
-            do i = 1, nsides
-              ic = i
+      do k = 1, nsides
+        kc = k
+        do j = 1, nsides
+          jc = j
+          do i = 1, nsides
+            ic = i
 
 ! associate pneigh with the current neighbor
 !
-              pneigh => pmeta%faces(i,j,k,idir)%ptr
+            pneigh => pmeta%faces(i,j,k,idir)%ptr
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+! prepare indices of the region in which the boundaries should be updated
 !
-                        select case(idir)
-                        case(1)
-                          jc = pmeta%pos(2)
-                          kc = pmeta%pos(3)
-                          if (i == 1) then
-                            il = 1
-                            iu = ibl
-                          else
-                            il = ieu
-                            iu = im
-                          end if
-                          if (jc == 0) then
-                            jl = jb
-                            ju = jm
-                          else
-                            jl = 1
-                            ju = je
-                          end if
-                          if (kc == 0) then
-                            kl = kb
-                            ku = km
-                          else
-                            kl = 1
-                            ku = ke
-                          end if
+                      select case(idir)
+                      case(1)
+                        jc = pmeta%pos(2) + 1
+                        kc = pmeta%pos(3) + 1
+                        il = faces_gp(i ,jc,kc,idir)%l(1)
+                        jl = faces_gp(i ,jc,kc,idir)%l(2)
+                        kl = faces_gp(i ,jc,kc,idir)%l(3)
+                        iu = faces_gp(i ,jc,kc,idir)%u(1)
+                        ju = faces_gp(i ,jc,kc,idir)%u(2)
+                        ku = faces_gp(i ,jc,kc,idir)%u(3)
 
-                        case(2)
-                          ic = pmeta%pos(1)
-                          kc = pmeta%pos(3)
-                          if (ic == 0) then
-                            il = ib
-                            iu = im
-                          else
-                            il = 1
-                            iu = ie
-                          end if
-                          if (j == 1) then
-                            jl = 1
-                            ju = jbl
-                          else
-                            jl = jeu
-                            ju = jm
-                          end if
-                          if (kc == 0) then
-                            kl = kb
-                            ku = km
-                          else
-                            kl = 1
-                            ku = ke
-                          end if
+                      case(2)
+                        ic = pmeta%pos(1) + 1
+                        kc = pmeta%pos(3) + 1
+                        il = faces_gp(ic,j ,kc,idir)%l(1)
+                        jl = faces_gp(ic,j ,kc,idir)%l(2)
+                        kl = faces_gp(ic,j ,kc,idir)%l(3)
+                        iu = faces_gp(ic,j ,kc,idir)%u(1)
+                        ju = faces_gp(ic,j ,kc,idir)%u(2)
+                        ku = faces_gp(ic,j ,kc,idir)%u(3)
 
-                        case(3)
-                          ic = pmeta%pos(1)
-                          jc = pmeta%pos(2)
-                          if (ic == 0) then
-                            il = ib
-                            iu = im
-                          else
-                            il = 1
-                            iu = ie
-                          end if
-                          if (jc == 0) then
-                            jl = jb
-                            ju = jm
-                          else
-                            jl = 1
-                            ju = je
-                          end if
-                          if (k == 1) then
-                            kl = 1
-                            ku = kbl
-                          else
-                            kl = keu
-                            ku = km
-                          end if
-                        end select
+                      case(3)
+                        ic = pmeta%pos(1) + 1
+                        jc = pmeta%pos(2) + 1
+                        il = faces_gp(ic,jc,k ,idir)%l(1)
+                        jl = faces_gp(ic,jc,k ,idir)%l(2)
+                        kl = faces_gp(ic,jc,k ,idir)%l(3)
+                        iu = faces_gp(ic,jc,k ,idir)%u(1)
+                        ju = faces_gp(ic,jc,k ,idir)%u(2)
+                        ku = faces_gp(ic,jc,k ,idir)%u(3)
+                      end select
 
-! extract the corresponding face region from the neighbor and insert it in
-! the current data block
+! take the neighbor volume, extract the corresponding face region and insert
+! it in the current data block
 !
-                        call block_face_prolong(idir, ic, jc, kc               &
+                      call block_face_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
+                end if ! pmeta and pneigh marked for update
 
-                  end if ! pmeta and pneigh marked for update
+              end if ! neighbor at lower level
 
-                end if ! neighbor at lower level
+            end if ! neighbor associated
 
-              end if ! neighbor associated
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
+      end do ! k = 1, nsides
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
-        end do ! k = 1, nsides
-
-      end if ! leaf
-
-! associate pmeta with the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -2509,20 +2225,20 @@ module boundaries
 !
             select case(idir)
             case(1)
-              j = pmeta%pos(2)
-              k = pmeta%pos(3)
+              j = pmeta%pos(2) + 1
+              k = pmeta%pos(3) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ng,1:jh,1:kh))
             case(2)
-              i = pmeta%pos(1)
-              k = pmeta%pos(3)
+              i = pmeta%pos(1) + 1
+              k = pmeta%pos(3) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ih,1:ng,1:kh))
             case(3)
-              i = pmeta%pos(1)
-              j = pmeta%pos(2)
+              i = pmeta%pos(1) + 1
+              j = pmeta%pos(2) + 1
               call block_face_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ih,1:jh,1:ng))
@@ -2534,7 +2250,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -2574,74 +2290,47 @@ module boundaries
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = 1
-                iu = ibl
-              else
-                il = ieu
-                iu = im
-              end if
-              if (pmeta%pos(2) == 0) then
-                jl = jb
-                ju = jm
-              else
-                jl =  1
-                ju = je
-              end if
-              if (pmeta%pos(3) == 0) then
-                kl = kb
-                ku = km
-              else
-                kl =  1
-                ku = ke
-              end if
+
+              jc = pmeta%pos(2) + 1
+              kc = pmeta%pos(3) + 1
+
+              il = faces_gp(i ,jc,kc,idir)%l(1)
+              jl = faces_gp(i ,jc,kc,idir)%l(2)
+              kl = faces_gp(i ,jc,kc,idir)%l(3)
+              iu = faces_gp(i ,jc,kc,idir)%u(1)
+              ju = faces_gp(i ,jc,kc,idir)%u(2)
+              ku = faces_gp(i ,jc,kc,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:kh)
+
             case(2)
-              if (j == 1) then
-                jl = 1
-                ju = jbl
-              else
-                jl = jeu
-                ju = jm
-              end if
-              if (pmeta%pos(1) == 0) then
-                il = ib
-                iu = im
-              else
-                il =  1
-                iu = ie
-              end if
-              if (pmeta%pos(3) == 0) then
-                kl = kb
-                ku = km
-              else
-                kl =  1
-                ku = ke
-              end if
+
+              ic = pmeta%pos(1) + 1
+              kc = pmeta%pos(3) + 1
+
+              il = faces_gp(ic,j ,kc,idir)%l(1)
+              jl = faces_gp(ic,j ,kc,idir)%l(2)
+              kl = faces_gp(ic,j ,kc,idir)%l(3)
+              iu = faces_gp(ic,j ,kc,idir)%u(1)
+              ju = faces_gp(ic,j ,kc,idir)%u(2)
+              ku = faces_gp(ic,j ,kc,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:kh)
+
             case(3)
-              if (k == 1) then
-                kl = 1
-                ku = kbl
-              else
-                kl = keu
-                ku = km
-              end if
-              if (pmeta%pos(1) == 0) then
-                il = ib
-                iu = im
-              else
-                il =  1
-                iu = ie
-              end if
-              if (pmeta%pos(2) == 0) then
-                jl = jb
-                ju = jm
-              else
-                jl =  1
-                ju = je
-              end if
+
+              ic = pmeta%pos(1) + 1
+              jc = pmeta%pos(2) + 1
+
+              il = faces_gp(ic,jc,k ,idir)%l(1)
+              jl = faces_gp(ic,jc,k ,idir)%l(2)
+              kl = faces_gp(ic,jc,k ,idir)%l(3)
+              iu = faces_gp(ic,jc,k ,idir)%u(1)
+              ju = faces_gp(ic,jc,k ,idir)%u(2)
+              ku = faces_gp(ic,jc,k ,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:jh,1:ng)
+
             end select
 
 ! associate the pointer with the next block
@@ -2666,9 +2355,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the face boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(ifp)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -2687,9 +2376,7 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_COPY:
 ! -------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors which
-!   are the same level, and perform the update of the edge boundaries between
-!   them.
+!   Subroutine updates the edge boundaries from blocks on the same level.
 !
 !   Arguments:
 !
@@ -2702,16 +2389,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : in, jn, kn
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : edges_gc, edges_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -2729,6 +2413,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -2739,6 +2424,8 @@ module boundaries
     integer :: ih, jh, kh
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -2752,9 +2439,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the edge boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(iec)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -2766,167 +2453,134 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE EDGE BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! associate pneigh with the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%edges(i,j,idir)%ptr
+            pneigh => pmeta%edges(i,j,idir)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%edges(i,j,k,idir)%ptr
+            pneigh => pmeta%edges(i,j,k,idir)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at the same level
 !
-                if (pneigh%level == pmeta%level) then
+              if (pneigh%level == pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare the region indices for edge boundary update
-!
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
-#if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
-#endif /* NDIMS == 3 */
-
-! extract the corresponding edge region from the neighbor and insert it in
-! the current data block
-!
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                        case(2)
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
+! prepare region indices of the block and its neighbor for the edge boundary
+! update
 #if NDIMS == 2
-                        call block_edge_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
+                      il = edges_gc(i,j  ,idir)%l(1)
+                      jl = edges_gc(i,j  ,idir)%l(2)
+                      iu = edges_gc(i,j  ,idir)%u(1)
+                      ju = edges_gc(i,j  ,idir)%u(2)
+
+                      is = edges_dc(i,j  ,idir)%l(1)
+                      js = edges_dc(i,j  ,idir)%l(2)
+                      it = edges_dc(i,j  ,idir)%u(1)
+                      jt = edges_dc(i,j  ,idir)%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_edge_copy(idir, i, j, k                     &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                      il = edges_gc(i,j,k,idir)%l(1)
+                      jl = edges_gc(i,j,k,idir)%l(2)
+                      kl = edges_gc(i,j,k,idir)%l(3)
+                      iu = edges_gc(i,j,k,idir)%u(1)
+                      ju = edges_gc(i,j,k,idir)%u(2)
+                      ku = edges_gc(i,j,k,idir)%u(3)
+
+                      is = edges_dc(i,j,k,idir)%l(1)
+                      js = edges_dc(i,j,k,idir)%l(2)
+                      ks = edges_dc(i,j,k,idir)%l(3)
+                      it = edges_dc(i,j,k,idir)%u(1)
+                      jt = edges_dc(i,j,k,idir)%u(2)
+                      kt = edges_dc(i,j,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding edge region from the neighbor and insert it in
+! the current data block
+!
+#if NDIMS == 2
+                      pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                   &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                      pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                   &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! associate the pointer to the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -3018,37 +2672,49 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding edge region from the neighbor and insert it
-! to the buffer
+! prepare indices of the region for edge boundary update
+!
+#if NDIMS == 2
+            is = edges_dc(i,j  ,idir)%l(1)
+            js = edges_dc(i,j  ,idir)%l(2)
+            it = edges_dc(i,j  ,idir)%u(1)
+            jt = edges_dc(i,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            is = edges_dc(i,j,k,idir)%l(1)
+            js = edges_dc(i,j,k,idir)%l(2)
+            ks = edges_dc(i,j,k,idir)%l(3)
+            it = edges_dc(i,j,k,idir)%u(1)
+            jt = edges_dc(i,j,k,idir)%u(2)
+            kt = edges_dc(i,j,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding edge region from the neighbor and insert it in
+! the buffer
 !
             select case(idir)
             case(1)
 #if NDIMS == 2
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:km))
+              sbuf(l,1:nv,1:ih,1:ng,1:km) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ih,1:ng,1:ng))
+              sbuf(l,1:nv,1:ih,1:ng,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
             case(2)
 #if NDIMS == 2
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:km))
+              sbuf(l,1:nv,1:ng,1:jh,1:km) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt, 1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:jh,1:ng))
+              sbuf(l,1:nv,1:ng,1:jh,1:ng) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              call block_edge_copy(idir, i, j, k                               &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:kh))
+              sbuf(l,1:nv,1:ng,1:ng,1:kh) =                                    &
+                                         pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
             end select
 
@@ -3058,7 +2724,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -3096,78 +2762,43 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare indices of the region for the edge update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = edges_gc(i,j  ,idir)%l(1)
+            jl = edges_gc(i,j  ,idir)%l(2)
+            iu = edges_gc(i,j  ,idir)%u(1)
+            ju = edges_gc(i,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = edges_gc(i,j,k,idir)%l(1)
+            jl = edges_gc(i,j,k,idir)%l(2)
+            kl = edges_gc(i,j,k,idir)%l(3)
+            iu = edges_gc(i,j,k,idir)%u(1)
+            ju = edges_gc(i,j,k,idir)%u(2)
+            ku = edges_gc(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
-! update the corresponding corner region of the current block
+! update the corresponding edge region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
 #if NDIMS == 2
-              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
-                                                   rbuf(l,1:nv,1:ih,1:ng,1:km)
+              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) = rbuf(l,1:nv,1:ih,1:ng,1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ih,1:ng,1:ng)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ih,1:ng,1:ng)
 #endif /* NDIMS == 3 */
             case(2)
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
 #if NDIMS == 2
-              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:jh,1:km)
+              pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) = rbuf(l,1:nv,1:ng,1:jh,1:km)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:jh,1:ng)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:jh,1:ng)
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
-              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
-                                                   rbuf(l,1:nv,1:ng,1:ng,1:kh)
+              pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) = rbuf(l,1:nv,1:ng,1:ng,1:kh)
 #endif /* NDIMS == 3 */
             end select
 
@@ -3193,9 +2824,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the edge boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(iec)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -3207,9 +2838,7 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_RESTRICT:
 ! -----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors which
-!   are on different levels, and perform the update of edge boundaries of
-!   lower blocks by restricting them from higher level neighbors.
+!   Subroutine updates the edge boundaries from blocks on higher level.
 !
 !   Arguments:
 !
@@ -3222,16 +2851,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : edges_gr
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -3249,6 +2875,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -3272,9 +2899,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the edge boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(ier)
 #endif /* PROFILE */
 
 ! calculate half sizes
@@ -3286,167 +2913,124 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE EDGE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%edges(i,j,idir)%ptr
+            pneigh => pmeta%edges(i,j,idir)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%edges(i,j,k,idir)%ptr
+            pneigh => pmeta%edges(i,j,k,idir)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at higher level
 !
-                if (pneigh%level > pmeta%level) then
+              if (pneigh%level > pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+#if NDIMS == 2
+                      il = edges_gr(i,j,  idir)%l(1)
+                      jl = edges_gr(i,j,  idir)%l(2)
+                      iu = edges_gr(i,j,  idir)%u(1)
+                      ju = edges_gr(i,j,  idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                      il = edges_gr(i,j,k,idir)%l(1)
+                      jl = edges_gr(i,j,k,idir)%l(2)
+                      kl = edges_gr(i,j,k,idir)%l(3)
+                      iu = edges_gr(i,j,k,idir)%u(1)
+                      ju = edges_gr(i,j,k,idir)%u(2)
+                      ku = edges_gr(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding edge region from the neighbor and insert it in
-! the current data block
+! extract the corresponding edge region from the neighbor to the current
+! data block
 !
-                        select case(idir)
-                        case(1)
-                          if (i == 1) then
-                            il = ib
-                            iu = ib + ih - 1
-                          else
-                            il = ie - ih + 1
-                            iu = ie
-                          end if
-                        case(2)
-                          if (j == 1) then
-                            jl = jb
-                            ju = jb + jh - 1
-                          else
-                            jl = je - jh + 1
-                            ju = je
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          if (k == 1) then
-                            kl = kb
-                            ku = kb + kh - 1
-                          else
-                            kl = ke - kh + 1
-                            ku = ke
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
 #if NDIMS == 2
-                        call block_edge_restrict(idir, i, j, k                 &
+                      call block_edge_restrict(idir, i, j, k                   &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_edge_restrict(idir, i, j, k                 &
+                      call block_edge_restrict(idir, i, j, k                   &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! associate the pointer to the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -3578,7 +3162,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -3616,43 +3200,27 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the region indices for edge boundary update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = edges_gr(i,j,  idir)%l(1)
+            jl = edges_gr(i,j,  idir)%l(2)
+            iu = edges_gr(i,j,  idir)%u(1)
+            ju = edges_gr(i,j,  idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = edges_gr(i,j,k,idir)%l(1)
+            jl = edges_gr(i,j,k,idir)%l(2)
+            kl = edges_gr(i,j,k,idir)%l(3)
+            iu = edges_gr(i,j,k,idir)%u(1)
+            ju = edges_gr(i,j,k,idir)%u(2)
+            ku = edges_gr(i,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
 !
             select case(idir)
             case(1)
-              if (i == 1) then
-                il = ib
-                iu = ib + ih - 1
-              else
-                il = ie - ih + 1
-                iu = ie
-              end if
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ih,1:ng,1:km)
@@ -3662,13 +3230,6 @@ module boundaries
                                                    rbuf(l,1:nv,1:ih,1:ng,1:ng)
 #endif /* NDIMS == 3 */
             case(2)
-              if (j == 1) then
-                jl = jb
-                ju = jb + jh - 1
-              else
-                jl = je - jh + 1
-                ju = je
-              end if
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ng,1:jh,1:km)
@@ -3679,13 +3240,6 @@ module boundaries
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              if (k == 1) then
-                kl = kb
-                ku = kb + kh - 1
-              else
-                kl = ke - kh + 1
-                ku = ke
-              end if
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ng,1:ng,1:kh)
 #endif /* NDIMS == 3 */
@@ -3713,9 +3267,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the edge boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(ier)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -3727,9 +3281,7 @@ module boundaries
 ! subroutine BOUNDARIES_EDGE_PROLONG:
 ! ----------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find edge neighbors which
-!   are on different levels, and perform the update of edge boundaries of
-!   higher blocks by prolongating them from lower level neighbors.
+!   Subroutine updates the edge boundaries from blocks on lower level.
 !
 !   Arguments:
 !
@@ -3742,16 +3294,13 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : edges_gp
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -3769,6 +3318,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -3793,9 +3343,9 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the edge boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(iep)
 #endif /* PROFILE */
 
 ! calculate the sizes
@@ -3807,173 +3357,161 @@ module boundaries
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE EDGE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
-          kc = k
+      do k = 1, nsides
+        kc = k
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            jc = j
-            do i = 1, nsides
-              ic = i
+        do j = 1, nsides
+          jc = j
+          do i = 1, nsides
+            ic = i
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%edges(i,j,idir)%ptr
+            pneigh => pmeta%edges(i,j,idir)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%edges(i,j,k,idir)%ptr
+            pneigh => pmeta%edges(i,j,k,idir)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! process only blocks and neighbors which are marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for edge boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+                      select case(idir)
+                      case(1)
+
+                        ic = pmeta%pos(1) + 1
+
+#if NDIMS == 2
+                        il = edges_gp(ic,j  ,idir)%l(1)
+                        iu = edges_gp(ic,j  ,idir)%u(1)
+                        jl = edges_gp(i ,j  ,idir)%l(2)
+                        ju = edges_gp(i ,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                        il = edges_gp(ic,j,k,idir)%l(1)
+                        iu = edges_gp(ic,j,k,idir)%u(1)
+                        jl = edges_gp(i ,j,k,idir)%l(2)
+                        ju = edges_gp(i ,j,k,idir)%u(2)
+                        kl = edges_gp(i ,j,k,idir)%l(3)
+                        ku = edges_gp(i ,j,k,idir)%u(3)
 #endif /* NDIMS == 3 */
+                      case(2)
+
+                        jc = pmeta%pos(2) + 1
+
+#if NDIMS == 2
+                        il = edges_gp(i,j   ,idir)%l(1)
+                        iu = edges_gp(i,j   ,idir)%u(1)
+                        jl = edges_gp(i,jc  ,idir)%l(2)
+                        ju = edges_gp(i,jc  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                        il = edges_gp(i,j ,k,idir)%l(1)
+                        iu = edges_gp(i,j ,k,idir)%u(1)
+                        jl = edges_gp(i,jc,k,idir)%l(2)
+                        ju = edges_gp(i,jc,k,idir)%u(2)
+                        kl = edges_gp(i,j ,k,idir)%l(3)
+                        ku = edges_gp(i,j ,k,idir)%u(3)
+                      case(3)
+
+                        kc = pmeta%pos(3) + 1
+
+                        il = edges_gp(i,j,k ,idir)%l(1)
+                        iu = edges_gp(i,j,k ,idir)%u(1)
+                        jl = edges_gp(i,j,k ,idir)%l(2)
+                        ju = edges_gp(i,j,k ,idir)%u(2)
+                        kl = edges_gp(i,j,kc,idir)%l(3)
+                        ku = edges_gp(i,j,kc,idir)%u(3)
+#endif /* NDIMS == 3 */
+                      end select
 
 ! extract the corresponding edge region from the neighbor and insert it in
 ! the current data block
 !
-                        select case(idir)
-                        case(1)
-                          ic = pmeta%pos(1)
-                          if (ic == 0) then
-                            il = ib
-                            iu = im
-                          else
-                            il = 1
-                            iu = ie
-                          end if
-                        case(2)
-                          jc = pmeta%pos(2)
-                          if (jc == 0) then
-                            jl = jb
-                            ju = jm
-                          else
-                            jl = 1
-                            ju = je
-                          end if
-#if NDIMS == 3
-                        case(3)
-                          kc = pmeta%pos(3)
-                          if (kc == 0) then
-                            kl = kb
-                            ku = km
-                          else
-                            kl = 1
-                            ku = ke
-                          end if
-#endif /* NDIMS == 3 */
-                        end select
 #if NDIMS == 2
-                        call block_edge_prolong(idir, ic, jc, kc               &
+                      call block_edge_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_edge_prolong(idir, ic, jc, kc               &
+                      call block_edge_prolong(idir, ic, jc, kc                 &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, idir, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, idir, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at lower level
+              end if ! neighbor at lower level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! associate the pointer to the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -4071,7 +3609,7 @@ module boundaries
 !
             select case(idir)
             case(1)
-              i = pmeta%pos(1)
+              i = pmeta%pos(1) + 1
 #if NDIMS == 2
               call block_edge_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
@@ -4083,7 +3621,7 @@ module boundaries
                                    ,        sbuf(l,1:nv,1:ih,1:ng,1:ng))
 #endif /* NDIMS == 3 */
             case(2)
-              j = pmeta%pos(2)
+              j = pmeta%pos(2) + 1
 #if NDIMS == 2
               call block_edge_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
@@ -4096,7 +3634,7 @@ module boundaries
 #endif /* NDIMS == 3 */
 #if NDIMS == 3
             case(3)
-              k = pmeta%pos(3)
+              k = pmeta%pos(3) + 1
               call block_edge_prolong(idir, i, j, k                            &
                                    , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
                                    ,        sbuf(l,1:nv,1:ng,1:ng,1:kh))
@@ -4109,7 +3647,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -4147,43 +3685,27 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
-!
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
-#if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
-#endif /* NDIMS == 3 */
-
 ! update the corresponding corner region of the current block
 !
             select case(idir)
             case(1)
-              if (pmeta%pos(1) == 0) then
-                il = ib
-                iu = im
-              else
-                il =  1
-                iu = ie
-              end if
+              ic = pmeta%pos(1) + 1
+
+#if NDIMS == 2
+              il = edges_gp(ic,j  ,idir)%l(1)
+              iu = edges_gp(ic,j  ,idir)%u(1)
+              jl = edges_gp(i ,j  ,idir)%l(2)
+              ju = edges_gp(i ,j  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              il = edges_gp(ic,j,k,idir)%l(1)
+              iu = edges_gp(ic,j,k,idir)%u(1)
+              jl = edges_gp(i ,j,k,idir)%l(2)
+              ju = edges_gp(i ,j,k,idir)%u(2)
+              kl = edges_gp(i ,j,k,idir)%l(3)
+              ku = edges_gp(i ,j,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ih,1:ng,1:km)
@@ -4192,14 +3714,26 @@ module boundaries
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ih,1:ng,1:ng)
 #endif /* NDIMS == 3 */
+
             case(2)
-              if (pmeta%pos(2) == 0) then
-                jl = jb
-                ju = jm
-              else
-                jl =  1
-                ju = je
-              end if
+
+              jc = pmeta%pos(2) + 1
+
+#if NDIMS == 2
+              il = edges_gp(i,j   ,idir)%l(1)
+              iu = edges_gp(i,j   ,idir)%u(1)
+              jl = edges_gp(i,jc  ,idir)%l(2)
+              ju = edges_gp(i,jc  ,idir)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+              il = edges_gp(i,j ,k,idir)%l(1)
+              iu = edges_gp(i,j ,k,idir)%u(1)
+              jl = edges_gp(i,jc,k,idir)%l(2)
+              ju = edges_gp(i,jc,k,idir)%u(2)
+              kl = edges_gp(i,j ,k,idir)%l(3)
+              ku = edges_gp(i,j ,k,idir)%u(3)
+#endif /* NDIMS == 3 */
+
 #if NDIMS == 2
               pmeta%data%q(1:nv,il:iu,jl:ju, 1:km) =                           &
                                                    rbuf(l,1:nv,1:ng,1:jh,1:km)
@@ -4207,16 +3741,17 @@ module boundaries
 #if NDIMS == 3
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ng,1:jh,1:ng)
-#endif /* NDIMS == 3 */
-#if NDIMS == 3
+
             case(3)
-              if (pmeta%pos(3) == 0) then
-                kl = kb
-                ku = km
-              else
-                kl =  1
-                ku = ke
-              end if
+              kc = pmeta%pos(3) + 1
+
+              il = edges_gp(i,j,k ,idir)%l(1)
+              iu = edges_gp(i,j,k ,idir)%u(1)
+              jl = edges_gp(i,j,k ,idir)%l(2)
+              ju = edges_gp(i,j,k ,idir)%u(2)
+              kl = edges_gp(i,j,kc,idir)%l(3)
+              ku = edges_gp(i,j,kc,idir)%u(3)
+
               pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku) =                           &
                                                    rbuf(l,1:nv,1:ng,1:ng,1:kh)
 #endif /* NDIMS == 3 */
@@ -4244,9 +3779,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the edge boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(iep)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -4264,9 +3799,7 @@ module boundaries
 ! subroutine BOUNDARIES_CORNER_COPY:
 ! ---------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors at
-!   the same level, and perform the update of the corner boundaries between
-!   them.
+!   Subroutine updates the corner boundaries from blocks on the same level.
 !
 !
 !===============================================================================
@@ -4276,13 +3809,12 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : corners_gc, corners_dc
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -4296,6 +3828,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -4305,6 +3838,8 @@ module boundaries
     integer :: i , j , k
     integer :: il, jl, kl
     integer :: iu, ju, ku
+    integer :: is, js, ks
+    integer :: it, jt, kt
 #ifdef MPI
     integer :: sproc, scount, stag
     integer :: rproc, rcount, rtag
@@ -4318,145 +3853,140 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for copy boundary update
+! start accounting time for the corner boundary update by copying
 !
-    call start_timer(imc)
+    call start_timer(icc)
 #endif /* PROFILE */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE CORNER BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%corners(i,j)%ptr
+            pneigh => pmeta%corners(i,j)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%corners(i,j,k)%ptr
+            pneigh => pmeta%corners(i,j,k)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at the same level
 !
-                if (pneigh%level == pmeta%level) then
+              if (pneigh%level == pmeta%level) then
 
 ! skip if the block and its neighbor are not marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
-! prepare the region indices for corner boundary update
-!
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
-#if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
-#endif /* NDIMS == 3 */
-
-! extract the corresponding corner region from the neighbor and insert it in
-! the current data block
-!
+! prepare region indices of the block and its neighbor for the corner boundary
+! update
 #if NDIMS == 2
-                        call block_corner_copy(i, j, k                         &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
+                      il = corners_gc(i,j  )%l(1)
+                      jl = corners_gc(i,j  )%l(2)
+                      iu = corners_gc(i,j  )%u(1)
+                      ju = corners_gc(i,j  )%u(2)
+
+                      is = corners_dc(i,j  )%l(1)
+                      js = corners_dc(i,j  )%l(2)
+                      it = corners_dc(i,j  )%u(1)
+                      jt = corners_dc(i,j  )%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_corner_copy(i, j, k                         &
-                                   , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
-                                   ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
+                      il = corners_gc(i,j,k)%l(1)
+                      jl = corners_gc(i,j,k)%l(2)
+                      kl = corners_gc(i,j,k)%l(3)
+                      iu = corners_gc(i,j,k)%u(1)
+                      ju = corners_gc(i,j,k)%u(2)
+                      ku = corners_gc(i,j,k)%u(3)
+
+                      is = corners_dc(i,j,k)%l(1)
+                      js = corners_dc(i,j,k)%l(2)
+                      ks = corners_dc(i,j,k)%l(3)
+                      it = corners_dc(i,j,k)%u(1)
+                      jt = corners_dc(i,j,k)%u(2)
+                      kt = corners_dc(i,j,k)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding corner region from the neighbor to the current
+! data block
+!
+#if NDIMS == 2
+                      pmeta%data%q(1:nv,il:iu,jl:ju, 1:km)                     &
+                                       = pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+                      pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku)                     &
+                                       = pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! pneigh on the current process
+                    end if ! pneigh on the current process
 
-                    else ! block and neighbor belong to different processes
+                  else ! block and neighbor belong to different processes
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, -1, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, -1, i, j, k)
 
-                    end if ! block and neighbor belong to different processes
+                  end if ! block and neighbor belong to different processes
 #endif /* MPI */
 
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at the same level
+              end if ! neighbor at the same level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! associate the pointer to the next meta block
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -4535,18 +4065,30 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! extract the corresponding corner region from the neighbor and insert it
-! to the buffer
+! prepare the corner region indices for the neighbor
 !
 #if NDIMS == 2
-            call block_corner_copy(i, j, k                                     &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:km))
+            is = corners_dc(i,j  )%l(1)
+            js = corners_dc(i,j  )%l(2)
+            it = corners_dc(i,j  )%u(1)
+            jt = corners_dc(i,j  )%u(2)
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-            call block_corner_copy(i, j, k                                     &
-                                   , pneigh%data%q(1:nv,1:im,1:jm,1:km)        &
-                                   ,        sbuf(l,1:nv,1:ng,1:ng,1:ng))
+            is = corners_dc(i,j,k)%l(1)
+            js = corners_dc(i,j,k)%l(2)
+            ks = corners_dc(i,j,k)%l(3)
+            it = corners_dc(i,j,k)%u(1)
+            jt = corners_dc(i,j,k)%u(2)
+            kt = corners_dc(i,j,k)%u(3)
+#endif /* NDIMS == 3 */
+
+! copy the corresponding corner region from the neighbor to the buffer
+!
+#if NDIMS == 2
+            sbuf(l,1:nv,1:ng,1:ng,1:km) = pneigh%data%q(1:nv,is:it,js:jt, 1:km)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+            sbuf(l,1:nv,1:ng,1:ng,1:ng) = pneigh%data%q(1:nv,is:it,js:jt,ks:kt)
 #endif /* NDIMS == 3 */
 
 ! associate the pointer with the next block
@@ -4555,7 +4097,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -4593,30 +4135,21 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the corner region indices for the block
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = corners_gc(i,j  )%l(1)
+            jl = corners_gc(i,j  )%l(2)
+            iu = corners_gc(i,j  )%u(1)
+            ju = corners_gc(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = corners_gc(i,j,k)%l(1)
+            jl = corners_gc(i,j,k)%l(2)
+            kl = corners_gc(i,j,k)%l(3)
+            iu = corners_gc(i,j,k)%u(1)
+            ju = corners_gc(i,j,k)%u(2)
+            ku = corners_gc(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
@@ -4650,9 +4183,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for copy boundary update
+! stop accounting time for the corner boundary update by copying
 !
-    call stop_timer(imc)
+    call stop_timer(icc)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -4664,9 +4197,7 @@ module boundaries
 ! subroutine BOUNDARIES_CORNER_RESTRICT:
 ! -------------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors
-!   which are on different levels, and perform the update of corner boundaries
-!   of lower blocks by restricting them from higher level neighbors.
+!   Subroutine updates the corner boundaries from blocks on higher level.
 !
 !
 !===============================================================================
@@ -4676,13 +4207,12 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : corners_gr
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -4696,6 +4226,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -4718,144 +4249,129 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for restrict boundary update
+! start accounting time for the corner boundary update by restriction
 !
-    call start_timer(imr)
+    call start_timer(icr)
 #endif /* PROFILE */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE CORNER BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%corners(i,j)%ptr
+            pneigh => pmeta%corners(i,j)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%corners(i,j,k)%ptr
+            pneigh => pmeta%corners(i,j,k)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor is at higher level
 !
-                if (pneigh%level > pmeta%level) then
+              if (pneigh%level > pmeta%level) then
 
 ! skip if the block and its neighbor are not marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+#if NDIMS == 2
+                      il = corners_gr(i,j  )%l(1)
+                      jl = corners_gr(i,j  )%l(2)
+                      iu = corners_gr(i,j  )%u(1)
+                      ju = corners_gr(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                      il = corners_gr(i,j,k)%l(1)
+                      jl = corners_gr(i,j,k)%l(2)
+                      kl = corners_gr(i,j,k)%l(3)
+                      iu = corners_gr(i,j,k)%u(1)
+                      ju = corners_gr(i,j,k)%u(2)
+                      ku = corners_gr(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
-! restrict and extract the corresponding corner region from the neighbor and
+! extract and restrict the corresponding corner region from the neighbor and
 ! insert it in the current data block
 !
 #if NDIMS == 2
-                        call block_corner_restrict(i, j, k                     &
+                      call block_corner_restrict(i, j, k                       &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_corner_restrict(i, j, k                     &
+                      call block_corner_restrict(i, j, k                       &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! block on the current processor
+                    end if ! block on the current processor
 
-                    else ! block and neighbor on different processors
+                  else ! block and neighbor on different processors
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, -1, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, -1, i, j, k)
 
-                    end if ! block and neighbor on different processors
+                  end if ! block and neighbor on different processors
 #endif /* MPI */
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at higher level
+              end if ! neighbor at higher level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! assign the pointer to the next block on the list
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -4954,7 +4470,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -4992,30 +4508,21 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the region indices for corner boundary update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = corners_gr(i,j  )%l(1)
+            jl = corners_gr(i,j  )%l(2)
+            iu = corners_gr(i,j  )%u(1)
+            ju = corners_gr(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = corners_gr(i,j,k)%l(1)
+            jl = corners_gr(i,j,k)%l(2)
+            kl = corners_gr(i,j,k)%l(3)
+            iu = corners_gr(i,j,k)%u(1)
+            ju = corners_gr(i,j,k)%u(2)
+            ku = corners_gr(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
@@ -5049,9 +4556,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for restrict boundary update
+! stop accounting time for the corner boundary update by restriction
 !
-    call stop_timer(imr)
+    call stop_timer(icr)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -5063,9 +4570,7 @@ module boundaries
 ! subroutine BOUNDARIES_CORNER_PROLONG:
 ! ------------------------------------
 !
-!   Subroutine scans over all leaf blocks in order to find corner neighbors at
-!   different levels, and update the corner boundaries of blocks at higher
-!   levels by prolongating variables from lower level blocks.
+!   Subroutine updates the corner boundaries from blocks on lower level.
 !
 !
 !===============================================================================
@@ -5075,13 +4580,12 @@ module boundaries
 ! import external procedures and variables
 !
     use blocks         , only : nsides
-    use blocks         , only : block_meta, block_data
-    use blocks         , only : list_meta
+    use blocks         , only : block_meta, block_data, block_leaf
+    use blocks         , only : list_meta, list_leaf
     use blocks         , only : block_info, pointer_info
     use coordinates    , only : ng
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl
-    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : corners_gp
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc, nprocs, npairs, pairs
@@ -5095,6 +4599,7 @@ module boundaries
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
+    type(block_leaf), pointer :: pleaf
 #ifdef MPI
     type(block_info), pointer :: pinfo
 #endif /* MPI */
@@ -5117,144 +4622,129 @@ module boundaries
 !-------------------------------------------------------------------------------
 !
 #ifdef PROFILE
-! start accounting time for prolong boundary update
+! start accounting time for the corner boundary update by prolongation
 !
-    call start_timer(imp)
+    call start_timer(icp)
 #endif /* PROFILE */
 
 #ifdef MPI
-!! 1. PREPARE THE BLOCK EXCHANGE ARRAYS FOR MPI
-!!
-! prepare the array of exchange block lists and its counters
+! prepare the block exchange structures
 !
     call prepare_exchange_array()
 #endif /* MPI */
 
-!! 2. UPDATE VARIABLE CORNER BOUNDARIES BETWEEN BLOCKS BELONGING TO THE SAME
-!!    PROCESS AND PREPARE THE EXCHANGE BLOCK LIST OF BLOCKS WHICH BELONG TO
-!!    DIFFERENT PROCESSES
-!!
-! associate pmeta with the first block on the meta block list
+! update boundaries between blocks on the same process
 !
-    pmeta => list_meta
+! associate pleaf with the first block on the leaf list
+!
+    pleaf => list_leaf
 
-! scan all meta blocks
+! scan all leaf meta blocks in the list
 !
-    do while(associated(pmeta))
+    do while(associated(pleaf))
 
-! check if the block is leaf
+! get the associated meta block
 !
-      if (pmeta%leaf) then
+      pmeta => pleaf%meta
 
 ! scan over all block corners
 !
 #if NDIMS == 3
-        do k = 1, nsides
+      do k = 1, nsides
 #endif /* NDIMS == 3 */
-          do j = 1, nsides
-            do i = 1, nsides
+        do j = 1, nsides
+          do i = 1, nsides
 
 ! assign pneigh to the current neighbor
 !
 #if NDIMS == 2
-              pneigh => pmeta%corners(i,j)%ptr
+            pneigh => pmeta%corners(i,j)%ptr
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-              pneigh => pmeta%corners(i,j,k)%ptr
+            pneigh => pmeta%corners(i,j,k)%ptr
 #endif /* NDIMS == 3 */
 
 ! check if the neighbor is associated
 !
-              if (associated(pneigh)) then
+            if (associated(pneigh)) then
 
 ! check if the neighbor lays at lower level
 !
-                if (pneigh%level < pmeta%level) then
+              if (pneigh%level < pmeta%level) then
 
 ! skip if the block and its neighbor are not marked for update
 !
-                  if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .and. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
 !
-                    if (pmeta%process == pneigh%process) then
+                  if (pmeta%process == pneigh%process) then
 
 ! check if the neighbor belongs to the current process
 !
-                      if (pneigh%process == nproc) then
+                    if (pneigh%process == nproc) then
 #endif /* MPI */
 
 ! prepare the region indices for corner boundary update
 !
-                        if (i == 1) then
-                          il = 1
-                          iu = ibl
-                        else
-                          il = ieu
-                          iu = im
-                        end if
-                        if (j == 1) then
-                          jl = 1
-                          ju = jbl
-                        else
-                          jl = jeu
-                          ju = jm
-                        end if
+#if NDIMS == 2
+                      il = corners_gp(i,j  )%l(1)
+                      jl = corners_gp(i,j  )%l(2)
+                      iu = corners_gp(i,j  )%u(1)
+                      ju = corners_gp(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        if (k == 1) then
-                          kl = 1
-                          ku = kbl
-                        else
-                          kl = keu
-                          ku = km
-                        end if
+                      il = corners_gp(i,j,k)%l(1)
+                      jl = corners_gp(i,j,k)%l(2)
+                      kl = corners_gp(i,j,k)%l(3)
+                      iu = corners_gp(i,j,k)%u(1)
+                      ju = corners_gp(i,j,k)%u(2)
+                      ku = corners_gp(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! restrict and extract the corresponding corner region from the neighbor and
 ! insert it in the current data block
 !
 #if NDIMS == 2
-                        call block_corner_prolong(i, j, k                      &
+                      call block_corner_prolong(i, j, k                        &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju, 1:km))
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
-                        call block_corner_prolong(i, j, k                      &
+                      call block_corner_prolong(i, j, k                        &
                                    , pneigh%data%q(1:nv, 1:im, 1:jm, 1:km)     &
                                    ,  pmeta%data%q(1:nv,il:iu,jl:ju,kl:ku))
 #endif /* NDIMS == 3 */
 
 #ifdef MPI
-                      end if ! block on the current processor
+                    end if ! block on the current processor
 
-                    else ! block and neighbor on different processors
+                  else ! block and neighbor on different processors
 
 ! append the block to the exchange list
 !
-                      call append_exchange_block(pmeta, pneigh, -1, i, j, k)
+                    call append_exchange_block(pmeta, pneigh, -1, i, j, k)
 
-                    end if ! block and neighbor on different processors
+                  end if ! block and neighbor on different processors
 #endif /* MPI */
-                  end if ! pmeta and pneigh marked for update
+                end if ! pmeta and pneigh marked for update
 
-                end if ! neighbor at lower level
+              end if ! neighbor at lower level
 
-              end if ! neighbor associated
+            end if ! neighbor associated
 
-            end do ! i = 1, nsides
-          end do ! j = 1, nsides
+          end do ! i = 1, nsides
+        end do ! j = 1, nsides
 #if NDIMS == 3
-        end do ! k = 1, nsides
+      end do ! k = 1, nsides
 #endif /* NDIMS == 3 */
 
-      end if ! leaf
-
-! assign the pointer to the next block on the list
+! associate pleaf with the next leaf on the list
 !
-      pmeta => pmeta%next
+      pleaf => pleaf%next
 
-    end do ! meta blocks
+    end do ! over leaf blocks
 
 #ifdef MPI
 !! 3. UPDATE VARIABLE BOUNDARIES BETWEEN BLOCKS BELONGING TO DIFFERENT PROCESSES
@@ -5353,7 +4843,7 @@ module boundaries
 
           end do ! %ptr block list
 
-!! SEND PREPARED BLOCKS AND RECEIVCE NEW ONES
+!! SEND PREPARED BLOCKS AND RECEIVE NEW ONES
 !!
 ! exchange data
 !
@@ -5391,30 +4881,21 @@ module boundaries
             k = pinfo%corner(3)
 #endif /* NDIMS == 3 */
 
-! calculate the insertion indices
+! prepare the region indices for corner boundary update
 !
-            if (i == 1) then
-              il = 1
-              iu = ibl
-            else
-              il = ieu
-              iu = im
-            end if
-            if (j == 1) then
-              jl = 1
-              ju = jbl
-            else
-              jl = jeu
-              ju = jm
-            end if
+#if NDIMS == 2
+            il = corners_gp(i,j  )%l(1)
+            jl = corners_gp(i,j  )%l(2)
+            iu = corners_gp(i,j  )%u(1)
+            ju = corners_gp(i,j  )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-            if (k == 1) then
-              kl = 1
-              ku = kbl
-            else
-              kl = keu
-              ku = km
-            end if
+            il = corners_gp(i,j,k)%l(1)
+            jl = corners_gp(i,j,k)%l(2)
+            kl = corners_gp(i,j,k)%l(3)
+            iu = corners_gp(i,j,k)%u(1)
+            ju = corners_gp(i,j,k)%u(2)
+            ku = corners_gp(i,j,k)%u(3)
 #endif /* NDIMS == 3 */
 
 ! update the corresponding corner region of the current block
@@ -5448,9 +4929,9 @@ module boundaries
 #endif /* MPI */
 
 #ifdef PROFILE
-! stop accounting time for prolong boundary update
+! stop accounting time for the corner boundary update by prolongation
 !
-    call stop_timer(imp)
+    call stop_timer(icp)
 #endif /* PROFILE */
 
 !-------------------------------------------------------------------------------
@@ -6160,168 +5641,6 @@ module boundaries
 !
 !===============================================================================
 !
-! subroutine BLOCK_FACE_COPY:
-! --------------------------
-!
-!   Subroutine returns the face boundary region copied from the provided
-!   input variable array.
-!
-!   Arguments:
-!
-!     nc         - the face direction;
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output face boundary array;
-!
-!===============================================================================
-!
-  subroutine block_face_copy(nc, ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: nc, ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
-
-! local indices
-!
-    integer :: ih, jh, kh
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half sizes
-!
-      jh = jn / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ng,1:jh,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    case(2)
-
-! calculate half sizes
-!
-      ih = in / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ih,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    case(3)
-
-! calculate half sizes
-!
-      ih = in / 2
-      jh = jn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-
-! copy the face region to the output array
-!
-      qb(1:nv,1:ih,1:jh,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_face_copy
-!
-!===============================================================================
-!
 ! subroutine BLOCK_FACE_RESTRICT:
 ! ------------------------------
 !
@@ -6345,8 +5664,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : faces_dr
     use equations      , only : nv
 
 ! local variables are not implicit by default
@@ -6368,6 +5686,18 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! prepare indices for the face region
+!
+    il = faces_dr(ic,jc,kc,nc)%l(1)
+    jl = faces_dr(ic,jc,kc,nc)%l(2)
+    kl = faces_dr(ic,jc,kc,nc)%l(3)
+    ip = il + 1
+    jp = jl + 1
+    kp = kl + 1
+    iu = faces_dr(ic,jc,kc,nc)%u(1)
+    ju = faces_dr(ic,jc,kc,nc)%u(2)
+    ku = faces_dr(ic,jc,kc,nc)%u(3)
+
 ! process depending on the direction
 !
     select case(nc)
@@ -6377,24 +5707,6 @@ module boundaries
 !
       jh = jn / 2
       kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ie - nd + 1
-        ip = il + 1
-        iu = ie
-      else
-        il = ib
-        ip = il + 1
-        iu = ib + nd - 1
-      end if
-      jl = jb
-      jp = jl + 1
-      ju = je
-      kl = kb
-      kp = kl + 1
-      ku = ke
 
 ! restrict the face region to the output array
 !
@@ -6415,24 +5727,6 @@ module boundaries
       ih = in / 2
       kh = kn / 2
 
-! prepare indices for the face region
-!
-      il = ib
-      ip = il + 1
-      iu = ie
-      if (jc == 1) then
-        jl = je - nd + 1
-        jp = jl + 1
-        ju = je
-      else
-        jl = jb
-        jp = jl + 1
-        ju = jb + nd - 1
-      end if
-      kl = kb
-      kp = kl + 1
-      ku = ke
-
 ! restrict the face region to the output array
 !
       qb(1:nv,1:ih,1:ng,1:kh) =                                                &
@@ -6451,24 +5745,6 @@ module boundaries
 !
       ih = in / 2
       jh = jn / 2
-
-! prepare indices for the face region
-!
-      il = ib
-      ip = il + 1
-      iu = ie
-      jl = jb
-      jp = jl + 1
-      ju = je
-      if (kc == 1) then
-        kl = ke - nd + 1
-        kp = kl + 1
-        ku = ke
-      else
-        kl = kb
-        kp = kl + 1
-        ku = kb + nd - 1
-      end if
 
 ! restrict the face region to the output array
 !
@@ -6513,8 +5789,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : faces_dp
     use equations      , only : nv
     use interpolations , only : limiter
 
@@ -6544,103 +5819,14 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! process depending on the direction
+! prepare subregion indices
 !
-    select case(nc)
-    case(1)
-
-! calculate half sizes
-!
-      jh = jn / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 1) then
-        il = ie - nh + 1
-        iu = ie
-      else
-        il = ib
-        iu = ib + nh - 1
-      end if
-      if (jc == 0) then
-        jl = jb
-        ju = jb + jh + nh - 1
-      else
-        jl = je - jh - nh + 1
-        ju = je
-      end if
-      if (kc == 0) then
-        kl = kb
-        ku = kb + kh + nh - 1
-      else
-        kl = ke - kh - nh + 1
-        ku = ke
-      end if
-
-    case(2)
-
-! calculate half sizes
-!
-      ih = in / 2
-      kh = kn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 0) then
-        il = ib
-        iu = ib + ih + nh - 1
-      else
-        il = ie - ih - nh + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = je - nh + 1
-        ju = je
-      else
-        jl = jb
-        ju = jb + nh - 1
-      end if
-      if (kc == 0) then
-        kl = kb
-        ku = kb + kh + nh - 1
-      else
-        kl = ke - kh - nh + 1
-        ku = ke
-      end if
-
-    case(3)
-
-! calculate half sizes
-!
-      ih = in / 2
-      jh = jn / 2
-
-! prepare indices for the face region
-!
-      if (ic == 0) then
-        il = ib
-        iu = ib + ih + nh - 1
-      else
-        il = ie - ih - nh + 1
-        iu = ie
-      end if
-      if (jc == 0) then
-        jl = jb
-        ju = jb + jh + nh - 1
-      else
-        jl = je - jh - nh + 1
-        ju = je
-      end if
-      if (kc == 1) then
-        kl = ke - nh + 1
-        ku = ke
-      else
-        kl = kb
-        ku = kb + nh - 1
-      end if
-
-    end select
+    il = faces_dp(ic,jc,kc,nc)%l(1)
+    jl = faces_dp(ic,jc,kc,nc)%l(2)
+    kl = faces_dp(ic,jc,kc,nc)%l(3)
+    iu = faces_dp(ic,jc,kc,nc)%u(1)
+    ju = faces_dp(ic,jc,kc,nc)%u(2)
+    ku = faces_dp(ic,jc,kc,nc)%u(3)
 
 ! iterate over all face region cells
 !
@@ -6715,181 +5901,6 @@ module boundaries
 !
 !===============================================================================
 !
-! subroutine BLOCK_EDGE_COPY:
-! --------------------------
-!
-!   Subroutine returns the edge boundary region by copying the corresponding
-!   region from the provided input variable array.
-!
-!   Arguments:
-!
-!     nc         - the edge direction;
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output edge boundary array;
-!
-!===============================================================================
-!
-  subroutine block_edge_copy(nc, ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : in , jn , kn
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: nc, ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-    real(kind=8), dimension( :  , :  , :  , :  ), intent(out) :: qb
-
-! local indices
-!
-    integer :: ih, jh, kh
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half size
-!
-      ih = in / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ib
-        iu = ib + ih - 1
-      else
-        il = ie - ih + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-#endif /* NDIMS == 3 */
-
-! copy the edge region to the output array
-!
-#if NDIMS == 2
-      qb(1:nv,1:ih,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      qb(1:nv,1:ih,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-    case(2)
-
-! calculate half size
-!
-      jh = jn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jb
-        ju = jb + jh - 1
-      else
-        jl = je - jh + 1
-        ju = je
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = kel
-        ku = ke
-      else
-        kl = kb
-        ku = kbu
-      end if
-#endif /* NDIMS == 3 */
-
-! copy the edge region to the output array
-!
-#if NDIMS == 2
-      qb(1:nv,1:ng,1:jh,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-      qb(1:nv,1:ng,1:jh,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! calculate half size
-!
-      kh = kn / 2
-
-! prepare source edge region indices
-!
-      if (ic == 1) then
-        il = iel
-        iu = ie
-      else
-        il = ib
-        iu = ibu
-      end if
-      if (jc == 1) then
-        jl = jel
-        ju = je
-      else
-        jl = jb
-        ju = jbu
-      end if
-      if (kc == 1) then
-        kl = kb
-        ku = kb + kh - 1
-      else
-        kl = ke - kh + 1
-        ku = ke
-      end if
-
-! copy the edge region to the output array
-!
-      qb(1:nv,1:ng,1:ng,1:kh) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-    end select
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_edge_copy
-!
-!===============================================================================
-!
 ! subroutine BLOCK_EDGE_RESTRICT:
 ! ------------------------------
 !
@@ -6913,8 +5924,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : edges_dr
     use equations      , only : nv
 
 ! local variables are not implicit by default
@@ -6936,6 +5946,28 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
+! prepare indices for the edge region
+!
+#if NDIMS == 2
+    il = edges_dr(ic,jc,nc)%l(1)
+    jl = edges_dr(ic,jc,nc)%l(2)
+    ip = il + 1
+    jp = jl + 1
+    iu = edges_dr(ic,jc,nc)%u(1)
+    ju = edges_dr(ic,jc,nc)%u(2)
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    il = edges_dr(ic,jc,kc,nc)%l(1)
+    jl = edges_dr(ic,jc,kc,nc)%l(2)
+    kl = edges_dr(ic,jc,kc,nc)%l(3)
+    ip = il + 1
+    jp = jl + 1
+    kp = kl + 1
+    iu = edges_dr(ic,jc,kc,nc)%u(1)
+    ju = edges_dr(ic,jc,kc,nc)%u(2)
+    ku = edges_dr(ic,jc,kc,nc)%u(3)
+#endif /* NDIMS == 3 */
+
 ! process depending on the direction
 !
     select case(nc)
@@ -6944,32 +5976,6 @@ module boundaries
 ! calculate half size
 !
       ih = in / 2
-
-! prepare indices for the edge region
-!
-      il = ib
-      ip = il + 1
-      iu = ie
-      if (jc == 1) then
-        jl = je - nd + 1
-        jp = jl + 1
-        ju = je
-      else
-        jl = jb
-        jp = jl + 1
-        ju = jb + nd - 1
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nd + 1
-        kp = kl + 1
-        ku = ke
-      else
-        kl = kb
-        kp = kl + 1
-        ku = kb + nd - 1
-      end if
-#endif /* NDIMS == 3 */
 
 ! restrict the edge region to the output array
 !
@@ -6998,32 +6004,6 @@ module boundaries
 !
       jh = jn / 2
 
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nd + 1
-        ip = il + 1
-        iu = ie
-      else
-        il = ib
-        ip = il + 1
-        iu = ib + nd - 1
-      end if
-      jl = jb
-      jp = jl + 1
-      ju = je
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nd + 1
-        kp = kl + 1
-        ku = ke
-      else
-        kl = kb
-        kp = kl + 1
-        ku = kb + nd - 1
-      end if
-#endif /* NDIMS == 3 */
-
 ! restrict the edge region to the output array
 !
 #if NDIMS == 2
@@ -7051,30 +6031,6 @@ module boundaries
 ! calculate half size
 !
       kh = kn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nd + 1
-        ip = il + 1
-        iu = ie
-      else
-        il = ib
-        ip = il + 1
-        iu = ib + nd - 1
-      end if
-      if (jc == 1) then
-        jl = je - nd + 1
-        jp = jl + 1
-        ju = je
-      else
-        jl = jb
-        jp = jl + 1
-        ju = jb + nd - 1
-      end if
-      kl = kb
-      kp = kl + 1
-      ku = ke
 
 ! restrict the edge region to the output array
 !
@@ -7120,8 +6076,7 @@ module boundaries
     use coordinates    , only : in
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : edges_dp
     use equations      , only : nv
     use interpolations , only : limiter
 
@@ -7138,7 +6093,6 @@ module boundaries
 ! local variables
 !
     integer      :: i, j, k, p
-    integer      :: ih, jh, kh
     integer      :: il, jl, kl
     integer      :: iu, ju, ku
     integer      :: is, js, ks
@@ -7151,106 +6105,22 @@ module boundaries
 !
 !-------------------------------------------------------------------------------
 !
-! process depending on the direction
-!
-    select case(nc)
-    case(1)
-
-! calculate half size
-!
-      ih = in / 2
-
 ! prepare indices for the edge region
 !
-      if (ic == 0) then
-        il = ib
-        iu = ib + ih + nh - 1
-      else
-        il = ie - ih - nh + 1
-        iu = ie
-      end if
-      if (jc == 1) then
-        jl = je - nh + 1
-        ju = je
-      else
-        jl = jb
-        ju = jb + nh - 1
-      end if
+#if NDIMS == 2
+    il = edges_dp(ic,jc   ,nc)%l(1)
+    jl = edges_dp(ic,jc   ,nc)%l(2)
+    iu = edges_dp(ic,jc   ,nc)%u(1)
+    ju = edges_dp(ic,jc   ,nc)%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nh + 1
-        ku = ke
-      else
-        kl = kb
-        ku = kb + nh - 1
-      end if
+    il = edges_dp(ic,jc,kc,nc)%l(1)
+    jl = edges_dp(ic,jc,kc,nc)%l(2)
+    kl = edges_dp(ic,jc,kc,nc)%l(3)
+    iu = edges_dp(ic,jc,kc,nc)%u(1)
+    ju = edges_dp(ic,jc,kc,nc)%u(2)
+    ku = edges_dp(ic,jc,kc,nc)%u(3)
 #endif /* NDIMS == 3 */
-
-    case(2)
-
-! calculate half size
-!
-      jh = jn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nh + 1
-        iu = ie
-      else
-        il = ib
-        iu = ib + nh - 1
-      end if
-      if (jc == 0) then
-        jl = jb
-        ju = jb + jh + nh - 1
-      else
-        jl = je - jh - nh + 1
-        ju = je
-      end if
-#if NDIMS == 3
-      if (kc == 1) then
-        kl = ke - nh + 1
-        ku = ke
-      else
-        kl = kb
-        ku = kb + nh - 1
-      end if
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-    case(3)
-
-! calculate half size
-!
-      kh = kn / 2
-
-! prepare indices for the edge region
-!
-      if (ic == 1) then
-        il = ie - nh + 1
-        iu = ie
-      else
-        il = ib
-        iu = ib + nh - 1
-      end if
-      if (jc == 1) then
-        jl = je - nh + 1
-        ju = je
-      else
-        jl = jb
-        ju = jb + nh - 1
-      end if
-      if (kc == 0) then
-        kl = kb
-        ku = kb + kh + nh - 1
-      else
-        kl = ke - kh - nh + 1
-        ku = ke
-      end if
-#endif /* NDIMS == 3 */
-
-    end select
 
 ! iterate over all edge region cells
 !
@@ -7347,95 +6217,6 @@ module boundaries
 !
 !===============================================================================
 !
-! subroutine BLOCK_CORNER_COPY:
-! ----------------------------
-!
-!   Subroutine returns the corner boundary region by copying the corresponding
-!   region from the provided input variable array.
-!
-!   Arguments:
-!
-!     ic, jc, kc - the corner position;
-!     qn         - the input neighbor variable array;
-!     qb         - the output corner boundary array;
-!
-!===============================================================================
-!
-  subroutine block_corner_copy(ic, jc, kc, qn, qb)
-
-! import external procedures and variables
-!
-    use coordinates    , only : ng
-    use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
-    use coordinates    , only : ibu, jbu, kbu
-    use coordinates    , only : iel, jel, kel
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                                     , intent(in)  :: ic, jc, kc
-    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(in)  :: qn
-#if NDIMS == 2
-    real(kind=8), dimension(1:nv,1:ng,1:ng,1:km), intent(out) :: qb
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    real(kind=8), dimension(1:nv,1:ng,1:ng,1:ng), intent(out) :: qb
-#endif /* NDIMS == 3 */
-
-! local indices
-!
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-!
-!-------------------------------------------------------------------------------
-!
-! prepare indices for the corner region
-!
-    if (ic == 1) then
-      il = iel
-      iu = ie
-    else
-      il = ib
-      iu = ibu
-    end if
-    if (jc == 1) then
-      jl = jel
-      ju = je
-    else
-      jl = jb
-      ju = jbu
-    end if
-#if NDIMS == 3
-    if (kc == 1) then
-      kl = kel
-      ku = ke
-    else
-      kl = kb
-      ku = kbu
-    end if
-#endif /* NDIMS == 3 */
-
-! copy the corner region to the output array
-!
-#if NDIMS == 2
-    qb(1:nv,1:ng,1:ng,1:km) = qn(1:nv,il:iu,jl:ju, 1:km)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-    qb(1:nv,1:ng,1:ng,1:ng) = qn(1:nv,il:iu,jl:ju,kl:ku)
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine block_corner_copy
-!
-!===============================================================================
-!
 ! subroutine BLOCK_CORNER_RESTRICT:
 ! --------------------------------
 !
@@ -7456,8 +6237,7 @@ module boundaries
 !
     use coordinates    , only : ng, nd
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : corners_dr
     use equations      , only : nv
 
 ! local variables are not implicit by default
@@ -7485,34 +6265,24 @@ module boundaries
 !
 ! prepare indices for the corner region
 !
-    if (ic == 1) then
-      il = ie - nd + 1
-      ip = il + 1
-      iu = ie
-    else
-      il = ib
-      ip = il + 1
-      iu = ib + nd - 1
-    end if
-    if (jc == 1) then
-      jl = je - nd + 1
-      jp = jl + 1
-      ju = je
-    else
-      jl = jb
-      jp = jl + 1
-      ju = jb + nd - 1
-    end if
+#if NDIMS == 2
+    il = corners_dr(ic,jc   )%l(1)
+    jl = corners_dr(ic,jc   )%l(2)
+    ip = il + 1
+    jp = jl + 1
+    iu = corners_dr(ic,jc   )%u(1)
+    ju = corners_dr(ic,jc   )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-    if (kc == 1) then
-      kl = ke - nd + 1
-      kp = kl + 1
-      ku = ke
-    else
-      kl = kb
-      kp = kl + 1
-      ku = kb + nd - 1
-    end if
+    il = corners_dr(ic,jc,kc)%l(1)
+    jl = corners_dr(ic,jc,kc)%l(2)
+    kl = corners_dr(ic,jc,kc)%l(3)
+    ip = il + 1
+    jp = jl + 1
+    kp = kl + 1
+    iu = corners_dr(ic,jc,kc)%u(1)
+    ju = corners_dr(ic,jc,kc)%u(2)
+    ku = corners_dr(ic,jc,kc)%u(3)
 #endif /* NDIMS == 3 */
 
 ! restrict the corner region to the output array
@@ -7562,8 +6332,7 @@ module boundaries
 !
     use coordinates    , only : ng, nh
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ib , jb , kb
-    use coordinates    , only : ie , je , ke
+    use coordinates    , only : corners_dp
     use equations      , only : nv
     use interpolations , only : limiter
 
@@ -7599,28 +6368,19 @@ module boundaries
 !
 ! prepare indices for the corner region
 !
-    if (ic == 1) then
-      il = ie - nh + 1
-      iu = ie
-    else
-      il = ib
-      iu = ib + nh - 1
-    end if
-    if (jc == 1) then
-      jl = je - nh + 1
-      ju = je
-    else
-      jl = jb
-      ju = jb + nh - 1
-    end if
+#if NDIMS == 2
+    il = corners_dp(ic,jc   )%l(1)
+    jl = corners_dp(ic,jc   )%l(2)
+    iu = corners_dp(ic,jc   )%u(1)
+    ju = corners_dp(ic,jc   )%u(2)
+#endif /* NDIMS == 2 */
 #if NDIMS == 3
-    if (kc == 1) then
-      kl = ke - nh + 1
-      ku = ke
-    else
-      kl = kb
-      ku = kb + nh - 1
-    end if
+    il = corners_dp(ic,jc,kc)%l(1)
+    jl = corners_dp(ic,jc,kc)%l(2)
+    kl = corners_dp(ic,jc,kc)%l(3)
+    iu = corners_dp(ic,jc,kc)%u(1)
+    ju = corners_dp(ic,jc,kc)%u(2)
+    ku = corners_dp(ic,jc,kc)%u(3)
 #endif /* NDIMS == 3 */
 
 ! iterate over all corner region cells

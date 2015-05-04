@@ -81,22 +81,19 @@ name = amun
 
 default: $(name).x
 
-sources = blocks.F90 boundaries.F90 constants.F90 coordinates.F90 domains.F90  \
-          driver.F90 equations.F90 error.F90 evolution.F90 integrals.F90       \
-          interpolations.F90 io.F90 mesh.F90 mpitools.F90 operators.F90        \
-          parameters.F90 problems.F90 random.F90 refinement.F90 schemes.F90    \
-          shapes.F90 sources.F90 timers.F90
-objects = blocks.o boundaries.o constants.o coordinates.o domains.o driver.o   \
-          equations.o error.o evolution.o integrals.o interpolations.o io.o    \
-          mesh.o mpitools.o operators.o parameters.o problems.o random.o       \
-          refinement.o schemes.o shapes.o sources.o timers.o
-files   = $(sources) makefile make.default license.txt hosts
+sources = algebra.F90 blocks.F90 boundaries.F90 constants.F90 coordinates.F90  \
+          domains.F90 driver.F90 equations.F90 error.F90 evolution.F90         \
+          integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
+          operators.F90 parameters.F90 problems.F90 random.F90 refinement.F90  \
+          schemes.F90 shapes.F90 sources.F90 timers.F90
+objects = algebra.o blocks.o boundaries.o constants.o coordinates.o domains.o  \
+          driver.o equations.o error.o evolution.o integrals.o                 \
+          interpolations.o io.o mesh.o mpitools.o operators.o parameters.o     \
+          problems.o random.o refinement.o schemes.o shapes.o sources.o        \
+          timers.o
 
 $(name).x: $(objects)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(name).x
-
-arch: $(files)
-	tar czvf $(name)-$(DATE).tar.gz $(files)
 
 clean-bak:
 	rm -rf *.bak *~
@@ -123,6 +120,7 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 
 #-------------------------------------------------------------------------------
 
+algebra.o        : algebra.F90 constants.o
 blocks.o         : blocks.F90 error.o timers.o
 boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
                    interpolations.o mpitools.o timers.o
@@ -132,7 +130,7 @@ driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    integrals.o interpolations.o io.o mesh.o mpitools.o         \
                    operators.o parameters.o problems.o random.o refinement.o   \
                    schemes.o shapes.o sources.o
-equations.o      : equations.F90 coordinates.o parameters.o timers.o
+equations.o      : equations.F90 algebra.o coordinates.o parameters.o timers.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
                    equations.o mesh.o mpitools.o parameters.o schemes.o        \
@@ -155,8 +153,8 @@ problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
 random.o         : random.F90 mpitools.o parameters.o
 refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    operators.o parameters.o timers.o
-schemes.o        : schemes.F90 coordinates.o equations.o interpolations.o      \
-                   timers.o
+schemes.o        : schemes.F90 algebra.o coordinates.o equations.o             \
+                   interpolations.o timers.o
 shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
                    parameters.o timers.o
 sources.o        : sources.F90 blocks.o coordinates.o equations.o operators.o  \

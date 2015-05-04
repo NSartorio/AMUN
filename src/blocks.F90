@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -227,6 +227,20 @@ module blocks
 
   end type block_meta
 
+! define the LEAF structure; this is a simple structure used to keep the leaf
+! list; it contains the pointer to the next leaf block and the pointer to
+! the meta block which is leaf;
+!
+  type block_leaf
+                                 ! pointer to the next leaf block
+                                 !
+    type(block_leaf), pointer :: next
+                                 ! pointer to the leaf meta block
+                                 !
+    type(block_meta), pointer :: meta
+
+  end type block_leaf
+
 ! define the DATA block structure; all data blocks are divided between
 ! processes, therefore the same data block cannot be associated with two
 ! different processes, but they can be moved from one process to another;
@@ -298,10 +312,12 @@ module blocks
 ! POINTERS TO THE FIST AND LAST BLOCKS IN THE LISTS:
 ! =================================================
 !
-! these pointers construct the lists of meta and data blocks;
+! these pointers construct the lists of meta and data blocks, and the list of
+! leaf blocks;
 !
   type(block_meta), pointer, save :: list_meta, last_meta
   type(block_data), pointer, save :: list_data, last_data
+  type(block_leaf), pointer, save :: list_leaf
 
 ! all variables and subroutines are private by default
 !
@@ -310,8 +326,8 @@ module blocks
 ! declare public pointers, structures, and variables
 !
   public :: pointer_meta, pointer_info
-  public :: block_meta, block_data, block_info
-  public :: list_meta, list_data
+  public :: block_meta, block_data, block_info, block_leaf
+  public :: list_meta, list_data, list_leaf
   public :: ndims, nsides, nchildren
 
 ! declare public subroutines
@@ -332,6 +348,7 @@ module blocks
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates
   public :: metablock_set_bounds, metablock_set_leaf, metablock_unset_leaf
+  public :: build_leaf_list
 #ifdef DEBUG
   public :: check_neighbors
 #endif /* DEBUG */
@@ -419,6 +436,7 @@ module blocks
     nullify(list_data)
     nullify(last_meta)
     nullify(last_data)
+    nullify(list_leaf)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -484,12 +502,17 @@ module blocks
 
     end do ! meta blocks
 
+! wipe the leaf list out
+!
+    call wipe_leaf_list()
+
 ! nullify pointers defining the meta and data lists
 !
     nullify(list_meta)
     nullify(list_data)
     nullify(last_meta)
     nullify(last_data)
+    nullify(list_leaf)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -3698,6 +3721,70 @@ module blocks
 !
 !===============================================================================
 !
+! subroutine BUILD_LEAF_LIST:
+! ---------------------------
+!
+!   Subroutine builds the list of leaf blocks.
+!
+!
+!===============================================================================
+!
+  subroutine build_leaf_list()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_meta), pointer  :: pmeta
+    type(block_leaf), pointer  :: pleaf
+!
+!-------------------------------------------------------------------------------
+!
+! if the list_leaf is associated, wipe it out
+!
+    if (associated(list_leaf)) call wipe_leaf_list()
+
+! associate pmeta with the first block on the meta block list
+!
+    pmeta => list_meta
+
+! iterate over all meta blocks in the list
+!
+    do while (associated(pmeta))
+
+! check if the block is the leaf
+!
+      if (pmeta%leaf) then
+
+! allocate new leaf structure
+!
+        allocate(pleaf)
+
+! associate its pointers
+!
+        pleaf%next => list_leaf
+        pleaf%meta => pmeta
+
+! associate list_leaf to the allocated structure
+!
+        list_leaf  => pleaf
+
+      end if ! leaf
+
+! associate pmeta with the next meta block
+!
+      pmeta => pmeta%next
+
+    end do ! meta blocks
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine build_leaf_list
+!
+!===============================================================================
+!
 ! subroutine SET_NEIGHBORS_REFINE:
 ! -------------------------------
 !
@@ -4000,6 +4087,54 @@ module blocks
 !-------------------------------------------------------------------------------
 !
   end subroutine insert_metablock_before
+!
+!===============================================================================
+!
+! subroutine WIPE_LEAF_LIST:
+! --------------------------
+!
+!   Subroutine releases the memory used by the leaf block list.
+!
+!
+!===============================================================================
+!
+  subroutine wipe_leaf_list()
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_leaf), pointer  :: pleaf
+!
+!-------------------------------------------------------------------------------
+!
+! associate pleaf with the first pointer on the leaf list
+!
+    pleaf => list_leaf
+
+! iterate over all leafs in the list
+!
+    do while (associated(pleaf))
+
+! associate the list pointer to the next leaf block
+!
+      list_leaf => pleaf%next
+
+! deallocate the current leaf block
+!
+      deallocate(pleaf)
+
+! associate pleaf with the first pointer on the leaf list
+!
+      pleaf => list_leaf
+
+    end do ! leaf list
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine wipe_leaf_list
 !
 !===============================================================================
 !

@@ -25,9 +25,9 @@ clip_extrema         = "off"
 
 # mesh parameters
 #
-rdimx                =  2
-rdimy                =  3
-rdimz                =  1
+xblocks              =  2
+yblocks              =  3
+zblocks              =  1
 xmin                 = -5.00d-01
 xmax                 =  5.00d-01
 ymin                 = -7.50d-01

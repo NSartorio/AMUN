@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -39,11 +39,11 @@ module timers
 ! module variables
 !
   integer          , parameter                :: ntimers = 128
-  integer                              , save :: ntimer, norder
-  logical          , dimension(ntimers), save :: ftimer, forder
+  integer                              , save :: ntimer
+  logical          , dimension(ntimers), save :: tenabled, tlocked
   character(len=32), dimension(ntimers), save :: description
   integer(kind=8)  , dimension(ntimers), save :: times, tstart, tstop
-  integer(kind=4)  , dimension(ntimers), save :: tcount, torder
+  integer(kind=8)  , dimension(ntimers), save :: tcount
   integer(kind=8)                      , save :: ticks, tbegin
   real   (kind=8)                      , save :: conv    = 1.0d+00
 
@@ -85,28 +85,26 @@ module timers
 !
     call system_clock(count=tbegin, count_rate=ticks)
 
-! initialize flags for enabled timers and timer order
+! initialize arrays of flags for indicating which timers are enabled, and lock
+! currently active timers
 !
-    ftimer(:)      = .false.
-    forder(:)      = .false.
+    tenabled(:)    = .false.
+    tlocked(:)     = .false.
 
 ! initialize flag  desciptions
 !
     description(:) = ''
 
-! initialize the next available timer and the number of occupied positions
-! in the order array
+! initialize the next available timer
 !
     ntimer         = 1
-    norder         = 0
 
-! reset timers
+! reset timer variables
 !
     times(:)       = 0
     tstart(:)      = 0
     tstop(:)       = 0
     tcount(:)      = 0
-    torder(:)      = 0
 
 ! prepare the conversion factor
 !
@@ -180,7 +178,7 @@ module timers
 
 ! set the timer flag
 !
-      ftimer(ntimer)      = .true.
+      tenabled(ntimer)      = .true.
 
 ! return the timer index
 !
@@ -205,7 +203,7 @@ module timers
 !
 !===============================================================================
 !
-  subroutine start_timer(itimer)
+  subroutine start_timer(timer)
 
 ! local variables are not implicit by default
 !
@@ -213,27 +211,30 @@ module timers
 
 ! input arguments
 !
-    integer, intent(in) :: itimer
+    integer, intent(in) :: timer
 !
 !-------------------------------------------------------------------------------
 !
-! start accounting the time
+! check if the timer is unlocked, if not, lock it and star counting
 !
-    call system_clock(tstart(itimer))
+    if (tlocked(timer)) then
 
-! return, if the timer is already allocated in the order array
+! the timer is already locked
 !
-    if (forder(itimer)) return
+      write(*,'("start_timer:: The timer -", a, "- is already locked!")')      &
+                                                      trim(description(timer))
 
-! otherwise, increase the order position
-!
-    norder = norder + 1
+    else ! unlocked
 
-! assign the current timer with the order position and switch the flag
-! signifying that the timer is already in the order array
+! lock the timer
 !
-    torder(norder) = itimer
-    forder(itimer) = .true.
+      tlocked(timer) = .true.
+
+! get the system clock to initiate the counting
+!
+      call system_clock(tstart(timer))
+
+    end if ! unlocked
 
 !-------------------------------------------------------------------------------
 !
@@ -264,17 +265,34 @@ module timers
 !
 !-------------------------------------------------------------------------------
 !
-! get the system clock
+! check if the timer is locked
 !
-    call system_clock(tstop(timer))
+    if (tlocked(timer)) then
 
-! increase the timer count
+! get the system clock to terminate the time counting
 !
-    tcount(timer) = tcount(timer) + 1
+      call system_clock(tstop(timer))
 
 ! add the time increment
 !
-    times(timer) = times(timer) + (tstop(timer) - tstart(timer))
+      times(timer)  = times(timer) + (tstop(timer) - tstart(timer))
+
+! increase the timer count
+!
+      tcount(timer) = tcount(timer) + 1
+
+! unlock the timer
+!
+      tlocked(timer) = .false.
+
+    else ! unlocked
+
+! the timer is unlocked, nothing to count
+!
+      write(*,'("stop_timer:: The timer -", a, "- is already unlocked!")')     &
+                                                      trim(description(timer))
+
+    end if ! unlocked
 
 !-------------------------------------------------------------------------------
 !
@@ -393,7 +411,7 @@ module timers
 !
 ! estimate the accounted time for the specified timer
 !
-    timer_enabled = ftimer(timer)
+    timer_enabled = tenabled(timer)
 
 ! return the value
 !

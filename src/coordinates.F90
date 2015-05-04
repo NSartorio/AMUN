@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -105,6 +105,36 @@ module coordinates
   real(kind=8), dimension(:  ), allocatable, save :: adxi, adyi, adzi
   real(kind=8), dimension(:  ), allocatable, save :: advol
 
+! define type for rectangular subarray description
+!
+  type rectangular
+    integer, dimension(NDIMS) :: l ! indices of the lower corner
+    integer, dimension(NDIMS) :: u ! indices of the upper corner
+  end type rectangular
+
+! the subarray indices to ghost and domain areas used for boundary exchange
+! ('c' for copy, 'p' for prolongation, 'r' for restriction)
+!
+#if NDIMS == 2
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dc  , edges_gc
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dp  , edges_gp
+  type(rectangular), dimension(2,2,NDIMS)  , save :: edges_dr  , edges_gr
+  type(rectangular), dimension(2,2)        , save :: corners_dc, corners_gc
+  type(rectangular), dimension(2,2)        , save :: corners_dp, corners_gp
+  type(rectangular), dimension(2,2)        , save :: corners_dr, corners_gr
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dc  , faces_gc
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dp  , faces_gp
+  type(rectangular), dimension(2,2,2,NDIMS), save :: faces_dr  , faces_gr
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dc  , edges_gc
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dp  , edges_gp
+  type(rectangular), dimension(2,2,2,NDIMS), save :: edges_dr  , edges_gr
+  type(rectangular), dimension(2,2,2)      , save :: corners_dc, corners_gc
+  type(rectangular), dimension(2,2,2)      , save :: corners_dp, corners_gp
+  type(rectangular), dimension(2,2,2)      , save :: corners_dr, corners_gr
+#endif /* NDIMS == 3 */
+
 ! the decay factors for all levels
 !
   real(kind=8), dimension(:  ), allocatable, save :: adec
@@ -148,8 +178,9 @@ module coordinates
 
 ! local variables
 !
-    integer :: i, j, k, l, ff
-    integer :: ni, nj, nk
+    integer :: i, j, k, l, p, q, r, ff
+    integer :: fi, fj, fk
+    integer :: ni, nj, nk, nm, np, nr, nq, ns, nt, nu
     logical :: info
 
 ! local arrays
@@ -232,10 +263,10 @@ module coordinates
 
 ! obtain the domain base division
 !
-    call get_parameter_integer("rdimx" , ir    )
-    call get_parameter_integer("rdimy" , jr    )
+    call get_parameter_integer("xblocks", ir   )
+    call get_parameter_integer("yblocks", jr   )
 #if NDIMS == 3
-    call get_parameter_integer("rdimz" , kr    )
+    call get_parameter_integer("zblocks", kr   )
 #endif /* NDIMS == 3 */
 
 ! obtain the domain bounds
@@ -343,6 +374,354 @@ module coordinates
       advol(l) = adx(l) * ady(l) * adz(l)
 
     end do ! l = 1, toplev
+
+! initialize ghost subarray indices
+!
+    np = nc + ng
+    nm = nc - ng
+    nr = nc - nd
+    nq = nc - nh
+    ns = nc / 2
+    nt = np / 2
+    nu = nm / 2
+#if NDIMS == 2
+    do j = 1, 2
+      fj = j - 1
+      q  = 3 - j
+      do i = 1, 2
+        fi = i - 1
+        p  = 3 - i
+
+! for edge copy
+!
+        edges_gc(i,j,1)%l(1) = ib + fi * ns
+        edges_gc(i,j,1)%l(2) =  1 + fj * np
+        edges_gc(i,j,2)%l(1) =  1 + fi * np
+        edges_gc(i,j,2)%l(2) = jb + fj * ns
+
+        edges_dc(i,q,1)%l(1) = ib + fi * ns
+        edges_dc(i,q,1)%l(2) = jb + fj * nm
+        edges_dc(p,j,2)%l(1) = ib + fi * nm
+        edges_dc(p,j,2)%l(2) = jb + fj * ns
+
+        edges_gc(i,j,1)%u(:) = edges_gc(i,j,1)%l(:) + (/ ns, ng /) - 1
+        edges_gc(i,j,2)%u(:) = edges_gc(i,j,2)%l(:) + (/ ng, ns /) - 1
+
+        edges_dc(i,q,1)%u(:) = edges_dc(i,q,1)%l(:) + (/ ns, ng /) - 1
+        edges_dc(p,j,2)%u(:) = edges_dc(p,j,2)%l(:) + (/ ng, ns /) - 1
+
+! for edge restriction
+!
+        edges_gr(i,j,1)%l(1) = ib + fi * ns
+        edges_gr(i,j,1)%l(2) =  1 + fj * np
+        edges_gr(i,j,2)%l(1) =  1 + fi * np
+        edges_gr(i,j,2)%l(2) = jb + fj * ns
+
+        edges_dr(i,q,1)%l(1) = ib
+        edges_dr(i,q,1)%l(2) = jb + fj * nr
+        edges_dr(p,j,2)%l(1) = ib + fi * nr
+        edges_dr(p,j,2)%l(2) = jb
+
+        edges_gr(i,j,1)%u(:) = edges_gr(i,j,1)%l(:) + (/ ns, ng /) - 1
+        edges_gr(i,j,2)%u(:) = edges_gr(i,j,2)%l(:) + (/ ng, ns /) - 1
+
+        edges_dr(i,q,1)%u(:) = edges_dr(i,q,1)%l(:) + (/ nc, nd /) - 1
+        edges_dr(p,j,2)%u(:) = edges_dr(p,j,2)%l(:) + (/ nd, nc /) - 1
+
+! for edge prolongation
+!
+        edges_gp(i,j,1)%l(1) = ib - fi * ng
+        edges_gp(i,j,1)%l(2) =  1 + fj * np
+        edges_gp(i,j,2)%l(1) =  1 + fi * np
+        edges_gp(i,j,2)%l(2) = jb - fj * ng
+
+        edges_dp(i,q,1)%l(1) = ib + fi * nu
+        edges_dp(i,q,1)%l(2) = jb + fj * nq
+        edges_dp(p,j,2)%l(1) = ib + fi * nq
+        edges_dp(p,j,2)%l(2) = jb + fj * nu
+
+        edges_gp(i,j,1)%u(:) = edges_gp(i,j,1)%l(:) + (/ np, ng /) - 1
+        edges_gp(i,j,2)%u(:) = edges_gp(i,j,2)%l(:) + (/ ng, np /) - 1
+
+        edges_dp(i,q,1)%u(:) = edges_dp(i,q,1)%l(:) + (/ nt, nh /) - 1
+        edges_dp(p,j,2)%u(:) = edges_dp(p,j,2)%l(:) + (/ nh, nt /) - 1
+
+! for corner copy
+!
+        corners_gc(i,j)%l(1) =  1 + fi * np
+        corners_gc(i,j)%l(2) =  1 + fj * np
+
+        corners_dc(p,q)%l(1) = ib + fi * nm
+        corners_dc(p,q)%l(2) = jb + fj * nm
+
+        corners_gc(i,j)%u(:) = corners_gc(i,j)%l(:) + ng - 1
+
+        corners_dc(p,q)%u(:) = corners_dc(p,q)%l(:) + ng - 1
+
+! for corner restriction
+!
+        corners_gr(i,j)%l(1) =  1 + fi * np
+        corners_gr(i,j)%l(2) =  1 + fj * np
+
+        corners_dr(p,q)%l(1) = ib + fi * nr
+        corners_dr(p,q)%l(2) = jb + fj * nr
+
+        corners_gr(i,j)%u(:) = corners_gr(i,j)%l(:) + ng - 1
+
+        corners_dr(p,q)%u(:) = corners_dr(p,q)%l(:) + nd - 1
+
+! for corner prolongation
+!
+        corners_gp(i,j)%l(1) =  1 + fi * np
+        corners_gp(i,j)%l(2) =  1 + fj * np
+
+        corners_dp(p,q)%l(1) = ib + fi * nq
+        corners_dp(p,q)%l(2) = jb + fj * nq
+
+        corners_gp(i,j)%u(:) = corners_gp(i,j)%l(:) + ng - 1
+
+        corners_dp(p,q)%u(:) = corners_dp(p,q)%l(:) + nh - 1
+
+      end do ! i = 1, 2
+    end do ! j = 1, 2
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do k = 1, 2
+      fk = k - 1
+      r  = 3 - k
+      do j = 1, 2
+        fj = j - 1
+        q  = 3 - j
+        do i = 1, 2
+          fi = i - 1
+          p  = 3 - i
+
+! for face copy
+!
+          faces_gc(i,j,k,1)%l(1) =  1 + fi * np
+          faces_gc(i,j,k,1)%l(2) = jb + fj * ns
+          faces_gc(i,j,k,1)%l(3) = kb + fk * ns
+          faces_gc(i,j,k,2)%l(1) = ib + fi * ns
+          faces_gc(i,j,k,2)%l(2) =  1 + fj * np
+          faces_gc(i,j,k,2)%l(3) = kb + fk * ns
+          faces_gc(i,j,k,3)%l(1) = ib + fi * ns
+          faces_gc(i,j,k,3)%l(2) = jb + fj * ns
+          faces_gc(i,j,k,3)%l(3) =  1 + fk * np
+
+          faces_dc(p,j,k,1)%l(1) = ib + fi * nm
+          faces_dc(p,j,k,1)%l(2) = jb + fj * ns
+          faces_dc(p,j,k,1)%l(3) = kb + fk * ns
+          faces_dc(i,q,k,2)%l(1) = ib + fi * ns
+          faces_dc(i,q,k,2)%l(2) = jb + fj * nm
+          faces_dc(i,q,k,2)%l(3) = kb + fk * ns
+          faces_dc(i,j,r,3)%l(1) = ib + fi * ns
+          faces_dc(i,j,r,3)%l(2) = jb + fj * ns
+          faces_dc(i,j,r,3)%l(3) = kb + fk * nm
+
+          faces_gc(i,j,k,1)%u(:) = faces_gc(i,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_gc(i,j,k,2)%u(:) = faces_gc(i,j,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_gc(i,j,k,3)%u(:) = faces_gc(i,j,k,3)%l(:) + (/ ns, ns, ng /) - 1
+
+          faces_dc(p,j,k,1)%u(:) = faces_dc(p,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_dc(i,q,k,2)%u(:) = faces_dc(i,q,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_dc(i,j,r,3)%u(:) = faces_dc(i,j,r,3)%l(:) + (/ ns, ns, ng /) - 1
+
+! for face restriction
+!
+          faces_gr(i,j,k,1)%l(1) =  1 + fi * np
+          faces_gr(i,j,k,1)%l(2) = jb + fj * ns
+          faces_gr(i,j,k,1)%l(3) = kb + fk * ns
+          faces_gr(i,j,k,2)%l(1) = ib + fi * ns
+          faces_gr(i,j,k,2)%l(2) =  1 + fj * np
+          faces_gr(i,j,k,2)%l(3) = kb + fk * ns
+          faces_gr(i,j,k,3)%l(1) = ib + fi * ns
+          faces_gr(i,j,k,3)%l(2) = jb + fj * ns
+          faces_gr(i,j,k,3)%l(3) =  1 + fk * np
+
+          faces_dr(p,j,k,1)%l(1) = ib + fi * nr
+          faces_dr(p,j,k,1)%l(2) = jb
+          faces_dr(p,j,k,1)%l(3) = kb
+          faces_dr(i,q,k,2)%l(1) = ib
+          faces_dr(i,q,k,2)%l(2) = jb + fj * nr
+          faces_dr(i,q,k,2)%l(3) = kb
+          faces_dr(i,j,r,3)%l(1) = ib
+          faces_dr(i,j,r,3)%l(2) = jb
+          faces_dr(i,j,r,3)%l(3) = kb + fk * nr
+
+          faces_gr(i,j,k,1)%u(:) = faces_gr(i,j,k,1)%l(:) + (/ ng, ns, ns /) - 1
+          faces_gr(i,j,k,2)%u(:) = faces_gr(i,j,k,2)%l(:) + (/ ns, ng, ns /) - 1
+          faces_gr(i,j,k,3)%u(:) = faces_gr(i,j,k,3)%l(:) + (/ ns, ns, ng /) - 1
+
+          faces_dr(p,j,k,1)%u(:) = faces_dr(p,j,k,1)%l(:) + (/ nd, nc, nc /) - 1
+          faces_dr(i,q,k,2)%u(:) = faces_dr(i,q,k,2)%l(:) + (/ nc, nd, nc /) - 1
+          faces_dr(i,j,r,3)%u(:) = faces_dr(i,j,r,3)%l(:) + (/ nc, nc, nd /) - 1
+
+! for face prolongation
+!
+          faces_gp(i,j,k,1)%l(1) =  1 + fi * np
+          faces_gp(i,j,k,1)%l(2) = jb - fj * ng
+          faces_gp(i,j,k,1)%l(3) = kb - fk * ng
+          faces_gp(i,j,k,2)%l(1) = ib - fi * ng
+          faces_gp(i,j,k,2)%l(2) =  1 + fj * np
+          faces_gp(i,j,k,2)%l(3) = kb - fk * ng
+          faces_gp(i,j,k,3)%l(1) = ib - fi * ng
+          faces_gp(i,j,k,3)%l(2) = jb - fj * ng
+          faces_gp(i,j,k,3)%l(3) =  1 + fk * np
+
+          faces_dp(p,j,k,1)%l(1) = ib + fi * nq
+          faces_dp(p,j,k,1)%l(2) = jb + fj * nu
+          faces_dp(p,j,k,1)%l(3) = kb + fk * nu
+          faces_dp(i,q,k,2)%l(1) = ib + fi * nu
+          faces_dp(i,q,k,2)%l(2) = jb + fj * nq
+          faces_dp(i,q,k,2)%l(3) = kb + fk * nu
+          faces_dp(i,j,r,3)%l(1) = ib + fi * nu
+          faces_dp(i,j,r,3)%l(2) = jb + fj * nu
+          faces_dp(i,j,r,3)%l(3) = kb + fk * nq
+
+          faces_gp(i,j,k,1)%u(:) = faces_gp(i,j,k,1)%l(:) + (/ ng, np, np /) - 1
+          faces_gp(i,j,k,2)%u(:) = faces_gp(i,j,k,2)%l(:) + (/ np, ng, np /) - 1
+          faces_gp(i,j,k,3)%u(:) = faces_gp(i,j,k,3)%l(:) + (/ np, np, ng /) - 1
+
+          faces_dp(p,j,k,1)%u(:) = faces_dp(p,j,k,1)%l(:) + (/ nh, nt, nt /) - 1
+          faces_dp(i,q,k,2)%u(:) = faces_dp(i,q,k,2)%l(:) + (/ nt, nh, nt /) - 1
+          faces_dp(i,j,r,3)%u(:) = faces_dp(i,j,r,3)%l(:) + (/ nt, nt, nh /) - 1
+
+! for edge copy
+!
+          edges_gc(i,j,k,1)%l(1) = ib + fi * ns
+          edges_gc(i,j,k,1)%l(2) =  1 + fj * np
+          edges_gc(i,j,k,1)%l(3) =  1 + fk * np
+          edges_gc(i,j,k,2)%l(1) =  1 + fi * np
+          edges_gc(i,j,k,2)%l(2) = jb + fj * ns
+          edges_gc(i,j,k,2)%l(3) =  1 + fk * np
+          edges_gc(i,j,k,3)%l(1) =  1 + fi * np
+          edges_gc(i,j,k,3)%l(2) =  1 + fj * np
+          edges_gc(i,j,k,3)%l(3) = kb + fk * ns
+
+          edges_dc(i,q,r,1)%l(1) = ib + fi * ns
+          edges_dc(i,q,r,1)%l(2) = jb + fj * nm
+          edges_dc(i,q,r,1)%l(3) = kb + fk * nm
+          edges_dc(p,j,r,2)%l(1) = jb + fi * nm
+          edges_dc(p,j,r,2)%l(2) = jb + fj * ns
+          edges_dc(p,j,r,2)%l(3) = kb + fk * nm
+          edges_dc(p,q,k,3)%l(1) = ib + fi * nm
+          edges_dc(p,q,k,3)%l(2) = jb + fj * nm
+          edges_dc(p,q,k,3)%l(3) = kb + fk * ns
+
+          edges_gc(i,j,k,1)%u(:) = edges_gc(i,j,k,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_gc(i,j,k,2)%u(:) = edges_gc(i,j,k,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_gc(i,j,k,3)%u(:) = edges_gc(i,j,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+          edges_dc(i,q,r,1)%u(:) = edges_dc(i,q,r,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_dc(p,j,r,2)%u(:) = edges_dc(p,j,r,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_dc(p,q,k,3)%u(:) = edges_dc(p,q,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+! for edge restriction
+!
+          edges_gr(i,j,k,1)%l(1) = ib + fi * ns
+          edges_gr(i,j,k,1)%l(2) =  1 + fj * np
+          edges_gr(i,j,k,1)%l(3) =  1 + fk * np
+          edges_gr(i,j,k,2)%l(1) =  1 + fi * np
+          edges_gr(i,j,k,2)%l(2) = jb + fj * ns
+          edges_gr(i,j,k,2)%l(3) =  1 + fk * np
+          edges_gr(i,j,k,3)%l(1) =  1 + fi * np
+          edges_gr(i,j,k,3)%l(2) =  1 + fj * np
+          edges_gr(i,j,k,3)%l(3) = kb + fk * ns
+
+          edges_dr(i,q,r,1)%l(1) = ib
+          edges_dr(i,q,r,1)%l(2) = jb + fj * nr
+          edges_dr(i,q,r,1)%l(3) = kb + fk * nr
+          edges_dr(p,j,r,2)%l(1) = ib + fi * nr
+          edges_dr(p,j,r,2)%l(2) = jb
+          edges_dr(p,j,r,2)%l(3) = kb + fk * nr
+          edges_dr(p,q,k,3)%l(1) = ib + fi * nr
+          edges_dr(p,q,k,3)%l(2) = jb + fj * nr
+          edges_dr(p,q,k,3)%l(3) = kb
+
+          edges_gr(i,j,k,1)%u(:) = edges_gr(i,j,k,1)%l(:) + (/ ns, ng, ng /) - 1
+          edges_gr(i,j,k,2)%u(:) = edges_gr(i,j,k,2)%l(:) + (/ ng, ns, ng /) - 1
+          edges_gr(i,j,k,3)%u(:) = edges_gr(i,j,k,3)%l(:) + (/ ng, ng, ns /) - 1
+
+          edges_dr(i,q,r,1)%u(:) = edges_dr(i,q,r,1)%l(:) + (/ nc, nd, nd /) - 1
+          edges_dr(p,j,r,2)%u(:) = edges_dr(p,j,r,2)%l(:) + (/ nd, nc, nd /) - 1
+          edges_dr(p,q,k,3)%u(:) = edges_dr(p,q,k,3)%l(:) + (/ nd, nd, nc /) - 1
+
+! for edge prolongation
+!
+          edges_gp(i,j,k,1)%l(1) = ib - fi * ng
+          edges_gp(i,j,k,1)%l(2) =  1 + fj * np
+          edges_gp(i,j,k,1)%l(3) =  1 + fk * np
+          edges_gp(i,j,k,2)%l(1) =  1 + fi * np
+          edges_gp(i,j,k,2)%l(2) = jb - fj * ng
+          edges_gp(i,j,k,2)%l(3) =  1 + fk * np
+          edges_gp(i,j,k,3)%l(1) =  1 + fi * np
+          edges_gp(i,j,k,3)%l(2) =  1 + fj * np
+          edges_gp(i,j,k,3)%l(3) = kb - fk * ng
+
+          edges_dp(i,q,r,1)%l(1) = ib + fi * nu
+          edges_dp(i,q,r,1)%l(2) = jb + fj * nq
+          edges_dp(i,q,r,1)%l(3) = kb + fk * nq
+          edges_dp(p,j,r,2)%l(1) = ib + fi * nq
+          edges_dp(p,j,r,2)%l(2) = jb + fj * nu
+          edges_dp(p,j,r,2)%l(3) = kb + fk * nq
+          edges_dp(p,q,k,3)%l(1) = ib + fi * nq
+          edges_dp(p,q,k,3)%l(2) = jb + fj * nq
+          edges_dp(p,q,k,3)%l(3) = kb + fk * nu
+
+          edges_gp(i,j,k,1)%u(:) = edges_gp(i,j,k,1)%l(:) + (/ np, ng, ng /) - 1
+          edges_gp(i,j,k,2)%u(:) = edges_gp(i,j,k,2)%l(:) + (/ ng, np, ng /) - 1
+          edges_gp(i,j,k,3)%u(:) = edges_gp(i,j,k,3)%l(:) + (/ ng, ng, np /) - 1
+
+          edges_dp(i,q,r,1)%u(:) = edges_dp(i,q,r,1)%l(:) + (/ nt, nh, nh /) - 1
+          edges_dp(p,j,r,2)%u(:) = edges_dp(p,j,r,2)%l(:) + (/ nh, nt, nh /) - 1
+          edges_dp(p,q,k,3)%u(:) = edges_dp(p,q,k,3)%l(:) + (/ nh, nh, nt /) - 1
+
+! for corner copy
+!
+          corners_gc(i,j,k)%l(1) =  1 + fi * np
+          corners_gc(i,j,k)%l(2) =  1 + fj * np
+          corners_gc(i,j,k)%l(3) =  1 + fk * np
+
+          corners_dc(p,q,r)%l(1) = ib + fi * nm
+          corners_dc(p,q,r)%l(2) = jb + fj * nm
+          corners_dc(p,q,r)%l(3) = kb + fk * nm
+
+          corners_gc(i,j,k)%u(:) = corners_gc(i,j,k)%l(:) + ng - 1
+
+          corners_dc(p,q,r)%u(:) = corners_dc(p,q,r)%l(:) + ng - 1
+
+! for corner restriction
+!
+          corners_gr(i,j,k)%l(1) =  1 + fi * np
+          corners_gr(i,j,k)%l(2) =  1 + fj * np
+          corners_gr(i,j,k)%l(3) =  1 + fk * np
+
+          corners_dr(p,q,r)%l(1) = ib + fi * nr
+          corners_dr(p,q,r)%l(2) = jb + fj * nr
+          corners_dr(p,q,r)%l(3) = kb + fk * nr
+
+          corners_gr(i,j,k)%u(:) = corners_gr(i,j,k)%l(:) + ng - 1
+
+          corners_dr(p,q,r)%u(:) = corners_dr(p,q,r)%l(:) + nd - 1
+
+! for corner prolongation
+!
+          corners_gp(i,j,k)%l(1) =  1 + fi * np
+          corners_gp(i,j,k)%l(2) =  1 + fj * np
+          corners_gp(i,j,k)%l(3) =  1 + fk * np
+
+          corners_dp(p,q,r)%l(1) = ib + fi * nq
+          corners_dp(p,q,r)%l(2) = jb + fj * nq
+          corners_dp(p,q,r)%l(3) = kb + fk * nq
+
+          corners_gp(i,j,k)%u(:) = corners_gp(i,j,k)%l(:) + ng - 1
+
+          corners_dp(p,q,r)%u(:) = corners_dp(p,q,r)%l(:) + nh - 1
+
+        end do ! i = 1, 2
+      end do ! j = 1, 2
+    end do ! k = 1, 2
+#endif /* NDIMS == 3 */
 
 ! get the characteristic decay scale
 !

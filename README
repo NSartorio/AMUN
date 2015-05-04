@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 # **The AMUN Code**
-## Copyright (C) 2008-2014 Grzegorz Kowal ##
+## Copyright (C) 2008-2015 Grzegorz Kowal ##
 --------------------------------------------------------------------------------
 
 AMUN is a parallel code to perform numerical simulations in fluid approximation
@@ -18,7 +18,7 @@ following features are already implemented:
   reconstructions,
 * Riemann solvers of Roe- and HLL-types (HLL, HLLC, and HLLD),
 * periodic and open boundary conditions,
-* viscosity and resistivity source terms,
+* viscous and resistive source terms,
 * data stored in the HDF5 format,
 * MPI parallelization,
 * completely written in Fortran 2003.

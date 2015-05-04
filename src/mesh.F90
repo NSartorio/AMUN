@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -256,7 +256,9 @@ module mesh
 
 ! import external procedures and variables
 !
-    use blocks         , only : ndims, block_meta, list_meta
+    use blocks         , only : block_meta, block_leaf
+    use blocks         , only : list_meta, list_leaf
+    use blocks         , only : ndims
     use blocks         , only : get_mblocks, get_nleafs
     use coordinates    , only : ng, nd, in, jn, kn, im, jm, km, ir, jr, kr, toplev
     use mpitools       , only : master, nprocs
@@ -278,6 +280,7 @@ module mesh
 ! local pointers
 !
     type(block_meta), pointer :: pmeta
+    type(block_leaf), pointer :: pleaf
 
 ! local saved variables
 !
@@ -342,10 +345,10 @@ module mesh
 !
           ff  = 2**(toplev - 1)
           fcv = 1.0d+00 / n
-          fef = 1.0d+00 * im / (ir * in * ff + nd)
-          fef =     fef * jm / (jr * jn * ff + nd)
+          fef = 1.0d+00 * (ir * in * ff + nd) / im
+          fef =     fef * (jr * jn * ff + nd) / jm
 #if NDIMS == 3
-          fef =     fef * km / (kr * kn * ff + nd)
+          fef =     fef * (kr * kn * ff + nd) / km
 #endif /* NDIMS == 3 */
 
 ! reset the first execution flag
@@ -360,11 +363,11 @@ module mesh
         nl = get_nleafs()
 
 ! calculate the coverage (the number of leafs divided by the maximum
-! block number) and the efficiency (the cells count for adaptive mesh
-! divided by the cell count for corresponding uniform mesh)
+! block number) and the efficiency (the cells count for corresponding uniform
+! mesh divided by the cell count for adaptive mesh)
 !
         cv = fcv * nl
-        ef = fef * nl
+        ef = fef / nl
 
 ! initialize the level and process block counter
 !
@@ -373,33 +376,30 @@ module mesh
         cdist(:) = 0
 #endif /* MPI */
 
-! set the pointer to the first block on the meta block list
+! associate pleaf with the first block on the leaf list
 !
-        pmeta => list_meta
+        pleaf => list_leaf
 
-! scan all meta blocks and prepare get the block level and process
-! distributions
+! scan all leaf meta blocks in the list
 !
-        do while(associated(pmeta))
+        do while(associated(pleaf))
 
-! process only leafs
+! get the associated meta block
 !
-          if (pmeta%leaf) then
+          pmeta => pleaf%meta
 
 ! increase the block level and process counts
 !
-            ldist(pmeta%level)     = ldist(pmeta%level)     + 1
+          ldist(pmeta%level)     = ldist(pmeta%level)     + 1
 #ifdef MPI
-            cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
+          cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
 #endif /* MPI */
 
-          end if ! the leaf
-
-! associate the pointer with the next block
+! associate pleaf with the next leaf on the list
 !
-          pmeta => pmeta%next
+          pleaf => pleaf%next
 
-        end do ! pmeta
+        end do ! over leaf blocks
 
 ! write down the block statistics
 !
@@ -462,6 +462,7 @@ module mesh
     use blocks         , only : link_blocks, unlink_blocks, refine_block
     use blocks         , only : get_mblocks, get_nleafs
     use blocks         , only : set_neighbors_refine
+    use blocks         , only : build_leaf_list
 #ifdef DEBUG
     use blocks         , only : check_neighbors
 #endif /* DEBUG */
@@ -738,6 +739,10 @@ module mesh
 
     end do ! pmeta
 
+! update the list of leafs
+!
+    call build_leaf_list()
+
 #ifdef DEBUG
 ! check if neighbors are consistent after mesh generation
 !
@@ -771,6 +776,7 @@ module mesh
 
 ! import external procedures and variables
 !
+    use blocks         , only : build_leaf_list
 #ifdef DEBUG
     use blocks         , only : check_neighbors
 #endif /* DEBUG */
@@ -806,6 +812,10 @@ module mesh
 ! prolong selected blocks
 !
     call refine_selected_blocks()
+
+! update the list of leafs
+!
+    call build_leaf_list()
 
 #ifdef MPI
 ! redistribute blocks equally among all processors

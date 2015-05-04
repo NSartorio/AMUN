@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2014 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -135,6 +135,9 @@ module shapes
 !
       case("blast")
         update_shapes => update_shapes_blast
+
+      case("jet")
+        update_shapes => update_shapes_jet
 
 ! no shape update
 !
@@ -540,6 +543,174 @@ module shapes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_shapes_blast
+!
+!===============================================================================
+!
+! subroutine UPDATE_SHAPES_JET:
+! ----------------------------
+!
+!   Subroutine resets the primitive and conserved variables within a defined
+!   shape for the jet problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the data block structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine update_shapes_jet(pdata)
+
+! include external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : ax, ay, az
+    use equations      , only : prim2cons
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters     , only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: djet  = 1.00d-01
+    real(kind=8), save :: pres  = 1.00d-02
+    real(kind=8), save :: vjet  = 0.99d+00
+    real(kind=8), save :: bjet  = 1.00d-03
+    real(kind=8), save :: ljet  = 1.00d+00
+    real(kind=8), save :: rjet  = 1.00d+00
+    real(kind=8), save :: rjet2 = 1.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: dx, dy, dz, rm, rr
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(nv)    :: qj
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the shape update
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("djet"  , djet)
+      call get_parameter_real("pres"  , pres)
+      call get_parameter_real("ljet"  , ljet)
+      call get_parameter_real("bjet"  , bjet)
+      call get_parameter_real("vjet"  , vjet)
+      call get_parameter_real("rjet"  , rjet)
+
+! calculate Rjet²
+!
+      rjet2 = rjet * rjet
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! set the conditions inside the jet radius
+!
+    qj(idn) = djet
+    if (ipr > 0) qj(ipr) = pres
+    qj(ivx) = vjet
+    qj(ivy) = 0.0d+00
+    qj(ivz) = 0.0d+00
+    if (ibx > 0) then
+      qj(ibx) = 0.0d+00
+      qj(iby) = 0.0d+00
+      qj(ibz) = bjet
+      qj(ibp) = 0.0d+00
+    end if ! ibx > 0
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    dx = x(2) - x(1)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+    dy = y(2) - y(1)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+    dz = z(2) - z(1)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+    dz      = 0.0d+00
+#endif /* NDIMS == 3 */
+    rm = dy * dy + dz * dz
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! copy the primitive variable vector
+!
+        q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+
+! calculate radius
+!
+        rr = y(j) * y(j) + z(k) * z(k)
+
+        if (rr <= max(rm, rjet2)) then
+          do i = 1, im
+            if (x(i) <= max(dx, ljet)) then
+              q(1:nv,i) = qj(1:nv)
+            end if
+          end do ! i = 1, im
+        end if ! R < Rjet
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the shape update
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_shapes_jet
 
 !===============================================================================
 !
