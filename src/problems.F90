@@ -128,6 +128,9 @@ module problems
 
 ! general test problems
 !
+    case("riemann")
+      setup_problem => setup_problem_riemann
+
     case("blast")
       setup_problem => setup_problem_blast
 
@@ -214,6 +217,119 @@ module problems
 !!***  PRIVATE SUBROUTINES  ****************************************************
 !!
 !===============================================================================
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_RIEMANN:
+! --------------------------------
+!
+!   Subroutine sets the initial conditions for the general Riemann problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!
+!===============================================================================
+!
+  subroutine setup_problem_riemann(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, adx
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : qpbnd
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! local variables
+!
+    integer       :: i , j , k , p
+    real(kind=8)  :: xl, xr
+    real(kind=8)  :: dx, dxh
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+
+! calculate mesh intervals and areas
+!
+    dx   = adx(pdata%meta%level)
+    dxh  = 0.5d+00 * dx
+
+! set the left and right states of the primitive variables
+!
+    do i = 1, im
+      xl = x(i) - dxh
+      xr = x(i) + dxh
+
+      if (xr <= 0.0d+00) then
+        do p = 1, nv
+          q(p,i) = qpbnd(p,1,1)
+        end do
+      else if (xl >= 0.0d+00) then
+        do p = 1, nv
+          q(p,i) = qpbnd(p,1,2)
+        end do
+      else
+        do p = 1, nv
+          q(p,i) = (xr * qpbnd(p,1,2) - xl * qpbnd(p,1,1)) / dx
+        end do
+      end if
+    end do ! i = 1, im
+
+! convert the primitive variables to conservative ones
+!
+    call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_riemann
 !
 !===============================================================================
 !

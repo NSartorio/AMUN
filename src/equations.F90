@@ -58,7 +58,7 @@ module equations
 #ifdef PROFILE
 ! timer indices
 !
-  integer            , save :: imi, imc, imf, imm, imp
+  integer            , save :: imi, imc, imf, imm, imp, imb
 #endif /* PROFILE */
 
 ! pointers to the conversion procedures
@@ -111,6 +111,10 @@ module equations
 ! variable names
 !
   character(len=4), dimension(:), allocatable, save :: pvars, cvars
+
+! variable boundary values
+!
+  real(kind=8), dimension(:,:,:), allocatable, save :: qpbnd
 
 ! eigenvectors
 !
@@ -179,6 +183,7 @@ module equations
   public :: ibx, iby, ibz, ibp, ipr, ien
   public :: eqsys, eos
   public :: pvars, cvars
+  public :: qpbnd
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -222,6 +227,7 @@ module equations
 ! local variables
 !
     logical                :: relativistic   = .false.
+    integer                :: p
     character(len=255)     :: name_eqsys     = ""
     character(len=255)     :: name_eos       = ""
     character(len=255)     :: name_c2p       = ""
@@ -237,6 +243,7 @@ module equations
     call set_timer('equations:: variable solver'    , imp)
     call set_timer('equations:: flux calculation'   , imf)
     call set_timer('equations:: speed estimation'   , imm)
+    call set_timer('equations:: initial brackets'   , imb)
 
 ! start accounting time for module initialization/finalization
 !
@@ -787,6 +794,33 @@ module equations
 !
     csnd2 = csnd * csnd
 
+! allocate array for the boundary values
+!
+    allocate(qpbnd(nv,3,2))
+
+! set the boundary values
+!
+    do p = 1, nv
+
+! set the initial boundary values (1.0 for density and pressure, 0.0 otherwise)
+!
+      if (pvars(p) == "dens" .or. pvars(p) == "pres") then
+        qpbnd(p,:,:) = 1.0d+00
+      else
+        qpbnd(p,:,:) = 0.0d+00
+      end if
+
+! read the boundary values from the parameter file
+!
+      call get_parameter_real(pvars(p) // "_bnd_xl", qpbnd(p,1,1))
+      call get_parameter_real(pvars(p) // "_bnd_xr", qpbnd(p,1,2))
+      call get_parameter_real(pvars(p) // "_bnd_yl", qpbnd(p,2,1))
+      call get_parameter_real(pvars(p) // "_bnd_yr", qpbnd(p,2,2))
+      call get_parameter_real(pvars(p) // "_bnd_zl", qpbnd(p,3,1))
+      call get_parameter_real(pvars(p) // "_bnd_zr", qpbnd(p,3,2))
+
+    end do ! over all variables
+
 ! allocate space for Roe eigenvectors
 !
     allocate(evroe(2,nv,nv))
@@ -880,6 +914,10 @@ module equations
 !
     if (allocated(pvars)) deallocate(pvars)
     if (allocated(cvars)) deallocate(cvars)
+
+! deallocate boundary values array
+!
+    if (allocated(qpbnd)) deallocate(qpbnd)
 
 ! deallocate Roe eigenvectors
 !
@@ -3742,10 +3780,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -3982,10 +4019,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4219,10 +4255,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4403,10 +4438,27 @@ module equations
         q(iby,i) = u(iby,i)
         q(ibz,i) = u(ibz,i)
         q(ibp,i) = u(ibp,i)
-        q(ipr,i) = gammaxi * (w - dn / vs) * vm
+        q(ipr,i) = w - en + 0.5d+00 * (bb + (bb * mm - mb * mb) / wt**2)
+
+! check if the pressure is positive, if not, print a warning and replace it
+! with the minimum allowed value pmin
+!
+        if (q(ipr,i) <= 0.0d+00) then
+
+          write(*,*)
+          write(*,"(a,1x,a)"           ) "WARNING in"                          &
+                                       , "EQUATIONS::cons2prim_srmhd_adi()"
+          write(*,"(a,9(1x,1e24.16e3))") "Negative pressure for U = ", u(1:nv,i)
+          write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
+                                                       , dn, mm, mb, bb, en, w
+          write(*,"(a,1(1x,1e24.16e3))") "Pressure corrected to ", pmin
+          q(ipr,i) = pmin
+
+        end if ! p <= 0
 
       else ! unphysical state
 
+        write(*,*)
         write(*,"(a,1x,a)"           ) "ERROR in"                              &
                                      , "EQUATIONS::cons2prim_srmhd_adi()"
         write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
@@ -4445,7 +4497,12 @@ module equations
 !
 !   References:
 !
-!     [1] van der Holst, B., Keppens, R., Meliani, Z.
+!     [1] Mignone, A., Bodo, G.,
+!         "An HLLC Riemann solver for relativistic flows -
+!          II. Magnetohydrodynamics",
+!         Monthly Notices of the Royal Astronomical Society,
+!         2006, Volume 368, Pages 1040-1054
+!     [2] van der Holst, B., Keppens, R., Meliani, Z.
 !         "A multidimentional grid-adaptive relativistic magnetofluid code",
 !         Computer Physics Communications, 2008, Volume 179, Pages 617-627
 !
@@ -4472,7 +4529,8 @@ module equations
 !
     integer      :: i, nr
     real(kind=8) :: vv, bb, vb, vm, vs
-    real(kind=8) :: rh, ww, wt, b2, pm, pt, bx, v1, v2
+    real(kind=8) :: bx, by, bz, b2, pm, pt
+    real(kind=8) :: rh, v1, v2
     real(kind=8) :: ca, cc, c2, gn, rt, zm, zp
     real(kind=8) :: fa, fb, fc, fd, fe, ff, fg
 
@@ -4499,38 +4557,29 @@ module equations
       bb  = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
       vb  = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
 
-! calculate the Lorentz factor
+! calculate (1 - |V|²)
 !
       vm  = 1.0d+00 - vv
-      vs  = sqrt(vm)
 
-! calculate specific and total enthalpies
+! calculate magnetic field components of the magnetic four-vector divided by
+! the Lorentz factor (eq. 3 in [1])
 !
-      rh  = q(idn,i) + q(ipr,i) / gammaxi
-      ww  = rh / vm
-      wt  = ww + bb
+      bx  = q(ibx,i) * vm + vb * q(ivx,i)
+      by  = q(iby,i) * vm + vb * q(ivy,i)
+      bz  = q(ibz,i) * vm + vb * q(ivz,i)
 
-! calculate magnetic and total pressures
+! calculate magnetic and total pressures (eq. 6 in [1])
 !
       b2  = bb * vm + vb * vb
       pm  = 0.5d+00 * b2
       pt  = q(ipr,i) + pm
 
-! calculate additional coefficients
-!
-      rt  = rh + b2
-
-! calculate temporary variables
-!
-      bx  = q(ibx,i) * vs + vb * q(ivx,i) / vs
-      fc  = bx * vs
-
-! calculate the relativistic hydrodynamic fluxes (eq. 2 in [1])
+! calculate the relativistic hydrodynamic fluxes (eq. 13 in [1])
 !
       f(idn,i) = u(idn,i) * q(ivx,i)
-      f(imx,i) = u(imx,i) * q(ivx,i) - fc * q(ibx,i) + pt
-      f(imy,i) = u(imy,i) * q(ivx,i) - fc * q(iby,i)
-      f(imz,i) = u(imz,i) * q(ivx,i) - fc * q(ibz,i)
+      f(imx,i) = u(imx,i) * q(ivx,i) - q(ibx,i) * bx + pt
+      f(imy,i) = u(imy,i) * q(ivx,i) - q(ibx,i) * by
+      f(imz,i) = u(imz,i) * q(ivx,i) - q(ibx,i) * bz
       f(ibx,i) = q(ibp,i)
       f(ibp,i) = cmax2 * q(ibx,i)
       f(iby,i) = q(ivx,i) * q(iby,i) - q(ibx,i) * q(ivy,i)
@@ -4543,9 +4592,14 @@ module equations
 !
       if (vv > 0.0d+00) then
 
-! check if the normal component of magnetic field Bx is larger than zero
+! calculate additional coefficients
 !
-        if (q(ibx,i) /= 0.0d+00) then ! Bx ≠ 0
+        rh  = q(idn,i) + q(ipr,i) / gammaxi
+        vs  = sqrt(vm)
+
+! check if the normal component of magnetic field Bₓ is larger than zero
+!
+        if (q(ibx,i) /= 0.0d+00) then ! Bₓ ≠ 0
 
 ! prepare parameters for this case
 !
@@ -4577,9 +4631,9 @@ module equations
 !
           x(1:nr) = sign(1.0d+00, q(ivx,i)) * (abs(v1) + x(1:nr) * vs)
 
-        else ! Bx ≠ 0
+        else ! Bₓ ≠ 0
 
-! special case when Bx = 0, then the quartic equation reduces to quadratic one
+! special case when Bₓ = 0, then the quartic equation reduces to quadratic one
 !
 ! prepare parameters for this case
 !
@@ -4606,6 +4660,10 @@ module equations
 !
 ! prepare parameters for this case
 !
+        rh  = q(idn,i) + q(ipr,i) / gammaxi
+        vs  = sqrt(vm)
+        bx  = q(ibx,i) * vs + vb * q(ivx,i) / vs
+        rt  = rh + b2
         c2 = gamma * q(ipr,i) / rh
         ca = bx * bx
 
@@ -4896,16 +4954,77 @@ module equations
 !
 !===============================================================================
 !
+! subroutine NR_PRESSURE_SRMHD_ADI_1D:
+! -----------------------------------
+!
+!   Subroutine calculates the pressure function
+!
+!     P(W)  = W  - E + ½ |B|² + ½ (|m|² |B|² - S²) / (W + |B|²)²
+!
+!   and its derivative
+!
+!     P'(W) = 1 - (|m|² |B|² - S²) / (W + |B|²)³
+!
+!   for a given enthalpy W.
+!
+!   This subroutine is used to find the minimum enthalpy for which the velocity
+!   is physical and the pressure is positive.
+!
+!   Arguments:
+!
+!     mm, bb, mb, dn, en, w - input coefficients for |M|², |B|², M.B, D, E,
+!                             and W, respectively;
+!     p, dp                 - the values for the function P(W) and its
+!                             derivative P'(W);
+!
+!===============================================================================
+!
+  subroutine nr_pressure_srmhd_adi_1d(mm, bb, mb, en, dn, w, p, dp)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8)          , intent(in)  :: mm, bb, mb, en, dn, w
+    real(kind=8)          , intent(out) :: p
+    real(kind=8), optional, intent(out) :: dp
+
+! local variables
+!
+    real(kind=8) :: wt, wd, ss, fn
+!
+!-------------------------------------------------------------------------------
+!
+! temporary variables
+!
+    wt = w  + bb
+    wd = wt * wt
+    ss = mb * mb
+    fn = (mm * bb - ss) / wd
+
+! the pressure function and its derivative
+!
+    p  = w - en + 0.5d+00 * (bb + fn)
+    if (present(dp)) dp = 1.0d+00 - fn / wt
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_pressure_srmhd_adi_1d
+!
+!===============================================================================
+!
 ! subroutine NR_FUNCTION_SRMHD_ADI_1D:
 ! -----------------------------------
 !
 !   Subroutine calculates the energy function
 !
-!     F(W)  = W - P(W) + ½ [(1 + |V|²) |B|² - S² / W²] - E
+!     F(W)  = W - P(W) + ½ |B|² + ½ (|m|² |B|² - S²) / (W + |B|²)² - E
 !
 !   and its derivative
 !
-!     F'(W) = 1 - dP(W)/dW + ½ |B|² d|V|²/dW + S² / W³
+!     F'(W) = 1 - dP(W)/dW - (|m|² |B|² - S²) / (W + |B|²)³
 !
 !   for a given enthalpy W. It is used to estimate the initial guess.
 !
@@ -4931,33 +5050,278 @@ module equations
 
 ! local variables
 !
-    real(kind=8) :: mw, vv, dv, vm, vs, pr, dp
+    real(kind=8) :: pr, dp, gm2, gm, dg
+    real(kind=8) :: ww, wt, wd, ss, sw, ws, fn, dv, ds
 !
 !-------------------------------------------------------------------------------
 !
 ! temporary variables
 !
-    mw = (mb / w)**2
+    ww  = w * w
+    wt  = w + bb
+    wd  = wt * wt
+    ss  = mb * mb
+    sw  = ss / ww
+    ws  = (w + wt) * sw
+    fn  = (mm * bb - ss) / wd
+    dv  = wd - mm - ws
+    ds  = sqrt(dv)
 
-! the function and its derivative if necessary
+! calculate the Lorentz factor
+!
+    gm2 = wd / dv
+    gm  = wt / ds
+
+! calculate the pressure P(W) and energy function F(W)
+!
+    pr  = gammaxi * (w - gm * dn) / gm2
+    f   = w - pr - en + 0.5d+00 * (bb + fn)
+
+! if desired, calculate the derivatives dP(W)/dW and dF(W)/dW
 !
     if (present(df)) then
-      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv, dv)
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-      dp = gammaxi * (vm - (w - 0.5d+00 * dn / vs) * dv)
-      df = 1.0d+00 - dp + 0.5d+00 * bb * dv + mw / w
-    else
-      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
-      vm = 1.0d+00 - vv
-      vs = sqrt(vm)
-    end if
-    pr = gammaxi * (w * vm - dn * vs)
-    f  = w - pr - en + 0.5d+00 * ((1.0d+00 + vv) * bb - mw)
+
+      dg  = (1.0d+00 - wt * (wt - sw + ws / w) / dv) / ds
+      dp  = gammaxi * (1.0d+00 - (2.0d+00 * w / gm - dn) * dg) / gm2
+      df  = 1.0d+00 - dp - fn / wt
+
+    end if ! df present
 
 !-------------------------------------------------------------------------------
 !
   end subroutine nr_function_srmhd_adi_1d
+!
+!===============================================================================
+!
+! subroutine NR_INITIAL_BRACKETS_SRMHD_ADI:
+! ----------------------------------------
+!
+!   Subroutine finds the initial brackets and initial guess from
+!   the positivity condition
+!
+!     W³ + (5/2 |B|² - E) W² + 2 (|B|² - E) |B|² W
+!                          + 1/2 [(|B|⁴ - 2 |B|² E + |m|²) |B|² - S²] > 0
+!
+!   coming from the energy equation and
+!
+!     W⁴ + 2 |B|² W³ - (|m|² + D² - |B|⁴) W²
+!                    - (2 S² + D² |B|²) W - (S² + D² |B|²) |B|² > 0
+!
+!   coming from the equation of state
+!
+!   using analytical. It takes the maximum estimated root as the lower bracket.
+!   If the analytical estimation fails, the Newton-Raphson iterative method
+!   is used.
+!
+!   Arguments:
+!
+!     mm, en - input coefficients for |M|² and E, respectively;
+!     bb, mb - input coefficients for |B|² and m.B, respectively;
+!     wl, wu - the lower and upper limits for the enthalpy;
+!     wc     - the initial root guess;
+!     info   - the flag is .true. if the initial brackets and guess were found,
+!              otherwise it is .false.;
+!
+!===============================================================================
+!
+  subroutine nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                  &
+                                                     , wl, wu, wc, fl, fu, info)
+
+! include external procedures
+!
+    use algebra        , only : cubic_normalized, quartic
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    real(kind=8), intent(in)  :: mm, bb, mb, en, dn
+    real(kind=8), intent(out) :: wl, wu, wc, fl, fu
+    logical     , intent(out) :: info
+
+! local variables
+!
+    logical      :: keep
+    integer      :: it, nr
+    real(kind=8) :: dd, ss, ec
+    real(kind=8) :: f , df
+    real(kind=8) :: dw, err
+
+! local vectors
+!
+    real(kind=8), dimension(5) :: a
+    real(kind=8), dimension(4) :: x
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for initial bracket solver
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
+! calculate temporary variables
+!
+    dd   = dn * dn
+    ss   = mb * mb
+    ec   = en + pmin
+
+! set the initial upper bracket
+!
+    wu   = en + pmin
+
+! calculate the cubic equation coefficients for the positivity condition
+! coming from the energy equation; the condition, in fact, finds the minimum
+! enthalphy for which the pressure is equal to pmin
+!
+    a(3) = 2.5d+00 * bb - ec
+    a(2) = 2.0d+00 * (bb - ec) * bb
+    a(1) = 0.5d+00 * (((bb - 2.0d+00 * ec) * bb + mm) * bb - ss)
+
+! solve the cubic equation
+!
+    nr = cubic_normalized(a(1:3), x(1:3))
+
+! if solution was found, use the maximum root as the lower bracket
+!
+    if (nr > 0) then
+
+      wl = x(nr)
+
+! calculate the quartic equation coefficients for the positivity condition
+! coming from the pressure equation
+!
+      a(5) = 1.0d+00
+      a(4) = 2.0d+00 * bb
+      a(3) = bb * bb - dd - mm
+      a(2) = - 2.0d+00 * (ss + dd * bb)
+      a(1) = - (ss + dd * bb) * bb
+
+! solve the quartic equation
+!
+      nr = quartic(a(1:5), x(1:4))
+
+! take the maximum ethalpy from both conditions to guarantee that the pressure
+! obtains from any of those equations is positive
+!
+      if (nr > 0) wl = max(wl, x(nr))
+
+    else ! nr = 0
+
+! the root could not be found analytically, so use the iterative solver
+! to find the lower bracket; as the initial guess use the initial upper bracket
+!
+      keep = .true.
+      it   = nrmax
+      wl   = wu
+
+      do while(keep)
+
+        call nr_pressure_srmhd_adi_1d(mm, bb, mb, ec, dn, wl, f, df)
+
+        dw   = f / df
+        wl   = wl - dw
+
+        err  = abs(dw / wl)
+        it   = it - 1
+        keep = (err > tol) .and. it > 0
+
+      end do
+
+      if (it <= 0) then
+        write(*,*)
+        write(*,"(a,1x,a)") "ERROR in"                                         &
+                          , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
+        write(*,"(a)"     ) "Could not find the lower limit for the enthalpy!"
+        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
+                                                          , dn, mm, mb, bb, en
+        info = .false.
+        return
+      end if
+
+    end if ! nr > 0
+
+! check if the energy function is negative for the lower limit
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
+
+    if (fl > 0.0d+00) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
+      write(*,"(a)"     ) "Lower limit positive!"
+      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
+                                                      , dn, mm, mb, bb, en, wl
+      info = .false.
+      return
+    end if
+
+! make sure that the upper limit is larger than the lower one
+!
+    keep = wl >= wu
+    it   = nrmax
+    do while(keep)
+      wu   = 2.0d+00 * wu
+      it   = it - 1
+      keep = (wl >= wu) .and. it > 0
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
+      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
+                                                      , dn, mm, mb, bb, en, wl
+      info = .false.
+      return
+    end if
+
+! check if the brackets bound the root region, if not proceed until
+! opposite function signs are found for the brackets
+!
+    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+    keep = (fl * fu > 0.0d+00)
+    it   = nrmax
+
+    do while (keep)
+
+      wl = wu
+      fl = fu
+      wu = 2.0d+00 * wu
+
+      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+
+      it   = it - 1
+      keep = (fl * fu > 0.0d+00) .and. it > 0
+
+    end do
+    if (it <= 0) then
+      write(*,*)
+      write(*,"(a,1x,a)") "ERROR in"                                           &
+                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a)"     ) "No initial brackets found!"
+      write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "               &
+                                                          , dn, mm, mb, bb, en
+      info = .false.
+      return
+    end if
+
+! estimate the enthalpy value close to the root
+!
+    wc   = wl - fl * (wu - wl) / (fu - fl)
+
+#ifdef PROFILE
+! stop accounting time for the initial brackets
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine nr_initial_brackets_srmhd_adi
 !
 !===============================================================================
 !
@@ -5003,10 +5367,8 @@ module equations
 !
     logical      :: keep
     integer      :: it, cn
-    real(kind=8) :: wl, wu, wn, fl, fu
-    real(kind=8) :: vm, vs, dv, wt, mw
-    real(kind=8) :: pr, dp
-    real(kind=8) :: f, df, dw
+    real(kind=8) :: wl, wu, fl, fu
+    real(kind=8) :: f , df, dw
     real(kind=8) :: err
 !
 !-------------------------------------------------------------------------------
@@ -5017,93 +5379,32 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! prepare the initial brackets
+! find the initial brackets and estimate the initial enthalpy
 !
-    wl   = dn
-    wu   = en + pmin
+    call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
+                                                     , wl, wu, w, fl, fu, info)
 
-! check, if the velocity corresponding to the lower bracket is physical, if not
-! find the minimum enthalphy which corresponds to physical velocity
+! if the brackets could not be found, return the lower bracket as the solution
 !
-    keep = .true.
-    it   = nrmax
-
-    do while(keep)
-
-      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
-
-      dw   = f / df
-      wl   = wl - dw
-
-      err  = abs(dw / wl)
-      it   = it - 1
-      keep = (err > tol) .and. it > 0
-
-    end do
-    if (it <= 0) then
+    if (.not. info) then
       write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
-      info = .false.
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
       return
+
     end if
-
-! add the minimum pressure contribution to enthalpy
-!
-    wl   = wl + gammaxi * pmin
-
-! make sure that the upper bracket is larger than the lower one
-!
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      info = .false.
-      return
-    end if
-
-! check if the brackets bound the root region, if not proceed until
-! opposite function signs are found for the brackets
-!
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
-      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-      it   = it - 1
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      info = .false.
-      return
-    end if
-
-! estimate the value of enthalpy close to the root
-!
-    w    = wl - fl * (wu - wl) / (fu - fl)
 
 ! initialize iteration parameters
 !
@@ -5175,10 +5476,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -5238,7 +5538,6 @@ module equations
     integer      :: it, cn
     real(kind=8) :: wl, wu, fl, fu
     real(kind=8) :: vm, vs, wt, mw, wt2
-    real(kind=8) :: pr, dpw, dpv
     real(kind=8) :: f, df, dfw, dfv
     real(kind=8) :: g, dg, dgw, dgv
     real(kind=8) :: det, jfw, jfv, jgw, jgv
@@ -5253,93 +5552,32 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! prepare the initial brackets
+! find the initial brackets and estimate the initial enthalpy
 !
-    wl   = dn
-    wu   = en + pmin
+    call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
+                                                     , wl, wu, w, fl, fu, info)
 
-! check, if the velocity corresponding to the lower bracket is physical, if not
-! find the minimum enthalphy which corresponds to physical velocity
+! if the brackets could not be found, return the lower bracket as the solution
 !
-    keep = .true.
-    it   = nrmax
-
-    do while(keep)
-
-      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
-
-      dw   = f / df
-      wl   = wl - dw
-
-      err  = abs(dw / wl)
-      it   = it - 1
-      keep = (err > tol) .and. it > 0
-
-    end do
-    if (it <= 0) then
+    if (.not. info) then
       write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
-      info = .false.
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
       return
+
     end if
-
-! add the minimum pressure contribution to enthalpy
-!
-    wl   = wl + gammaxi * pmin
-
-! make sure that the upper bracket is larger than the lower one
-!
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      info = .false.
-      return
-    end if
-
-! check if the brackets bound the root region, if not proceed until
-! opposite function signs are found for the brackets
-!
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
-      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-      it   = it - 1
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      info = .false.
-      return
-    end if
-
-! estimate the value of enthalpy close to the root...
-!
-    w    = wl - fl * (wu - wl) / (fu - fl)
 
 ! and the corresponding |V|²
 !
@@ -5446,10 +5684,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
@@ -5517,93 +5754,32 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
-! prepare the initial brackets
+! find the initial brackets and estimate the initial enthalpy
 !
-    wl   = dn
-    wu   = en + pmin
+    call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
+                                                     , wl, wu, w, fl, fu, info)
 
-! check, if the velocity corresponding to the lower bracket is physical, if not
-! find the minimum enthalphy which corresponds to physical velocity
+! if the brackets could not be found, return the lower bracket as the solution
 !
-    keep = .true.
-    it   = nrmax
-
-    do while(keep)
-
-      call nr_positivity_srmhd_adi_1d(mm, bb, mb, dn, wl, f, df)
-
-      dw   = f / df
-      wl   = wl - dw
-
-      err  = abs(dw / wl)
-      it   = it - 1
-      keep = (err > tol) .and. it > 0
-
-    end do
-    if (it <= 0) then
+    if (.not. info) then
       write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-      write(*,"(a)"     ) "Could not find the lower limit for enthalpy!"
-      info = .false.
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
+                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+
+! use the lower bracket, since it guarantees the positive pressure
+!
+      w = wl
+
+! calculate |V|² from W
+!
+      call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
+
+      info = .true.
       return
+
     end if
-
-! add the minimum pressure contribution to enthalpy
-!
-    wl   = wl + gammaxi * pmin
-
-! make sure that the upper bracket is larger than the lower one
-!
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      info = .false.
-      return
-    end if
-
-! check if the brackets bound the root region, if not proceed until
-! opposite function signs are found for the brackets
-!
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
-      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-      it   = it - 1
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      info = .false.
-      return
-    end if
-
-! estimate the value of enthalpy close to the root...
-!
-    w    = wl - fl * (wu - wl) / (fu - fl)
 
 ! and the corresponding |u|²
 !
@@ -5718,10 +5894,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "ERROR in"                                   &
+      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
       write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-      info = .false.
     end if
 
 #ifdef PROFILE
