@@ -2483,10 +2483,15 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
+
+! local variables
+!
+    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    c = (sign(x, a) + sign(x, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
+    y = x - eps
+    c = (sign(y, a) + sign(y, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
 
 !-------------------------------------------------------------------------------
 !
@@ -2517,11 +2522,16 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
+
+! local variables
+!
+    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    c = 0.5d+00 * (sign(x, a) + sign(x, b))                                    &
-           * max(min(2.0d+00 * abs(a), abs(b)), min(abs(a), 2.0d+00 * abs(b)))
+    y = x - eps
+    c = (sign(y, a) + sign(y, b))                                              &
+           * max(min(abs(a), 0.5d+00 * abs(b)), min(0.5d+00 * abs(a), abs(b)))
 
 !-------------------------------------------------------------------------------
 !
@@ -2557,7 +2567,7 @@ module interpolations
 !
     c = a * b
     if (c > 0.0d+00) then
-      c = 2.0d+00 * x * c / (a + b)
+      c = 2.0d+00 * (x - eps) * c / (a + b)
     else
       c = 0.0d+00
     end if
