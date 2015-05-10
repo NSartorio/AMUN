@@ -1055,7 +1055,7 @@ module mesh
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ib, ie, jb, je, kb, ke
     use equations      , only : nv
-    use interpolations , only : limiter
+    use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
 !
@@ -1141,16 +1141,16 @@ module mesh
 
             dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
             dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
-            dux = limiter(0.25d+00, dul, dur)
+            dux = limiter_prol(0.25d+00, dul, dur)
 
             dul = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
             dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
-            duy = limiter(0.25d+00, dul, dur)
+            duy = limiter_prol(0.25d+00, dul, dur)
 
 #if NDIMS == 3
             dul = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
             dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
-            duz = limiter(0.25d+00, dul, dur)
+            duz = limiter_prol(0.25d+00, dul, dur)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
