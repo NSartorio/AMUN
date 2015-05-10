@@ -51,6 +51,7 @@ module interpolations
 !
   procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
   procedure(limiter_zero)      , pointer, save :: limiter            => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
   procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
 
 ! module parameters
@@ -74,7 +75,7 @@ module interpolations
 ! declare public subroutines
 !
   public :: initialize_interpolations, finalize_interpolations
-  public :: reconstruct, limiter
+  public :: reconstruct, limiter_prol
   public :: fix_positivity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -113,11 +114,13 @@ module interpolations
 !
     character(len=255) :: sreconstruction = "tvd"
     character(len=255) :: slimiter        = "mm"
+    character(len=255) :: plimiter        = "mm"
     character(len=255) :: climiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
     character(len=255) :: name_lim        = ""
+    character(len=255) :: name_plim       = ""
     character(len=255) :: name_clim       = ""
 !
 !-------------------------------------------------------------------------------
@@ -137,14 +140,15 @@ module interpolations
 
 ! obtain the user defined interpolation methods and coefficients
 !
-    call get_parameter_string ("reconstruction" , sreconstruction)
-    call get_parameter_string ("limiter"        , slimiter       )
-    call get_parameter_string ("fix_positivity" , positivity_fix )
-    call get_parameter_string ("clip_extrema"   , clip_extrema   )
-    call get_parameter_string ("extrema_limiter", climiter       )
-    call get_parameter_integer("nghosts"        , ng             )
-    call get_parameter_real   ("eps"            , eps            )
-    call get_parameter_real   ("limo3_rad"      , rad            )
+    call get_parameter_string ("reconstruction"      , sreconstruction)
+    call get_parameter_string ("limiter"             , slimiter       )
+    call get_parameter_string ("fix_positivity"      , positivity_fix )
+    call get_parameter_string ("clip_extrema"        , clip_extrema   )
+    call get_parameter_string ("extrema_limiter"     , climiter       )
+    call get_parameter_string ("prolongation_limiter", plimiter       )
+    call get_parameter_integer("nghosts"             , ng             )
+    call get_parameter_real   ("eps"                 , eps            )
+    call get_parameter_real   ("limo3_rad"           , rad            )
 
 ! select the reconstruction method
 !
@@ -234,6 +238,26 @@ module interpolations
       limiter            => limiter_zero
     end select
 
+! select the prolongation limiter
+!
+    select case(trim(plimiter))
+    case ("mm", "minmod")
+      name_plim          =  "minmod"
+      limiter_prol       => limiter_minmod
+    case ("mc", "monotonized_central")
+      name_plim          =  "monotonized central"
+      limiter_prol       => limiter_monotonized_central
+    case ("sb", "superbee")
+      name_plim          =  "superbee"
+      limiter_prol       => limiter_superbee
+    case ("vl", "vanleer")
+      name_plim          =  "van Leer"
+      limiter_prol       => limiter_vanleer
+    case default
+      name_plim          =  "zero derivative"
+      limiter_prol       => limiter_zero
+    end select
+
 ! select the clipping limiter
 !
     select case(trim(climiter))
@@ -273,10 +297,11 @@ module interpolations
 !
     if (verbose) then
 
-      write (*,"(4x,a15,8x,'=',1x,a)") "reconstruction ", trim(name_rec)
-      write (*,"(4x,a15,8x,'=',1x,a)") "limiter        ", trim(name_lim)
-      write (*,"(4x,a15,8x,'=',1x,a)") "fix positivity ", trim(positivity_fix)
-      write (*,"(4x,a15,8x,'=',1x,a)") "clip extrema   ", trim(clip_extrema)
+      write (*,"(4x,a14, 9x,'=',1x,a)") "reconstruction"      , trim(name_rec)
+      write (*,"(4x, a7,16x,'=',1x,a)") "limiter"             , trim(name_lim)
+      write (*,"(4x,a20, 3x,'=',1x,a)") "prolongation limiter", trim(name_plim)
+      write (*,"(4x,a14, 9x,'=',1x,a)") "fix positivity"      , trim(positivity_fix)
+      write (*,"(4x,a12,11x,'=',1x,a)") "clip extrema"        , trim(clip_extrema)
       if (clip) then
         write (*,"(4x,a15,8x,'=',1x,a)") "extrema limiter", trim(name_clim)
       end if

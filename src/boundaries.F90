@@ -5426,7 +5426,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : faces_dp
     use equations      , only : nv
-    use interpolations , only : limiter
+    use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
 !
@@ -5489,15 +5489,15 @@ module boundaries
 !
             dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
             dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
-            dqx = limiter(0.25d+00, dql, dqr)
+            dqx = limiter_prol(0.25d+00, dql, dqr)
 
             dql = qn(p,i,j  ,k) - qn(p,i,jm1,k)
             dqr = qn(p,i,jp1,k) - qn(p,i,j  ,k)
-            dqy = limiter(0.25d+00, dql, dqr)
+            dqy = limiter_prol(0.25d+00, dql, dqr)
 
             dql = qn(p,i,j,k  ) - qn(p,i,j,km1)
             dqr = qn(p,i,j,kp1) - qn(p,i,j,k  )
-            dqz = limiter(0.25d+00, dql, dqr)
+            dqz = limiter_prol(0.25d+00, dql, dqr)
 
 ! calculate the derivative terms
 !
@@ -5713,7 +5713,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : edges_dp
     use equations      , only : nv
-    use interpolations , only : limiter
+    use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
 !
@@ -5789,16 +5789,16 @@ module boundaries
 !
             dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
             dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
-            dqx = limiter(0.25d+00, dql, dqr)
+            dqx = limiter_prol(0.25d+00, dql, dqr)
 
             dql = qn(p,i,j  ,k) - qn(p,i,jm1,k)
             dqr = qn(p,i,jp1,k) - qn(p,i,j  ,k)
-            dqy = limiter(0.25d+00, dql, dqr)
+            dqy = limiter_prol(0.25d+00, dql, dqr)
 
 #if NDIMS == 3
             dql = qn(p,i,j,k  ) - qn(p,i,j,km1)
             dqr = qn(p,i,j,kp1) - qn(p,i,j,k  )
-            dqz = limiter(0.25d+00, dql, dqr)
+            dqz = limiter_prol(0.25d+00, dql, dqr)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
@@ -5969,7 +5969,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : corners_dp
     use equations      , only : nv
-    use interpolations , only : limiter
+    use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
 !
@@ -6050,16 +6050,16 @@ module boundaries
 !
             dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
             dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
-            dqx = limiter(0.25d+00, dql, dqr)
+            dqx = limiter_prol(0.25d+00, dql, dqr)
 
             dql = qn(p,i,j  ,k) - qn(p,i,jm1,k)
             dqr = qn(p,i,jp1,k) - qn(p,i,j  ,k)
-            dqy = limiter(0.25d+00, dql, dqr)
+            dqy = limiter_prol(0.25d+00, dql, dqr)
 
 #if NDIMS == 3
             dql = qn(p,i,j,k  ) - qn(p,i,j,km1)
             dqr = qn(p,i,j,kp1) - qn(p,i,j,k  )
-            dqz = limiter(0.25d+00, dql, dqr)
+            dqz = limiter_prol(0.25d+00, dql, dqr)
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 2
