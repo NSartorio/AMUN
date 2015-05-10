@@ -2729,8 +2729,9 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1
+    integer      :: i, im1, ip1, ip2
     real(kind=8) :: fmn, fmx
+    real(kind=8) :: dfl, dfr, df
 !
 !------------------------------------------------------------------------------
 !
@@ -2758,10 +2759,19 @@ module interpolations
 !
       if (fl(i) < fmn .or. fl(i) > fmx) then
 
+! calculate the left and right derivatives
+!
+        dfl = f(i  ) - f(im1)
+        dfr = f(ip1) - f(i  )
+
+! get the limited slope
+!
+        df  = limiter_minmod(0.5d+00, dfl, dfr)
+
 ! calculate new states
 !
-        fl(i  ) = f(i  )
-        fr(im1) = f(i  )
+        fl(i  ) = f(i  ) + df
+        fr(im1) = f(i  ) - df
 
       end if
 
@@ -2769,10 +2779,23 @@ module interpolations
 !
       if (fr(i) < fmn .or. fr(i) > fmx) then
 
+! calculate the missing index
+!
+        ip2 = min(n, i + 2)
+
+! calculate the left and right derivatives
+!
+        dfl = f(ip1) - f(i  )
+        dfr = f(ip2) - f(ip1)
+
+! get the limited slope
+!
+        df  = limiter_minmod(0.5d+00, dfl, dfr)
+
 ! calculate new states
 !
-        fl(ip1) = f(ip1)
-        fr(i  ) = f(ip1)
+        fl(ip1) = f(ip1) + df
+        fr(i  ) = f(ip1) - df
 
       end if
 
