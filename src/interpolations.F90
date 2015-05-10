@@ -50,7 +50,7 @@ module interpolations
 ! pointers to the reconstruction and limiter procedures
 !
   procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
-  procedure(limiter_zero)      , pointer, save :: limiter            => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_tvd        => null()
   procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
   procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
 
@@ -113,13 +113,13 @@ module interpolations
 ! local variables
 !
     character(len=255) :: sreconstruction = "tvd"
-    character(len=255) :: slimiter        = "mm"
+    character(len=255) :: tlimiter        = "mm"
     character(len=255) :: plimiter        = "mm"
     character(len=255) :: climiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
-    character(len=255) :: name_lim        = ""
+    character(len=255) :: name_tlim       = ""
     character(len=255) :: name_plim       = ""
     character(len=255) :: name_clim       = ""
 !
@@ -141,7 +141,7 @@ module interpolations
 ! obtain the user defined interpolation methods and coefficients
 !
     call get_parameter_string ("reconstruction"      , sreconstruction)
-    call get_parameter_string ("limiter"             , slimiter       )
+    call get_parameter_string ("limiter"             , tlimiter       )
     call get_parameter_string ("fix_positivity"      , positivity_fix )
     call get_parameter_string ("clip_extrema"        , clip_extrema   )
     call get_parameter_string ("extrema_limiter"     , climiter       )
@@ -215,27 +215,27 @@ module interpolations
       end if
     end select
 
-! select the limiter
+! select the TVD limiter
 !
-    select case(trim(slimiter))
+    select case(trim(tlimiter))
     case ("mm", "minmod")
-      name_lim           =  "minmod"
-      limiter            => limiter_minmod
+      name_tlim          =  "minmod"
+      limiter_tvd        => limiter_minmod
     case ("mc", "monotonized_central")
-      name_lim           =  "monotonized central"
-      limiter            => limiter_monotonized_central
+      name_tlim          =  "monotonized central"
+      limiter_tvd        => limiter_monotonized_central
     case ("sb", "superbee")
-      name_lim           =  "superbee"
-      limiter            => limiter_superbee
+      name_tlim          =  "superbee"
+      limiter_tvd        => limiter_superbee
     case ("vl", "vanleer")
-      name_lim           =  "van Leer"
-      limiter            => limiter_vanleer
+      name_tlim          =  "van Leer"
+      limiter_tvd        => limiter_vanleer
     case ("va", "vanalbada")
-      name_lim           =  "van Albada"
-      limiter            => limiter_vanalbada
+      name_tlim          =  "van Albada"
+      limiter_tvd        => limiter_vanalbada
     case default
-      name_lim           =  "zero derivative"
-      limiter            => limiter_zero
+      name_tlim          =  "zero derivative"
+      limiter_tvd        => limiter_zero
     end select
 
 ! select the prolongation limiter
@@ -298,7 +298,7 @@ module interpolations
     if (verbose) then
 
       write (*,"(4x,a14, 9x,'=',1x,a)") "reconstruction"      , trim(name_rec)
-      write (*,"(4x, a7,16x,'=',1x,a)") "limiter"             , trim(name_lim)
+      write (*,"(4x,a11,12x,'=',1x,a)") "TVD limiter"         , trim(name_tlim)
       write (*,"(4x,a20, 3x,'=',1x,a)") "prolongation limiter", trim(name_plim)
       write (*,"(4x,a14, 9x,'=',1x,a)") "fix positivity"      , trim(positivity_fix)
       write (*,"(4x,a12,11x,'=',1x,a)") "clip extrema"        , trim(clip_extrema)
@@ -350,7 +350,9 @@ module interpolations
 ! release the procedure pointers
 !
     nullify(reconstruct_states)
-    nullify(limiter)
+    nullify(limiter_tvd)
+    nullify(limiter_prol)
+    nullify(limiter_clip)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -471,7 +473,7 @@ module interpolations
 
 ! obtain the TVD limited derivative
 !
-      df      = limiter(0.5d+00, dfl, dfr)
+      df      = limiter_tvd(0.5d+00, dfl, dfr)
 
 ! update the left and right-side interpolation states
 !
