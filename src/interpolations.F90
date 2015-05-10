@@ -51,6 +51,7 @@ module interpolations
 !
   procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
   procedure(limiter_zero)      , pointer, save :: limiter            => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
 
 ! module parameters
 !
@@ -112,10 +113,12 @@ module interpolations
 !
     character(len=255) :: sreconstruction = "tvd"
     character(len=255) :: slimiter        = "mm"
+    character(len=255) :: climiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
     character(len=255) :: name_lim        = ""
+    character(len=255) :: name_clim       = ""
 !
 !-------------------------------------------------------------------------------
 !
@@ -138,6 +141,7 @@ module interpolations
     call get_parameter_string ("limiter"        , slimiter       )
     call get_parameter_string ("fix_positivity" , positivity_fix )
     call get_parameter_string ("clip_extrema"   , clip_extrema   )
+    call get_parameter_string ("extrema_limiter", climiter       )
     call get_parameter_integer("nghosts"        , ng             )
     call get_parameter_real   ("eps"            , eps            )
     call get_parameter_real   ("limo3_rad"      , rad            )
@@ -230,6 +234,26 @@ module interpolations
       limiter            => limiter_zero
     end select
 
+! select the clipping limiter
+!
+    select case(trim(climiter))
+    case ("mm", "minmod")
+      name_clim          =  "minmod"
+      limiter_clip       => limiter_minmod
+    case ("mc", "monotonized_central")
+      name_clim          =  "monotonized central"
+      limiter_clip       => limiter_monotonized_central
+    case ("sb", "superbee")
+      name_clim          =  "superbee"
+      limiter_clip       => limiter_superbee
+    case ("vl", "vanleer")
+      name_clim          =  "van Leer"
+      limiter_clip       => limiter_vanleer
+    case default
+      name_clim          =  "zero derivative"
+      limiter_clip       => limiter_zero
+    end select
+
 ! check additional reconstruction limiting
 !
     select case(trim(positivity_fix))
@@ -253,6 +277,9 @@ module interpolations
       write (*,"(4x,a15,8x,'=',1x,a)") "limiter        ", trim(name_lim)
       write (*,"(4x,a15,8x,'=',1x,a)") "fix positivity ", trim(positivity_fix)
       write (*,"(4x,a15,8x,'=',1x,a)") "clip extrema   ", trim(clip_extrema)
+      if (clip) then
+        write (*,"(4x,a15,8x,'=',1x,a)") "extrema limiter", trim(name_clim)
+      end if
 
     end if
 
@@ -2766,7 +2793,7 @@ module interpolations
 
 ! get the limited slope
 !
-        df  = limiter_minmod(0.5d+00, dfl, dfr)
+        df  = limiter_clip(0.5d+00, dfl, dfr)
 
 ! calculate new states
 !
@@ -2790,7 +2817,7 @@ module interpolations
 
 ! get the limited slope
 !
-        df  = limiter_minmod(0.5d+00, dfl, dfr)
+        df  = limiter_clip(0.5d+00, dfl, dfr)
 
 ! calculate new states
 !
