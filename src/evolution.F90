@@ -287,7 +287,6 @@ module evolution
 ! include external procedures
 !
     use blocks        , only : set_blocks_update
-    use boundaries    , only : boundary_variables
     use mesh          , only : update_mesh
 
 ! include external variables
@@ -333,10 +332,6 @@ module evolution
 ! update primitive variables
 !
       call update_variables()
-
-! update boundaries
-!
-      call boundary_variables()
 
 #ifdef DEBUG
 ! check variables for NaNs
@@ -516,7 +511,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -589,10 +583,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 #ifdef PROFILE
 ! stop accounting time for one step update
 !
@@ -623,7 +613,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -691,10 +680,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 ! update fluxes from the intermediate stage
 !
     call update_fluxes()
@@ -740,10 +725,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 #ifdef PROFILE
 ! stop accounting time for one step update
 !
@@ -777,7 +758,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -901,10 +881,6 @@ module evolution
 !
       call update_variables()
 
-! update boundaries
-!
-      call boundary_variables()
-
     end do ! n = 1, stages - 1
 
 != the final step: U(n+1) = 1/m U(0) + (m-1)/m [1 + dt/(m-1) L] U(m-1)
@@ -954,10 +930,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 #ifdef PROFILE
 ! stop accounting time for one step update
 !
@@ -989,7 +961,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -1072,10 +1043,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 !! 2nd substep of integration
 !!
 ! prepare the fractional time step
@@ -1117,10 +1084,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 !! 3rd substep of integration
 !!
@@ -1173,10 +1136,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 #ifdef PROFILE
 ! stop accounting time for one step update
 !
@@ -1209,7 +1168,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -1292,10 +1250,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 != 2nd step: U(2) = U(1) + 1/2 dt F[U(1)]
 !
 ! update fluxes
@@ -1332,10 +1286,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 != 3rd step: U(3) = 2/3 U(n) + 1/3 U(2) + 1/6 dt F[U(2)]
 !
@@ -1378,10 +1328,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 != the final step: U(n+1) = U(3) + 1/2 dt F[U(3)]
 !
@@ -1433,10 +1379,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 #ifdef PROFILE
 ! stop accounting time for one step update
 !
@@ -1469,7 +1411,6 @@ module evolution
 
 ! include external procedures
 !
-    use boundaries    , only : boundary_variables
     use sources       , only : update_sources
 
 ! include external variables
@@ -1560,10 +1501,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 != 2nd step: U(2) = U(1) + b1 dt F[U(1)]
 !
 ! update fluxes
@@ -1600,10 +1537,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 != 3rd step: U(3) = a31 U(n) + a33 U(2) + b3 dt F[U(2)]
 !
@@ -1646,10 +1579,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 != 4th step: U(4) = a41 U(n) + a44 U(3) + b4 dt F[U(3)]
 !
@@ -1697,10 +1626,6 @@ module evolution
 !
     call update_variables()
 
-! update boundaries
-!
-    call boundary_variables()
-
 != the final step: U(n+1) = a53 U(2) + a55 U(4) + b5 dt F[U(4)]
 !
 ! calculate the fractional time step
@@ -1747,10 +1672,6 @@ module evolution
 ! update primitive variables
 !
     call update_variables()
-
-! update boundaries
-!
-    call boundary_variables()
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -1961,6 +1882,7 @@ module evolution
 
 ! include external procedures
 !
+    use boundaries    , only : boundary_variables
     use equations     , only : update_primitive_variables
     use shapes        , only : update_shapes
 
@@ -1986,31 +1908,23 @@ module evolution
     call start_timer(imv)
 #endif /* PROFILE */
 
-! associate the pointer with the first block on the data block list
+! update primitive variables and shapes if necessary
 !
     pdata => list_data
-
-! iterate over all data blocks
-!
     do while (associated(pdata))
-
-! associate pmeta with the corresponding meta block
-!
       pmeta => pdata%meta
 
-! convert conserved variables to primitive ones for the current block and
-! update shapes if necessary
-!
       if (pmeta%update) then
         call update_primitive_variables(pdata%u, pdata%q)
         call update_shapes(pdata, time)
       end if
 
-! assign pointer to the next block
-!
       pdata => pdata%next
-
     end do
+
+! update boundaries
+!
+    call boundary_variables()
 
 #ifdef PROFILE
 ! stop accounting time for variable update
