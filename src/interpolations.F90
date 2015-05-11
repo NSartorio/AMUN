@@ -50,7 +50,9 @@ module interpolations
 ! pointers to the reconstruction and limiter procedures
 !
   procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
-  procedure(limiter_zero)      , pointer, save :: limiter            => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_tvd        => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
+  procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
 
 ! module parameters
 !
@@ -73,7 +75,7 @@ module interpolations
 ! declare public subroutines
 !
   public :: initialize_interpolations, finalize_interpolations
-  public :: reconstruct, limiter
+  public :: reconstruct, limiter_prol
   public :: fix_positivity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -111,11 +113,15 @@ module interpolations
 ! local variables
 !
     character(len=255) :: sreconstruction = "tvd"
-    character(len=255) :: slimiter        = "mm"
+    character(len=255) :: tlimiter        = "mm"
+    character(len=255) :: plimiter        = "mm"
+    character(len=255) :: climiter        = "mm"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
-    character(len=255) :: name_lim        = ""
+    character(len=255) :: name_tlim       = ""
+    character(len=255) :: name_plim       = ""
+    character(len=255) :: name_clim       = ""
 !
 !-------------------------------------------------------------------------------
 !
@@ -134,13 +140,15 @@ module interpolations
 
 ! obtain the user defined interpolation methods and coefficients
 !
-    call get_parameter_string ("reconstruction" , sreconstruction)
-    call get_parameter_string ("limiter"        , slimiter       )
-    call get_parameter_string ("fix_positivity" , positivity_fix )
-    call get_parameter_string ("clip_extrema"   , clip_extrema   )
-    call get_parameter_integer("nghosts"        , ng             )
-    call get_parameter_real   ("eps"            , eps            )
-    call get_parameter_real   ("limo3_rad"      , rad            )
+    call get_parameter_string ("reconstruction"      , sreconstruction)
+    call get_parameter_string ("limiter"             , tlimiter       )
+    call get_parameter_string ("fix_positivity"      , positivity_fix )
+    call get_parameter_string ("clip_extrema"        , clip_extrema   )
+    call get_parameter_string ("extrema_limiter"     , climiter       )
+    call get_parameter_string ("prolongation_limiter", plimiter       )
+    call get_parameter_integer("nghosts"             , ng             )
+    call get_parameter_real   ("eps"                 , eps            )
+    call get_parameter_real   ("limo3_rad"           , rad            )
 
 ! select the reconstruction method
 !
@@ -207,27 +215,67 @@ module interpolations
       end if
     end select
 
-! select the limiter
+! select the TVD limiter
 !
-    select case(trim(slimiter))
+    select case(trim(tlimiter))
     case ("mm", "minmod")
-      name_lim           =  "minmod"
-      limiter            => limiter_minmod
+      name_tlim          =  "minmod"
+      limiter_tvd        => limiter_minmod
     case ("mc", "monotonized_central")
-      name_lim           =  "monotonized central"
-      limiter            => limiter_monotonized_central
+      name_tlim          =  "monotonized central"
+      limiter_tvd        => limiter_monotonized_central
     case ("sb", "superbee")
-      name_lim           =  "superbee"
-      limiter            => limiter_superbee
+      name_tlim          =  "superbee"
+      limiter_tvd        => limiter_superbee
     case ("vl", "vanleer")
-      name_lim           =  "van Leer"
-      limiter            => limiter_vanleer
+      name_tlim          =  "van Leer"
+      limiter_tvd        => limiter_vanleer
     case ("va", "vanalbada")
-      name_lim           =  "van Albada"
-      limiter            => limiter_vanalbada
+      name_tlim          =  "van Albada"
+      limiter_tvd        => limiter_vanalbada
     case default
-      name_lim           =  "zero derivative"
-      limiter            => limiter_zero
+      name_tlim          =  "zero derivative"
+      limiter_tvd        => limiter_zero
+    end select
+
+! select the prolongation limiter
+!
+    select case(trim(plimiter))
+    case ("mm", "minmod")
+      name_plim          =  "minmod"
+      limiter_prol       => limiter_minmod
+    case ("mc", "monotonized_central")
+      name_plim          =  "monotonized central"
+      limiter_prol       => limiter_monotonized_central
+    case ("sb", "superbee")
+      name_plim          =  "superbee"
+      limiter_prol       => limiter_superbee
+    case ("vl", "vanleer")
+      name_plim          =  "van Leer"
+      limiter_prol       => limiter_vanleer
+    case default
+      name_plim          =  "zero derivative"
+      limiter_prol       => limiter_zero
+    end select
+
+! select the clipping limiter
+!
+    select case(trim(climiter))
+    case ("mm", "minmod")
+      name_clim          =  "minmod"
+      limiter_clip       => limiter_minmod
+    case ("mc", "monotonized_central")
+      name_clim          =  "monotonized central"
+      limiter_clip       => limiter_monotonized_central
+    case ("sb", "superbee")
+      name_clim          =  "superbee"
+      limiter_clip       => limiter_superbee
+    case ("vl", "vanleer")
+      name_clim          =  "van Leer"
+      limiter_clip       => limiter_vanleer
+    case default
+      name_clim          =  "zero derivative"
+      limiter_clip       => limiter_zero
     end select
 
 ! check additional reconstruction limiting
@@ -249,10 +297,14 @@ module interpolations
 !
     if (verbose) then
 
-      write (*,"(4x,a15,8x,'=',1x,a)") "reconstruction ", trim(name_rec)
-      write (*,"(4x,a15,8x,'=',1x,a)") "limiter        ", trim(name_lim)
-      write (*,"(4x,a15,8x,'=',1x,a)") "fix positivity ", trim(positivity_fix)
-      write (*,"(4x,a15,8x,'=',1x,a)") "clip extrema   ", trim(clip_extrema)
+      write (*,"(4x,a14, 9x,'=',1x,a)") "reconstruction"      , trim(name_rec)
+      write (*,"(4x,a11,12x,'=',1x,a)") "TVD limiter"         , trim(name_tlim)
+      write (*,"(4x,a20, 3x,'=',1x,a)") "prolongation limiter", trim(name_plim)
+      write (*,"(4x,a14, 9x,'=',1x,a)") "fix positivity"      , trim(positivity_fix)
+      write (*,"(4x,a12,11x,'=',1x,a)") "clip extrema"        , trim(clip_extrema)
+      if (clip) then
+        write (*,"(4x,a15,8x,'=',1x,a)") "extrema limiter", trim(name_clim)
+      end if
 
     end if
 
@@ -298,7 +350,9 @@ module interpolations
 ! release the procedure pointers
 !
     nullify(reconstruct_states)
-    nullify(limiter)
+    nullify(limiter_tvd)
+    nullify(limiter_prol)
+    nullify(limiter_clip)
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -419,7 +473,7 @@ module interpolations
 
 ! obtain the TVD limited derivative
 !
-      df      = limiter(0.5d+00, dfl, dfr)
+      df      = limiter_tvd(0.5d+00, dfl, dfr)
 
 ! update the left and right-side interpolation states
 !
@@ -2483,10 +2537,15 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
+
+! local variables
+!
+    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    c = (sign(x, a) + sign(x, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
+    y = x - eps
+    c = (sign(y, a) + sign(y, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
 
 !-------------------------------------------------------------------------------
 !
@@ -2517,11 +2576,16 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
+
+! local variables
+!
+    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    c = 0.5d+00 * (sign(x, a) + sign(x, b))                                    &
-           * max(min(2.0d+00 * abs(a), abs(b)), min(abs(a), 2.0d+00 * abs(b)))
+    y = x - eps
+    c = (sign(y, a) + sign(y, b))                                              &
+           * max(min(abs(a), 0.5d+00 * abs(b)), min(0.5d+00 * abs(a), abs(b)))
 
 !-------------------------------------------------------------------------------
 !
@@ -2557,7 +2621,7 @@ module interpolations
 !
     c = a * b
     if (c > 0.0d+00) then
-      c = 2.0d+00 * x * c / (a + b)
+      c = 2.0d+00 * (x - eps) * c / (a + b)
     else
       c = 0.0d+00
     end if
@@ -2719,8 +2783,9 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1
+    integer      :: i, im1, ip1, ip2
     real(kind=8) :: fmn, fmx
+    real(kind=8) :: dfl, dfr, df
 !
 !------------------------------------------------------------------------------
 !
@@ -2748,10 +2813,19 @@ module interpolations
 !
       if (fl(i) < fmn .or. fl(i) > fmx) then
 
+! calculate the left and right derivatives
+!
+        dfl = f(i  ) - f(im1)
+        dfr = f(ip1) - f(i  )
+
+! get the limited slope
+!
+        df  = limiter_clip(0.5d+00, dfl, dfr)
+
 ! calculate new states
 !
-        fl(i  ) = f(i  )
-        fr(im1) = f(i  )
+        fl(i  ) = f(i  ) + df
+        fr(im1) = f(i  ) - df
 
       end if
 
@@ -2759,10 +2833,23 @@ module interpolations
 !
       if (fr(i) < fmn .or. fr(i) > fmx) then
 
+! calculate the missing index
+!
+        ip2 = min(n, i + 2)
+
+! calculate the left and right derivatives
+!
+        dfl = f(ip1) - f(i  )
+        dfr = f(ip2) - f(ip1)
+
+! get the limited slope
+!
+        df  = limiter_clip(0.5d+00, dfl, dfr)
+
 ! calculate new states
 !
-        fl(ip1) = f(ip1)
-        fr(i  ) = f(ip1)
+        fl(ip1) = f(ip1) + df
+        fr(i  ) = f(ip1) - df
 
       end if
 

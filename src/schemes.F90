@@ -114,7 +114,7 @@ module schemes
     character(len=64)      :: solver   = "HLL"
     character(len=64)      :: statev   = "primitive"
     character(len=255)     :: name_sol = ""
-    character(len=255)     :: name_sts = ""
+    character(len=255)     :: name_sts = "primitive"
 !
 !-------------------------------------------------------------------------------
 !
