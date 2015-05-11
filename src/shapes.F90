@@ -601,7 +601,7 @@ module shapes
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(nv)    :: qj
+    real(kind=8), dimension(nv)    :: qj, uj
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -650,6 +650,7 @@ module shapes
       qj(ibz) = bjet
       qj(ibp) = 0.0d+00
     end if ! ibx > 0
+    call prim2cons(1, qj(1:nv), uj(1:nv))
 
 ! prepare block coordinates
 !
@@ -674,6 +675,7 @@ module shapes
 ! copy the primitive variable vector
 !
         q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+        u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
 
 ! calculate radius
 !
@@ -683,21 +685,18 @@ module shapes
           do i = 1, im
             if (x(i) <= max(dx, ljet)) then
               q(1:nv,i) = qj(1:nv)
+              u(1:nv,i) = uj(1:nv)
             end if
           end do ! i = 1, im
         end if ! R < Rjet
 
-! convert the primitive variables to conservative ones
+! copy the primitive variables to the current block
 !
-        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
 
 ! copy the conserved variables to the current block
 !
         pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
-
-! copy the primitive variables to the current block
-!
-        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
 
       end do ! j = 1, jm
     end do ! k = 1, km
