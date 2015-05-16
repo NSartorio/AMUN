@@ -331,7 +331,7 @@ module evolution
 
 ! update primitive variables
 !
-      call update_variables()
+      call update_variables(time + dt, 0.0d+00)
 
 #ifdef DEBUG
 ! check variables for NaNs
@@ -525,7 +525,11 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer            :: pdata
+    type(block_data), pointer :: pdata
+
+! local variables
+!
+    real(kind=8) :: tm, dtm
 
 ! local arrays
 !
@@ -579,9 +583,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = dt
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -627,7 +636,11 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer            :: pdata
+    type(block_data), pointer :: pdata
+
+! local variables
+!
+    real(kind=8) :: tm, dtm
 
 ! local arrays
 !
@@ -641,6 +654,8 @@ module evolution
     call start_timer(imu)
 #endif /* PROFILE */
 
+!= 1st step: U(1) = U(n) + dt * F[U(n)]
+!
 ! update fluxes
 !
     call update_fluxes()
@@ -676,10 +691,17 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = dt
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
+!= 2nd step: U(n+1) = 1/2 U(n) + 1/2 U(1) + 1/2 dt * F[U(1)]
+!
 ! update fluxes from the intermediate stage
 !
     call update_fluxes()
@@ -721,9 +743,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = 0.5d+00 * dt
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -778,6 +805,7 @@ module evolution
 !
     integer      :: n
     real(kind=8) :: ds
+    real(kind=8) :: tm, dtm
 
 ! local saved variables
 !
@@ -877,9 +905,14 @@ module evolution
 
       end do ! over data blocks
 
+! prepare times
+!
+      tm  = time + n * ds
+      dtm = ds
+
 ! update primitive variables
 !
-      call update_variables()
+      call update_variables(tm, dtm)
 
     end do ! n = 1, stages - 1
 
@@ -926,9 +959,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = fl * dt
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -975,11 +1013,12 @@ module evolution
 
 ! local pointers
 !
-    type(block_data), pointer            :: pdata
+    type(block_data), pointer :: pdata
 
 ! local variables
 !
-    real(kind=8)                         :: ds
+    real(kind=8) :: ds
+    real(kind=8) :: tm, dtm
 
 ! local arrays
 !
@@ -998,8 +1037,8 @@ module evolution
     call start_timer(imu)
 #endif /* PROFILE */
 
-!! 1st substep of integration
-!!
+!= 1st substep: U(1) = U(n) + dt F[U(n)]
+!
 ! prepare the fractional time step
 !
     ds = dt
@@ -1039,12 +1078,17 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
-!! 2nd substep of integration
-!!
+!= 2nd step: U(2) = 3/4 U(n) + 1/4 U(1) + 1/4 dt F[U(1)]
+!
 ! prepare the fractional time step
 !
     ds = f22 * dt
@@ -1081,12 +1125,17 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + 0.5d+00 * dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
-!! 3rd substep of integration
-!!
+!= 3rd step: U(n+1) = 1/3 U(n) + 2/3 U(2) + 2/3 dt F[U(2)]
+!
 ! prepare the fractional time step
 !
     ds = f32 * dt
@@ -1132,9 +1181,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -1186,7 +1240,8 @@ module evolution
 
 ! local variables
 !
-    real(kind=8)                         :: ds
+    real(kind=8) :: ds
+    real(kind=8) :: tm, dtm
 
 ! local arrays
 !
@@ -1246,9 +1301,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != 2nd step: U(2) = U(1) + 1/2 dt F[U(1)]
 !
@@ -1283,9 +1343,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != 3rd step: U(3) = 2/3 U(n) + 1/3 U(2) + 1/6 dt F[U(2)]
 !
@@ -1325,9 +1390,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + 0.5d+00 * dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != the final step: U(n+1) = U(3) + 1/2 dt F[U(3)]
 !
@@ -1375,9 +1445,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -1429,7 +1504,8 @@ module evolution
 
 ! local variables
 !
-    real(kind=8)                         :: ds
+    real(kind=8) :: ds
+    real(kind=8) :: tm, dtm
 
 ! local arrays
 !
@@ -1442,7 +1518,7 @@ module evolution
     real(kind=8), parameter :: b4  = 2.38458932846290d-01
     real(kind=8), parameter :: b5  = 2.87632146308408d-01
     real(kind=8), parameter :: a31 = 3.55909775063327d-01
-    real(kind=8), parameter :: a33 = 6.44090224936674d-01
+    real(kind=8), parameter :: a33 = 6.44090224936673d-01
     real(kind=8), parameter :: a41 = 3.67933791638137d-01
     real(kind=8), parameter :: a44 = 6.32066208361863d-01
     real(kind=8), parameter :: a53 = 2.37593836598569d-01
@@ -1497,9 +1573,14 @@ module evolution
 
     end do
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != 2nd step: U(2) = U(1) + b1 dt F[U(1)]
 !
@@ -1534,9 +1615,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + 2.0d+00 * ds
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != 3rd step: U(3) = a31 U(n) + a33 U(2) + b3 dt F[U(2)]
 !
@@ -1576,9 +1662,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + (2.0d+00 * a33 * b1 + b3) * dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != 4th step: U(4) = a41 U(n) + a44 U(3) + b4 dt F[U(3)]
 !
@@ -1622,9 +1713,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + ((2.0d+00 * b1 * a33 + b3) * a44 + b4) * dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 != the final step: U(n+1) = a53 U(2) + a55 U(4) + b5 dt F[U(4)]
 !
@@ -1669,9 +1765,14 @@ module evolution
 
     end do ! over data blocks
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
+
 ! update primitive variables
 !
-    call update_variables()
+    call update_variables(tm, dtm)
 
 #ifdef PROFILE
 ! stop accounting time for one step update
@@ -1875,10 +1976,14 @@ module evolution
 !   Subroutine iterates over all data blocks and converts the conservative
 !   variables to their primitive representation.
 !
+!   Arguments:
+!
+!     tm  - time at the moment of update;
+!     dtm - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_variables()
+  subroutine update_variables(tm, dtm)
 
 ! include external procedures
 !
@@ -1894,6 +1999,10 @@ module evolution
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    real(kind=8), intent(in) :: tm, dtm
 
 ! local pointers
 !
@@ -1929,7 +2038,7 @@ module evolution
     do while (associated(pdata))
       pmeta => pdata%meta
 
-      if (pmeta%update) call update_shapes(pdata)
+      if (pmeta%update) call update_shapes(pdata, tm, dtm)
 
       pdata => pdata%next
     end do

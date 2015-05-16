@@ -235,10 +235,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_none(pdata)
+  subroutine update_shapes_none(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -251,6 +253,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
+    real(kind=8)             , intent(in)    :: time, dt
 !
 !-------------------------------------------------------------------------------
 !
@@ -282,10 +285,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_blast(pdata)
+  subroutine update_shapes_blast(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -306,6 +311,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
+    real(kind=8)             , intent(in)    :: time, dt
 
 ! default parameter values
 !
@@ -556,10 +562,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_jet(pdata)
+  subroutine update_shapes_jet(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -578,6 +586,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
+    real(kind=8)             , intent(in)    :: time, dt
 
 ! default parameter values
 !
