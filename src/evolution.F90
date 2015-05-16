@@ -1908,16 +1908,13 @@ module evolution
     call start_timer(imv)
 #endif /* PROFILE */
 
-! update primitive variables and shapes if necessary
+! update primitive variables in the changed blocks
 !
     pdata => list_data
     do while (associated(pdata))
       pmeta => pdata%meta
 
-      if (pmeta%update) then
-        call update_primitive_variables(pdata%u, pdata%q)
-        call update_shapes(pdata)
-      end if
+      if (pmeta%update) call update_primitive_variables(pdata%u, pdata%q)
 
       pdata => pdata%next
     end do
@@ -1925,6 +1922,17 @@ module evolution
 ! update boundaries
 !
     call boundary_variables()
+
+! apply shapes in blocks which need it
+!
+    pdata => list_data
+    do while (associated(pdata))
+      pmeta => pdata%meta
+
+      if (pmeta%update) call update_shapes(pdata)
+
+      pdata => pdata%next
+    end do
 
 #ifdef PROFILE
 ! stop accounting time for variable update
