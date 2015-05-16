@@ -242,10 +242,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_none(pdata, time)
+  subroutine update_shapes_none(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -258,7 +260,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
-    real(kind=8)             , intent(in)    :: time
+    real(kind=8)             , intent(in)    :: time, dt
 !
 !-------------------------------------------------------------------------------
 !
@@ -290,10 +292,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_blast(pdata, time)
+  subroutine update_shapes_blast(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -314,7 +318,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
-    real(kind=8)             , intent(in)    :: time
+    real(kind=8)             , intent(in)    :: time, dt
 
 ! default parameter values
 !
@@ -565,10 +569,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_jet(pdata, time)
+  subroutine update_shapes_jet(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -587,7 +593,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
-    real(kind=8)             , intent(in)    :: time
+    real(kind=8)             , intent(in)    :: time, dt
 
 ! default parameter values
 !
@@ -733,10 +739,12 @@ module shapes
 !
 !     pdata - pointer to the data block structure of the currently initialized
 !             block;
+!     time  - time at the moment of update;
+!     dt    - time step since the last update;
 !
 !===============================================================================
 !
-  subroutine update_shapes_binaries(pdata, time)
+  subroutine update_shapes_binaries(pdata, time, dt)
 
 ! include external procedures and variables
 !
@@ -757,7 +765,7 @@ module shapes
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
-    real(kind=8)             , intent(in)    :: time
+    real(kind=8)             , intent(in)    :: time, dt
 
 ! default parameter values
 !
@@ -798,7 +806,7 @@ module shapes
     integer       :: i, j, k
     real(kind=8)  :: xs, ys, zs
     real(kind=8)  :: xc, yc, zc
-    real(kind=8)  :: dv, dt
+    real(kind=8)  :: dv, ds
     real(kind=8)  :: sn, cs, man, res
     real(kind=8)  :: rs2, rc2, rs, rc, rd
     real(kind=8)  :: dns, prs, vxs, vys, vzs
@@ -940,11 +948,11 @@ module shapes
       yps = - rs * sn
       xpc =   rc * cs
       ypc =   rc * sn
-      dt  = time - tprev
-      uxs = (xps - xrs) / dt
-      uys = (yps - yrs) / dt
-      uxc = (xpc - xrc) / dt
-      uyc = (ypc - yrc) / dt
+      ds  = time - tprev
+      uxs = (xps - xrs) / ds
+      uys = (yps - yrs) / ds
+      uxc = (xpc - xrc) / ds
+      uyc = (ypc - yrc) / ds
 
 ! update tprev, previous positions
 !
