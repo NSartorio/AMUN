@@ -51,10 +51,11 @@ module boundaries
 
 ! parameters corresponding to the boundary type
 !
-  integer, parameter            :: bnd_periodic   = 0
-  integer, parameter            :: bnd_open       = 1
-  integer, parameter            :: bnd_outflow    = 2
-  integer, parameter            :: bnd_reflective = 3
+  integer, parameter            :: bnd_periodic     = 0
+  integer, parameter            :: bnd_open         = 1
+  integer, parameter            :: bnd_outflow      = 2
+  integer, parameter            :: bnd_reflective   = 3
+  integer, parameter            :: bnd_reconnection = 4
 
 ! variable to store boundary type flags
 !
@@ -172,6 +173,8 @@ module boundaries
       bnd_type(1,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,1) = bnd_reflective
+    case("reconnection", "recon", "rec")
+      bnd_type(1,1) = bnd_reconnection
     case default
       bnd_type(1,1) = bnd_periodic
     end select
@@ -183,6 +186,8 @@ module boundaries
       bnd_type(1,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,2) = bnd_reflective
+    case("reconnection", "recon", "rec")
+      bnd_type(1,2) = bnd_reconnection
     case default
       bnd_type(1,2) = bnd_periodic
     end select
@@ -194,6 +199,8 @@ module boundaries
       bnd_type(2,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,1) = bnd_reflective
+    case("reconnection", "recon", "rec")
+      bnd_type(2,1) = bnd_reconnection
     case default
       bnd_type(2,1) = bnd_periodic
     end select
@@ -205,6 +212,8 @@ module boundaries
       bnd_type(2,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,2) = bnd_reflective
+    case("reconnection", "recon", "rec")
+      bnd_type(2,2) = bnd_reconnection
     case default
       bnd_type(2,2) = bnd_periodic
     end select
@@ -1118,6 +1127,7 @@ module boundaries
 !
                   if (.not. associated(pmeta%edges(i,j,m)%ptr))                &
                             call block_boundary_specific(i, j, k, n            &
+                                          , pmeta%level                        &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                 end do ! i = 1, sides
@@ -1146,6 +1156,7 @@ module boundaries
 !
                     if (.not. associated(pmeta%faces(i,j,k,n)%ptr))            &
                             call block_boundary_specific(i, j, k, n            &
+                                          , pmeta%level                        &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                   end do ! i = 1, sides
@@ -4944,20 +4955,23 @@ module boundaries
 !
 !     nc         - the edge direction;
 !     ic, jc, kc - the corner position;
+!     lv         - the block level;
 !     qn         - the variable array;
 !
 !===============================================================================
 !
-  subroutine block_boundary_specific(ic, jc, kc, nc, qn)
+  subroutine block_boundary_specific(ic, jc, kc, nc, lv, qn)
 
 ! import external procedures and variables
 !
     use coordinates    , only : im , jm , km , ng
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+    use coordinates    , only : adx, ady, adxi, adyi, adzi
     use equations      , only : nv
-    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use error          , only : print_error, print_warning
+    use parameters     , only : get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -4966,8 +4980,20 @@ module boundaries
 ! subroutine arguments
 !
     integer                                     , intent(in)    :: ic, jc, kc
-    integer                                     , intent(in)    :: nc
+    integer                                     , intent(in)    :: nc, lv
     real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+
+! default parameter values
+!
+    real(kind=8), save :: dens = 1.00d+00
+    real(kind=8), save :: pres = 1.00d+00
+    real(kind=8), save :: bamp = 1.00d+00
+    real(kind=8), save :: bgui = 0.00d+00
+    real(kind=8), save :: blim = 1.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
 
 ! local variables
 !
@@ -4976,9 +5002,38 @@ module boundaries
     integer :: iu, ju, ku
     integer :: is, js, ks
     integer :: it, jt, kt
+    integer :: im2, im1, ip1, ip2
+    integer :: jm2, jm1, jp1, jp2
+#if NDIMS == 3
+    integer :: km2, km1, kp1, kp2
+#endif /* NDIMS == 3 */
+    real(kind=8) :: dxy, dxz, dyx, dyz
+    real(kind=8) :: fl, fr, ds
 !
 !-------------------------------------------------------------------------------
 !
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("dens"  , dens)
+      call get_parameter_real("pres"  , pres)
+      call get_parameter_real("bamp"  , bamp)
+      call get_parameter_real("bgui"  , bgui)
+      call get_parameter_real("blimit", blim)
+
+! upper limit for blim
+!
+      blim = max(blim, ng * ady(1))
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
 ! apply specific boundaries depending on the direction
 !
     select case(nc)
@@ -5039,6 +5094,180 @@ module boundaries
             qn(ivx ,i,jl:ju,kl:ku) = max(0.0d+00, qn(ivx,ie,jl:ju,kl:ku))
           end do ! i = ieu, im
         end if
+
+! "reconnection" boundary conditions
+!
+      case(bnd_reconnection)
+
+! process case with magnetic field, otherwise revert to standard outflow
+!
+        if (ibx > 0) then
+
+! get the cell size ratios
+!
+          dxy = adx(lv) * adyi(lv)
+          dxz = adx(lv) * adzi(lv)
+
+! process left and right side boundary separatelly
+!
+          if (ic == 1) then
+
+! iterate over left-side ghost layers
+!
+            do i = ibl, 1, -1
+
+! calculate neighbor cell indices
+!
+              ip1 = min(im, i + 1)
+              ip2 = min(im, i + 2)
+
+! iterate over boundary layer
+!
+              do k = kl, ku
+#if NDIMS == 3
+                km2 = max( 1, k - 2)
+                km1 = max( 1, k - 1)
+                kp1 = min(km, k + 1)
+                kp2 = min(km, k + 2)
+#endif /* NDIMS == 3 */
+                do j = jl, ju
+                  jm2 = max( 1, j - 2)
+                  jm1 = max( 1, j - 1)
+                  jp1 = min(jm, j + 1)
+                  jp2 = min(jm, j + 2)
+
+! make normal derivatives zero
+!
+                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+! prevent the inflow
+!
+                  qn(ivx,i,j,k) = min(0.0d+00, qn(ivx,ib,j,k))
+
+! prevent from creating strong reconnection at the boundary (only near
+! the plane of Bx polarity change)
+!
+#if NDIMS == 3
+! detect the current sheet
+!
+                  ds = min(qn(ibx,ib,jm2,k) * qn(ibx,ib,jp2,k)                 &
+                         , qn(ibx,ib,j,km2) * qn(ibx,ib,j,kp2))
+
+! apply curl-free condition in the vicinity of current sheet
+!
+                  if (ds < 0.0d+00) then
+                    qn(iby,i,j,k) = qn(iby,ip2,j,k)                            &
+                                 + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
+                    qn(ibz,i,j,k) = qn(ibz,ip2,j,k)                            &
+                                 + (qn(ibx,ip1,j,km1) - qn(ibx,ip1,j,kp1)) * dxz
+                  end if
+#else /* NDIMS == 3 */
+! apply curl-free condition in the vicinity of current sheet
+!
+                  if (qn(ibx,ib,jm2,k) * qn(ibx,ib,jp2,k) < 0.0d+00) then
+                    qn(iby,i,j,k) = qn(iby,ip2,j,k)                            &
+                                 + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
+                  end if
+#endif /* NDIMS == 3 */
+
+! update Bx from div(B)=0
+!
+                  qn(ibx,i,j,k) = qn(ibx,ip2,j,k)                              &
+                               + (qn(iby,ip1,jp1,k) - qn(iby,ip1,jm1,k)) * dxy
+#if NDIMS == 3
+                  qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                              &
+                               + (qn(ibz,ip1,j,kp1) - qn(ibz,ip1,j,km1)) * dxz
+#endif /* NDIMS == 3 */
+                  qn(ibp,i,j,k) = 0.0d+00
+                end do ! j = jl, ju
+              end do ! k = kl, ku
+            end do ! i = ibl, 1, -1
+          else ! ic == 1
+
+! iterate over right-side ghost layers
+!
+            do i = ieu, im
+
+! calculate neighbor cell indices
+!
+              im1 = max( 1, i - 1)
+              im2 = max( 1, i - 2)
+
+! iterate over boundary layer
+!
+              do k = kl, ku
+#if NDIMS == 3
+                km1 = max( 1, k - 1)
+                kp1 = min(km, k + 1)
+                km2 = max( 1, k - 2)
+                kp2 = min(km, k + 2)
+#endif /* NDIMS == 3 */
+                do j = jl, ju
+                  jm1 = max( 1, j - 1)
+                  jp1 = min(jm, j + 1)
+                  jm2 = max( 1, j - 2)
+                  jp2 = min(jm, j + 2)
+
+! make normal derivatives zero
+!
+                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+! prevent the inflow
+!
+                  qn(ivx,i,j,k) = max(0.0d+00, qn(ivx,ie,j,k))
+
+! prevent from creating strong reconnection at the boundary (only near
+! the plane of Bx polarity change)
+!
+#if NDIMS == 3
+! detect the current sheet
+!
+                  ds = min(qn(ibx,ie,jm2,k) * qn(ibx,ie,jp2,k)                 &
+                         , qn(ibx,ie,j,km2) * qn(ibx,ie,j,kp2))
+
+! apply curl-free condition in the vicinity of current sheet
+!
+                  if (ds < 0.0d+00) then
+                    qn(iby,i,j,k) = qn(iby,im2,j,k)                            &
+                                 + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
+                    qn(ibz,i,j,k) = qn(ibz,im2,j,k)                            &
+                                 + (qn(ibx,im1,j,kp1) - qn(ibx,im1,j,km1)) * dxz
+                  end if
+#else /* NDIMS == 3 */
+! apply curl-free condition in the vicinity of current sheet
+!
+                  if (qn(ibx,ie,jm2,k) * qn(ibx,ie,jp2,k) < 0.0d+00) then
+                    qn(iby,i,j,k) = qn(iby,im2,j,k)                            &
+                                 + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
+                  end if
+#endif /* NDIMS == 3 */
+
+! update Bx from div(B)=0
+!
+                  qn(ibx,i,j,k) = qn(ibx,im2,j,k)                              &
+                               + (qn(iby,im1,jm1,k) - qn(iby,im1,jp1,k)) * dxy
+#if NDIMS == 3
+                  qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                              &
+                               + (qn(ibz,im1,j,km1) - qn(ibz,im1,j,kp1)) * dxz
+#endif /* NDIMS == 3 */
+                  qn(ibp,i,j,k) = 0.0d+00
+                end do ! j = jl, ju
+              end do ! k = kl, ku
+            end do ! i = ieu, im
+          end if ! ic == 1
+        else ! ibx > 0
+          if (ic == 1) then
+            do i = ibl, 1, -1
+              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+              qn(ivx ,i,jl:ju,kl:ku) = min(0.0d+00, qn(ivx,ib,jl:ju,kl:ku))
+            end do ! i = ibl, 1, -1
+          else
+            do i = ieu, im
+              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+              qn(ivx ,i,jl:ju,kl:ku) = max(0.0d+00, qn(ivx,ie,jl:ju,kl:ku))
+            end do ! i = ieu, im
+          end if
+        end if ! ibx > 0
 
 ! "reflective" boundary conditions
 !
@@ -5133,6 +5362,142 @@ module boundaries
             qn(ivy ,il:iu,j,kl:ku) = max(0.0d+00, qn(ivy,il:iu,je,kl:ku))
           end do ! j = jeu, jm
         end if
+
+! "reconnection" boundary conditions
+!
+      case(bnd_reconnection)
+
+! process case with magnetic field, otherwise revert to standard outflow
+!
+        if (ibx > 0) then
+
+! get the cell size ratios
+!
+          dyx = ady(lv) * adxi(lv)
+          dyz = ady(lv) * adzi(lv)
+
+! process left and right side boundary separatelly
+!
+          if (jc == 1) then
+
+! iterate over left-side ghost layers
+!
+            do j = jbl, 1, -1
+
+! calculate neighbor cell indices
+!
+              jp1 = min(jm, j + 1)
+              jp2 = min(jm, j + 2)
+
+! calculate variable decay coefficients
+!
+              fr  = (ady(lv) * (jb - j - 5.0d-01)) / blim
+              fl  = 1.0d+00 - fr
+
+! iterate over boundary layer
+!
+              do k = kl, ku
+#if NDIMS == 3
+                km1 = max( 1, k - 1)
+                kp1 = min(km, k + 1)
+#endif /* NDIMS == 3 */
+                do i = il, iu
+                  im1 = max( 1, i - 1)
+                  ip1 = min(im, i + 1)
+
+! make normal derivatives zero
+!
+                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+! decay density and pressure to their limits
+!
+                  qn(idn,i,j,k) = fl * qn(idn,i,jb,k) + fr * dens
+                  if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,jb,k) + fr * pres
+
+! decay magnetic field to its limit
+!
+                  qn(ibx,i,j,k) = fl * qn(ibx,i,jb,k) - fr * bamp
+                  qn(ibz,i,j,k) = fl * qn(ibz,i,jb,k) + fr * bgui
+
+! update By from div(B)=0
+!
+                  qn(iby,i,j,k) = qn(iby,i,jp2,k)                              &
+                               + (qn(ibx,ip1,jp1,k) - qn(ibx,im1,jp1,k)) * dyx
+#if NDIMS == 3
+                  qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
+                               + (qn(ibz,i,jp1,kp1) - qn(ibz,i,jp1,km1)) * dyz
+#endif /* NDIMS == 3 */
+                  qn(ibp,i,j,k) = 0.0d+00
+                end do ! i = il, iu
+              end do ! k = kl, ku
+            end do ! j = jbl, 1, -1
+          else ! jc = 1
+
+! iterate over right-side ghost layers
+!
+            do j = jeu, jm
+
+! calculate neighbor cell indices
+!
+              jm1 = max( 1, j - 1)
+              jm2 = max( 1, j - 2)
+
+! calculate variable decay coefficients
+!
+              fr  = (ady(lv) * (j - je - 5.0d-01)) / blim
+              fl  = 1.0d+00 - fr
+
+! iterate over boundary layer
+!
+              do k = kl, ku
+#if NDIMS == 3
+                km1 = max( 1, k - 1)
+                kp1 = min(km, k + 1)
+#endif /* NDIMS == 3 */
+                do i = il, iu
+                  im1 = max( 1, i - 1)
+                  ip1 = min(im, i + 1)
+
+! make normal derivatives zero
+!
+                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+! decay density and pressure to their limits
+!
+                  qn(idn,i,j,k) = fl * qn(idn,i,je,k) + fr * dens
+                  if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,je,k) + fr * pres
+
+! decay magnetic field to its limit
+!
+                  qn(ibx,i,j,k) = fl * qn(ibx,i,je,k) + fr * bamp
+                  qn(ibz,i,j,k) = fl * qn(ibz,i,je,k) + fr * bgui
+
+! update By from div(B)=0
+!
+                  qn(iby,i,j,k) = qn(iby,i,jm2,k)                              &
+                               + (qn(ibx,im1,jm1,k) - qn(ibx,ip1,jm1,k)) * dyx
+#if NDIMS == 3
+                  qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
+                               + (qn(ibz,i,jm1,km1) - qn(ibz,i,jm1,kp1)) * dyz
+#endif /* NDIMS == 3 */
+                  qn(ibp,i,j,k) = 0.0d+00
+                end do ! i = il, iu
+              end do ! k = kl, ku
+            end do ! j = jeu, jm
+          end if ! jc = 1
+        else ! ibx > 0
+          if (jc == 1) then
+            do j = jbl, 1, -1
+              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+              qn(ivy ,il:iu,j,kl:ku) = min(0.0d+00, qn(ivy,il:iu,jb,kl:ku))
+            end do ! j = jbl, 1, -1
+          else
+            do j = jeu, jm
+              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+              qn(ivy ,il:iu,j,kl:ku) = max(0.0d+00, qn(ivy,il:iu,je,kl:ku))
+            end do ! j = jeu, jm
+          end if
+        end if ! ibx > 0
 
 ! "reflective" boundary conditions
 !

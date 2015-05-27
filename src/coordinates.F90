@@ -94,6 +94,10 @@ module coordinates
   real(kind=8), save :: yarea = 1.0d+00
   real(kind=8), save :: zarea = 1.0d+00
 
+! the characteristic decay length
+!
+  real(kind=8), save :: ldec = 1.0d-03
+
 ! the block coordinates for all levels of refinement
 !
   real(kind=8), dimension(:,:), allocatable, save :: ax  , ay  , az
@@ -130,6 +134,10 @@ module coordinates
   type(rectangular), dimension(2,2,2)      , save :: corners_dp, corners_gp
   type(rectangular), dimension(2,2,2)      , save :: corners_dr, corners_gr
 #endif /* NDIMS == 3 */
+
+! the decay factors for all levels
+!
+  real(kind=8), dimension(:  ), allocatable, save :: adec
 
 ! by default everything is private
 !
@@ -304,6 +312,7 @@ module coordinates
     allocate(adyi (toplev))
     allocate(adzi (toplev))
     allocate(advol(toplev))
+    allocate(adec (toplev))
 
 ! reset all coordinate variables to initial values
 !
@@ -714,6 +723,16 @@ module coordinates
     end do ! k = 1, 2
 #endif /* NDIMS == 3 */
 
+! get the characteristic decay scale
+!
+    call get_parameter_real("ldecay", ldec)
+
+! calculate the decay factors
+!
+    do l = 1, toplev
+      adec(l) = exp(- adx(l) / ldec)
+    end do ! l = 1, toplev
+
 ! print general information about the level resolutions
 !
     if (verbose) then
@@ -794,6 +813,7 @@ module coordinates
     if (allocated(adyi) ) deallocate(adyi)
     if (allocated(adzi) ) deallocate(adzi)
     if (allocated(advol)) deallocate(advol)
+    if (allocated(adec) ) deallocate(adec)
 
 !-------------------------------------------------------------------------------
 !
