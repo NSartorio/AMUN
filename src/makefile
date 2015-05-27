@@ -85,12 +85,12 @@ sources = algebra.F90 blocks.F90 boundaries.F90 constants.F90 coordinates.F90  \
           domains.F90 driver.F90 equations.F90 error.F90 evolution.F90         \
           integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
           operators.F90 parameters.F90 problems.F90 random.F90 refinement.F90  \
-          schemes.F90 shapes.F90 sources.F90 timers.F90
+          schemes.F90 shapes.F90 sources.F90 timers.F90 utils.F90
 objects = algebra.o blocks.o boundaries.o constants.o coordinates.o domains.o  \
           driver.o equations.o error.o evolution.o integrals.o                 \
           interpolations.o io.o mesh.o mpitools.o operators.o parameters.o     \
           problems.o random.o refinement.o schemes.o shapes.o sources.o        \
-          timers.o
+          timers.o utils.o
 
 $(name).x: $(objects)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(name).x
@@ -160,5 +160,6 @@ shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
 sources.o        : sources.F90 blocks.o coordinates.o equations.o operators.o  \
                    parameters.o timers.o
 timers.o         : timers.F90
+utils.o          : utils.F90 error.o
 
 #-------------------------------------------------------------------------------
