@@ -39,6 +39,7 @@ module utils
     module procedure assert_scalar
     module procedure assert_array_1d
     module procedure assert_array_2d
+    module procedure assert_array_3d
   end interface
 
 ! by default everything is public
