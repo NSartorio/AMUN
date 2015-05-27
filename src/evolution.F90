@@ -1909,7 +1909,7 @@ module evolution
 ! subroutine arguments
 !
     type(block_data), pointer           , intent(inout) :: pdata
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: du
+    real(kind=8), dimension(nv,im,jm,km), intent(  out) :: du
 
 ! local variables
 !
@@ -1932,6 +1932,10 @@ module evolution
 #if NDIMS == 3
     dzi = adzi(pdata%meta%level)
 #endif /* NDIMS == 3 */
+
+! initialize du
+!
+    du(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! calculate the variable update from the directional fluxes
 !
