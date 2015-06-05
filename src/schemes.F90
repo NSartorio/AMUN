@@ -592,10 +592,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -614,6 +614,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -1094,10 +1098,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -1116,6 +1120,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -1778,10 +1786,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -1800,6 +1808,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -3090,10 +3102,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -3112,6 +3124,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -4538,10 +4554,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -4560,6 +4576,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !
@@ -5233,10 +5253,10 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)    :: idir
-    real(kind=8)                        , intent(in)    :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)    :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: f
+    integer                             , intent(in)  :: idir
+    real(kind=8)                        , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -5255,6 +5275,10 @@ module schemes
 !
     call start_timer(imf)
 #endif /* PROFILE */
+
+! initialize fluxes
+!
+    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
 
 ! select the directional flux to compute
 !

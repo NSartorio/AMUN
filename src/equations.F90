@@ -1017,8 +1017,9 @@ module equations
 
 ! include external procedures and variables
 !
-    use coordinates, only : im, jm, km, in, jn, kn
-    use coordinates, only : ib, jb, kb, ie, je, ke
+    use coordinates, only : im , jm , km , in , jn , kn
+    use coordinates, only : ib , jb , kb , ie , je , ke
+    use coordinates, only : ibl, jbl, kbl, ieu, jeu, keu
 
 ! local variables are not implicit by default
 !
@@ -1078,6 +1079,29 @@ module equations
       end do ! k = kb, ke
 
     end if
+
+! fill out the borders
+!
+    do i = ibl, 1, -1
+      qq(1:nv, i,jb:je,kb:ke) = qq(1:nv,ib,jb:je,kb:ke)
+    end do
+    do i = ieu, im
+      qq(1:nv, i,jb:je,kb:ke) = qq(1:nv,ie,jb:je,kb:ke)
+    end do
+    do j = jbl, 1, -1
+      qq(1:nv, 1:im, j,kb:ke) = qq(1:nv, 1:im,jb,kb:ke)
+    end do
+    do j = jeu, jm
+      qq(1:nv, 1:im, j,kb:ke) = qq(1:nv, 1:im,je,kb:ke)
+    end do
+#if NDIMS == 3
+    do k = kbl, 1, -1
+      qq(1:nv, 1:im, 1:jm, k) = qq(1:nv, 1:im, 1:jm,kb)
+    end do
+    do k = keu, km
+      qq(1:nv, 1:im, 1:jm, k) = qq(1:nv, 1:im, 1:jm,ke)
+    end do
+#endif /* NDIMS == 3 */
 
 !-------------------------------------------------------------------------------
 !
