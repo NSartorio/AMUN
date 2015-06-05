@@ -1848,10 +1848,6 @@ module evolution
       dx(2) = ady(pdata%meta%level)
       dx(3) = adz(pdata%meta%level)
 
-! initialize fluxes
-!
-      pdata%f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
-
 ! update fluxes for the current block
 !
       do n = 1, NDIMS
