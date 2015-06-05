@@ -1373,6 +1373,43 @@ module mesh
 
     end do ! p = 1, nchildren
 
+! fill out the borders
+!
+#if NDIMS == 2
+    do il = is - 1, 1, -1
+      pparent%u(1:nv,il,js:jt, 1   ) = pparent%u(1:nv,is,js:jt, 1   )
+    end do
+    do iu = it + 1, im
+      pparent%u(1:nv,iu,js:jt, 1   ) = pparent%u(1:nv,it,js:jt, 1   )
+    end do
+    do jl = js - 1, 1, -1
+      pparent%u(1:nv, 1:im,jl, 1   ) = pparent%u(1:nv, 1:im,js, 1   )
+    end do
+    do ju = jt + 1, jm
+      pparent%u(1:nv, 1:im,ju, 1   ) = pparent%u(1:nv, 1:im,jt, 1   )
+    end do
+#endif /* NDIMS == 2 */
+#if NDIMS == 3
+    do il = is - 1, 1, -1
+      pparent%u(1:nv,il,js:jt,ks:kt) = pparent%u(1:nv,is,js:jt,ks:kt)
+    end do
+    do iu = it + 1, im
+      pparent%u(1:nv,iu,js:jt,ks:kt) = pparent%u(1:nv,it,js:jt,ks:kt)
+    end do
+    do jl = js - 1, 1, -1
+      pparent%u(1:nv, 1:im,jl,ks:kt) = pparent%u(1:nv, 1:im,js,ks:kt)
+    end do
+    do ju = jt + 1, jm
+      pparent%u(1:nv, 1:im,ju,ks:kt) = pparent%u(1:nv, 1:im,jt,ks:kt)
+    end do
+    do kl = ks - 1, 1, -1
+      pparent%u(1:nv, 1:im, 1:jm,kl) = pparent%u(1:nv, 1:im, 1:jm,ks)
+    end do
+    do ku = kt + 1, km
+      pparent%u(1:nv, 1:im, 1:jm,ku) = pparent%u(1:nv, 1:im, 1:jm,kt)
+    end do
+#endif /* NDIMS == 3 */
+
 #ifdef PROFILE
 ! stop accounting time for the block restriction
 !
