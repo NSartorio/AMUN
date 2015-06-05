@@ -5008,7 +5008,7 @@ module boundaries
     integer :: km2, km1, kp1, kp2
 #endif /* NDIMS == 3 */
     real(kind=8) :: dxy, dxz, dyx, dyz
-    real(kind=8) :: fl, fr, ds
+    real(kind=8) :: fl, fr
 !
 !-------------------------------------------------------------------------------
 !
@@ -5136,7 +5136,7 @@ module boundaries
                   jp1 = min(jm, j + 1)
                   jp2 = min(jm, j + 2)
 
-! make normal derivatives zero
+! make the normal derivative zero
 !
                   qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
 
@@ -5144,33 +5144,16 @@ module boundaries
 !
                   qn(ivx,i,j,k) = min(0.0d+00, qn(ivx,ib,j,k))
 
-! prevent from creating strong reconnection at the boundary (only near
-! the plane of Bx polarity change)
+! get the tangential components of magnetic field from the curl-free condition
 !
+                  qn(iby,i,j,k) = qn(iby,ip2,j,k)                              &
+                               + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
 #if NDIMS == 3
-! detect the current sheet
-!
-                  ds = min(qn(ibx,ib,jm2,k) * qn(ibx,ib,jp2,k)                 &
-                         , qn(ibx,ib,j,km2) * qn(ibx,ib,j,kp2))
-
-! apply curl-free condition in the vicinity of current sheet
-!
-                  if (ds < 0.0d+00) then
-                    qn(iby,i,j,k) = qn(iby,ip2,j,k)                            &
-                                 + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
-                    qn(ibz,i,j,k) = qn(ibz,ip2,j,k)                            &
-                                 + (qn(ibx,ip1,j,km1) - qn(ibx,ip1,j,kp1)) * dxz
-                  end if
-#else /* NDIMS == 3 */
-! apply curl-free condition in the vicinity of current sheet
-!
-                  if (qn(ibx,ib,jm2,k) * qn(ibx,ib,jp2,k) < 0.0d+00) then
-                    qn(iby,i,j,k) = qn(iby,ip2,j,k)                            &
-                                 + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
-                  end if
+                  qn(ibz,i,j,k) = qn(ibz,ip2,j,k)                              &
+                               + (qn(ibx,ip1,j,km1) - qn(ibx,ip1,j,kp1)) * dxz
 #endif /* NDIMS == 3 */
 
-! update Bx from div(B)=0
+! update the normal component of magnetic field from divergence-free condition
 !
                   qn(ibx,i,j,k) = qn(ibx,ip2,j,k)                              &
                                + (qn(iby,ip1,jp1,k) - qn(iby,ip1,jm1,k)) * dxy
@@ -5208,7 +5191,7 @@ module boundaries
                   jm2 = max( 1, j - 2)
                   jp2 = min(jm, j + 2)
 
-! make normal derivatives zero
+! make the normal derivative zero
 !
                   qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
 
@@ -5216,33 +5199,16 @@ module boundaries
 !
                   qn(ivx,i,j,k) = max(0.0d+00, qn(ivx,ie,j,k))
 
-! prevent from creating strong reconnection at the boundary (only near
-! the plane of Bx polarity change)
+! get the tangential components of magnetic field from the curl-free condition
 !
+                  qn(iby,i,j,k) = qn(iby,im2,j,k)                              &
+                               + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
 #if NDIMS == 3
-! detect the current sheet
-!
-                  ds = min(qn(ibx,ie,jm2,k) * qn(ibx,ie,jp2,k)                 &
-                         , qn(ibx,ie,j,km2) * qn(ibx,ie,j,kp2))
-
-! apply curl-free condition in the vicinity of current sheet
-!
-                  if (ds < 0.0d+00) then
-                    qn(iby,i,j,k) = qn(iby,im2,j,k)                            &
-                                 + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
-                    qn(ibz,i,j,k) = qn(ibz,im2,j,k)                            &
-                                 + (qn(ibx,im1,j,kp1) - qn(ibx,im1,j,km1)) * dxz
-                  end if
-#else /* NDIMS == 3 */
-! apply curl-free condition in the vicinity of current sheet
-!
-                  if (qn(ibx,ie,jm2,k) * qn(ibx,ie,jp2,k) < 0.0d+00) then
-                    qn(iby,i,j,k) = qn(iby,im2,j,k)                            &
-                                 + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
-                  end if
+                  qn(ibz,i,j,k) = qn(ibz,im2,j,k)                              &
+                               + (qn(ibx,im1,j,kp1) - qn(ibx,im1,j,km1)) * dxz
 #endif /* NDIMS == 3 */
 
-! update Bx from div(B)=0
+! update the normal component of magnetic field from divergence-free condition
 !
                   qn(ibx,i,j,k) = qn(ibx,im2,j,k)                              &
                                + (qn(iby,im1,jm1,k) - qn(iby,im1,jp1,k)) * dxy
