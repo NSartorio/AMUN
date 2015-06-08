@@ -1373,20 +1373,31 @@ module mesh
 
     end do ! p = 1, nchildren
 
+! prepare indices for the border filling
+!
+    is = ib - nh
+    it = ie + nh
+    js = jb - nh
+    jt = je + nh
+#if NDIMS == 3
+    ks = kb - nh
+    kt = ke + nh
+#endif /* NDIMS == 3 */
+
 ! fill out the borders
 !
 #if NDIMS == 2
     do il = is - 1, 1, -1
-      pparent%u(1:nv,il,js:jt, 1   ) = pparent%u(1:nv,is,js:jt, 1   )
+      pparent%u(1:nv,il,js:jt, 1:km) = pparent%u(1:nv,is,js:jt, 1:km)
     end do
     do iu = it + 1, im
-      pparent%u(1:nv,iu,js:jt, 1   ) = pparent%u(1:nv,it,js:jt, 1   )
+      pparent%u(1:nv,iu,js:jt, 1:km) = pparent%u(1:nv,it,js:jt, 1:km)
     end do
     do jl = js - 1, 1, -1
-      pparent%u(1:nv, 1:im,jl, 1   ) = pparent%u(1:nv, 1:im,js, 1   )
+      pparent%u(1:nv, 1:im,jl, 1:km) = pparent%u(1:nv, 1:im,js, 1:km)
     end do
     do ju = jt + 1, jm
-      pparent%u(1:nv, 1:im,ju, 1   ) = pparent%u(1:nv, 1:im,jt, 1   )
+      pparent%u(1:nv, 1:im,ju, 1:km) = pparent%u(1:nv, 1:im,jt, 1:km)
     end do
 #endif /* NDIMS == 2 */
 #if NDIMS == 3
