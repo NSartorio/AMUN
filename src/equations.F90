@@ -282,6 +282,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "HD"
+      eqsys      = "hd"
 
 ! initialize the number of variables (density + 3 components of velocity)
 !
@@ -379,6 +380,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "MHD"
+      eqsys      = "mhd"
 
 ! initialize the number of variables (density + 3 components of velocity
 !                                             + 3 components of magnetic field)
@@ -487,6 +489,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "Special Relativity HD"
+      eqsys      = "srhd"
 
 ! set relativistic flag
 !
@@ -621,6 +624,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "Special Relativity MHD"
+      eqsys      = "srmhd"
 
 ! set relativistic flag
 !
