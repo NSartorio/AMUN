@@ -1104,6 +1104,7 @@ module io
     use coordinates    , only : minlev, maxlev, toplev
     use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use equations      , only : eqsys, eos
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
@@ -1147,6 +1148,11 @@ module io
       return
 
     end if
+
+! store string attributes
+!
+    call write_attribute(gid, 'eqsys'  , eqsys        )
+    call write_attribute(gid, 'eos'    , eos          )
 
 ! store the integer attributes
 !
