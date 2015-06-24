@@ -10,6 +10,7 @@ methods which can be selected in an easy way through the parameter file. The
 following features are already implemented:
 
 * hydrodynamic and magnetohydrodynamic set of equations (HD and MHD),
+* both classical and special relativity cases for the above equations,
 * Cartesian coordinate system,
 * uniform and adaptive mesh generation and update,
 * 2nd to 4th order time integration using Strong Stability Preserving
