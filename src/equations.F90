@@ -307,6 +307,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "isothermal"
+        eos       = "iso"
 
 ! set pointers to subroutines
 !
@@ -321,6 +322,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !
@@ -410,6 +412,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "isothermal"
+        eos       = "iso"
 
 ! set pointers to the subroutines
 !
@@ -424,6 +427,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! increase the number of variables by the pressure/energy
 !
@@ -518,6 +522,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !
@@ -659,6 +664,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !
