@@ -59,6 +59,11 @@ module interpolations
   real(kind=8), save :: eps        = epsilon(1.0d+00)
   real(kind=8), save :: rad        = 0.5d+00
 
+! monotonicity preserving reconstruction coefficients
+!
+  real(kind=8), save :: kappa      = 1.0d+00
+  real(kind=8), save :: kbeta      = 1.0d+00
+
 ! number of ghost zones (required for compact schemes)
 !
   integer     , save :: ng         = 2
@@ -122,6 +127,7 @@ module interpolations
     character(len=255) :: name_tlim       = ""
     character(len=255) :: name_plim       = ""
     character(len=255) :: name_clim       = ""
+    real(kind=8)       :: cfl             = 0.5d+00
 !
 !-------------------------------------------------------------------------------
 !
@@ -149,6 +155,13 @@ module interpolations
     call get_parameter_integer("nghosts"             , ng             )
     call get_parameter_real   ("eps"                 , eps            )
     call get_parameter_real   ("limo3_rad"           , rad            )
+    call get_parameter_real   ("kappa"               , kappa          )
+    call get_parameter_real   ("kbeta"               , kbeta          )
+    call get_parameter_real   ("cfl"                 , cfl            )
+
+! calculate κ = (1 - ν) / ν
+!
+    kappa = min(kappa, (1.0d+00 - cfl) / cfl)
 
 ! select the reconstruction method
 !
@@ -204,6 +217,12 @@ module interpolations
     case ("crweno5ns", "crweno5-ns", "CRWENO5NS", "CRWENO5-NS")
       name_rec           =  "5th order Compact WENO-NS"
       reconstruct_states => reconstruct_crweno5ns
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
+    case ("mp5", "MP5")
+      name_rec           =  "5th order Monotonicity Preserving"
+      reconstruct_states => reconstruct_mp5
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
@@ -2447,6 +2466,173 @@ module interpolations
 !
 !===============================================================================
 !
+! subroutine RECONSTRUCT_MP5:
+! --------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Monotonicity Preserving (MP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine reconstruct_mp5(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! obtain the face values using high order interpolation
+!
+    do i = 1, n
+
+      im2 = max(1, i - 2)
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+      ip2 = min(n, i + 2)
+
+      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
+                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
+                                                                     / 6.0d+01
+      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
+                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
+                                                                     / 6.0d+01
+
+    end do ! i = 1, n
+
+! apply monotonicity preserving limiting
+!
+    do i = 1, n
+
+      im1 = max(1, i - 1)
+      ip1 = min(n, i + 1)
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+! get the limiting condition for the left state
+!
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (fl(i) - f(i)) * (fl(i) - fmp)
+
+! limit the left state
+!
+      if (ds > eps) then
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(fl(i), fmn, fmx)
+
+      end if
+
+! get the limiting condition for the right state
+!
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+      ds    = (fr(i) - f(i)) * (fr(i) - fmp)
+
+! limit the right state
+!
+      if (ds > eps) then
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(fr(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do
+
+! update the interpolation of the first and last points
+!
+    fl(1) = fr(1)
+    fr(n) = fl(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_mp5
+!
+!===============================================================================
+!
 ! function LIMITER_ZERO:
 ! ---------------------
 !
@@ -2663,6 +2849,103 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end function limiter_vanalbada
+!
+!===============================================================================
+!
+! function MINMOD:
+! ===============
+!
+!   Function returns the minimum module value among two arguments.
+!
+!   Arguments:
+!
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function minmod(a, b)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b
+!
+!-------------------------------------------------------------------------------
+!
+    minmod = (sign(0.5d+00, a) + sign(0.5d+00, b)) * min(abs(a), abs(b))
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function minmod
+!
+!===============================================================================
+!
+! function MINMOD4:
+! ================
+!
+!   Function returns the minimum module value among four arguments.
+!
+!   Arguments:
+!
+!     a, b, c, d - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function minmod4(a, b, c, d)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b, c, d
+!
+!-------------------------------------------------------------------------------
+!
+    minmod4 = minmod(minmod(a, b), minmod(c, d))
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function minmod4
+!
+!===============================================================================
+!
+! function MEDIAN:
+! ===============
+!
+!   Function returns the median of three argument values.
+!
+!   Arguments:
+!
+!     a, b, c - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function median(a, b, c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b, c
+!
+!-------------------------------------------------------------------------------
+!
+    median = a + minmod(b - a, c - a)
+
+    return
+
+  end function median
 !
 !===============================================================================
 !
