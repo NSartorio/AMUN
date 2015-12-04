@@ -1316,7 +1316,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -1691,7 +1691,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -2061,7 +2061,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -2499,7 +2499,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -2959,7 +2959,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -3406,7 +3406,7 @@ module boundaries
 
 ! process only blocks and neighbors which are marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -3905,7 +3905,7 @@ module boundaries
 
 ! skip if the block and its neighbor are not marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -4301,7 +4301,7 @@ module boundaries
 
 ! skip if the block and its neighbor are not marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process
@@ -4674,7 +4674,7 @@ module boundaries
 
 ! skip if the block and its neighbor are not marked for update
 !
-                if (pmeta%update .and. pneigh%update) then
+                if (pmeta%update .or. pneigh%update) then
 
 #ifdef MPI
 ! check if the block and its neighbor belong to the same process

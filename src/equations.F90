@@ -282,6 +282,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "HD"
+      eqsys      = "hd"
 
 ! initialize the number of variables (density + 3 components of velocity)
 !
@@ -306,6 +307,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "isothermal"
+        eos       = "iso"
 
 ! set pointers to subroutines
 !
@@ -320,6 +322,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !
@@ -379,6 +382,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "MHD"
+      eqsys      = "mhd"
 
 ! initialize the number of variables (density + 3 components of velocity
 !                                             + 3 components of magnetic field)
@@ -408,6 +412,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "isothermal"
+        eos       = "iso"
 
 ! set pointers to the subroutines
 !
@@ -422,6 +427,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! increase the number of variables by the pressure/energy
 !
@@ -487,6 +493,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "Special Relativity HD"
+      eqsys      = "srhd"
 
 ! set relativistic flag
 !
@@ -515,6 +522,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !
@@ -621,6 +629,7 @@ module equations
 ! the name of equation system
 !
       name_eqsys = "Special Relativity MHD"
+      eqsys      = "srmhd"
 
 ! set relativistic flag
 !
@@ -655,6 +664,7 @@ module equations
 ! the type of equation of state
 !
         name_eos  = "adiabatic"
+        eos       = "adi"
 
 ! include the pressure/energy in the number of variables
 !

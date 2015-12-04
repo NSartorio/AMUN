@@ -45,6 +45,7 @@ module io
 !
   interface write_attribute
 #ifdef HDF5
+    module procedure write_scalar_attribute_string_h5
     module procedure write_scalar_attribute_integer_h5
     module procedure write_scalar_attribute_double_h5
     module procedure write_vector_attribute_integer_h5
@@ -1103,6 +1104,7 @@ module io
     use coordinates    , only : minlev, maxlev, toplev
     use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use equations      , only : eqsys, eos
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
@@ -1146,6 +1148,11 @@ module io
       return
 
     end if
+
+! store string attributes
+!
+    call write_attribute(gid, 'eqsys'  , eqsys        )
+    call write_attribute(gid, 'eos'    , eos          )
 
 ! store the integer attributes
 !
@@ -2926,6 +2933,129 @@ module io
 !===============================================================================
 !
 ! WRITE_ATTRIBUTE SUBROUTINES
+!
+!===============================================================================
+!
+! subroutine WRITE_SCALAR_ATTRIBUTE_STRING_H5:
+! --------------------------------------------
+!
+!   Subroutine stores a value of the string attribute in the group provided
+!   by an identifier and the attribute name.
+!
+!   Arguments:
+!
+!     gid    - the group identifier to which the attribute should be linked;
+!     aname  - the attribute name;
+!     avalue - the attribute value;
+!
+!===============================================================================
+!
+  subroutine write_scalar_attribute_string_h5(gid, aname, avalue)
+
+! import procedures and variables from other modules
+!
+    use error          , only : print_error
+    use hdf5           , only : H5T_NATIVE_CHARACTER
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5screate_simple_f, h5sclose_f
+    use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+    use hdf5           , only : h5tcopy_f, h5tset_size_f, h5tclose_f
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer(hid_t)  , intent(in) :: gid
+    character(len=*), intent(in) :: aname
+    character(len=*), intent(in) :: avalue
+
+! local variables
+!
+    integer(hid_t)                 :: sid, aid, atype
+    integer(hsize_t)               :: alen
+    integer(hsize_t), dimension(1) :: am = (/ 1 /)
+    integer                        :: ierr
+
+! subroutine name string
+!
+    character(len=*), parameter :: fname =                                     &
+                                       "io::write_scalar_attribute_string_h5"
+!
+!-------------------------------------------------------------------------------
+!
+! copy the attribute type and set its size
+!
+    call h5tcopy_f(H5T_NATIVE_CHARACTER, atype, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot copy type for attribute :" // trim(aname))
+      return
+    end if
+
+! get the string length
+!
+    alen = len(trim(avalue))
+    if (alen <= 0) then
+      call print_error(fname                                                   &
+                       , "String attribute has wrong length:" // trim(aname))
+      return
+    end if
+
+! set the attribute type size
+!
+    call h5tset_size_f(atype, alen, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                  , "Cannot set the type size for attribute :" // trim(aname))
+      return
+    end if
+
+! create space for the attribute value
+!
+    call h5screate_simple_f(1, am, sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                       , "Cannot create space for attribute :" // trim(aname))
+      return
+    end if
+
+! create the attribute in the given group
+!
+    call h5acreate_f(gid, aname, atype, sid, aid, ierr)
+    if (ierr == 0) then
+
+! write the attribute data
+!
+      call h5awrite_f(aid, atype, trim(avalue), am, ierr)
+      if (ierr /= 0) then
+        call print_error(fname                                                 &
+                      , "Cannot write the attribute data in :" // trim(aname))
+      end if
+
+! close the attribute
+!
+      call h5aclose_f(aid, ierr)
+      if (ierr /= 0) then
+        call print_error(fname, "Cannot close attribute :" // trim(aname))
+      end if
+
+    else
+      call print_error(fname, "Cannot create attribute :" // trim(aname))
+    end if
+
+! release the space
+!
+    call h5sclose_f(sid, ierr)
+    if (ierr /= 0) then
+      call print_error(fname                                                   &
+                        , "Cannot close space for attribute :" // trim(aname))
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_scalar_attribute_string_h5
 !
 !===============================================================================
 !
