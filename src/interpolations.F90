@@ -1344,13 +1344,16 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! interpolation coefficients
 !
@@ -1724,13 +1727,16 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! interpolation coefficients
 !
@@ -2113,12 +2119,11 @@ module interpolations
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 1.0d+00 / 4.0d+00
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! 3rd order interpolation coefficients for three stencils
 !
