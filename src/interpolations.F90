@@ -797,12 +797,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2008, vol. 227, pp. 3191-3211,
 !         http://dx.doi.org/10.1016/j.jcp.2007.11.038
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -835,10 +829,9 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -965,12 +958,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2009, vol. 228, pp. 4248-4272,
 !         http://dx.doi.org/10.1016/j.jcp.2009.03.002
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -1003,10 +990,9 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -1134,12 +1120,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2013, vol. 232, pp. 68-86
 !         http://dx.doi.org/10.1016/j.jcp.2012.06.016
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -1169,10 +1149,9 @@ module interpolations
 !
     real(kind=8), dimension(n) :: dfm, dfp, df2
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -1365,13 +1344,16 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! interpolation coefficients
 !
@@ -1745,13 +1727,16 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! interpolation coefficients
 !
@@ -2134,12 +2119,11 @@ module interpolations
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 1.0d+00 / 4.0d+00
+    real(kind=8), parameter :: dq = 2.5d-01
 
 ! 3rd order interpolation coefficients for three stencils
 !
