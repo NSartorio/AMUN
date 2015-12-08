@@ -138,7 +138,7 @@ evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
 integrals.o      : integrals.F90 blocks.o coordinates.o equations.o error.o    \
                    evolution.o mpitools.o parameters.o timers.o
-interpolations.o : interpolations.F90 blocks.o coordinates.o error.o           \
+interpolations.o : interpolations.F90 algebra.o blocks.o coordinates.o error.o \
                    parameters.o timers.o
 io.o             : io.F90 blocks.o coordinates.o equations.o error.o           \
                    evolution.o mesh.o mpitools.o random.o refinement.o timers.o

@@ -2650,6 +2650,10 @@ module interpolations
 !
   subroutine reconstruct_crmp5(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -2666,12 +2670,12 @@ module interpolations
     integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
     real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma, bt
+    real(kind=8) :: sigma
 
 ! local arrays for derivatives
 !
     real(kind=8), dimension(n)   :: dfm, dfp
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 !
 !-------------------------------------------------------------------------------
@@ -2780,18 +2784,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    bt   = b(1,1)
-    u(1) = r(1,1) / bt
-    do i = 2, n
-      im1  = i - 1
-      g(i) =  c(im1,1) / bt
-      bt   =  b(i,1) - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / bt
-    end do
-    do i = n - 1, 1, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
@@ -2839,18 +2832,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the right-side interpolation
 !
-    bt   = b(n,2)
-    u(n) = r(n,2) / bt
-    do i = n - 1, 1, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / bt
-      bt   =  b(i,2) - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / bt
-    end do
-    do i = 2, n
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
