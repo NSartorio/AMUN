@@ -1688,6 +1688,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5yc(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -1710,7 +1714,7 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n)   :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! smoothness indicator coefficients
@@ -1726,7 +1730,7 @@ module interpolations
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 2.5d-01
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! interpolation coefficients
 !
@@ -1807,20 +1811,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i)
+      wl  = cl * ar(i)
       wc  = cc * ac(i)
-      wr  = cl * ar(i)
+      wr  = cr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -1828,14 +1832,14 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
     end do ! i = 1, n
 
@@ -1873,6 +1877,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1912,6 +1917,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1951,6 +1957,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -1990,6 +1997,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -1997,37 +2005,19 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
