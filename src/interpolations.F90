@@ -1315,6 +1315,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5z(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -1328,7 +1332,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -1337,7 +1341,7 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n)   :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! smoothness indicator coefficients
@@ -1353,7 +1357,7 @@ module interpolations
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 2.5d-01
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! interpolation coefficients
 !
@@ -1431,20 +1435,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i)
+      wl  = cl * ar(i)
       wc  = cc * ac(i)
-      wr  = cl * ar(i)
+      wr  = cr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -1452,14 +1456,14 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
     end do ! i = 1, n
 
@@ -1497,6 +1501,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1536,6 +1541,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1575,6 +1581,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -1614,6 +1621,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -1621,37 +1629,19 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
@@ -1698,6 +1688,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5yc(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -1711,7 +1705,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -1720,7 +1714,7 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n)   :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! smoothness indicator coefficients
@@ -1736,7 +1730,7 @@ module interpolations
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 2.5d-01
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! interpolation coefficients
 !
@@ -1817,20 +1811,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i)
+      wl  = cl * ar(i)
       wc  = cc * ac(i)
-      wr  = cl * ar(i)
+      wr  = cr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -1838,14 +1832,14 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
     end do ! i = 1, n
 
@@ -1883,6 +1877,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1922,6 +1917,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -1961,6 +1957,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -2000,6 +1997,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -2007,37 +2005,19 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
@@ -2084,6 +2064,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5ns(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -2097,7 +2081,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: df, lq, l3, zt
@@ -2107,7 +2091,7 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n,2) :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! the free parameter for smoothness indicators (see eq. 3.6 in [3])
@@ -2123,7 +2107,7 @@ module interpolations
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 2.5d-01
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! 3rd order interpolation coefficients for three stencils
 !
@@ -2223,20 +2207,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i,2)
+      wl  = cl * ar(i,2)
       wc  = cc * ac(i,2)
-      wr  = cl * ar(i,2)
+      wr  = cr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2244,14 +2228,14 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
     end do ! i = 1, n
 
@@ -2289,6 +2273,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -2328,6 +2313,7 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
@@ -2346,9 +2332,9 @@ module interpolations
 
 ! normalize weights
 !
-      wl  = dr * al(i,2)
+      wl  = dl * ar(i,2)
       wc  = dc * ac(i,2)
-      wr  = dl * ar(i,2)
+      wr  = dr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2356,17 +2342,18 @@ module interpolations
 
 ! calculate the interpolations of the right state
 !
-      ql = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
       qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
 ! calculate the right state
 !
-      fr(i) = (wr * qr + wl * ql) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -2385,9 +2372,9 @@ module interpolations
 
 ! normalize weights
 !
-      wl  = dr * al(i,2)
+      wl  = dl * ar(i,2)
       wc  = dc * ac(i,2)
-      wr  = dl * ar(i,2)
+      wr  = dr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2395,17 +2382,18 @@ module interpolations
 
 ! calculate the interpolations of the right state
 !
-      ql = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
       qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
 ! calculate the right state
 !
-      fr(i) = (wr * qr + wl * ql) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
@@ -2413,37 +2401,19 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
@@ -2650,6 +2620,10 @@ module interpolations
 !
   subroutine reconstruct_crmp5(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -2666,12 +2640,12 @@ module interpolations
     integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
     real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma, bt
+    real(kind=8) :: sigma
 
 ! local arrays for derivatives
 !
     real(kind=8), dimension(n)   :: dfm, dfp
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 !
 !-------------------------------------------------------------------------------
@@ -2780,18 +2754,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    bt   = b(1,1)
-    u(1) = r(1,1) / bt
-    do i = 2, n
-      im1  = i - 1
-      g(i) =  c(im1,1) / bt
-      bt   =  b(i,1) - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / bt
-    end do
-    do i = n - 1, 1, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
@@ -2839,18 +2802,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the right-side interpolation
 !
-    bt   = b(n,2)
-    u(n) = r(n,2) / bt
-    do i = n - 1, 1, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / bt
-      bt   =  b(i,2) - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / bt
-    end do
-    do i = 2, n
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
