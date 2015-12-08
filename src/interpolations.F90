@@ -1332,7 +1332,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -1705,7 +1705,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
