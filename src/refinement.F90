@@ -51,14 +51,17 @@ module refinement
 !
   real(kind=8), save :: crefmin = 2.0d-01
   real(kind=8), save :: crefmax = 8.0d-01
-  real(kind=8), save :: jabsmin = 1.0d+00
-  real(kind=8), save :: jabsmax = 1.0d+01
+  real(kind=8), save :: jabsmin = 1.0d-03
+  real(kind=8), save :: jabsmax = 1.0d-01
+  real(kind=8), save :: vortmin = 1.0d-03
+  real(kind=8), save :: vortmax = 1.0d-01
   real(kind=8), save :: epsref  = 1.0d-02
 
 ! flags for variable included in the refinement criterion calculation
 !
   logical, dimension(:), allocatable, save :: qvar_ref
   logical                           , save :: jabs_ref = .false.
+  logical                           , save :: vort_ref = .false.
 
 ! by default everything is private
 !
@@ -134,6 +137,8 @@ module refinement
     call get_parameter_real("crefmax", crefmax)
     call get_parameter_real("jabsmin", jabsmin)
     call get_parameter_real("jabsmax", jabsmax)
+    call get_parameter_real("vortmin", vortmin)
+    call get_parameter_real("vortmax", vortmax)
     call get_parameter_real("epsref" , epsref )
 
 ! get variables to include in the refinement criterion calculation
@@ -152,7 +157,12 @@ module refinement
       if (qvar_ref(p)) rvars = adjustl(trim(rvars) // ' ' // trim(pvars(p)))
     end do ! p = 1, nv
 
-! turn on current density refinement if turned on
+! turn on refinement based on vorticity if specified
+!
+    vort_ref = index(variables, 'vort') > 0
+    if (vort_ref) rvars = adjustl(trim(rvars) // ' vort')
+
+! turn on refinement based on current density if specified
 !
     if (ibx > 0) then
       jabs_ref = index(variables, 'jabs') > 0
@@ -165,7 +175,9 @@ module refinement
 
       write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
       write (*,"(4x,a,1x,2e9.2)") "2nd order error limits =", crefmin, crefmax
-      if (ibx > 0) &
+      if (vort_ref) &
+        write (*,"(4x,a,1x,2e9.2)") "vorticity limits       =", vortmin, vortmax
+      if (jabs_ref) &
         write (*,"(4x,a,1x,2e9.2)") "current density limits =", jabsmin, jabsmax
 
     end if
@@ -264,7 +276,7 @@ module refinement
 ! local variables
 !
     integer      :: p
-    real(kind=4) :: cref, jref
+    real(kind=4) :: cref
 !
 !-------------------------------------------------------------------------------
 !
@@ -274,29 +286,39 @@ module refinement
     call start_timer(irc)
 #endif /* PROFILE */
 
-! reset indicators
+! reset the refinement criterion flag
 !
-    cref = 0.0e+00
+    criterion = -1
 
-! calculate the second derivative error for selected primitive variables only
+! check the second derivative error from selected primitive variables
 !
     do p = 1, nv
-      if (qvar_ref(p)) cref = max(cref, second_derivative_error(p, pdata))
+      if (qvar_ref(p)) then
+
+        cref = second_derivative_error(p, pdata)
+
+        if (cref > crefmin) criterion = max(criterion, 0)
+        if (cref > crefmax) criterion = max(criterion, 1)
+
+      end if
     end do ! p = 1, nv
 
-! check current density refinement
+! check vorticity criterion
 !
-    jref = current_density_magnitude(pdata)
+    if (vort_ref) then
+      cref = vorticity_magnitude(pdata)
 
-! return the refinement flag depending on the condition value
-!
-    criterion = 0
-
-    if (cref > crefmax .or. jref > jabsmax) then
-      criterion =  1
+      if (cref > vortmin) criterion = max(criterion, 0)
+      if (cref > vortmax) criterion = max(criterion, 1)
     end if
-    if (cref < crefmin .and. jref < jabsmin) then
-      criterion = -1
+
+! check current density criterion
+!
+    if (jabs_ref) then
+      cref = current_density_magnitude(pdata)
+
+      if (cref > jabsmin) criterion = max(criterion, 0)
+      if (cref > jabsmax) criterion = max(criterion, 1)
     end if
 
 #ifdef PROFILE
@@ -441,6 +463,91 @@ module refinement
 !
 !===============================================================================
 !
+! function VORTICITY_MAGNITUDE:
+! ----------------------------
+!
+!   Function finds the maximum magnitude of vorticity in the block associated
+!   with pdata.
+!
+!   Arguments:
+!
+!     pdata - pointer to the data block for which error is calculated;
+!
+!===============================================================================
+!
+  function vorticity_magnitude(pdata) result(wmax)
+
+! import external procedures and variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : ibl, jbl, kbl
+    use coordinates    , only : ieu, jeu, keu
+    use coordinates    , only : adx, ady, adz
+    use equations      , only : inx, iny, inz
+    use equations      , only : ivx, ivy, ivz
+    use operators      , only : curl
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer, intent(in) :: pdata
+
+! return variable
+!
+    real(kind=4)  :: wmax
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: vort
+
+! local arrays
+!
+    real(kind=8), dimension(3)          :: dh = 1.0d+00
+    real(kind=8), dimension(3,im,jm,km) :: wc
+!
+!-------------------------------------------------------------------------------
+!
+! reset indicators
+!
+    wmax = 0.0e+00
+
+! calculate current density W = ∇xV
+!
+    call curl(dh(:), pdata%q(ivx:ivz,:,:,:), wc(inx:inz,:,:,:))
+
+! find maximum current density
+!
+      do k = kbl, keu
+        do j = jbl, jeu
+          do i = ibl, ieu
+
+! calculate the squared magnitude of vorticity
+!
+            vort = sum(wc(inx:inz,i,j,k)**2)
+
+! find the maximum of squared vorticity
+!
+            wmax = max(wmax, real(vort, kind=4))
+
+          end do ! i = ibl, ieu
+        end do ! j = jbl, jeu
+      end do ! kbl, keu
+
+! return the maximum vorticity
+!
+      wmax = sqrt(wmax)
+
+!-------------------------------------------------------------------------------
+!
+  end function vorticity_magnitude
+!
+!===============================================================================
+!
 ! function CURRENT_DENSITY_MAGNITUDE:
 ! ----------------------------------
 !
@@ -485,7 +592,7 @@ module refinement
 
 ! local arrays
 !
-    real(kind=8), dimension(3)          :: dh
+    real(kind=8), dimension(3)          :: dh = 1.0d+00
     real(kind=8), dimension(3,im,jm,km) :: jc
 !
 !-------------------------------------------------------------------------------
@@ -497,12 +604,6 @@ module refinement
 ! return if there is no magnetic field
 !
     if (ibx <= 0) return
-
-! prepare coordinate increments
-!
-    dh(1) = adx(pdata%meta%level)
-    dh(2) = ady(pdata%meta%level)
-    dh(3) = adz(pdata%meta%level)
 
 ! calculate current density J = ∇xB
 !
