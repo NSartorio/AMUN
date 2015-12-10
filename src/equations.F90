@@ -3465,33 +3465,37 @@ module equations
     call start_timer(imf)
 #endif /* PROFILE */
 
-! iterate over all positions
+! calculate the relativistic hydrodynamic fluxes (eq. 2 in [1])
 !
     do i = 1, n
 
-! calculate the relativistic hydrodynamic fluxes (eq. 2 in [1])
-!
       f(idn,i) = u(idn,i) * q(ivx,i)
       f(imx,i) = u(imx,i) * q(ivx,i) + q(ipr,i)
       f(imy,i) = u(imy,i) * q(ivx,i)
       f(imz,i) = u(imz,i) * q(ivx,i)
       f(ien,i) = u(imx,i) - f(idn,i)
 
-! calculate the relativistic speed of sound (eqs. 4, 22 and 23 in [1])
-!
-      ww       = q(idn,i) + q(ipr,i) / gammaxi
-      c2       = gamma * q(ipr,i) / ww
-      vv       = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
-      ss       = c2 * (1.0d+00 - vv) / (1.0d+00 - c2)
-      fc       = 1.0d+00 + ss
-      cc       = sqrt(ss * (fc - q(ivx,i)**2))
+    end do ! i = 1, n
 
 ! calculate characteristic speeds (eq. 23 in [1])
 !
-      cm(i)    = (q(ivx,i) - cc) / fc
-      cp(i)    = (q(ivx,i) + cc) / fc
+    if (present(cm) .and. present(cp)) then
 
-    end do ! i = 1, n
+      do i = 1, n
+
+        ww       = q(idn,i) + q(ipr,i) / gammaxi
+        c2       = gamma * q(ipr,i) / ww
+        vv       = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
+        ss       = c2 * (1.0d+00 - vv) / (1.0d+00 - c2)
+        fc       = 1.0d+00 + ss
+        cc       = sqrt(ss * (fc - q(ivx,i)**2))
+
+        cm(i)    = (q(ivx,i) - cc) / fc
+        cp(i)    = (q(ivx,i) + cc) / fc
+
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
@@ -4585,11 +4589,15 @@ module equations
 ! local variables
 !
     integer      :: i, nr
-    real(kind=8) :: vv, bb, vb, vm, vs
-    real(kind=8) :: bx, by, bz, b2, pm, pt
+    real(kind=8) :: bb, vs
+    real(kind=8) :: bx, by, bz, pm, pt
     real(kind=8) :: rh, v1, v2
     real(kind=8) :: ca, cc, c2, gn, rt, zm, zp
     real(kind=8) :: fa, fb, fc, fd, fe, ff, fg
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: vv, vm, vb, b2
 
 ! local arrays for characteristic speeds
 !
@@ -4610,26 +4618,26 @@ module equations
 
 ! calculate the square of velocity, magnetic field and their scalar product
 !
-      vv  = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
-      bb  = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
-      vb  = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
+      vv(i) = sum(q(ivx:ivz,i) * q(ivx:ivz,i))
+      bb    = sum(q(ibx:ibz,i) * q(ibx:ibz,i))
+      vb(i) = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
 
 ! calculate (1 - |V|²)
 !
-      vm  = 1.0d+00 - vv
+      vm(i) = 1.0d+00 - vv(i)
 
 ! calculate magnetic field components of the magnetic four-vector divided by
 ! the Lorentz factor (eq. 3 in [1])
 !
-      bx  = q(ibx,i) * vm + vb * q(ivx,i)
-      by  = q(iby,i) * vm + vb * q(ivy,i)
-      bz  = q(ibz,i) * vm + vb * q(ivz,i)
+      bx  = q(ibx,i) * vm(i) + vb(i) * q(ivx,i)
+      by  = q(iby,i) * vm(i) + vb(i) * q(ivy,i)
+      bz  = q(ibz,i) * vm(i) + vb(i) * q(ivz,i)
 
 ! calculate magnetic and total pressures (eq. 6 in [1])
 !
-      b2  = bb * vm + vb * vb
-      pm  = 0.5d+00 * b2
-      pt  = q(ipr,i) + pm
+      b2(i) = bb * vm(i) + vb(i) * vb(i)
+      pm    = 0.5d+00 * b2(i)
+      pt    = q(ipr,i) + pm
 
 ! calculate the relativistic hydrodynamic fluxes (eq. 13 in [1])
 !
@@ -4643,177 +4651,184 @@ module equations
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
       f(ien,i) = u(imx,i) - f(idn,i)
 
-! calculate the fast magnetosonic speed
+    end do ! i = 1, n
+
+    if (present(cm) .and. present(cp)) then
+
+! calculate the characteristic speeds
 !
+      do i = 1, n
+
 ! check if the total velocity |V|² is larger than zero
 !
-      if (vv > 0.0d+00) then
+        if (vv(i) > 0.0d+00) then
 
 ! calculate additional coefficients
 !
-        rh  = q(idn,i) + q(ipr,i) / gammaxi
-        vs  = sqrt(vm)
+          rh  = q(idn,i) + q(ipr,i) / gammaxi
+          vs  = sqrt(vm(i))
 
 ! check if the normal component of magnetic field Bₓ is larger than zero
 !
-        if (q(ibx,i) /= 0.0d+00) then ! Bₓ ≠ 0
+          if (q(ibx,i) /= 0.0d+00) then ! Bₓ ≠ 0
 
 ! prepare parameters for this case
 !
-          c2 = gamma * q(ipr,i) / rh
-          v1 = abs(q(ivx,i))
-          v2 = v1 * v1
+            c2 = gamma * q(ipr,i) / rh
+            v1 = abs(q(ivx,i))
+            v2 = v1 * v1
 
-          fa = rh * (1.0d+00 - c2)
-          fb = c2 * (rh - vb * vb) + b2
-          fc = sign(1.0d+00, q(ivx,i)) * q(ibx,i) * vs
-          fd = c2 * fc * fc
-          fe = 1.0d+00 - v2
-          ff = c2 * vb * fc
-          fg = v1 * vs
+            fa = rh * (1.0d+00 - c2)
+            fb = c2 * (rh - vb(i) * vb(i)) + b2(i)
+            fc = sign(1.0d+00, q(ivx,i)) * q(ibx,i) * vs
+            fd = c2 * fc * fc
+            fe = 1.0d+00 - v2
+            ff = c2 * vb(i) * fc
+            fg = v1 * vs
 
 ! prepare polynomial coefficients
 !
-          a(5) = fa + fb * vm
-          a(4) = 2.0d+00 * (ff * vm + fb * fg)
-          a(3) = - fd * vm + 4.0d+00 * ff * fg - fb * fe
-          a(2) = - 2.0d+00 * (fd * fg + fe * ff)
-          a(1) = fd * fe
+            a(5) = fa + fb * vm(i)
+            a(4) = 2.0d+00 * (ff * vm(i) + fb * fg)
+            a(3) = - fd * vm(i) + 4.0d+00 * ff * fg - fb * fe
+            a(2) = - 2.0d+00 * (fd * fg + fe * ff)
+            a(1) = fd * fe
 
 ! call the quartic solver
 !
-          nr = quartic(a(1:5), x(1:4))
+            nr = quartic(a(1:5), x(1:4))
 
 ! convert eigenvalues to charasteristic speeds
 !
-          x(1:nr) = sign(1.0d+00, q(ivx,i)) * (abs(v1) + x(1:nr) * vs)
+            x(1:nr) = sign(1.0d+00, q(ivx,i)) * (abs(v1) + x(1:nr) * vs)
 
-        else ! Bₓ ≠ 0
+          else ! Bₓ ≠ 0
 
 ! special case when Bₓ = 0, then the quartic equation reduces to quadratic one
 !
 ! prepare parameters for this case
 !
-          c2 = gamma * q(ipr,i) / rh
-          cc = (1.0d+00 - c2) / vm
-          gn = b2 - c2 * vb * vb
+            c2 = gamma * q(ipr,i) / rh
+            cc = (1.0d+00 - c2) / vm(i)
+            gn = b2(i) - c2 * vb(i) * vb(i)
 
 ! prepare polynomial coefficients
 !
-          a(3) = rh * (c2 + cc) + gn
-          a(2) = - 2.0d+00 * rh * cc * q(ivx,i)
-          a(1) = rh * (cc * q(ivx,i)**2 - c2) - gn
+            a(3) = rh * (c2 + cc) + gn
+            a(2) = - 2.0d+00 * rh * cc * q(ivx,i)
+            a(1) = rh * (cc * q(ivx,i)**2 - c2) - gn
 
 ! solve the quadratic equation
 !
-          nr = quadratic(a(1:3), x(1:2))
+            nr = quadratic(a(1:3), x(1:2))
 
-        end if ! Bx ≠ 0
+          end if ! Bx ≠ 0
 
-      else ! |V|² > 0
+        else ! |V|² > 0
 
 ! special case when |V|² = 0 (Γ = 1), then the quartic equation reduces to
 ! bi-quartic one
 !
 ! prepare parameters for this case
 !
-        rh  = q(idn,i) + q(ipr,i) / gammaxi
-        vs  = sqrt(vm)
-        bx  = q(ibx,i) * vs + vb * q(ivx,i) / vs
-        rt  = rh + b2
-        c2 = gamma * q(ipr,i) / rh
-        ca = bx * bx
+          rh = q(idn,i) + q(ipr,i) / gammaxi
+          vs = sqrt(vm(i))
+          rt = rh + b2(i)
+          c2 = gamma * q(ipr,i) / rh
+          ca = (q(ibx,i) * vs + vb(i) * q(ivx,i) / vs)**2
 
 ! prepare polynomial coefficients
 !
-        a(3) = 1.0d+00
-        a(2) = - ((rh + ca) * c2 + b2) / rt
-        a(1) = c2 * ca / rt
+          a(3) = 1.0d+00
+          a(2) = - ((rh + ca) * c2 + b2(i)) / rt
+          a(1) = c2 * ca / rt
 
 ! solve the bi-quartic equation
 !
-        nr = quadratic(a(1:3), x(1:2))
+          nr = quadratic(a(1:3), x(1:2))
 
 ! compute the roots
 !
-        if (nr > 0) then
+          if (nr > 0) then
 
-          zm = min(x(1), x(2))
-          zp = max(x(1), x(2))
+            zm = min(x(1), x(2))
+            zp = max(x(1), x(2))
 
-          if (zm >= 0.0d+00) then
+            if (zm >= 0.0d+00) then
 
-            zm   = sqrt(zm)
-            zp   = sqrt(zp)
-
-            x(1) =   zp
-            x(2) =   zm
-            x(3) = - zm
-            x(4) = - zp
-
-            nr   = 4
-
-          else
-
-            if (zp >= 0.0d+00) then
-
+              zm   = sqrt(zm)
               zp   = sqrt(zp)
 
               x(1) =   zp
-              x(2) = - zp
+              x(2) =   zm
+              x(3) = - zm
+              x(4) = - zp
 
-              nr = 2
+              nr   = 4
 
             else
 
-              x(:) = 0.0d+00
+              if (zp >= 0.0d+00) then
 
-              nr   = 0
+                zp   = sqrt(zp)
 
+                x(1) =   zp
+                x(2) = - zp
+
+                nr = 2
+
+              else
+
+                x(:) = 0.0d+00
+
+                nr   = 0
+
+              end if
             end if
           end if
-        end if
 
-      end if ! |V|² > 0
+        end if ! |V|² > 0
 
 ! find the minimum and maximum characteristic speeds
 !
-      if (nr > 1) then
+        if (nr > 1) then
 
-        cm(i) = minval(x(1:nr))
-        cp(i) = maxval(x(1:nr))
+          cm(i) = minval(x(1:nr))
+          cp(i) = maxval(x(1:nr))
 
 #ifdef DEBUG
-        if (max(abs(cm(i)), abs(cp(i))) >= 1.0d+00) then
-          write(*,*)
-          write(*,*) 'Estimation returned unphysical speeds!'
-          write(*,"('A = ',5(1pe24.16))") a(1:5)
-          write(*,"('N = ',1i2)"        ) nr
-          write(*,"('X = ',4(1pe24.16))") x(1:4)
-          stop
-        end if
+          if (max(abs(cm(i)), abs(cp(i))) >= 1.0d+00) then
+            write(*,*)
+            write(*,*) 'Estimation returned unphysical speeds!'
+            write(*,"('A = ',5(1pe24.16))") a(1:5)
+            write(*,"('N = ',1i2)"        ) nr
+            write(*,"('X = ',4(1pe24.16))") x(1:4)
+            stop
+          end if
 #endif /* DEBUG */
 
-      else
+        else
 
 ! speed estimation failed, so we substitute the minimum and maximum physical
 ! speeds equal the speed of light
 !
-        cm(i) = - 1.0d+00
-        cp(i) =   1.0d+00
+          cm(i) = - 1.0d+00
+          cp(i) =   1.0d+00
 
 #ifdef DEBUG
-        write(*,*)
-        write(*,*) 'Speed estimation failed!'
-        write(*,"('A = ',5(1pe24.16))") a(1:5)
-        write(*,"('N = ',1i2)"        ) nr
-        write(*,"('X = ',4(1pe24.16))") x(1:4)
-        stop
+          write(*,*)
+          write(*,*) 'Speed estimation failed!'
+          write(*,"('A = ',5(1pe24.16))") a(1:5)
+          write(*,"('N = ',1i2)"        ) nr
+          write(*,"('X = ',4(1pe24.16))") x(1:4)
+          stop
 #endif /* DEBUG */
 
-      end if
+        end if
 
-    end do ! i = 1, n
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
