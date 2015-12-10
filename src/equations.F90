@@ -1294,24 +1294,30 @@ module equations
     call start_timer(imf)
 #endif /* PROFILE */
 
-! iterate over all positions
+! calculate the hydrodynamic fluxes
 !
     do i = 1, n
 
-! calculate the hydrodynamic fluxes
-!
       f(idn,i) = u(imx,i)
       f(imx,i) = q(ivx,i) * u(imx,i)
       f(imy,i) = q(ivx,i) * u(imy,i)
       f(imz,i) = q(ivx,i) * u(imz,i)
       f(imx,i) = f(imx,i) + csnd2 * q(idn,i)
 
-! calculate characteristic speeds
-!
-      cm(i)    = q(ivx,i) - csnd
-      cp(i)    = q(ivx,i) + csnd
-
     end do ! i = 1, n
+
+! calculate the characteristic speeds
+!
+    if (present(cm) .and. present(cp)) then
+
+      do i = 1, n
+
+        cm(i)    = q(ivx,i) - csnd
+        cp(i)    = q(ivx,i) + csnd
+
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
@@ -1701,12 +1707,10 @@ module equations
     call start_timer(imf)
 #endif /* PROFILE */
 
-! iterate over all positions
+! calculate the hydrodynamic fluxes
 !
     do i = 1, n
 
-! calculate the hydrodynamic fluxes
-!
       f(idn,i) = u(imx,i)
       f(imx,i) = q(ivx,i) * u(imx,i)
       f(imy,i) = q(ivx,i) * u(imy,i)
@@ -1714,13 +1718,22 @@ module equations
       f(imx,i) = f(imx,i) + q(ipr,i)
       f(ien,i) = q(ivx,i) * (u(ien,i) + q(ipr,i))
 
-! calculate characteristic speeds
-!
-      cs       = sqrt(gamma * q(ipr,i) / q(idn,i))
-      cm(i)    = q(ivx,i) - cs
-      cp(i)    = q(ivx,i) + cs
-
     end do ! i = 1, n
+
+! calculate the characteristic speeds
+!
+    if (present(cm) .and. present(cp)) then
+
+      do i = 1, n
+
+        cs       = sqrt(gamma * q(ipr,i) / q(idn,i))
+
+        cm(i)    = q(ivx,i) - cs
+        cp(i)    = q(ivx,i) + cs
+
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
@@ -2140,8 +2153,12 @@ module equations
 ! local variables
 !
     integer      :: i
-    real(kind=8) :: bx2, by2, bz2, bb, pr, pt
+    real(kind=8) :: by2, bz2, pt
     real(kind=8) :: fa, fb, fc, cf
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: bx2, bb
 !
 !-------------------------------------------------------------------------------
 !
@@ -2151,23 +2168,18 @@ module equations
     call start_timer(imf)
 #endif /* PROFILE */
 
-! iterate over all positions
+! calculate the magnetohydrodynamic fluxes
 !
     do i = 1, n
 
-! prepare pressures and scalar product
-!
-      bx2 = q(ibx,i) * q(ibx,i)
-      by2 = q(iby,i) * q(iby,i)
-      bz2 = q(ibz,i) * q(ibz,i)
-      bb  = bx2 + by2 + bz2
-      pr  = csnd2 * q(idn,i)
-      pt  = pr + 0.5d+00 * bb
+      bx2(i) = q(ibx,i) * q(ibx,i)
+      by2    = q(iby,i) * q(iby,i)
+      bz2    = q(ibz,i) * q(ibz,i)
+      bb(i)  = bx2(i) + by2 + bz2
+      pt     = csnd2 * q(idn,i) + 0.5d+00 * bb(i)
 
-! calculate the magnetohydrodynamic fluxes
-!
       f(idn,i) = u(imx,i)
-      f(imx,i) = q(ivx,i) * u(imx,i) - bx2
+      f(imx,i) = q(ivx,i) * u(imx,i) - bx2(i)
       f(imy,i) = q(ivx,i) * u(imy,i) - q(ibx,i) * q(iby,i)
       f(imz,i) = q(ivx,i) * u(imz,i) - q(ibx,i) * q(ibz,i)
       f(imx,i) = f(imx,i) + pt
@@ -2176,23 +2188,29 @@ module equations
       f(ibz,i) = q(ivx,i) * q(ibz,i) - q(ibx,i) * q(ivz,i)
       f(ibp,i) = cmax2 * q(ibx,i)
 
-! calculate the fast magnetosonic speed
-!
-      fa       = csnd2 * q(idn,i)
-      fb       = fa + bb
-      fc       = fb * fb - 4.0d+00 * fa * bx2
-      if (fc > 0.0d+00) then
-        cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
-      else
-        cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
-      end if
-
-! calculate characteristic speeds
-!
-      cm(i)    = q(ivx,i) - cf
-      cp(i)    = q(ivx,i) + cf
-
     end do ! i = 1, n
+
+! calculate the characteristic speeds
+!
+    if (present(cm) .and. present(cp)) then
+
+      do i = 1, n
+
+        fa       = csnd2 * q(idn,i)
+        fb       = fa + bb(i)
+        fc       = fb * fb - 4.0d+00 * fa * bx2(i)
+        if (fc > 0.0d+00) then
+          cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+        else
+          cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
+        end if
+
+        cm(i)    = q(ivx,i) - cf
+        cp(i)    = q(ivx,i) + cf
+
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
@@ -2742,9 +2760,13 @@ module equations
 ! local variables
 !
     integer      :: i
-    real(kind=8) :: bx2, by2, bz2, bb, pr, pt
+    real(kind=8) :: by2, bz2, pt
     real(kind=8) :: vb
     real(kind=8) :: fa, fb, fc, cf
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: bx2, bb
 !
 !-------------------------------------------------------------------------------
 !
@@ -2754,24 +2776,19 @@ module equations
     call start_timer(imf)
 #endif /* PROFILE */
 
-! iterate over all positions
+! calculate the magnetohydrodynamic fluxes
 !
     do i = 1, n
 
-! prepare pressures and scalar product
-!
-      bx2 = q(ibx,i) * q(ibx,i)
-      by2 = q(iby,i) * q(iby,i)
-      bz2 = q(ibz,i) * q(ibz,i)
-      bb  = bx2 + by2 + bz2
+      bx2(i) = q(ibx,i) * q(ibx,i)
+      by2    = q(iby,i) * q(iby,i)
+      bz2    = q(ibz,i) * q(ibz,i)
+      bb(i)  = bx2(i) + by2 + bz2
       vb  = sum(q(ivx:ivz,i) * q(ibx:ibz,i))
-      pr  = q(ipr,i)
-      pt  = pr + 0.5d+00 * bb
+      pt  = q(ipr,i) + 0.5d+00 * bb(i)
 
-! calculate the magnetohydrodynamic fluxes
-!
       f(idn,i) = u(imx,i)
-      f(imx,i) = q(ivx,i) * u(imx,i) - bx2
+      f(imx,i) = q(ivx,i) * u(imx,i) - bx2(i)
       f(imy,i) = q(ivx,i) * u(imy,i) - q(ibx,i) * q(iby,i)
       f(imz,i) = q(ivx,i) * u(imz,i) - q(ibx,i) * q(ibz,i)
       f(imx,i) = f(imx,i) + pt
@@ -2781,23 +2798,29 @@ module equations
       f(ibp,i) = cmax2 * q(ibx,i)
       f(ien,i) = q(ivx,i) * (u(ien,i) + pt) - q(ibx,i) * vb
 
-! calculate the fast magnetosonic speed
-!
-      fa       = gamma * q(ipr,i)
-      fb       = fa + bb
-      fc       = fb * fb - 4.0d+00 * fa * bx2
-      if (fc > 0.0d+00) then
-        cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
-      else
-        cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
-      end if
-
-! calculate characteristic speeds
-!
-      cm(i)    = q(ivx,i) - cf
-      cp(i)    = q(ivx,i) + cf
-
     end do ! i = 1, n
+
+! calculate the characteristic speeds
+!
+    if (present(cm) .and. present(cp)) then
+
+      do i = 1, n
+
+        fa       = gamma * q(ipr,i)
+        fb       = fa + bb(i)
+        fc       = fb * fb - 4.0d+00 * fa * bx2(i)
+        if (fc > 0.0d+00) then
+          cf     = sqrt(0.5d+00 * (fb + sqrt(fc)) / q(idn,i))
+        else
+          cf     = sqrt(0.5d+00 *  fb             / q(idn,i))
+        end if
+
+        cm(i)    = q(ivx,i) - cf
+        cp(i)    = q(ivx,i) + cf
+
+      end do ! i = 1, n
+
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for flux calculation
