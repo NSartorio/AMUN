@@ -1037,13 +1037,13 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
       im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate βₖ (eq. 19 in [1])
@@ -1052,12 +1052,12 @@ module interpolations
       bc  = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
       br  = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
 
-! calculate τ (below eq. 64 in [1])
+! calculate τ (below eq. 20 in [1])
 !
-      tt  = (6.0d+00 * f(i) + (f(im2) + f(ip2))                                &
-                                             - 4.0d+00 * (f(im1) + f(ip1)))**2
+      tt  = (6.0d+00 * f(i) - 4.0d+00 * (f(im1) + f(ip1))                      &
+                                                       + (f(im2) + f(ip2)))**2
 
-! calculate αₖ (eq. 58 in [1])
+! calculate αₖ (eqs. 18 or 58 in [1])
 !
       al  = 1.0d+00 + tt / (bl + eps)
       ac  = 1.0d+00 + tt / (bc + eps)
@@ -1103,12 +1103,15 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1200,13 +1203,13 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
       im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate βₖ (eq. 3.6 in [1])
@@ -1281,12 +1284,15 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1402,12 +1408,12 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
+      im1   = i - 1
+      ip1   = i + 1
 
 ! calculate βₖ (eqs. 9-11 in [1])
 !
@@ -1425,16 +1431,16 @@ module interpolations
       ac(i) = 1.0d+00 + tt / (bc + eps)
       ar(i) = 1.0d+00 + tt / (br + eps)
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -1478,17 +1484,61 @@ module interpolations
       r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
                                    + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -1518,51 +1568,59 @@ module interpolations
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
-
-! interpolate ghost zones using explicit solver (left-side reconstruction)
-!
-    do i = n - ng, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! calculate weights
-!
-      wl  = dl * al(i)
-      wc  = dc * ac(i)
-      wr  = dr * ar(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the left state
-!
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
-
-! calculate the left state
-!
-      fl(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
-
-    end do ! i = n - ng, n
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = 2, ng + 1
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! normalize weights
+!
+      wl  = dl * ar(i)
+      wc  = dc * ac(i)
+      wr  = dr * al(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+! interpolate ghost zones using explicit solver (right-side reconstruction)
+!
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
@@ -1598,47 +1656,11 @@ module interpolations
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
-
-! interpolate ghost zones using explicit solver (right-side reconstruction)
-!
-    do i = n - ng + 1, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weights
-!
-      wl  = dl * ar(i)
-      wc  = dc * ac(i)
-      wr  = dr * al(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the right state
-!
-      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
-
-! calculate the right state
-!
-      fr(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-      r(i,2) = fr(i)
-
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
@@ -1658,8 +1680,11 @@ module interpolations
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1775,13 +1800,13 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
       im2   = max(1, i - 2)
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
+      im1   = i - 1
+      ip1   = i + 1
       ip2   = min(n, i + 2)
 
 ! calculate βₖ (eqs. 9-11 in [1])
@@ -1801,16 +1826,16 @@ module interpolations
       ac(i) = 1.0d+00 + tt / (bc + eps)
       ar(i) = 1.0d+00 + tt / (br + eps)
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -1854,17 +1879,61 @@ module interpolations
       r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
                                    + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -1894,57 +1963,65 @@ module interpolations
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
-! interpolate ghost zones using explicit solver (left-side reconstruction)
+! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = n - ng, n
+    do i = 2, ng + 1
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
-! calculate weights
+! normalize weights
 !
-      wl  = dl * al(i)
+      wl  = dl * ar(i)
       wc  = dc * ac(i)
-      wr  = dr * ar(i)
+      wr  = dr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
       wc  = 1.0d+00 - (wl + wr)
 
-! calculate the interpolations of the left state
+! calculate the interpolations of the right state
 !
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
-! calculate the left state
+! calculate the right state
 !
-      fl(i) = (wl * ql + wr * qr) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
 
-    end do ! i = n - ng, n
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! normalize weights
@@ -1974,47 +2051,11 @@ module interpolations
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
-
-! interpolate ghost zones using explicit solver (right-side reconstruction)
-!
-    do i = n - ng + 1, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weights
-!
-      wl  = dl * ar(i)
-      wc  = dc * ac(i)
-      wr  = dr * al(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the right state
-!
-      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
-
-! calculate the right state
-!
-      fr(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-      r(i,2) = fr(i)
-
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
@@ -2034,8 +2075,11 @@ module interpolations
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -2152,12 +2196,12 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1  = max(1, i - 1)
-      ip1  = min(n, i + 1)
+      im1  = i - 1
+      ip1  = i + 1
 
 ! calculate βₖ
 !
@@ -2197,16 +2241,16 @@ module interpolations
       ac(i,2) = 1.0d+00 + zt / (bc + eps)**2
       ar(i,2) = 1.0d+00 + zt / (br + eps)**2
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -2250,17 +2294,61 @@ module interpolations
       r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
                                    + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i,1)
+      wc  = dc * ac(i,1)
+      wr  = dr * ar(i,1)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -2290,57 +2378,65 @@ module interpolations
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
-! interpolate ghost zones using explicit solver (left-side reconstruction)
+! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = n - ng, n
+    do i = 2, ng + 1
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
-! calculate weights
+! normalize weights
 !
-      wl  = dl * al(i,1)
-      wc  = dc * ac(i,1)
-      wr  = dr * ar(i,1)
+      wl  = dl * ar(i,2)
+      wc  = dc * ac(i,2)
+      wr  = dr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
       wc  = 1.0d+00 - (wl + wr)
 
-! calculate the interpolations of the left state
+! calculate the interpolations of the right state
 !
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
-! calculate the left state
+! calculate the right state
 !
-      fl(i) = (wl * ql + wr * qr) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
 
-    end do ! i = n - ng, n
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! normalize weights
@@ -2370,47 +2466,11 @@ module interpolations
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
-
-! interpolate ghost zones using explicit solver (right-side reconstruction)
-!
-    do i = n - ng + 1, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weights
-!
-      wl  = dl * ar(i,2)
-      wc  = dc * ac(i,2)
-      wr  = dr * al(i,2)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the right state
-!
-      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
-
-! calculate the right state
-!
-      fr(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-      r(i,2) = fr(i)
-
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
@@ -2430,8 +2490,11 @@ module interpolations
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
