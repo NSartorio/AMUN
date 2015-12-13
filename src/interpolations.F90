@@ -2502,11 +2502,11 @@ module interpolations
 
 ! obtain the face values using high order interpolation
 !
-    do i = 1, n
+    do i = 2, n - 1
 
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
       fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
@@ -2516,14 +2516,14 @@ module interpolations
                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
                                                                      / 6.0d+01
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! apply monotonicity preserving limiting
 !
-    do i = 1, n
+    do i = 2, n - 1
 
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
       if (dfm(i) * dfp(i) >= 0.0d+00) then
         sigma = kappa
@@ -2593,12 +2593,15 @@ module interpolations
 !
       fr(im1) = fr(i)
 
-    end do
+    end do ! n = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
