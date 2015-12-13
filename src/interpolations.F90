@@ -2678,10 +2678,10 @@ module interpolations
 
 ! prepare the tridiagonal system coefficients for the interior
 !
-    do i = 1, n
+    do i = ng, n - ng + 1
 
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
       a(i,1) = 3.0d-01
       b(i,1) = 6.0d-01
@@ -2694,15 +2694,36 @@ module interpolations
       r(i,1) = (f(im1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(ip1)) / 3.0d+01
       r(i,2) = (f(ip1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(im1)) / 3.0d+01
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit method (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+    do i = n - ng, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
       a(i,1) = 0.0d+00
@@ -2713,32 +2734,40 @@ module interpolations
                                  - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
                                                                      / 6.0d+01
 
-    end do ! i = 1, ng
-
-    do i = n - ng, n
-
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-
-      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
-                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng, n
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
 ! interpolate ghost zones using explicit method (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = 2, ng + 1
 
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+    do i = n - ng + 1, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
       a(i,2) = 0.0d+00
@@ -2749,24 +2778,11 @@ module interpolations
                                  - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
                                                                      / 6.0d+01
 
-    end do ! i = 1, ng + 1
-
-    do i = n - ng + 1, n
-
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-
-      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
-                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng + 1, n
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
@@ -2774,10 +2790,10 @@ module interpolations
 
 ! apply the monotonicity preserving limiting
 !
-    do i = 1, n
+    do i = 2, n - 1
 
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
       if (dfm(i) * dfp(i) >= 0.0d+00) then
         sigma = kappa
@@ -2814,7 +2830,7 @@ module interpolations
 
       end if
 
-    end do
+    end do ! i = 2, n - 1
 
 ! solve the tridiagonal system of equations for the right-side interpolation
 !
@@ -2822,10 +2838,10 @@ module interpolations
 
 ! apply the monotonicity preserving limiting
 !
-    do i = 1, n
+    do i = 2, n - 1
 
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
       if (dfm(i) * dfp(i) >= 0.0d+00) then
         sigma = kappa
@@ -2867,12 +2883,15 @@ module interpolations
 !
       fr(im1) = fr(i)
 
-    end do
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
