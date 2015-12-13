@@ -1037,13 +1037,13 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
       im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate βₖ (eq. 19 in [1])
@@ -1052,12 +1052,12 @@ module interpolations
       bc  = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
       br  = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
 
-! calculate τ (below eq. 64 in [1])
+! calculate τ (below eq. 20 in [1])
 !
-      tt  = (6.0d+00 * f(i) + (f(im2) + f(ip2))                                &
-                                             - 4.0d+00 * (f(im1) + f(ip1)))**2
+      tt  = (6.0d+00 * f(i) - 4.0d+00 * (f(im1) + f(ip1))                      &
+                                                       + (f(im2) + f(ip2)))**2
 
-! calculate αₖ (eq. 58 in [1])
+! calculate αₖ (eqs. 18 or 58 in [1])
 !
       al  = 1.0d+00 + tt / (bl + eps)
       ac  = 1.0d+00 + tt / (bc + eps)
@@ -1103,12 +1103,15 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
