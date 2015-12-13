@@ -715,11 +715,7 @@ module interpolations
 
 ! calculate values at i + ½
 !
-      if (dfr == 0.0d+00) then
-
-        fl(i) = f(i)
-
-      else
+      if (abs(dfr) > eps) then
 
 ! calculate the slope ratio (eq. 2.8 in [1])
 !
@@ -741,15 +737,15 @@ module interpolations
 !
         fl(i) = f(i) + dfr * (xl * f1 + xi * f2)
 
+      else
+
+        fl(i) = f(i)
+
       end if
 
 ! calculate values at i - ½
 !
-      if (dfl == 0.0d+00) then
-
-        fr(im1) = f(i)
-
-      else
+      if (abs(dfl) > eps) then
 
 ! calculate the slope ratio (eq. 2.8 in [1])
 !
@@ -770,6 +766,10 @@ module interpolations
 ! interpolate the right state (eq. 3.5 in [1], eq. 30 in [2])
 !
         fr(im1) = f(i) - dfl * (xl * f1 + xi * f2)
+
+      else
+
+        fr(im1) = f(i)
 
       end if
 
