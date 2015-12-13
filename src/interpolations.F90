@@ -184,6 +184,7 @@ module interpolations
       if (verbose .and. ng < 2)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 2).")
+      eps = max(1.0d-12, eps)
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       reconstruct_states => reconstruct_weno5z
