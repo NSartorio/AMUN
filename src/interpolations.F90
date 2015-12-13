@@ -692,12 +692,12 @@ module interpolations
 
 ! iterate over positions and interpolate states
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! prepare left and right differences
 !
@@ -773,12 +773,15 @@ module interpolations
 
       end if
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = f (1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
