@@ -1215,14 +1215,14 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 2, n - 1
+    do i = 3, n - 2
 
 ! prepare neighbour indices
 !
-      im2 = max(1, i - 2)
+      im2 = i - 2
       im1 = i - 1
       ip1 = i + 1
-      ip2 = min(n, i + 2)
+      ip2 = i + 2
 
 ! calculate βₖ (eq. 3.6 in [1])
 !
@@ -1296,15 +1296,21 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 2, n - 1
+    end do ! i = 3, n - 2
 
-! update the interpolation of the first and last points
+! update the interpolation of the first and last two points
 !
-    i     = n - 1
-    fl(1) = 0.5d+00 * (f(1) + f(2))
-    fr(i) = 0.5d+00 * (f(i) + f(n))
-    fl(n) = f(n)
-    fr(n) = f(n)
+    fl(1)   = 0.5d+00 * (f(1) + f(2))
+    df      = limiter_tvd(0.5d+00, dfm(2), dfp(2))
+    fr(1)   = f(2) - df
+    fl(2)   = f(2) + df
+    i       = n - 1
+    df      = limiter_tvd(0.5d+00, dfm(i), dfp(i))
+    fr(i-1) = f(i) - df
+    fl(i)   = f(i) + df
+    fr(i)   = 0.5d+00 * (f(i) + f(n))
+    fl(n)   = f(n)
+    fr(n)   = f(n)
 
 !-------------------------------------------------------------------------------
 !
