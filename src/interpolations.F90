@@ -233,6 +233,12 @@ module interpolations
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
+    case ("crmp5l", "crmp5ld", "CRMP5L", "CRMP5LD")
+      name_rec           =  "5th order Low-Dissipation Compact Monotonicity Preserving"
+      reconstruct_states => reconstruct_crmp5ld
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
@@ -2977,6 +2983,307 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crmp5
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRMP5LD:
+! ------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Low-Dissipation Compact Reconstruction Monotonicity Preserving (CRMP)
+!   method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!     [3] Ghosh, D. & Baeder, J.,
+!         "Compact Reconstruction Schemes With Weighted ENO Limiting For
+!          Hyperbolic Conservation Laws",
+!         SIAM Journal on Scientific Computing,
+!         2012, vol. 34, no. 3, pp. A1678-A1705,
+!         http://dx.doi.org/10.1137/110857659
+!
+!===============================================================================
+!
+  subroutine reconstruct_crmp5ld(n, h, f, fl, fr)
+
+! include external procedures
+!
+    use algebra   , only : tridiag
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n)   :: dfm, dfp
+    real(kind=8), dimension(n)   :: u
+    real(kind=8), dimension(n,2) :: a, b, c, r
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! prepare the tridiagonal system coefficients for the interior (eq. 3.6 in [3])
+!
+    do i = ng, n - ng + 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 2.5d-01
+      b(i,1) = 6.0d-01
+      c(i,1) = 1.5d-01
+
+      a(i,2) = 1.5d-01
+      b(i,2) = 6.0d-01
+      c(i,2) = 2.5d-01
+
+      r(i,1) = (3.0d+00 * f(im1) + 6.7d+01 * f(i  )                            &
+                                 + 4.9d+01 * f(ip1) + f(ip2)) / 1.2d+02
+      r(i,2) = (3.0d+00 * f(ip1) + 6.7d+01 * f(i  )                            &
+                                 + 4.9d+01 * f(im1) + f(im2)) / 1.2d+02
+
+    end do ! i = ng, n - ng + 1
+
+! interpolate ghost zones using explicit method (left-side reconstruction)
+!
+    do i = 2, ng
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+    do i = n - ng, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
+
+! interpolate ghost zones using explicit method (right-side reconstruction)
+!
+    do i = 2, ng + 1
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+    do i = n - ng + 1, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fl(i) = u(i)
+
+      else
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(u(i), fmn, fmx)
+
+      end if
+
+    end do ! i = 2, n - 1
+
+! solve the tridiagonal system of equations for the right-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fr(i) = u(i)
+
+      else
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(u(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do ! i = 2, n - 1
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crmp5ld
 !
 !===============================================================================
 !
