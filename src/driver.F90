@@ -35,6 +35,7 @@ program amun
 ! include external subroutines used in this module
 !
   use blocks        , only : initialize_blocks, finalize_blocks, get_nleafs
+  use blocks        , only : build_leaf_list
   use boundaries    , only : initialize_boundaries, finalize_boundaries
   use boundaries    , only : boundary_variables
   use coordinates   , only : initialize_coordinates, finalize_coordinates
@@ -446,6 +447,10 @@ program amun
 ! reconstruct the meta and data block structures from a given restart file
 !
     call read_restart_snapshot()
+
+! update the list of leafs
+!
+    call build_leaf_list()
 
   else
 
