@@ -59,6 +59,11 @@ module interpolations
   real(kind=8), save :: eps        = epsilon(1.0d+00)
   real(kind=8), save :: rad        = 0.5d+00
 
+! monotonicity preserving reconstruction coefficients
+!
+  real(kind=8), save :: kappa      = 1.0d+00
+  real(kind=8), save :: kbeta      = 1.0d+00
+
 ! number of ghost zones (required for compact schemes)
 !
   integer     , save :: ng         = 2
@@ -122,6 +127,7 @@ module interpolations
     character(len=255) :: name_tlim       = ""
     character(len=255) :: name_plim       = ""
     character(len=255) :: name_clim       = ""
+    real(kind=8)       :: cfl             = 0.5d+00
 !
 !-------------------------------------------------------------------------------
 !
@@ -149,6 +155,13 @@ module interpolations
     call get_parameter_integer("nghosts"             , ng             )
     call get_parameter_real   ("eps"                 , eps            )
     call get_parameter_real   ("limo3_rad"           , rad            )
+    call get_parameter_real   ("kappa"               , kappa          )
+    call get_parameter_real   ("kbeta"               , kbeta          )
+    call get_parameter_real   ("cfl"                 , cfl            )
+
+! calculate κ = (1 - ν) / ν
+!
+    kappa = min(kappa, (1.0d+00 - cfl) / cfl)
 
 ! select the reconstruction method
 !
@@ -171,6 +184,7 @@ module interpolations
       if (verbose .and. ng < 2)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 2).")
+      eps = max(1.0d-12, eps)
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       reconstruct_states => reconstruct_weno5z
@@ -204,6 +218,24 @@ module interpolations
     case ("crweno5ns", "crweno5-ns", "CRWENO5NS", "CRWENO5-NS")
       name_rec           =  "5th order Compact WENO-NS"
       reconstruct_states => reconstruct_crweno5ns
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
+    case ("mp5", "MP5")
+      name_rec           =  "5th order Monotonicity Preserving"
+      reconstruct_states => reconstruct_mp5
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
+    case ("crmp5", "CRMP5")
+      name_rec           =  "5th order Compact Monotonicity Preserving"
+      reconstruct_states => reconstruct_crmp5
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
+    case ("crmp5l", "crmp5ld", "CRMP5L", "CRMP5LD")
+      name_rec           =  "5th order Low-Dissipation Compact Monotonicity Preserving"
+      reconstruct_states => reconstruct_crmp5ld
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
@@ -459,12 +491,12 @@ module interpolations
 !
 ! calculate the left- and right-side interface interpolations
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! calculate left and right indices
 !
-      im1     = max(1, i - 1)
-      ip1     = min(n, i + 1)
+      im1     = i - 1
+      ip1     = i + 1
 
 ! calculate left and right side derivatives
 !
@@ -480,11 +512,14 @@ module interpolations
       fl(i  ) = f(i) + df
       fr(im1) = f(i) - df
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = f(1)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
     fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
@@ -538,12 +573,12 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1     = max(1, i - 1)
-      ip1     = min(n, i + 1)
+      im1     = i - 1
+      ip1     = i + 1
 
 ! calculate the left and right derivatives
 !
@@ -600,12 +635,15 @@ module interpolations
 !
       fr(im1) = (wp * fp + wm * fm) / ww
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = f (1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -661,12 +699,12 @@ module interpolations
 
 ! iterate over positions and interpolate states
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! prepare left and right differences
 !
@@ -684,11 +722,7 @@ module interpolations
 
 ! calculate values at i + ½
 !
-      if (dfr == 0.0d+00) then
-
-        fl(i) = f(i)
-
-      else
+      if (abs(dfr) > eps) then
 
 ! calculate the slope ratio (eq. 2.8 in [1])
 !
@@ -710,15 +744,15 @@ module interpolations
 !
         fl(i) = f(i) + dfr * (xl * f1 + xi * f2)
 
+      else
+
+        fl(i) = f(i)
+
       end if
 
 ! calculate values at i - ½
 !
-      if (dfl == 0.0d+00) then
-
-        fr(im1) = f(i)
-
-      else
+      if (abs(dfl) > eps) then
 
 ! calculate the slope ratio (eq. 2.8 in [1])
 !
@@ -740,14 +774,21 @@ module interpolations
 !
         fr(im1) = f(i) - dfl * (xl * f1 + xi * f2)
 
+      else
+
+        fr(im1) = f(i)
+
       end if
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = f (1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -772,12 +813,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2008, vol. 227, pp. 3191-3211,
 !         http://dx.doi.org/10.1016/j.jcp.2007.11.038
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -797,7 +832,7 @@ module interpolations
 ! local variables
 !
     integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: bl, bc, br, tt
+    real(kind=8) :: bl, bc, br, tt, df
     real(kind=8) :: al, ac, ar
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -810,10 +845,9 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -845,14 +879,14 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 3, n - 2
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
 ! calculate βₖ (eqs. 9-11 in [1])
 !
@@ -910,12 +944,21 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 3, n - 2
 
-! update the interpolation of the first and last points
+! update the interpolation of the first and last two points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    fl(1)   = 0.5d+00 * (f(1) + f(2))
+    df      = limiter_tvd(0.5d+00, dfm(2), dfp(2))
+    fr(1)   = f(2) - df
+    fl(2)   = f(2) + df
+    i       = n - 1
+    df      = limiter_tvd(0.5d+00, dfm(i), dfp(i))
+    fr(i-1) = f(i) - df
+    fl(i)   = f(i) + df
+    fr(i)   = 0.5d+00 * (f(i) + f(n))
+    fl(n)   = f(n)
+    fr(n)   = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -940,12 +983,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2009, vol. 228, pp. 4248-4272,
 !         http://dx.doi.org/10.1016/j.jcp.2009.03.002
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -965,7 +1002,7 @@ module interpolations
 ! local variables
 !
     integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: bl, bc, br, tt
+    real(kind=8) :: bl, bc, br, tt, df
     real(kind=8) :: al, ac, ar
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -978,10 +1015,9 @@ module interpolations
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -1013,14 +1049,14 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 3, n - 2
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
 ! calculate βₖ (eq. 19 in [1])
 !
@@ -1028,12 +1064,12 @@ module interpolations
       bc  = df2(i  ) + c2 * (          dfp(i  ) + dfm(i  ))**2
       br  = df2(ip1) + c2 * (3.0d+00 * dfp(i  ) - dfp(ip1))**2
 
-! calculate τ (below eq. 64 in [1])
+! calculate τ (below eq. 20 in [1])
 !
-      tt  = (6.0d+00 * f(i) + (f(im2) + f(ip2))                                &
-                                             - 4.0d+00 * (f(im1) + f(ip1)))**2
+      tt  = (6.0d+00 * f(i) - 4.0d+00 * (f(im1) + f(ip1))                      &
+                                                       + (f(im2) + f(ip2)))**2
 
-! calculate αₖ (eq. 58 in [1])
+! calculate αₖ (eqs. 18 or 58 in [1])
 !
       al  = 1.0d+00 + tt / (bl + eps)
       ac  = 1.0d+00 + tt / (bc + eps)
@@ -1079,12 +1115,21 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 3, n - 2
 
-! update the interpolation of the first and last points
+! update the interpolation of the first and last two points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    fl(1)   = 0.5d+00 * (f(1) + f(2))
+    df      = limiter_tvd(0.5d+00, dfm(2), dfp(2))
+    fr(1)   = f(2) - df
+    fl(2)   = f(2) + df
+    i       = n - 1
+    df      = limiter_tvd(0.5d+00, dfm(i), dfp(i))
+    fr(i-1) = f(i) - df
+    fl(i)   = f(i) + df
+    fr(i)   = 0.5d+00 * (f(i) + f(n))
+    fl(n)   = f(n)
+    fr(n)   = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1109,12 +1154,6 @@ module interpolations
 !         Journal of Computational Physics,
 !         2013, vol. 232, pp. 68-86
 !         http://dx.doi.org/10.1016/j.jcp.2012.06.016
-!     [2] Arshed, G. M. & Hoffmann, K. A.,
-!         "Minimizing errors from linear and nonlinear weights of WENO scheme
-!          for broadband applications with shock waves",
-!         Journal of Computational Physics,
-!         2013, vol. 246, pp. 58-77
-!         http://dx.doi.org/10.1016/j.jcp.2013.03.037
 !
 !===============================================================================
 !
@@ -1144,10 +1183,9 @@ module interpolations
 !
     real(kind=8), dimension(n) :: dfm, dfp, df2
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients
 !
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! interpolation coefficients
 !
@@ -1183,14 +1221,14 @@ module interpolations
 
 ! iterate along the vector
 !
-    do i = 1, n
+    do i = 3, n - 2
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      im2 = max(1, i - 2)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
 ! calculate βₖ (eq. 3.6 in [1])
 !
@@ -1264,12 +1302,21 @@ module interpolations
 !
       fr(im1) = (wl * ql + wr * qr) + wc * qc
 
-    end do ! i = 1, n
+    end do ! i = 3, n - 2
 
-! update the interpolation of the first and last points
+! update the interpolation of the first and last two points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    fl(1)   = 0.5d+00 * (f(1) + f(2))
+    df      = limiter_tvd(0.5d+00, dfm(2), dfp(2))
+    fr(1)   = f(2) - df
+    fl(2)   = f(2) + df
+    i       = n - 1
+    df      = limiter_tvd(0.5d+00, dfm(i), dfp(i))
+    fr(i-1) = f(i) - df
+    fl(i)   = f(i) + df
+    fr(i)   = 0.5d+00 * (f(i) + f(n))
+    fl(n)   = f(n)
+    fr(n)   = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1311,6 +1358,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5z(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -1324,7 +1375,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -1333,20 +1384,23 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n)   :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! smoothness indicator coefficients
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! interpolation coefficients
 !
@@ -1378,12 +1432,12 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
+      im1   = i - 1
+      ip1   = i + 1
 
 ! calculate βₖ (eqs. 9-11 in [1])
 !
@@ -1401,16 +1455,16 @@ module interpolations
       ac(i) = 1.0d+00 + tt / (bc + eps)
       ar(i) = 1.0d+00 + tt / (br + eps)
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -1424,20 +1478,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i)
+      wl  = cl * ar(i)
       wc  = cc * ac(i)
-      wr  = cl * ar(i)
+      wr  = cr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -1445,26 +1499,70 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -1490,53 +1588,63 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
-
-! interpolate ghost zones using explicit solver (left-side reconstruction)
-!
-    do i = n - ng, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! calculate weights
-!
-      wl  = dl * al(i)
-      wc  = dc * ac(i)
-      wr  = dr * ar(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the left state
-!
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
-
-! calculate the left state
-!
-      fl(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,1) = 0.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
-
-    end do ! i = n - ng, n
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = 2, ng + 1
+
+! prepare neighbour indices
+!
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! normalize weights
+!
+      wl  = dl * ar(i)
+      wc  = dc * ac(i)
+      wr  = dr * al(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the right state
+!
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+
+! calculate the right state
+!
+      fr(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+! interpolate ghost zones using explicit solver (right-side reconstruction)
+!
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
@@ -1568,88 +1676,39 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
-
-! interpolate ghost zones using explicit solver (right-side reconstruction)
-!
-    do i = n - ng + 1, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weights
-!
-      wl  = dl * ar(i)
-      wc  = dc * ac(i)
-      wr  = dr * al(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the right state
-!
-      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
-
-! calculate the right state
-!
-      fr(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,2) = 0.0d+00
-      c(i,2) = 0.0d+00
-      r(i,2) = fr(i)
-
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -1691,6 +1750,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5yc(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -1704,7 +1767,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -1713,20 +1776,23 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n)   :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! smoothness indicator coefficients
 !
     real(kind=8), parameter :: c1 = 1.3d+01 / 1.2d+01, c2 = 2.5d-01
 
-! improved weight coefficients (Table 1 in [2])
+! weight coefficients for implicit (c) and explicit (d) interpolations
 !
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01, dq = 2.5d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
+
+! implicit method coefficients
+!
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! interpolation coefficients
 !
@@ -1758,13 +1824,13 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
       im2   = max(1, i - 2)
-      im1   = max(1, i - 1)
-      ip1   = min(n, i + 1)
+      im1   = i - 1
+      ip1   = i + 1
       ip2   = min(n, i + 2)
 
 ! calculate βₖ (eqs. 9-11 in [1])
@@ -1784,16 +1850,16 @@ module interpolations
       ac(i) = 1.0d+00 + tt / (bc + eps)
       ar(i) = 1.0d+00 + tt / (br + eps)
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -1807,20 +1873,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i)
+      wl  = cl * ar(i)
       wc  = cc * ac(i)
-      wr  = cl * ar(i)
+      wr  = cr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -1828,26 +1894,70 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i)
+      wc  = dc * ac(i)
+      wr  = dr * ar(i)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -1873,59 +1983,69 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
-! interpolate ghost zones using explicit solver (left-side reconstruction)
+! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = n - ng, n
+    do i = 2, ng + 1
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
-! calculate weights
+! normalize weights
 !
-      wl  = dl * al(i)
+      wl  = dl * ar(i)
       wc  = dc * ac(i)
-      wr  = dr * ar(i)
+      wr  = dr * al(i)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
       wc  = 1.0d+00 - (wl + wr)
 
-! calculate the interpolations of the left state
+! calculate the interpolations of the right state
 !
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
-! calculate the left state
+! calculate the right state
 !
-      fl(i) = (wl * ql + wr * qr) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
-      a(i,1) = 0.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+      r(i,2) = fr(i)
 
-    end do ! i = n - ng, n
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! normalize weights
@@ -1951,88 +2071,39 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
-
-! interpolate ghost zones using explicit solver (right-side reconstruction)
-!
-    do i = n - ng + 1, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! normalize weights
-!
-      wl  = dl * ar(i)
-      wc  = dc * ac(i)
-      wr  = dr * al(i)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the right state
-!
-      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
-      qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
-
-! calculate the right state
-!
-      fr(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,2) = 0.0d+00
-      c(i,2) = 0.0d+00
-      r(i,2) = fr(i)
-
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -2074,6 +2145,10 @@ module interpolations
 !
   subroutine reconstruct_crweno5ns(n, h, f, fl, fr)
 
+! include external procedures
+!
+    use algebra   , only : tridiag
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -2087,7 +2162,7 @@ module interpolations
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, ib, ie
+    integer      :: i, im1, ip1, im2, ip2
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: df, lq, l3, zt
@@ -2097,7 +2172,7 @@ module interpolations
 !
     real(kind=8), dimension(n)   :: dfm, dfp, df2
     real(kind=8), dimension(n,2) :: al, ac, ar
-    real(kind=8), dimension(n)   :: u, g
+    real(kind=8), dimension(n)   :: u
     real(kind=8), dimension(n,2) :: a, b, c, r
 
 ! the free parameter for smoothness indicators (see eq. 3.6 in [3])
@@ -2109,12 +2184,11 @@ module interpolations
     real(kind=8), parameter :: cl = 1.0d+00 / 9.0d+00
     real(kind=8), parameter :: cc = 5.0d+00 / 9.0d+00
     real(kind=8), parameter :: cr = 1.0d+00 / 3.0d+00
-    real(kind=8), parameter :: dl = 1.235341937d-01, dr = 3.699651429d-01      &
-                             , dc = 5.065006634d-01
+    real(kind=8), parameter :: dl = 1.0d-01, dc = 6.0d-01, dr = 3.0d-01
 
 ! implicit method coefficients
 !
-    real(kind=8), parameter :: dq = 1.0d+00 / 4.0d+00
+    real(kind=8), parameter :: dq = 5.0d-01
 
 ! 3rd order interpolation coefficients for three stencils
 !
@@ -2146,12 +2220,12 @@ module interpolations
 
 ! prepare smoothness indicators
 !
-    do i = 1, n
+    do i = 2, n - 1
 
 ! prepare neighbour indices
 !
-      im1  = max(1, i - 1)
-      ip1  = min(n, i + 1)
+      im1  = i - 1
+      ip1  = i + 1
 
 ! calculate βₖ
 !
@@ -2191,16 +2265,16 @@ module interpolations
       ac(i,2) = 1.0d+00 + zt / (bc + eps)**2
       ar(i,2) = 1.0d+00 + zt / (br + eps)**2
 
-    end do ! i = 1, n
+    end do ! i = 2, n - 1
 
 ! prepare tridiagonal system coefficients
 !
-    do i = ng, n - ng
+    do i = ng, n - ng + 1
 
 ! prepare neighbour indices
 !
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
 
 ! calculate weights
 !
@@ -2214,20 +2288,20 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,1) = 2.0d+00 * wl + 5.0d-01 * wc
-      c(i,1) = 5.0d-01 * wr
+      a(i,1) = 2.0d+00 * wl +            wc
+      b(i,1) =           wl + 2.0d+00 * (wc + wr)
+      c(i,1) =           wr
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,1) = ( 2.0d+00 * wl                                * f(im1)          &
-             +  (1.0d+01 * wl + 5.0d+00 * wc +           wr) * f(i  )          &
-             +  (                         wc + 5.0d+00 * wr) * f(ip1)) * dq
+      r(i,1) = (wl * f(im1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(ip1)) * dq
 
 ! calculate weights
 !
-      wl  = cr * al(i,2)
+      wl  = cl * ar(i,2)
       wc  = cc * ac(i,2)
-      wr  = cl * ar(i,2)
+      wr  = cr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2235,26 +2309,70 @@ module interpolations
 
 ! calculate tridiagonal matrix coefficients
 !
-      a(i,2) = 5.0d-01 * wl
-      c(i,2) = 5.0d-01 * wc + 2.0d+00 * wr
+      a(i,2) =           wr
+      b(i,2) =           wl + 2.0d+00 * (wc + wr)
+      c(i,2) = 2.0d+00 * wl +            wc
 
 ! prepare right hand side of tridiagonal equation
 !
-      r(i,2) = ((5.0d+00 * wl +           wc               ) * f(im1)          &
-             +  (          wl + 5.0d+00 * wc + 1.0d+01 * wr) * f(i  )          &
-             +   2.0d+00 * wr                                * f(ip1)) * dq
+      r(i,2) = (wl * f(ip1) + (5.0d+00 * (wl + wc) + wr) * f(i  )              &
+                                   + (wc + 5.0d+00 * wr) * f(im1)) * dq
 
-    end do ! i = 1, n
+    end do ! i = ng, n - ng + 1
 
 ! interpolate ghost zones using explicit solver (left-side reconstruction)
 !
-    do i = 1, ng
+    do i = 2, ng
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+! calculate weights
+!
+      wl  = dl * al(i,1)
+      wc  = dc * ac(i,1)
+      wr  = dr * ar(i,1)
+      ww  = (wl + wr) + wc
+      wl  = wl / ww
+      wr  = wr / ww
+      wc  = 1.0d+00 - (wl + wr)
+
+! calculate the interpolations of the left state
+!
+      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
+      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
+      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
+
+! calculate the left state
+!
+      fl(i) = (wl * ql + wr * qr) + wc * qc
+
+! prepare coefficients of the tridiagonal system
+!
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+      r(i,1) = fl(i)
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+! interpolate ghost zones using explicit solver (left-side reconstruction)
+!
+    do i = n - ng, n - 1
+
+! prepare neighbour indices
+!
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! calculate weights
@@ -2280,66 +2398,32 @@ module interpolations
 ! prepare coefficients of the tridiagonal system
 !
       a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
       c(i,1) = 0.0d+00
       r(i,1) = fl(i)
 
-    end do ! i = 1, ng
-
-! interpolate ghost zones using explicit solver (left-side reconstruction)
-!
-    do i = n - ng, n
-
-! prepare neighbour indices
-!
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
-
-! calculate weights
-!
-      wl  = dl * al(i,1)
-      wc  = dc * ac(i,1)
-      wr  = dr * ar(i,1)
-      ww  = (wl + wr) + wc
-      wl  = wl / ww
-      wr  = wr / ww
-      wc  = 1.0d+00 - (wl + wr)
-
-! calculate the interpolations of the left state
-!
-      ql = a11 * f(im2) + a12 * f(im1) + a13 * f(i  )
-      qc = a21 * f(im1) + a22 * f(i  ) + a23 * f(ip1)
-      qr = a31 * f(i  ) + a32 * f(ip1) + a33 * f(ip2)
-
-! calculate the left state
-!
-      fl(i) = (wl * ql + wr * qr) + wc * qc
-
-! prepare coefficients of the tridiagonal system
-!
-      a(i,1) = 0.0d+00
-      c(i,1) = 0.0d+00
-      r(i,1) = fl(i)
-
-    end do ! i = n - ng, n
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = 1, ng + 1
+    do i = 2, ng + 1
 
 ! prepare neighbour indices
 !
       im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
-      ip2 = min(n, i + 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
 
 ! normalize weights
 !
-      wl  = dr * al(i,2)
+      wl  = dl * ar(i,2)
       wc  = dc * ac(i,2)
-      wr  = dl * ar(i,2)
+      wr  = dr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2347,38 +2431,43 @@ module interpolations
 
 ! calculate the interpolations of the right state
 !
-      ql = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
       qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
 ! calculate the right state
 !
-      fr(i) = (wr * qr + wl * ql) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
 
 ! interpolate ghost zones using explicit solver (right-side reconstruction)
 !
-    do i = n - ng + 1, n
+    do i = n - ng + 1, n - 1
 
 ! prepare neighbour indices
 !
-      im2 = max(1, i - 2)
-      im1 = max(1, i - 1)
-      ip1 = min(n, i + 1)
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
       ip2 = min(n, i + 2)
 
 ! normalize weights
 !
-      wl  = dr * al(i,2)
+      wl  = dl * ar(i,2)
       wc  = dc * ac(i,2)
-      wr  = dl * ar(i,2)
+      wr  = dr * al(i,2)
       ww  = (wl + wr) + wc
       wl  = wl / ww
       wr  = wr / ww
@@ -2386,64 +2475,815 @@ module interpolations
 
 ! calculate the interpolations of the right state
 !
-      ql = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
+      ql = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
       qc = a21 * f(ip1) + a22 * f(i  ) + a23 * f(im1)
-      qr = a11 * f(ip2) + a12 * f(ip1) + a13 * f(i  )
+      qr = a31 * f(i  ) + a32 * f(im1) + a33 * f(im2)
 
 ! calculate the right state
 !
-      fr(i) = (wr * qr + wl * ql) + wc * qc
+      fr(i) = (wl * ql + wr * qr) + wc * qc
 
 ! prepare coefficients of the tridiagonal system
 !
       a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
       c(i,2) = 0.0d+00
       r(i,2) = fr(i)
 
-    end do ! i = 1, ng + 1
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    ib = 1
-    ie = n
-    tt    = 1.0d+00
-    u(ib) = r(ib,1)
-    do i = ib + 1, ie
-      im1  = i - 1
-      g(i) =  c(im1,1) / tt
-      tt   =  1.0d+00 - a(i,1) * g(i)
-      u(i) = (r(i,1) - a(i,1) * u(im1)) / tt
-    end do
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      u(i) = u(i) - g(ip1) * u(ip1)
-    end do
-    fl(ib:ie) = u(ib:ie)
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
 
-! solve the tridiagonal system of equations for the right-side interpolation
+! substitute the left-side values
 !
-    tt    = 1.0d+00
-    u(ie) = r(ie,2)
-    do i = ie - 1, ib, -1
-      ip1  = i + 1
-      g(i) =  a(ip1,2) / tt
-      tt   =  1.0d+00 - c(i,2) * g(i)
-      u(i) = (r(i,2) - c(i,2) * u(ip1)) / tt
-    end do
-    do i = ib + 1, ie
-      im1  = i - 1
-      u(i) = u(i) - g(im1) * u(im1)
-    end do
-    fr(ib:ie-1) = u(ib+1:ie)
+    fl(1:n  ) = u(1:n)
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! substitute the right-side values
+!
+    fr(1:n-1) = u(2:n)
 
 ! update the interpolation of the first and last points
 !
-    fl(1) = fr(1)
-    fr(n) = fl(n)
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
 
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crweno5ns
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_MP5:
+! --------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Monotonicity Preserving (MP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine reconstruct_mp5(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! obtain the face values using high order interpolation
+!
+    do i = 2, n - 1
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
+                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
+                                                                     / 6.0d+01
+      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
+                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, n - 1
+
+! apply monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+! get the limiting condition for the left state
+!
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (fl(i) - f(i)) * (fl(i) - fmp)
+
+! limit the left state
+!
+      if (ds > eps) then
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(fl(i), fmn, fmx)
+
+      end if
+
+! get the limiting condition for the right state
+!
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+      ds    = (fr(i) - f(i)) * (fr(i) - fmp)
+
+! limit the right state
+!
+      if (ds > eps) then
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(fr(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do ! n = 2, n - 1
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_mp5
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRMP5:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Compact Reconstruction Monotonicity Preserving (CRMP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine reconstruct_crmp5(n, h, f, fl, fr)
+
+! include external procedures
+!
+    use algebra   , only : tridiag
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n)   :: dfm, dfp
+    real(kind=8), dimension(n)   :: u
+    real(kind=8), dimension(n,2) :: a, b, c, r
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! prepare the tridiagonal system coefficients for the interior
+!
+    do i = ng, n - ng + 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      a(i,1) = 3.0d-01
+      b(i,1) = 6.0d-01
+      c(i,1) = 1.0d-01
+
+      a(i,2) = 1.0d-01
+      b(i,2) = 6.0d-01
+      c(i,2) = 3.0d-01
+
+      r(i,1) = (f(im1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(ip1)) / 3.0d+01
+      r(i,2) = (f(ip1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(im1)) / 3.0d+01
+
+    end do ! i = ng, n - ng + 1
+
+! interpolate ghost zones using explicit method (left-side reconstruction)
+!
+    do i = 2, ng
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+    do i = n - ng, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
+
+! interpolate ghost zones using explicit method (right-side reconstruction)
+!
+    do i = 2, ng + 1
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+    do i = n - ng + 1, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fl(i) = u(i)
+
+      else
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(u(i), fmn, fmx)
+
+      end if
+
+    end do ! i = 2, n - 1
+
+! solve the tridiagonal system of equations for the right-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fr(i) = u(i)
+
+      else
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(u(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do ! i = 2, n - 1
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crmp5
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRMP5LD:
+! ------------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Low-Dissipation Compact Reconstruction Monotonicity Preserving (CRMP)
+!   method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!     [3] Ghosh, D. & Baeder, J.,
+!         "Compact Reconstruction Schemes With Weighted ENO Limiting For
+!          Hyperbolic Conservation Laws",
+!         SIAM Journal on Scientific Computing,
+!         2012, vol. 34, no. 3, pp. A1678-A1705,
+!         http://dx.doi.org/10.1137/110857659
+!
+!===============================================================================
+!
+  subroutine reconstruct_crmp5ld(n, h, f, fl, fr)
+
+! include external procedures
+!
+    use algebra   , only : tridiag
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n)   :: dfm, dfp
+    real(kind=8), dimension(n)   :: u
+    real(kind=8), dimension(n,2) :: a, b, c, r
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! prepare the tridiagonal system coefficients for the interior (eq. 3.6 in [3])
+!
+    do i = ng, n - ng + 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 2.5d-01
+      b(i,1) = 6.0d-01
+      c(i,1) = 1.5d-01
+
+      a(i,2) = 1.5d-01
+      b(i,2) = 6.0d-01
+      c(i,2) = 2.5d-01
+
+      r(i,1) = (3.0d+00 * f(im1) + 6.7d+01 * f(i  )                            &
+                                 + 4.9d+01 * f(ip1) + f(ip2)) / 1.2d+02
+      r(i,2) = (3.0d+00 * f(ip1) + 6.7d+01 * f(i  )                            &
+                                 + 4.9d+01 * f(im1) + f(im2)) / 1.2d+02
+
+    end do ! i = ng, n - ng + 1
+
+! interpolate ghost zones using explicit method (left-side reconstruction)
+!
+    do i = 2, ng
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng
+    a(1,1) = 0.0d+00
+    b(1,1) = 1.0d+00
+    c(1,1) = 0.0d+00
+    r(1,1) = 0.5d+00 * (f(1) + f(2))
+
+    do i = n - ng, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,1) = 0.0d+00
+      b(i,1) = 1.0d+00
+      c(i,1) = 0.0d+00
+
+      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
+                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng, n - 1
+    a(n,1) = 0.0d+00
+    b(n,1) = 1.0d+00
+    c(n,1) = 0.0d+00
+    r(n,1) = f(n)
+
+! interpolate ghost zones using explicit method (right-side reconstruction)
+!
+    do i = 2, ng + 1
+
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = i + 2
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = 2, ng + 1
+    a(1,2) = 0.0d+00
+    b(1,2) = 1.0d+00
+    c(1,2) = 0.0d+00
+    r(1,2) = f(1)
+
+    do i = n - ng + 1, n - 1
+
+      im2 = i - 2
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      a(i,2) = 0.0d+00
+      b(i,2) = 1.0d+00
+      c(i,2) = 0.0d+00
+
+      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
+                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
+                                                                     / 6.0d+01
+
+    end do ! i = n - ng + 1, n - 1
+    a(n,2) = 0.0d+00
+    b(n,2) = 1.0d+00
+    c(n,2) = 0.0d+00
+    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
+
+! solve the tridiagonal system of equations for the left-side interpolation
+!
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fl(i) = u(i)
+
+      else
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(u(i), fmn, fmx)
+
+      end if
+
+    end do ! i = 2, n - 1
+
+! solve the tridiagonal system of equations for the right-side interpolation
+!
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+
+      ds    = (u(i) - f(i)) * (u(i) - fmp)
+
+      if (ds <= eps) then
+
+        fr(i) = u(i)
+
+      else
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(u(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do ! i = 2, n - 1
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crmp5ld
 !
 !===============================================================================
 !
@@ -2537,15 +3377,10 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
-
-! local variables
-!
-    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    y = x - eps
-    c = (sign(y, a) + sign(y, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
+    c = (sign(x, a) + sign(x, b)) * min(abs(a), abs(b), 2.5d-01 * abs(a + b))
 
 !-------------------------------------------------------------------------------
 !
@@ -2576,16 +3411,11 @@ module interpolations
 !
     real(kind=8), intent(in) :: x, a, b
     real(kind=8)             :: c
-
-! local variables
-!
-    real(kind=8)             :: y
 !
 !-------------------------------------------------------------------------------
 !
-    y = x - eps
-    c = (sign(y, a) + sign(y, b))                                              &
-           * max(min(abs(a), 0.5d+00 * abs(b)), min(0.5d+00 * abs(a), abs(b)))
+    c = 0.5d+00 * (sign(x, a) + sign(x, b))                                    &
+           * max(min(2.0d+00 * abs(a), abs(b)), min(abs(a), 2.0d+00 * abs(b)))
 
 !-------------------------------------------------------------------------------
 !
@@ -2621,7 +3451,7 @@ module interpolations
 !
     c = a * b
     if (c > 0.0d+00) then
-      c = 2.0d+00 * (x - eps) * c / (a + b)
+      c = 2.0d+00 * x * c / (a + b)
     else
       c = 0.0d+00
     end if
@@ -2663,6 +3493,103 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end function limiter_vanalbada
+!
+!===============================================================================
+!
+! function MINMOD:
+! ===============
+!
+!   Function returns the minimum module value among two arguments.
+!
+!   Arguments:
+!
+!     a, b - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function minmod(a, b)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b
+!
+!-------------------------------------------------------------------------------
+!
+    minmod = (sign(0.5d+00, a) + sign(0.5d+00, b)) * min(abs(a), abs(b))
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function minmod
+!
+!===============================================================================
+!
+! function MINMOD4:
+! ================
+!
+!   Function returns the minimum module value among four arguments.
+!
+!   Arguments:
+!
+!     a, b, c, d - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function minmod4(a, b, c, d)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b, c, d
+!
+!-------------------------------------------------------------------------------
+!
+    minmod4 = minmod(minmod(a, b), minmod(c, d))
+
+    return
+
+!-------------------------------------------------------------------------------
+!
+  end function minmod4
+!
+!===============================================================================
+!
+! function MEDIAN:
+! ===============
+!
+!   Function returns the median of three argument values.
+!
+!   Arguments:
+!
+!     a, b, c - the input values;
+!
+!===============================================================================
+!
+  real(kind=8) function median(a, b, c)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    real(kind=8), intent(in) :: a, b, c
+!
+!-------------------------------------------------------------------------------
+!
+    median = a + minmod(b - a, c - a)
+
+    return
+
+  end function median
 !
 !===============================================================================
 !

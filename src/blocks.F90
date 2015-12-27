@@ -2353,10 +2353,6 @@ module blocks
       end do ! kp = 1, nsides
 #endif /* NDIMS == 3 */
 
-! mark all neighbors to be updated as well
-!
-      call set_neighbors_update(pmeta)
-
 !! ASSOCIATE DATA BLOCKS IF NECESSARY
 !!
 ! allocate data blocks if requested
@@ -2959,10 +2955,6 @@ module blocks
 ! mark the parent to be updated
 !
     call metablock_set_update(pmeta)
-
-! mark all neighbors to be updated as well
-!
-    call set_neighbors_update(pmeta)
 
 #ifdef PROFILE
 ! stop accounting time for the block derefinement

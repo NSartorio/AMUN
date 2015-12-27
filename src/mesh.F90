@@ -243,11 +243,11 @@ module mesh
 ! subroutine STORE_MESH_STATS:
 ! ---------------------------
 !
-!   Subroutine prepares and stores various mesh statistics.
+!   Subroutine calculates and stores various mesh statistics.
 !
 !   Arguments:
 !
-!     step - the integration step;
+!     step - the integration iteration step number;
 !     time - the physical time;
 !
 !===============================================================================
@@ -260,7 +260,8 @@ module mesh
     use blocks         , only : list_meta, list_leaf
     use blocks         , only : ndims
     use blocks         , only : get_mblocks, get_nleafs
-    use coordinates    , only : ng, nd, in, jn, kn, im, jm, km, ir, jr, kr, toplev
+    use coordinates    , only : ng, nd, in, jn, kn, im, jm, km, ir, jr, kr
+    use coordinates    , only : toplev
     use mpitools       , only : master, nprocs
 
 ! local variables are not implicit by default
@@ -303,45 +304,36 @@ module mesh
     call start_timer(ims)
 #endif /* PROFILE */
 
-! store the mesh statistics only on master
+! process and store the mesh statistics only on master node
 !
     if (master) then
 
-! store the mesh statistics only if they changed
+! and only if the number of blocks changed
 !
       if (nm /= get_mblocks() .or. nl /= get_nleafs()) then
 
-! get the mximum block number and maximum level
+! get the maximum number of block and level, calculated only once
 !
         if (first) then
 
-! reset the maximum number of base blocks
-!
-          n = 0
-
-! set the pointer to the first block on the meta block list
-!
-          pmeta => list_meta
-
 ! determine the number of base blocks
 !
+          n = 0
+          pmeta => list_meta
+
           do while(associated(pmeta))
 
-! if the block is at the lowest level, count it
-!
             if (pmeta%level == 1) n = n + 1
 
-! associate the pointer with the next block
-!
             pmeta => pmeta%next
 
           end do ! pmeta
 
-! calculate the maximum block number
+! calculate the maximum number of blocks
 !
           n = n * 2**(ndims*(toplev - 1))
 
-! prepare coverage and efficiency factors
+! calculate the coverage and efficiency factors
 !
           ff  = 2**(toplev - 1)
           fcv = 1.0d+00 / n
@@ -362,51 +354,41 @@ module mesh
         nm = get_mblocks()
         nl = get_nleafs()
 
-! calculate the coverage (the number of leafs divided by the maximum
-! block number) and the efficiency (the cells count for corresponding uniform
-! mesh divided by the cell count for adaptive mesh)
+! calculate the coverage (the number of leafs divided by the maximum number
+! of blocks) and the efficiency (the total number of cells in a corresponding
+! uniform mesh divided by the number of cells for adaptive mesh case)
 !
         cv = fcv * nl
         ef = fef / nl
 
-! initialize the level and process block counter
+! get the block level and block process distributions
 !
         ldist(:) = 0
 #ifdef MPI
         cdist(:) = 0
 #endif /* MPI */
 
-! associate pleaf with the first block on the leaf list
-!
         pleaf => list_leaf
 
-! scan all leaf meta blocks in the list
-!
         do while(associated(pleaf))
 
-! get the associated meta block
-!
           pmeta => pleaf%meta
 
-! increase the block level and process counts
-!
           ldist(pmeta%level)     = ldist(pmeta%level)     + 1
 #ifdef MPI
           cdist(pmeta%process+1) = cdist(pmeta%process+1) + 1
 #endif /* MPI */
 
-! associate pleaf with the next leaf on the list
-!
           pleaf => pleaf%next
 
-        end do ! over leaf blocks
+        end do ! pleaf
 
-! write down the block statistics
+! store the block statistics
 !
         write(funit, "(i9,3e14.6e3,2(2x,i9))", advance="no")                   &
                                                     step, time, cv, ef, nm, nl
 
-! write down the block level distribution
+! store the block level distribution
 !
         write(funit,"(12x)", advance="no")
         do l = 1, toplev
@@ -414,7 +396,7 @@ module mesh
         end do ! l = 1, toplev
 
 #ifdef MPI
-! write down the process level distribution
+! store the process level distribution
 !
         write(funit,"(10x)", advance="no")
         do l = 1, nprocs
@@ -422,7 +404,7 @@ module mesh
         end do ! l = 1, nprocs
 #endif /* MPI */
 
-! write the new line symbol
+! append the new line character
 !
         write(funit,"('')")
 

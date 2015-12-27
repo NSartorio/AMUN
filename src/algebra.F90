@@ -42,6 +42,7 @@ module algebra
   public :: quadratic, quadratic_normalized
   public :: cubic, cubic_normalized
   public :: quartic
+  public :: tridiag
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -1080,6 +1081,80 @@ module algebra
 !-------------------------------------------------------------------------------
 !
   end subroutine sort
+!
+!===============================================================================
+!
+! subroutine TRIDIAG:
+! ------------------
+!
+!   Subroutine solves the system of tridiagonal linear equations.
+!
+!   Arguments:
+!
+!     n    - the size of the matrix;
+!     l(:) - the vector of the lower off-diagonal values;
+!     d(:) - the vector of the diagonal values;
+!     u(:) - the vector of the upper off-diagonal values;
+!     r(:) - the vector of the right side values;
+!     x(:) - the solution vector;
+!
+!   References:
+!
+!     [1] Press, W. H, Teukolsky, S. A., Vetterling, W. T., Flannery, B. P.,
+!         "Numerical Recipes in Fortran",
+!         Cambridge University Press, Cambridge, 1992
+!
+!===============================================================================
+!
+  subroutine tridiag(n, l, d, u, r, x)
+
+! import external procedures
+!
+    use error, only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8), dimension(n), intent(in)  :: l, d, u, r
+    real(kind=8), dimension(n), intent(out) :: x
+
+! local variables
+!
+    integer                    :: i, j
+    real(kind=8)               :: t
+    real(kind=8), dimension(n) :: g
+!
+!-------------------------------------------------------------------------------
+!
+! decomposition and forward substitution
+!
+    t    = d(1)
+    x(1) = r(1) / t
+    do i = 2, n
+      j  = i - 1
+      g(i) = u(j) / t
+      t    = d(i) - l(i) * g(i)
+      if (t == 0.0d+00) then
+        call print_error("algebra::tridiag", "solution failed!")
+        stop
+      end if
+      x(i) = (r(i) - l(i) * x(j)) / t
+    end do
+
+! backsubstitution
+!
+    do i = n - 1, 1, -1
+      j    = i + 1
+      x(i) = x(i) - g(j) * x(j)
+    end do
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine tridiag
 
 !===============================================================================
 !
