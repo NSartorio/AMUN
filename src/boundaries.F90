@@ -5144,15 +5144,6 @@ module boundaries
 !
                   qn(ivx,i,j,k) = min(0.0d+00, qn(ivx,ib,j,k))
 
-! get the tangential components of magnetic field from the curl-free condition
-!
-                  qn(iby,i,j,k) = qn(iby,ip2,j,k)                              &
-                               + (qn(ibx,ip1,jm1,k) - qn(ibx,ip1,jp1,k)) * dxy
-#if NDIMS == 3
-                  qn(ibz,i,j,k) = qn(ibz,ip2,j,k)                              &
-                               + (qn(ibx,ip1,j,km1) - qn(ibx,ip1,j,kp1)) * dxz
-#endif /* NDIMS == 3 */
-
 ! update the normal component of magnetic field from divergence-free condition
 !
                   qn(ibx,i,j,k) = qn(ibx,ip2,j,k)                              &
@@ -5198,15 +5189,6 @@ module boundaries
 ! prevent the inflow
 !
                   qn(ivx,i,j,k) = max(0.0d+00, qn(ivx,ie,j,k))
-
-! get the tangential components of magnetic field from the curl-free condition
-!
-                  qn(iby,i,j,k) = qn(iby,im2,j,k)                              &
-                               + (qn(ibx,im1,jp1,k) - qn(ibx,im1,jm1,k)) * dxy
-#if NDIMS == 3
-                  qn(ibz,i,j,k) = qn(ibz,im2,j,k)                              &
-                               + (qn(ibx,im1,j,kp1) - qn(ibx,im1,j,km1)) * dxz
-#endif /* NDIMS == 3 */
 
 ! update the normal component of magnetic field from divergence-free condition
 !
