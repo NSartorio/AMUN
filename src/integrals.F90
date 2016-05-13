@@ -215,7 +215,15 @@ module integrals
 
 ! write the integral file header
 !
-      write(runit,"('#',a8,3(1x,a18))") 'step', 'time', 'Vrec_l', 'Vrec_u'
+      write(runit,'("#",a8,19a18)')                                            &
+          'step', 'time'                                                       &
+        , '|Bx| int', '|Bx| y-adv', '|Bx| z-adv'                               &
+                    , '|Bx| y-shr', '|Bx| z-shr'                               &
+                    , '|Bx| x-cmp', '|Bx| y-cmp', '|Bx| z-cmp'                 &
+                    , '|Bx| x-div', '|Bx| y-div', '|Bx| z-div'                 &
+                    , '|Bx| x-dif', '|Bx| y-dif', '|Bx| z-dif'                 &
+                    , '|Bx| y-res', '|Bx| z-res'                               &
+                    , 'Vin lower' , 'Vin upper'
       write(runit,"('#')")
 
     end if ! master
@@ -292,8 +300,8 @@ module integrals
 ! import external variables and subroutines
 !
     use blocks         , only : block_meta, block_data, list_data
-    use coordinates    , only : in, jn, kn, ib, jb, kb, ie, je, ke
-    use coordinates    , only : adx, adz, advol, voli
+    use coordinates    , only : im, jm, km, in, jn, kn, ib, jb, kb, ie, je, ke
+    use coordinates    , only : adx, ady, adz, advol, voli
     use coordinates    , only : ymin, ymax, xlen, zlen, yarea
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use equations      , only : ien, imx, imy, imz
@@ -305,6 +313,8 @@ module integrals
     use mpitools       , only : reduce_minimum_real_array
     use mpitools       , only : reduce_maximum_real_array
 #endif /* MPI */
+    use operators      , only : gradient, derivative_1st, derivative_2nd
+    use sources        , only : resistivity
 
 ! local variables are not implicit by default
 !
@@ -314,6 +324,7 @@ module integrals
 !
     integer                       :: iret
     real(kind=8)                  :: dvol, dvolh, dxz
+    real(kind=8), dimension(3)    :: dh
 
 ! local pointers
 !
@@ -321,12 +332,13 @@ module integrals
 
 ! local parameters
 !
-    integer, parameter            :: narr = 16
+    integer, parameter            :: narr = 32
 
 ! local arrays
 !
-    real(kind=8), dimension(narr)     :: inarr, avarr, mnarr, mxarr
-    real(kind=8), dimension(in,jn,kn) :: vel, mag, sqd, tmp
+    real(kind=8), dimension(narr)       :: inarr, avarr, mnarr, mxarr
+    real(kind=8), dimension(in,jn,kn)   :: vel, mag, sqd, tmp, sgn
+    real(kind=8), dimension(3,im,jm,km) :: grad
 
 ! parameters
 !
@@ -380,6 +392,9 @@ module integrals
       dvol  = advol(pdata%meta%level)
       dvolh = 0.5d+00 * dvol
       dxz   = adx(pdata%meta%level) * adz(pdata%meta%level) / yarea
+      dh(1) = adx(pdata%meta%level)
+      dh(2) = ady(pdata%meta%level)
+      dh(3) = adz(pdata%meta%level)
 
 ! sum up density and momenta components
 !
@@ -470,15 +485,95 @@ module integrals
         avarr(7) = avarr(7) + sum(tmp(:,:,:)) * dvol
         mnarr(7) = min(mnarr(7), minval(tmp(:,:,:)))
         mxarr(7) = max(mxarr(7), maxval(tmp(:,:,:)))
-      end if
+
+! the integral of |Bx|
+!
+        inarr(11) = inarr(11) + sum(abs(pdata%u(ibx,ib:ie,jb:je,kb:ke))) * dvol
+
+! reconnecting field sign
+!
+        sgn(:,:,:) = sign(1.0d+00, pdata%u(ibx,ib:ie,jb:je,kb:ke))
+
+! advection
+!
+        call gradient(dh(:), pdata%u(ibx,:,:,:), grad(:,:,:,:))
+        tmp(:,:,:) = - sgn(:,:,:)                                              &
+                   * pdata%u(ivy,ib:ie,jb:je,kb:ke) * grad(2,ib:ie,jb:je,kb:ke)
+        inarr(12) = inarr(12) + sum(tmp(:,:,:)) * dvol
+#if NDIMS == 3
+        tmp(:,:,:) = - sgn(:,:,:)                                              &
+                   * pdata%u(ivz,ib:ie,jb:je,kb:ke) * grad(3,ib:ie,jb:je,kb:ke)
+        inarr(13) = inarr(13) + sum(tmp(:,:,:)) * dvol
+#endif /* NDIMS == 3 */
+
+! divergence
+!
+        tmp(:,:,:) =   sgn(:,:,:)                                              &
+                   * pdata%u(ivx,ib:ie,jb:je,kb:ke) * grad(1,ib:ie,jb:je,kb:ke)
+        inarr(19) = inarr(19) + sum(tmp(:,:,:)) * dvol
+        call derivative_1st(2, dh(2), pdata%u(iby,:,:,:), grad(2,:,:,:))
+        tmp(:,:,:) =   sgn(:,:,:)                                              &
+                   * pdata%u(ivx,ib:ie,jb:je,kb:ke) * grad(2,ib:ie,jb:je,kb:ke)
+        inarr(20) = inarr(20) + sum(tmp(:,:,:)) * dvol
+#if NDIMS == 3
+        call derivative_1st(3, dh(3), pdata%u(ibz,:,:,:), grad(3,:,:,:))
+        tmp(:,:,:) =   sgn(:,:,:)                                              &
+                   * pdata%u(ivx,ib:ie,jb:je,kb:ke) * grad(3,ib:ie,jb:je,kb:ke)
+        inarr(21) = inarr(21) + sum(tmp(:,:,:)) * dvol
+#endif /* NDIMS == 3 */
+
+! shear
+!
+        call gradient(dh(:), pdata%u(ivx,:,:,:), grad(:,:,:,:))
+        tmp(:,:,:) =   sgn(:,:,:)                                              &
+                   * pdata%u(iby,ib:ie,jb:je,kb:ke) * grad(2,ib:ie,jb:je,kb:ke)
+        inarr(14) = inarr(14) + sum(tmp(:,:,:)) * dvol
+#if NDIMS == 3
+        tmp(:,:,:) =   sgn(:,:,:)                                              &
+                   * pdata%u(ibz,ib:ie,jb:je,kb:ke) * grad(3,ib:ie,jb:je,kb:ke)
+        inarr(15) = inarr(15) + sum(tmp(:,:,:)) * dvol
+#endif /* NDIMS == 3 */
+
+! compression
+!
+        tmp(:,:,:) = - sgn(:,:,:)                                              &
+                   * pdata%u(ibx,ib:ie,jb:je,kb:ke) * grad(1,ib:ie,jb:je,kb:ke)
+        inarr(16) = inarr(16) + sum(tmp(:,:,:)) * dvol
+        call derivative_1st(2, dh(2), pdata%u(ivy,:,:,:), grad(2,:,:,:))
+        tmp(:,:,:) = - sgn(:,:,:)                                              &
+                   * pdata%u(ibx,ib:ie,jb:je,kb:ke) * grad(2,ib:ie,jb:je,kb:ke)
+        inarr(17) = inarr(17) + sum(tmp(:,:,:)) * dvol
+#if NDIMS == 3
+        call derivative_1st(3, dh(3), pdata%u(ivz,:,:,:), grad(3,:,:,:))
+        tmp(:,:,:) = - sgn(:,:,:)                                              &
+                   * pdata%u(ibx,ib:ie,jb:je,kb:ke) * grad(3,ib:ie,jb:je,kb:ke)
+        inarr(18) = inarr(18) + sum(tmp(:,:,:)) * dvol
+#endif /* NDIMS == 3 */
+
+! diffusion
+!
+        if (resistivity > 0.0d+00) then
+          call derivative_2nd(1, dh(1), pdata%u(ibx,:,:,:), grad(1,:,:,:))
+          tmp(:,:,:) = resistivity * sgn(:,:,:) * grad(1,ib:ie,jb:je,kb:ke)
+          inarr(22) = inarr(22) + sum(tmp(:,:,:)) * dvol
+          call derivative_2nd(2, dh(2), pdata%u(ibx,:,:,:), grad(2,:,:,:))
+          tmp(:,:,:) = resistivity * sgn(:,:,:) * grad(2,ib:ie,jb:je,kb:ke)
+          inarr(23) = inarr(23) + sum(tmp(:,:,:)) * dvol
+#if NDIMS == 3
+          call derivative_2nd(3, dh(3), pdata%u(ibx,:,:,:), grad(3,:,:,:))
+          tmp(:,:,:) = resistivity * sgn(:,:,:) * grad(3,ib:ie,jb:je,kb:ke)
+          inarr(24) = inarr(24) + sum(tmp(:,:,:)) * dvol
+#endif /* NDIMS == 3 */
+        end if ! resistivity > 0
+      end if ! ibx > 0
 
 ! get the inflow speed
 !
       if (pdata%meta%ymin == ymin) then
-        inarr(10) = inarr(10) + sum(pdata%q(ivy,ib:ie,jb,kb:ke)) * dxz
+        inarr(27) = inarr(27) + sum(pdata%q(ivy,ib:ie,jb,kb:ke)) * dxz
       end if
       if (pdata%meta%ymax == ymax) then
-        inarr(11) = inarr(11) + sum(pdata%q(ivy,ib:ie,je,kb:ke)) * dxz
+        inarr(28) = inarr(28) - sum(pdata%q(ivy,ib:ie,je,kb:ke)) * dxz
       end if
 
 ! associate the pointer with the next block on the list
@@ -519,7 +614,7 @@ module integrals
                                             , avarr(5), mnarr(5), mxarr(5)     &
                                             , avarr(6), mnarr(6), mxarr(6)     &
                                             , avarr(7), mnarr(7), mxarr(7)
-      write(runit,"(i9, 3(1x,1e18.8e3))") step, time, inarr(10:11)
+      write(runit,"(i9, 19e18.8e3)") step, time, inarr(11:28)
     end if
 
 #ifdef PROFILE
