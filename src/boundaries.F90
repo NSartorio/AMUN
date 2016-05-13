@@ -5051,6 +5051,9 @@ module boundaries
 
             qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
             qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+            if (ibx > 0) then
+              qn(ibx ,it,jl:ju,kl:ku) = - qn(ibx ,is,jl:ju,kl:ku)
+            end if
           end do
         else
           do i = 1, ng
@@ -5059,6 +5062,9 @@ module boundaries
 
             qn(1:nv,it,jl:ju,kl:ku) =   qn(1:nv,is,jl:ju,kl:ku)
             qn(ivx ,it,jl:ju,kl:ku) = - qn(ivx ,is,jl:ju,kl:ku)
+            if (ibx > 0) then
+              qn(ibx ,it,jl:ju,kl:ku) = - qn(ibx ,is,jl:ju,kl:ku)
+            end if
           end do
         end if
 
@@ -5145,6 +5151,9 @@ module boundaries
 
             qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
             qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+            if (iby > 0) then
+              qn(iby ,il:iu,jt,kl:ku) = - qn(iby ,il:iu,js,kl:ku)
+            end if
           end do
         else
           do j = 1, ng
@@ -5153,6 +5162,9 @@ module boundaries
 
             qn(1:nv,il:iu,jt,kl:ku) =   qn(1:nv,il:iu,js,kl:ku)
             qn(ivy ,il:iu,jt,kl:ku) = - qn(ivy ,il:iu,js,kl:ku)
+            if (iby > 0) then
+              qn(iby ,il:iu,jt,kl:ku) = - qn(iby ,il:iu,js,kl:ku)
+            end if
           end do
         end if
 
@@ -5235,6 +5247,9 @@ module boundaries
 
             qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
             qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+            if (ibz > 0) then
+              qn(ibz ,il:iu,jl:ju,kt) = - qn(ibz ,il:iu,jl:ju,ks)
+            end if
           end do
         else
           do k = 1, ng
@@ -5243,6 +5258,9 @@ module boundaries
 
             qn(1:nv,il:iu,jl:ju,kt) =   qn(1:nv,il:iu,jl:ju,ks)
             qn(ivz ,il:iu,jl:ju,kt) = - qn(ivz ,il:iu,jl:ju,ks)
+            if (ibz > 0) then
+              qn(ibz ,il:iu,jl:ju,kt) = - qn(ibz ,il:iu,jl:ju,ks)
+            end if
           end do
         end if
 
