@@ -42,7 +42,7 @@ module algebra
   public :: quadratic, quadratic_normalized
   public :: cubic, cubic_normalized
   public :: quartic
-  public :: tridiag
+  public :: tridiag, invert
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -1155,6 +1155,137 @@ module algebra
 !-------------------------------------------------------------------------------
 !
   end subroutine tridiag
+!
+!===============================================================================
+!
+! subroutine INVERT:
+! -----------------
+!
+!   Subroutine inverts the squared matrix.
+!
+!   Arguments:
+!
+!     n      - the size of the matrix;
+!     m(:,:) - the matrix elements;
+!     r(:,:) - the inverted matrix elements;
+!     f      - the solution flag;
+!
+!   References:
+!
+!     [1] Press, W. H, Teukolsky, S. A., Vetterling, W. T., Flannery, B. P.,
+!         "Numerical Recipes in Fortran",
+!         Cambridge University Press, Cambridge, 1992
+!
+!===============================================================================
+!
+  subroutine invert(n, m, r, f)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer                      , intent(in)  :: n
+    real(kind=16), dimension(n,n), intent(in)  :: m
+    real(kind=16), dimension(n,n), intent(out) :: r
+    logical                      , intent(out) :: f
+
+! local variables
+!
+    logical                         :: flag = .true.
+    integer                         :: i, j, k, l
+    real(kind=16)                   :: t
+    real(kind=16), dimension(n,2*n) :: g
+!
+!-------------------------------------------------------------------------------
+!
+! augment input matrix with an identity matrix
+!
+    do i = 1, n
+      do j = 1, 2 * n
+        if (j <= n) then
+          g(i,j) = m(i,j)
+        else if ((i+n) == j) then
+          g(i,j) = 1.0d+00
+        else
+          g(i,j) = 0.0d+00
+        end if
+      end do
+    end do
+
+! reduce augmented matrix to upper traingular form
+!
+    do k = 1, n - 1
+      if (g(k,k) == 0.0d+00) then
+        flag = .false.
+        do i = k + 1, n
+          if (g(i,k) /= 0.0d+00) then
+            do j = 1, 2 * n
+              g(k,j) = g(k,j) + g(i,j)
+            end do
+            flag = .true.
+            exit
+          end if
+
+          if (flag .eqv. .false.) then
+            r(:,:) = 0.0d+00
+            f      = .false.
+            return
+          end if
+        end do
+      end if
+      do j = k + 1, n
+        t = g(j,k) / g(k,k)
+        do i = k, 2 * n
+          g(j,i) = g(j,i) - t * g(k,i)
+        end do
+      end do
+    end do
+
+! test for invertibility
+!
+    do i = 1, n
+      if (g(i,i) == 0.0d+00) then
+        r(:,:) = 0.0d+00
+        f = .false.
+        return
+      end if
+    end do
+
+! make diagonal elements as 1
+!
+    do i = 1, n
+      t = g(i,i)
+      do j = i , 2 * n
+        g(i,j) = g(i,j) / t
+      end do
+    end do
+
+! reduced right side half of augmented matrix to identity matrix
+!
+    do k = n - 1, 1, -1
+      do i = 1, k
+        t = g(i,k+1)
+        do j = k, 2 * n
+          g(i,j) = g(i,j) - g(k+1,j) * t
+        end do
+      end do
+    end do
+
+! store answer
+!
+    do i = 1, n
+      do j = 1, n
+        r(i,j) = g(i,j+n)
+      end do
+    end do
+
+    f = .true.
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine invert
 
 !===============================================================================
 !
