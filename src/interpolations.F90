@@ -68,6 +68,18 @@ module interpolations
 !
   integer     , save :: ng         = 2
 
+! number of cells used in the Gaussian process reconstruction
+!
+  integer     , save :: ngp        = 5
+
+! normal distribution width in the Gaussian process reconstruction
+!
+  real(kind=8), save :: sgp        = 1.0d+01
+
+! Gaussian process reconstruction coefficients vector
+!
+  real(kind=8), dimension(:)  , allocatable, save :: cgp
+
 ! flags for reconstruction corrections
 !
   logical     , save :: positivity = .false.
@@ -127,6 +139,7 @@ module interpolations
     character(len=255) :: name_tlim       = ""
     character(len=255) :: name_plim       = ""
     character(len=255) :: name_clim       = ""
+    character(len= 16) :: stmp
     real(kind=8)       :: cfl             = 0.5d+00
 !
 !-------------------------------------------------------------------------------
@@ -153,6 +166,8 @@ module interpolations
     call get_parameter_string ("extrema_limiter"     , climiter       )
     call get_parameter_string ("prolongation_limiter", plimiter       )
     call get_parameter_integer("nghosts"             , ng             )
+    call get_parameter_integer("ngp"                 , ngp            )
+    call get_parameter_real   ("sgp"                 , sgp            )
     call get_parameter_real   ("eps"                 , eps            )
     call get_parameter_real   ("limo3_rad"           , rad            )
     call get_parameter_real   ("kappa"               , kappa          )
@@ -239,6 +254,26 @@ module interpolations
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
+    case ("gp", "GP")
+      write(stmp, '(f16.1)') sgp
+      write(name_rec, '("Gaussian Process (",i1,"-point, δ=",a,")")') ngp      &
+                                                         , trim(adjustl(stmp))
+
+! allocate the Gaussian process reconstruction matrix and position vector
+!
+      allocate(cgp(ngp))
+
+! prepare matrix coefficients
+!
+      call prepare_gp()
+
+      reconstruct_states => reconstruct_gp
+      if (verbose .and. 2 * ng <= ngp - 1)                                     &
+                  call print_warning("interpolations:initialize_interpolation" &
+                 , "Increase the number of ghost cells (at least (ngp+1)/2).")
+      if (verbose .and. mod(ngp,2) == 0)                                       &
+                  call print_warning("interpolations:initialize_interpolation" &
+                      , "The parameter ngp has to be integer with odd value.")
     case default
       if (verbose) then
         write (*,"(1x,a)") "The selected reconstruction method is not " //     &
@@ -378,6 +413,10 @@ module interpolations
 !
     call start_timer(imi)
 #endif /* PROFILE */
+
+! deallocate Gaussian process reconstruction coefficient vector if used
+!
+    if (allocated(cgp)) deallocate(cgp)
 
 ! release the procedure pointers
 !
@@ -3284,6 +3323,273 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crmp5ld
+!
+!===============================================================================
+!
+! subroutine PREPARE_GP:
+! ---------------------
+!
+!   Subroutine prepares matrixes for the Gaussian Process (GP) method.
+!
+!===============================================================================
+!
+  subroutine prepare_gp()
+
+! include external procedures
+!
+    use algebra   , only : invert
+    use constants , only : pi
+    use error     , only : print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    logical       :: flag
+    integer       :: i, j
+    real(kind=16) :: sig, z, fc
+
+! local arrays for derivatives
+!
+    real(kind=16), dimension(:,:), allocatable :: cov, mgp
+    real(kind=16), dimension(:)  , allocatable :: xgp
+!
+!-------------------------------------------------------------------------------
+!
+! calculate normal distribution sigma
+!
+    sig = sqrt(2.0d+00) * sgp
+
+! allocate the convariance matrix and interpolation position vector
+!
+    allocate(cov(ngp,ngp))
+    allocate(mgp(ngp,ngp))
+    allocate(xgp(ngp))
+
+! prepare the covariance matrix
+!
+    fc = 0.5d+00 * sqrt(pi) * sig
+    do i = 1, ngp
+      do j = 1, ngp
+          z = (1.0d+00 * (i - j) + 0.5d+00) / sig
+          cov(i,j) = erf(z)
+          z = (1.0d+00 * (i - j) - 0.5d+00) / sig
+          cov(i,j) = fc * (cov(i,j) - erf(z))
+      end do
+    end do
+
+! invert the matrix
+!
+    call invert(ngp, cov(1:ngp,1:ngp), mgp(1:ngp,1:ngp), flag)
+
+! prepare the interpolation position vector
+!
+    do i = 1, ngp
+      z = (0.5d+00 * (2 * i - 2 - ngp)) / sig
+      xgp(i) = exp(- z**2)
+    end do
+
+! prepare the interpolation coefficients vector
+!
+    cgp(1:ngp) = matmul(xgp(1:ngp), mgp(1:ngp,1:ngp))
+
+! deallocate the convariance matrix and interpolation position vector
+!
+    deallocate(cov)
+    deallocate(mgp)
+    deallocate(xgp)
+
+! check if the matrix was inverted successfully
+!
+    if (.not. flag) then
+      call print_error("interpolations::prepare_gp"                            &
+                                     , "Could not invert covariance matrix!")
+      stop
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine prepare_gp
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_GP:
+! -------------------------
+!
+!   Subroutine reconstructs the interface states using the fifth order
+!   Gaussian Process (GP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!===============================================================================
+!
+  subroutine reconstruct_gp(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer      :: i, im1, ip1, im2, ip2, j, m
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+    real(kind=8) :: sigma
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: dfm, dfp
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the left and right derivatives
+!
+    do i = 1, n - 1
+      ip1      = i + 1
+      dfp(i  ) = f(ip1) - f(i)
+      dfm(ip1) = dfp(i)
+    end do
+    dfm(1) = dfp(1)
+    dfp(n) = dfm(n)
+
+! obtain the face values using high order interpolation
+!
+    m = (ngp - 1) / 2
+    do i = 2, m
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
+                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
+                                                                     / 6.0d+01
+      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
+                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
+                                                                     / 6.0d+01
+    end do ! i = 2, m
+
+    do i = n - m + 1, n - 1
+      im2 = max(1, i - 2)
+      im1 = i - 1
+      ip1 = i + 1
+      ip2 = min(n, i + 2)
+
+      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
+                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
+                                                                     / 6.0d+01
+      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
+                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
+                                                                     / 6.0d+01
+    end do ! i = n - m + 1, n - 1
+
+    do i = 1 + m, n - m
+
+      im2 = i - m
+      ip2 = i + m
+
+      fl(i)  = sum(cgp(1:ngp) * f(im2:ip2   ))
+      fr(i)  = sum(cgp(1:ngp) * f(ip2:im2:-1))
+
+    end do ! i = 1 + m, n - m
+
+! apply monotonicity preserving limiting
+!
+    do i = 2, n - 1
+
+      im1 = i - 1
+      ip1 = i + 1
+
+      if (dfm(i) * dfp(i) >= 0.0d+00) then
+        sigma = kappa
+      else
+        sigma = kbeta
+      end if
+
+! get the limiting condition for the left state
+!
+      df    = sigma * dfm(i)
+      fmp   = f(i) + minmod(dfp(i), df)
+      ds    = (fl(i) - f(i)) * (fl(i) - fmp)
+
+! limit the left state
+!
+      if (ds > eps) then
+
+        dm1   = dfp(im1) - dfm(im1)
+        dc0   = dfp(i  ) - dfm(i  )
+        dp1   = dfp(ip1) - dfm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df     + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        fl(i) = median(fl(i), fmn, fmx)
+
+      end if
+
+! get the limiting condition for the right state
+!
+      df    = sigma * dfp(i)
+      fmp   = f(i) - minmod(dfm(i), df)
+      ds    = (fr(i) - f(i)) * (fr(i) - fmp)
+
+! limit the right state
+!
+      if (ds > eps) then
+
+        dm1 = dfp(im1) - dfm(im1)
+        dc0 = dfp(i  ) - dfm(i  )
+        dp1 = dfp(ip1) - dfm(ip1)
+        dc4 = 4.0d+00 * dc0
+
+        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
+        ful   = f(i) -           df
+        flc   = f(i) - 0.5d+00 * df     + dmr
+
+        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
+
+        fr(i) = median(fr(i), fmn, fmx)
+
+      end if
+
+! shift the right state
+!
+      fr(im1) = fr(i)
+
+    end do ! n = 2, n - 1
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (f(1) + f(2))
+    fr(i) = 0.5d+00 * (f(i) + f(n))
+    fl(n) = f(n)
+    fr(n) = f(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_gp
 !
 !===============================================================================
 !
