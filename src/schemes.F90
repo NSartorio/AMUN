@@ -622,6 +622,65 @@ module schemes
 !
 !===============================================================================
 !
+! subroutine RECONSTRUCT_INTERFACES:
+! ---------------------------------
+!
+!   Subroutine reconstructs the Riemann states using 3D reconstruction methods.
+!
+!   Arguments:
+!
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     qi   - the array of reconstructed states (2 in each direction);
+!
+!===============================================================================
+!
+  subroutine reconstruct_interfaces(dx, q, qi)
+
+! include external procedures
+!
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv, idn, ipr
+    use interpolations , only : interfaces
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8), dimension(NDIMS)              , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km)        , intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS), intent(out) :: qi
+
+! local variables
+!
+    logical                        :: positive
+    integer                        :: p
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all variables
+!
+    do p = 1, nv
+
+! determine if the variable is positive
+!
+      positive = (p == idn .or. p == ipr)
+
+! interpolate interfaces
+!
+      call interfaces(positive, dx(1:NDIMS), q (p,1:im,1:jm,1:km),             &
+                                             qi(p,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+    end do ! p = 1, nv
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_interfaces
+!
+!===============================================================================
+!
 !***** ISOTHERMAL HYDRODYNAMICS *****
 !
 !===============================================================================
@@ -687,8 +746,8 @@ module schemes
 
 ! reconstruct interfaces
 !
-    call reconstruct_states_1d(dx(:), q (1:nv,1:im,1:jm,1:km)                  &
-                                    , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !
@@ -1179,8 +1238,8 @@ module schemes
 
 ! reconstruct interfaces
 !
-    call reconstruct_states_1d(dx(:), q (1:nv,1:im,1:jm,1:km)                  &
-                                    , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !

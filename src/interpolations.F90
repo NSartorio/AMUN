@@ -49,6 +49,7 @@ module interpolations
 
 ! pointers to the reconstruction and limiter procedures
 !
+  procedure(interfaces_tvd)    , pointer, save :: interfaces         => null()
   procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
   procedure(limiter_zero)      , pointer, save :: limiter_tvd        => null()
   procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
@@ -92,7 +93,7 @@ module interpolations
 ! declare public subroutines
 !
   public :: initialize_interpolations, finalize_interpolations
-  public :: reconstruct, limiter_prol
+  public :: interfaces, reconstruct, limiter_prol
   public :: fix_positivity
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -177,6 +178,10 @@ module interpolations
 ! calculate κ = (1 - ν) / ν
 !
     kappa = min(kappa, (1.0d+00 - cfl) / cfl)
+
+! select the interface reconstruction method
+!
+    interfaces => interfaces_tvd
 
 ! select the reconstruction method
 !
@@ -434,6 +439,125 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_interpolations
+!
+!===============================================================================
+!
+! subroutine INTERFACES_TVD:
+! -------------------------
+!
+!   Subroutine reconstructs both side interfaces of variable using TVD methods.
+!
+!   Arguments:
+!
+!     positive - the variable positivity flag;
+!     h        - the spatial step;
+!     q        - the variable array;
+!     qi       - the array of reconstructed interfaces (2 in each direction);
+!
+!===============================================================================
+!
+  subroutine interfaces_tvd(positive, h, q, qi)
+
+! include external procedures
+!
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb , ie , je , ke
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    logical                                  , intent(in)  :: positive
+    real(kind=8), dimension(NDIMS)           , intent(in)  :: h
+    real(kind=8), dimension(im,jm,km)        , intent(in)  :: q
+    real(kind=8), dimension(im,jm,km,2,NDIMS), intent(out) :: qi
+
+! local variables
+!
+    integer                        :: i, im1, ip1
+    integer                        :: j, jm1, jp1
+    integer                        :: k, km1, kp1
+    real(kind=8), dimension(NDIMS) :: dql, dqr, dq
+!
+!-------------------------------------------------------------------------------
+!
+! copy ghost zones
+!
+    do k = 1, NDIMS
+      do j = 1, 2
+        qi( 1:ib, 1:jm, 1:km,j,k) = q( 1:ib, 1:jm, 1:km)
+        qi(ie:im, 1:jm, 1:km,j,k) = q(ie:im, 1:jm, 1:km)
+        qi(ib:ie, 1:jb, 1:km,j,k) = q(ib:ie, 1:jb, 1:km)
+        qi(ib:ie,je:jm, 1:km,j,k) = q(ib:ie,je:jm, 1:km)
+#if NDIMS == 3
+        qi(ib:ie,jb:je, 1:kb,j,k) = q(ib:ie,jb:je, 1:kb)
+        qi(ib:ie,jb:je,ke:km,j,k) = q(ib:ie,jb:je,ke:km)
+#endif /* NDIMS == 3 */
+      end do
+    end do
+
+! interpolate interfaces
+!
+    do k = kbl, keu
+#if NDIMS == 3
+      km1 = k - 1
+      kp1 = k + 1
+#endif /* NDIMS == 3 */
+      do j = jbl, jeu
+        jm1 = j - 1
+        jp1 = j + 1
+        do i = ibl, ieu
+          im1 = i - 1
+          ip1 = i + 1
+
+! calculate the TVD derivatives
+!
+          dql(1) = q(i  ,j,k) - q(im1,j,k)
+          dqr(1) = q(ip1,j,k) - q(i  ,j,k)
+          dq (1) = limiter_tvd(0.5d+00, dql(1), dqr(1))
+
+          dql(2) = q(i,j  ,k) - q(i,jm1,k)
+          dqr(2) = q(i,jp1,k) - q(i,j  ,k)
+          dq (2) = limiter_tvd(0.5d+00, dql(2), dqr(2))
+
+#if NDIMS == 3
+          dql(3) = q(i,j,k  ) - q(i,j,km1)
+          dqr(3) = q(i,j,kp1) - q(i,j,k  )
+          dq (3) = limiter_tvd(0.5d+00, dql(3), dqr(3))
+#endif /* NDIMS == 3 */
+
+! limit the derivatives if they produce negative interpolation for positive
+! variables
+!
+          if (positive) then
+            if (q(i,j,k) <= sum(abs(dq(1:NDIMS)))) then
+              dq(:) = 0.0d+00
+            end if
+          end if
+
+! interpolate states
+!
+          qi(i  ,j,k,1,1) = q(i,j,k) + dq(1)
+          qi(im1,j,k,2,1) = q(i,j,k) - dq(1)
+
+          qi(i,j  ,k,1,2) = q(i,j,k) + dq(2)
+          qi(i,jm1,k,2,2) = q(i,j,k) - dq(2)
+
+#if NDIMS == 3
+          qi(i,j,k  ,1,3) = q(i,j,k) + dq(3)
+          qi(i,j,km1,2,3) = q(i,j,k) - dq(3)
+#endif /* NDIMS == 3 */
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine interfaces_tvd
 !
 !===============================================================================
 !
