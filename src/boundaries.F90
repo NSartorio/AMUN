@@ -5443,7 +5443,7 @@ module boundaries
     use coordinates    , only : in , jn , kn
     use coordinates    , only : im , jm , km
     use coordinates    , only : faces_dp
-    use equations      , only : nv
+    use equations      , only : nv, idn, ipr
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -5467,8 +5467,11 @@ module boundaries
     integer      :: im1, jm1, km1
     integer      :: ip1, jp1, kp1
     real(kind=8) :: dql, dqr
-    real(kind=8) :: dqx, dqy, dqz
     real(kind=8) :: dq1, dq2, dq3, dq4
+
+! local arrays
+!
+    real(kind=8), dimension(3) :: dq
 !
 !-------------------------------------------------------------------------------
 !
@@ -5505,24 +5508,32 @@ module boundaries
 
 ! calculate limited derivatives in all directions
 !
-            dql = qn(p,i  ,j,k) - qn(p,im1,j,k)
-            dqr = qn(p,ip1,j,k) - qn(p,i  ,j,k)
-            dqx = limiter_prol(0.25d+00, dql, dqr)
+            dql   = qn(p,i  ,j,k) - qn(p,im1,j,k)
+            dqr   = qn(p,ip1,j,k) - qn(p,i  ,j,k)
+            dq(1) = limiter_prol(0.5d+00, dql, dqr)
 
-            dql = qn(p,i,j  ,k) - qn(p,i,jm1,k)
-            dqr = qn(p,i,jp1,k) - qn(p,i,j  ,k)
-            dqy = limiter_prol(0.25d+00, dql, dqr)
+            dql   = qn(p,i,j  ,k) - qn(p,i,jm1,k)
+            dqr   = qn(p,i,jp1,k) - qn(p,i,j  ,k)
+            dq(2) = limiter_prol(0.5d+00, dql, dqr)
 
-            dql = qn(p,i,j,k  ) - qn(p,i,j,km1)
-            dqr = qn(p,i,j,kp1) - qn(p,i,j,k  )
-            dqz = limiter_prol(0.25d+00, dql, dqr)
+            dql   = qn(p,i,j,k  ) - qn(p,i,j,km1)
+            dqr   = qn(p,i,j,kp1) - qn(p,i,j,k  )
+            dq(3) = limiter_prol(0.5d+00, dql, dqr)
+
+            if (p == idn .or. p == ipr) then
+              do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
+                dq(:) = 0.5d+00 * dq(:)
+              end do
+            end if
+
+            dq(:) = 0.5d+00 * dq(:)
 
 ! calculate the derivative terms
 !
-            dq1 = dqx + dqy + dqz
-            dq2 = dqx - dqy - dqz
-            dq3 = dqx - dqy + dqz
-            dq4 = dqx + dqy - dqz
+            dq1 = dq(1) + dq(2) + dq(3)
+            dq2 = dq(1) - dq(2) - dq(3)
+            dq3 = dq(1) - dq(2) + dq(3)
+            dq4 = dq(1) + dq(2) - dq(3)
 
 ! prolong the face region to the output array
 !
