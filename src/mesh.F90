@@ -1124,16 +1124,16 @@ module mesh
 
             dul   = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
             dur   = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
-            du(1) = limiter_prol(0.25d+00, dul, dur)
+            du(1) = limiter_prol(0.5d+00, dul, dur)
 
             dul   = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
             dur   = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
-            du(2) = limiter_prol(0.25d+00, dul, dur)
+            du(2) = limiter_prol(0.5d+00, dul, dur)
 
 #if NDIMS == 3
             dul   = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
             dur   = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
-            du(3) = limiter_prol(0.25d+00, dul, dur)
+            du(3) = limiter_prol(0.5d+00, dul, dur)
 #endif /* NDIMS == 3 */
 
             if (p == idn .or. p == ien) then
@@ -1141,6 +1141,8 @@ module mesh
                 du(:) = 0.5d+00 * du(:)
               end do
             end if
+
+            du(:) = 0.5d+00 * du(:)
 
 #if NDIMS == 2
             du1 = du(1) + du(2)
