@@ -533,9 +533,9 @@ module interpolations
 ! variables
 !
           if (positive) then
-            if (q(i,j,k) <= sum(abs(dq(1:NDIMS)))) then
-              dq(:) = 0.0d+00
-            end if
+            do while (q(i,j,k) <= sum(abs(dq(1:NDIMS))))
+              dq(:) = 0.5d+00 * dq(:)
+            end do
           end if
 
 ! interpolate states
