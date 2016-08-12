@@ -1036,7 +1036,7 @@ module mesh
     use blocks         , only : block_meta, block_data, nchildren
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ib, ie, jb, je, kb, ke
-    use equations      , only : nv
+    use equations      , only : nv, idn, ien
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -1052,7 +1052,7 @@ module mesh
     integer      :: i, j, k, q, p
     integer      :: il, iu, jl, ju, kl, ku
     integer      :: ic, jc, kc, ip, jp, kp
-    real(kind=8) :: dul, dur, dux, duy, duz, du1, du2, du3, du4
+    real(kind=8) :: dul, dur, du1, du2, du3, du4
 
 ! local pointers
 !
@@ -1061,7 +1061,8 @@ module mesh
 
 ! local arrays
 !
-    integer, dimension(3) :: dm
+    integer     , dimension(3)     :: dm
+    real(kind=8), dimension(NDIMS) :: du
 
 ! local allocatable arrays
 !
@@ -1121,34 +1122,41 @@ module mesh
 
           do p = 1, nv
 
-            dul = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
-            dur = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
-            dux = limiter_prol(0.25d+00, dul, dur)
+            dul   = pdata%u(p,i  ,j,k) - pdata%u(p,i-1,j,k)
+            dur   = pdata%u(p,i+1,j,k) - pdata%u(p,i  ,j,k)
+            du(1) = limiter_prol(0.25d+00, dul, dur)
 
-            dul = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
-            dur = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
-            duy = limiter_prol(0.25d+00, dul, dur)
+            dul   = pdata%u(p,i,j  ,k) - pdata%u(p,i,j-1,k)
+            dur   = pdata%u(p,i,j+1,k) - pdata%u(p,i,j  ,k)
+            du(2) = limiter_prol(0.25d+00, dul, dur)
 
 #if NDIMS == 3
-            dul = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
-            dur = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
-            duz = limiter_prol(0.25d+00, dul, dur)
+            dul   = pdata%u(p,i,j,k  ) - pdata%u(p,i,j,k-1)
+            dur   = pdata%u(p,i,j,k+1) - pdata%u(p,i,j,k  )
+            du(3) = limiter_prol(0.25d+00, dul, dur)
 #endif /* NDIMS == 3 */
 
+            if (p == idn .or. p == ien) then
+              do while (pdata%u(p,i,j,k) <= sum(abs(du(1:NDIMS))))
+                du(:) = 0.5d+00 * du(:)
+              end do
+            end if
+
 #if NDIMS == 2
-            du1 = dux + duy
-            du2 = dux - duy
+            du1 = du(1) + du(2)
+            du2 = du(1) - du(2)
             u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
             u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
             u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du2
             u(p,ip,jp,kc) = pdata%u(p,i,j,k) + du1
+
 #endif /* NDIMS == 2 */
 
 #if NDIMS == 3
-            du1 = dux + duy + duz
-            du2 = dux - duy - duz
-            du3 = dux - duy + duz
-            du4 = dux + duy - duz
+            du1 = du(1) + du(2) + du(3)
+            du2 = du(1) - du(2) - du(3)
+            du3 = du(1) - du(2) + du(3)
+            du4 = du(1) + du(2) - du(3)
             u(p,ic,jc,kc) = pdata%u(p,i,j,k) - du1
             u(p,ip,jc,kc) = pdata%u(p,i,j,k) + du2
             u(p,ic,jp,kc) = pdata%u(p,i,j,k) - du3
