@@ -179,27 +179,26 @@ module interpolations
 !
     kappa = min(kappa, (1.0d+00 - cfl) / cfl)
 
-! select the interface reconstruction method
-!
-    interfaces => interfaces_tvd
-
 ! select the reconstruction method
 !
     select case(trim(sreconstruction))
     case ("tvd", "TVD")
       name_rec           =  "2nd order TVD"
+      interfaces         => interfaces_tvd
       reconstruct_states => reconstruct_tvd
       if (verbose .and. ng < 2)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 2).")
     case ("weno3", "WENO3")
       name_rec           =  "3rd order WENO"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno3
       if (verbose .and. ng < 2)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 2).")
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_limo3
       if (verbose .and. ng < 2)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
@@ -207,54 +206,63 @@ module interpolations
       eps = max(1.0d-12, eps)
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5z
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("weno5yc", "weno5-yc", "WENO5YC", "WENO5-YC")
       name_rec           =  "5th order WENO-YC (Yamaleev & Carpenter 2009)"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5yc
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("weno5ns", "weno5-ns", "WENO5NS", "WENO5-NS")
       name_rec           =  "5th order WENO-NS (Ha et al. 2013)"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5ns
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("crweno5z", "crweno5-z", "CRWENO5Z", "CRWENO5-Z")
       name_rec           =  "5th order Compact WENO-Z"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5z
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("crweno5yc", "crweno5-yc", "CRWENO5YC", "CRWENO5-YC")
       name_rec           =  "5th order Compact WENO-YC"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5yc
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("crweno5ns", "crweno5-ns", "CRWENO5NS", "CRWENO5-NS")
       name_rec           =  "5th order Compact WENO-NS"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5ns
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("mp5", "MP5")
       name_rec           =  "5th order Monotonicity Preserving"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_mp5
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("crmp5", "CRMP5")
       name_rec           =  "5th order Compact Monotonicity Preserving"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crmp5
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
     case ("crmp5l", "crmp5ld", "CRMP5L", "CRMP5LD")
       name_rec           =  "5th order Low-Dissipation Compact Monotonicity Preserving"
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crmp5ld
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
@@ -272,6 +280,7 @@ module interpolations
 !
       call prepare_gp()
 
+      interfaces         => interfaces_dir
       reconstruct_states => reconstruct_gp
       if (verbose .and. 2 * ng <= ngp - 1)                                     &
                   call print_warning("interpolations:initialize_interpolation" &
@@ -558,6 +567,113 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine interfaces_tvd
+!
+!===============================================================================
+!
+! subroutine INTERFACES_DIR:
+! -------------------------
+!
+!   Subroutine reconstructs both side interfaces of variable separately
+!   along each direction.
+!
+!   Arguments:
+!
+!     positive - the variable positivity flag;
+!     h        - the spatial step;
+!     q        - the variable array;
+!     qi       - the array of reconstructed interfaces (2 in each direction);
+!
+!===============================================================================
+!
+  subroutine interfaces_dir(positive, h, q, qi)
+
+! include external procedures
+!
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ib , jb , kb , ie , je , ke
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    logical                                  , intent(in)  :: positive
+    real(kind=8), dimension(NDIMS)           , intent(in)  :: h
+    real(kind=8), dimension(im,jm,km)        , intent(in)  :: q
+    real(kind=8), dimension(im,jm,km,2,NDIMS), intent(out) :: qi
+
+! local variables
+!
+    integer :: i, j, k
+!
+!-------------------------------------------------------------------------------
+!
+! copy ghost zones
+!
+    do k = 1, NDIMS
+      do j = 1, 2
+        qi( 1:ib, 1:jm, 1:km,j,k) = q( 1:ib, 1:jm, 1:km)
+        qi(ie:im, 1:jm, 1:km,j,k) = q(ie:im, 1:jm, 1:km)
+        qi(ib:ie, 1:jb, 1:km,j,k) = q(ib:ie, 1:jb, 1:km)
+        qi(ib:ie,je:jm, 1:km,j,k) = q(ib:ie,je:jm, 1:km)
+#if NDIMS == 3
+        qi(ib:ie,jb:je, 1:kb,j,k) = q(ib:ie,jb:je, 1:kb)
+        qi(ib:ie,jb:je,ke:km,j,k) = q(ib:ie,jb:je,ke:km)
+#endif /* NDIMS == 3 */
+      end do
+    end do
+
+! interpolate interfaces
+!
+    do k = kbl, keu
+      do j = jbl, jeu
+        call reconstruct(im, h(1), q(1:im,j,k)                                 &
+                                         , qi(1:im,j,k,1,1), qi(1:im,j,k,2,1))
+      end do ! j = jbl, jeu
+      do i = ibl, ieu
+        call reconstruct(jm, h(2), q(i,1:jm,k)                                 &
+                                         , qi(i,1:jm,k,1,2), qi(i,1:jm,k,2,2))
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
+#if NDIMS == 3
+    do j = jbl, jeu
+      do i = ibl, ieu
+        call reconstruct(km, h(3), q(i,j,1:km)                                 &
+                                         , qi(i,j,1:km,1,3), qi(i,j,1:km,2,3))
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
+
+! make sure the interface states are positive for positive variables
+!
+    if (positive) then
+
+      do k = kbl, keu
+        do j = jbl, jeu
+          call fix_positivity(im, q(1:im,j,k)                                  &
+                                         , qi(1:im,j,k,1,1), qi(1:im,j,k,2,1))
+        end do ! j = jbl, jeu
+        do i = ibl, ieu
+          call fix_positivity(jm, q(i,1:jm,k)                                  &
+                                         , qi(i,1:jm,k,1,2), qi(i,1:jm,k,2,2))
+        end do ! i = ibl, ieu
+      end do ! k = kbl, keu
+#if NDIMS == 3
+      do j = jbl, jeu
+        do i = ibl, ieu
+          call fix_positivity(km, q(i,j,1:km)                                  &
+                                         , qi(i,j,1:km,1,3), qi(i,j,1:km,2,3))
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
+
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine interfaces_dir
 !
 !===============================================================================
 !
