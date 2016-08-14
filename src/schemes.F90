@@ -560,68 +560,6 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine RECONSTRUCT_STATES_1D:
-! --------------------------------
-!
-!   Subroutine reconstructs the Riemann states dimension by dimension
-!   using 1D reconstruction methods.
-!
-!   Arguments:
-!
-!     dx   - the spatial step;
-!     q    - the array of primitive variables;
-!     qs   - the array of reconstructed states (2 in each direction);
-!
-!===============================================================================
-!
-  subroutine reconstruct_states_1d(dx, q, qs)
-
-! include external procedures
-!
-    use coordinates    , only : im, jm, km, ibl, jbl, kbl, ieu, jeu, keu
-    use equations      , only : nv
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    real(kind=8), dimension(NDIMS)              , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km)        , intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km,2,NDIMS), intent(out) :: qs
-
-! local variables
-!
-    integer                        :: i, j, k
-!
-!-------------------------------------------------------------------------------
-!
-    do k = kbl, keu
-      do j = jbl, jeu
-        call states(im, dx(1), q(1:nv,1:im,j,k)                                &
-                             , qs(1:nv,1:im,j,k,1,1), qs(1:nv,1:im,j,k,2,1))
-      end do ! j = jbl, jeu
-      do i = ibl, ieu
-        call states(jm, dx(2), q(1:nv,i,1:jm,k)                                &
-                             , qs(1:nv,i,1:jm,k,1,2), qs(1:nv,i,1:jm,k,2,2))
-      end do ! i = ibl, ieu
-    end do ! k = kbl, keu
-#if NDIMS == 3
-    do j = jbl, jeu
-      do i = ibl, ieu
-        call states(km, dx(3), q(1:nv,i,j,1:km)                                &
-                             , qs(1:nv,i,j,1:km,1,3), qs(1:nv,i,j,1:km,2,3))
-      end do ! i = ibl, ieu
-    end do ! j = jbl, jeu
-#endif /* NDIMS == 3 */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine reconstruct_states_1d
-!
-!===============================================================================
-!
 ! subroutine RECONSTRUCT_INTERFACES:
 ! ---------------------------------
 !
