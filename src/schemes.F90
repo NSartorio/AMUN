@@ -5535,8 +5535,7 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : idn, ipr, ibx, ibp
-    use equations      , only : cmax
+    use equations      , only : idn, ipr
     use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
@@ -5553,7 +5552,6 @@ module schemes
 ! local variables
 !
     integer      :: i, p
-    real(kind=8) :: bx, bp
 !
 !-------------------------------------------------------------------------------
 !
@@ -5568,22 +5566,6 @@ module schemes
     do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do ! p = 1, nv
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
 
 ! check if the reconstruction gives negative values of density or density,
 ! if so, correct the states
@@ -5623,7 +5605,6 @@ module schemes
 !
     use equations      , only : nv
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
-    use equations      , only : cmax
     use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
@@ -5641,7 +5622,6 @@ module schemes
 !
     integer      :: p, i
     real(kind=8) :: vm
-    real(kind=8) :: bx, bp
 
 ! local arrays
 !
@@ -5699,22 +5679,6 @@ module schemes
 
     end do ! i = 1, n
 
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
-
 ! check if the reconstruction gives negative values of density or pressure,
 ! if so, correct the states
 !
@@ -5759,7 +5723,8 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : ivx
+    use equations      , only : ivx, ibx, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -5776,6 +5741,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, srml
+    real(kind=8)                  :: bx, bp
 
 ! local arrays to store the states
 !
@@ -5790,6 +5756,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate the conserved variables of the left and right states
 !
