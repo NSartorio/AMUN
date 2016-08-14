@@ -3182,9 +3182,13 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -3198,6 +3202,11 @@ module schemes
 !
     f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
+! reconstruct interfaces
+!
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+
 !  calculate the flux along the X-direction
 !
     do k = kbl, keu
@@ -3205,23 +3214,19 @@ module schemes
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-        qx(idn,1:im) = q(idn,1:im,j,k)
-        qx(ivx,1:im) = q(ivx,1:im,j,k)
-        qx(ivy,1:im) = q(ivy,1:im,j,k)
-        qx(ivz,1:im) = q(ivz,1:im,j,k)
-        qx(ibx,1:im) = q(ibx,1:im,j,k)
-        qx(iby,1:im) = q(iby,1:im,j,k)
-        qx(ibz,1:im) = q(ibz,1:im,j,k)
-        qx(ibp,1:im) = q(ibp,1:im,j,k)
-        qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! reconstruct Riemann states
-!
-        call states(im, dx(1), qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ibx,1:im,1:2) = qs(ibx,1:im,j,k,1:2,1)
+        qx(iby,1:im,1:2) = qs(iby,1:im,j,k,1:2,1)
+        qx(ibz,1:im,1:2) = qs(ibz,1:im,j,k,1:2,1)
+        qx(ibp,1:im,1:2) = qs(ibp,1:im,j,k,1:2,1)
+        qx(ipr,1:im,1:2) = qs(ipr,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-        call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
@@ -3245,23 +3250,19 @@ module schemes
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-        qy(idn,1:jm) = q(idn,i,1:jm,k)
-        qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-        qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-        qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-        qy(ibx,1:jm) = q(iby,i,1:jm,k)
-        qy(iby,1:jm) = q(ibz,i,1:jm,k)
-        qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-        qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-        qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-        call states(jm, dx(2), qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ibx,1:jm,1:2) = qs(iby,i,1:jm,k,1:2,2)
+        qy(iby,1:jm,1:2) = qs(ibz,i,1:jm,k,1:2,2)
+        qy(ibz,1:jm,1:2) = qs(ibx,i,1:jm,k,1:2,2)
+        qy(ibp,1:jm,1:2) = qs(ibp,i,1:jm,k,1:2,2)
+        qy(ipr,1:jm,1:2) = qs(ipr,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-        call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
@@ -3286,23 +3287,19 @@ module schemes
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-        qz(idn,1:km) = q(idn,i,j,1:km)
-        qz(ivx,1:km) = q(ivz,i,j,1:km)
-        qz(ivy,1:km) = q(ivx,i,j,1:km)
-        qz(ivz,1:km) = q(ivy,i,j,1:km)
-        qz(ibx,1:km) = q(ibz,i,j,1:km)
-        qz(iby,1:km) = q(ibx,i,j,1:km)
-        qz(ibz,1:km) = q(iby,i,j,1:km)
-        qz(ibp,1:km) = q(ibp,i,j,1:km)
-        qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! reconstruct Riemann states
-!
-        call states(km, dx(3), qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ibx,1:km,1:2) = qs(ibz,i,j,1:km,1:2,3)
+        qz(iby,1:km,1:2) = qs(ibx,i,j,1:km,1:2,3)
+        qz(ibz,1:km,1:2) = qs(iby,i,j,1:km,1:2,3)
+        qz(ibp,1:km,1:2) = qs(ibp,i,j,1:km,1:2,3)
+        qz(ipr,1:km,1:2) = qs(ipr,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-        call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
