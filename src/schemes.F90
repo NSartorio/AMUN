@@ -882,9 +882,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1003,9 +1003,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1381,9 +1381,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1499,9 +1499,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1674,9 +1674,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -2093,9 +2093,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -2211,9 +2211,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -2579,9 +2579,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -2949,9 +2949,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -3405,9 +3405,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -3530,9 +3530,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -3804,9 +3804,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -4380,9 +4380,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -4912,9 +4912,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -5032,9 +5032,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -5664,9 +5664,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
