@@ -3354,8 +3354,7 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : idn, ipr, ibx, ibp
-    use equations      , only : cmax
+    use equations      , only : idn, ipr
     use interpolations , only : reconstruct, fix_positivity
 
 ! local variables are not implicit by default
@@ -3372,7 +3371,6 @@ module schemes
 ! local variables
 !
     integer      :: i, p
-    real(kind=8) :: bx, bp
 !
 !-------------------------------------------------------------------------------
 !
@@ -3387,22 +3385,6 @@ module schemes
     do p = 1, nv
       call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
     end do ! p = 1, nv
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
 
 ! check if the reconstruction gives negative values of density or density,
 ! if so, correct the states
@@ -3448,7 +3430,8 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : ivx
+    use equations      , only : ivx, ibx, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3465,6 +3448,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, srml
+    real(kind=8)                  :: bx, bp
 
 ! local arrays to store the states
 !
@@ -3479,6 +3463,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3574,6 +3574,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3590,7 +3591,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
-    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
+    real(kind=8)                  :: dn, bx, bp, b2, pt, vy, vz, by, bz, vb
 
 ! local arrays to store the states
 !
@@ -3605,6 +3606,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3848,6 +3865,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3864,7 +3882,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
-    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
+    real(kind=8)                  :: dn, bx, bp, b2, pt, vy, vz, by, bz, vb
     real(kind=8)                  :: dnl, dnr, cal, car, sml, smr
     real(kind=8)                  :: dv, dvl, dvr
 
@@ -3881,6 +3899,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -4424,6 +4458,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed, eigensystem_roe
 
 ! local variables are not implicit by default
@@ -4440,6 +4475,7 @@ module schemes
 !
     integer                        :: p, i
     real(kind=8)                   :: sdl, sdr, sds
+    real(kind=8)                   :: bx, bp
     real(kind=8)                   :: pml, pmr
     real(kind=8)                   :: xx, yy
 
@@ -4456,6 +4492,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
