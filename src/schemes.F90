@@ -57,10 +57,6 @@ module schemes
 !
   procedure(update_flux_hd_iso), pointer, save :: update_flux => null()
 
-! pointer to the state reconstruction
-!
-  procedure(states_hd_iso)     , pointer, save :: states      => null()
-
 ! pointer to the Riemann solver
 !
   procedure(riemann_hd_iso_hll), pointer, save :: riemann     => null()
@@ -157,7 +153,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_iso
-        states      => states_hd_iso
 
 ! select the Riemann solver
 !
@@ -192,7 +187,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_adi
-        states      => states_hd_adi
 
 ! select the Riemann solver
 !
@@ -247,7 +241,6 @@ module schemes
 ! set pointers to the subroutines
 !
         update_flux => update_flux_mhd_iso
-        states      => states_mhd_iso
 
 ! select the Riemann solver
 !
@@ -302,7 +295,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_mhd_adi
-        states      => states_mhd_adi
 
 ! select the Riemann solver
 !
@@ -378,9 +370,8 @@ module schemes
 !
           name_sts =  "4-vector"
 
-! set pointers to subroutines
+! set 4-vector reconstruction flag
 !
-          states   => states_srhd_adi_4vec
           states_4vec = .true.
 
 ! in the case of state variables, revert to primitive
@@ -390,10 +381,6 @@ module schemes
 ! set the state reconstruction name
 !
           name_sts =  "primitive"
-
-! set pointers to subroutines
-!
-          states   => states_srhd_adi
 
         end select
 
@@ -451,9 +438,8 @@ module schemes
 !
           name_sts =  "4-vector"
 
-! set pointers to subroutines
+! set 4-vector reconstruction flag
 !
-          states   => states_srmhd_adi_4vec
           states_4vec = .true.
 
 ! in the case of state variables, revert to primitive
@@ -463,10 +449,6 @@ module schemes
 ! set the state reconstruction name
 !
           name_sts =  "primitive"
-
-! set pointers to subroutines
-!
-          states   => states_srmhd_adi
 
         end select
 
@@ -545,7 +527,6 @@ module schemes
 ! nullify procedure pointers
 !
     nullify(update_flux)
-    nullify(states)
     nullify(riemann)
 
 #ifdef PROFILE
@@ -782,74 +763,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_iso
-!
-!===============================================================================
-!
-! subroutine STATES_HD_ISO:
-! ------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_hd_iso(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_hd_iso
 !
 !===============================================================================
 !
@@ -1280,75 +1193,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_HD_ADI:
-! ------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_hd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_hd_adi
 !
 !===============================================================================
 !
@@ -1972,74 +1816,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_mhd_iso
-!
-!===============================================================================
-!
-! subroutine STATES_MHD_ISO:
-! -------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_mhd_iso(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_mhd_iso
 !
 !===============================================================================
 !
@@ -3332,75 +3108,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_mhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_MHD_ADI:
-! -------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_mhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do ! p = 1, nv
-
-! check if the reconstruction gives negative values of density or density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_mhd_adi
 !
 !===============================================================================
 !
@@ -4856,183 +4563,6 @@ module schemes
 !
 !===============================================================================
 !
-! subroutine STATES_SRHD_ADI:
-! --------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRHD_ADI_4VEC:
-! -------------------------------
-!
-!   Subroutine reconstructs the Riemann states using the 4-velocity vector.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srhd_adi_4vec(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ivx, ivy, ivz
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: p, i
-    real(kind=8) :: vm
-
-! local arrays
-!
-    real(kind=8), dimension(nv,n) :: qq
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! convert velocities to four-velocities for physical reconstruction
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i)**2))
-
-      qq(idn,i) = q(idn,i) / vm
-      qq(ivx,i) = q(ivx,i) / vm
-      qq(ivy,i) = q(ivy,i) / vm
-      qq(ivz,i) = q(ivz,i) / vm
-      qq(ipr,i) = q(ipr,i)
-
-    end do ! i = 1, n
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, qq(p,:), ql(p,:), qr(p,:))
-    end do
-
-! convert state four-velocities back to velocities
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 + sum(ql(ivx:ivz,i)**2))
-
-      ql(idn,i) = ql(idn,i) / vm
-      ql(ivx,i) = ql(ivx,i) / vm
-      ql(ivy,i) = ql(ivy,i) / vm
-      ql(ivz,i) = ql(ivz,i) / vm
-
-      vm = sqrt(1.0d+00 + sum(qr(ivx:ivz,i)**2))
-
-      qr(idn,i) = qr(idn,i) / vm
-      qr(ivx,i) = qr(ivx,i) / vm
-      qr(ivy,i) = qr(ivy,i) / vm
-      qr(ivz,i) = qr(ivz,i) / vm
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srhd_adi_4vec
-!
-!===============================================================================
-!
 ! subroutine RIEMANN_SRHD_ADI_HLL:
 ! -------------------------------
 !
@@ -5622,187 +5152,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_srmhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRMHD_ADI:
-! ---------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srmhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do ! p = 1, nv
-
-! check if the reconstruction gives negative values of density or density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srmhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRMHD_ADI_4VEC:
-! --------------------------------
-!
-!   Subroutine reconstructs the Riemann states using the 4-velocity vector.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srmhd_adi_4vec(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: p, i
-    real(kind=8) :: vm
-
-! local arrays
-!
-    real(kind=8), dimension(nv,n) :: qq
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! convert velocities to four-velocities for physical reconstruction
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i)**2))
-
-      qq(idn,i) = q(idn,i) / vm
-      qq(ivx,i) = q(ivx,i) / vm
-      qq(ivy,i) = q(ivy,i) / vm
-      qq(ivz,i) = q(ivz,i) / vm
-      qq(ibx,i) = q(ibx,i)
-      qq(iby,i) = q(iby,i)
-      qq(ibz,i) = q(ibz,i)
-      qq(ibp,i) = q(ibp,i)
-      qq(ipr,i) = q(ipr,i)
-
-    end do ! i = 1, n
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, qq(p,:), ql(p,:), qr(p,:))
-    end do
-
-! convert state four-velocities back to velocities
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 + sum(ql(ivx:ivz,i)**2))
-
-      ql(idn,i) = ql(idn,i) / vm
-      ql(ivx,i) = ql(ivx,i) / vm
-      ql(ivy,i) = ql(ivy,i) / vm
-      ql(ivz,i) = ql(ivz,i) / vm
-
-      vm = sqrt(1.0d+00 + sum(qr(ivx:ivz,i)**2))
-
-      qr(idn,i) = qr(idn,i) / vm
-      qr(ivx,i) = qr(ivx,i) / vm
-      qr(ivy,i) = qr(ivy,i) / vm
-      qr(ivz,i) = qr(ivz,i) / vm
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srmhd_adi_4vec
 !
 !===============================================================================
 !
