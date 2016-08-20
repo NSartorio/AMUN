@@ -49,13 +49,13 @@ module schemes
   integer            , save :: imi, imf, ims, imr
 #endif /* PROFILE */
 
+! 4-vector reconstruction flag
+!
+  logical            , save :: states_4vec = .false.
+
 ! pointer to the flux update procedure
 !
   procedure(update_flux_hd_iso), pointer, save :: update_flux => null()
-
-! pointer to the state reconstruction
-!
-  procedure(states_hd_iso)     , pointer, save :: states      => null()
 
 ! pointer to the Riemann solver
 !
@@ -153,7 +153,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_iso
-        states      => states_hd_iso
 
 ! select the Riemann solver
 !
@@ -188,7 +187,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_hd_adi
-        states      => states_hd_adi
 
 ! select the Riemann solver
 !
@@ -243,7 +241,6 @@ module schemes
 ! set pointers to the subroutines
 !
         update_flux => update_flux_mhd_iso
-        states      => states_mhd_iso
 
 ! select the Riemann solver
 !
@@ -298,7 +295,6 @@ module schemes
 ! set pointers to subroutines
 !
         update_flux => update_flux_mhd_adi
-        states      => states_mhd_adi
 
 ! select the Riemann solver
 !
@@ -374,9 +370,9 @@ module schemes
 !
           name_sts =  "4-vector"
 
-! set pointers to subroutines
+! set 4-vector reconstruction flag
 !
-          states   => states_srhd_adi_4vec
+          states_4vec = .true.
 
 ! in the case of state variables, revert to primitive
 !
@@ -385,10 +381,6 @@ module schemes
 ! set the state reconstruction name
 !
           name_sts =  "primitive"
-
-! set pointers to subroutines
-!
-          states   => states_srhd_adi
 
         end select
 
@@ -446,9 +438,9 @@ module schemes
 !
           name_sts =  "4-vector"
 
-! set pointers to subroutines
+! set 4-vector reconstruction flag
 !
-          states   => states_srmhd_adi_4vec
+          states_4vec = .true.
 
 ! in the case of state variables, revert to primitive
 !
@@ -457,10 +449,6 @@ module schemes
 ! set the state reconstruction name
 !
           name_sts =  "primitive"
-
-! set pointers to subroutines
-!
-          states   => states_srmhd_adi
 
         end select
 
@@ -539,7 +527,6 @@ module schemes
 ! nullify procedure pointers
 !
     nullify(update_flux)
-    nullify(states)
     nullify(riemann)
 
 #ifdef PROFILE
@@ -558,6 +545,67 @@ module schemes
 !!
 !===============================================================================
 !
+!===============================================================================
+!
+! subroutine RECONSTRUCT_INTERFACES:
+! ---------------------------------
+!
+!   Subroutine reconstructs the Riemann states using 3D reconstruction methods.
+!
+!   Arguments:
+!
+!     dx   - the spatial step;
+!     q    - the array of primitive variables;
+!     qi   - the array of reconstructed states (2 in each direction);
+!
+!===============================================================================
+!
+  subroutine reconstruct_interfaces(dx, q, qi)
+
+! include external procedures
+!
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv, idn, ipr
+    use interpolations , only : interfaces
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8), dimension(NDIMS)              , intent(in)  :: dx
+    real(kind=8), dimension(nv,im,jm,km)        , intent(in)  :: q
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS), intent(out) :: qi
+
+! local variables
+!
+    logical                        :: positive
+    integer                        :: p
+!
+!-------------------------------------------------------------------------------
+!
+! iterate over all variables
+!
+    do p = 1, nv
+
+! determine if the variable is positive
+!
+      positive = (p == idn .or. p == ipr)
+
+! interpolate interfaces
+!
+      call interfaces(positive, dx(1:NDIMS), q (p,1:im,1:jm,1:km),             &
+                                             qi(p,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+    end do ! p = 1, nv
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_interfaces
+!
+!===============================================================================
+!
 !***** ISOTHERMAL HYDRODYNAMICS *****
 !
 !===============================================================================
@@ -571,14 +619,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_hd_iso(idir, dx, q, f)
+  subroutine update_flux_hd_iso(dx, q, f)
 
 ! include external variables
 !
@@ -592,10 +639,9 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -603,9 +649,13 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -617,108 +667,92 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! reconstruct interfaces
 !
-    select case(idir)
-    case(1)
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
-! copy directional variable vectors to pass to the one dimensional solver
+! copy states to directional lines with proper vector component ordering
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -729,74 +763,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_iso
-!
-!===============================================================================
-!
-! subroutine STATES_HD_ISO:
-! ------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_hd_iso(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_hd_iso
 !
 !===============================================================================
 !
@@ -835,9 +801,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -956,9 +922,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1077,14 +1043,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_hd_adi(idir, dx, q, f)
+  subroutine update_flux_hd_adi(dx, q, f)
 
 ! include external variables
 !
@@ -1098,10 +1063,9 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -1109,9 +1073,13 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -1123,114 +1091,98 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! reconstruct interfaces
 !
-    select case(idir)
-    case(1)
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
-! copy directional variable vectors to pass to the one dimensional solver
+! copy states to directional lines with proper vector component ordering
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ipr,1:im,1:2) = qs(ipr,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ipr,1:jm,1:2) = qs(ipr,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ipr,1:km,1:2) = qs(ipr,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -1241,75 +1193,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_hd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_HD_ADI:
-! ------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_hd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_hd_adi
 !
 !===============================================================================
 !
@@ -1348,9 +1231,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1466,9 +1349,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1641,9 +1524,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -1764,14 +1647,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_mhd_iso(idir, dx, q, f)
+  subroutine update_flux_mhd_iso(dx, q, f)
 
 ! include external variables
 !
@@ -1786,10 +1668,9 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -1797,9 +1678,13 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -1811,132 +1696,116 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! reconstruct interfaces
 !
-    select case(idir)
-    case(1)
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ibx,1:im) = q(ibx,1:im,j,k)
-          qx(iby,1:im) = q(iby,1:im,j,k)
-          qx(ibz,1:im) = q(ibz,1:im,j,k)
-          qx(ibp,1:im) = q(ibp,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ibx,1:im,1:2) = qs(ibx,1:im,j,k,1:2,1)
+        qx(iby,1:im,1:2) = qs(iby,1:im,j,k,1:2,1)
+        qx(ibz,1:im,1:2) = qs(ibz,1:im,j,k,1:2,1)
+        qx(ibp,1:im,1:2) = qs(ibp,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ibx,1:im,j,k) = fx(ibx,1:im)
-          f(iby,1:im,j,k) = fx(iby,1:im)
-          f(ibz,1:im,j,k) = fx(ibz,1:im)
-          f(ibp,1:im,j,k) = fx(ibp,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+        f(1,ibx,1:im,j,k) = fx(ibx,1:im)
+        f(1,iby,1:im,j,k) = fx(iby,1:im)
+        f(1,ibz,1:im,j,k) = fx(ibz,1:im)
+        f(1,ibp,1:im,j,k) = fx(ibp,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ibx,1:jm) = q(iby,i,1:jm,k)
-          qy(iby,1:jm) = q(ibz,i,1:jm,k)
-          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ibx,1:jm,1:2) = qs(iby,i,1:jm,k,1:2,2)
+        qy(iby,1:jm,1:2) = qs(ibz,i,1:jm,k,1:2,2)
+        qy(ibz,1:jm,1:2) = qs(ibx,i,1:jm,k,1:2,2)
+        qy(ibp,1:jm,1:2) = qs(ibp,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
-          f(iby,i,1:jm,k) = fy(ibx,1:jm)
-          f(ibz,i,1:jm,k) = fy(iby,1:jm)
-          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,ibx,i,1:jm,k) = fy(ibz,1:jm)
+        f(2,iby,i,1:jm,k) = fy(ibx,1:jm)
+        f(2,ibz,i,1:jm,k) = fy(iby,1:jm)
+        f(2,ibp,i,1:jm,k) = fy(ibp,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ibx,1:km) = q(ibz,i,j,1:km)
-          qz(iby,1:km) = q(ibx,i,j,1:km)
-          qz(ibz,1:km) = q(iby,i,j,1:km)
-          qz(ibp,1:km) = q(ibp,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ibx,1:km,1:2) = qs(ibz,i,j,1:km,1:2,3)
+        qz(iby,1:km,1:2) = qs(ibx,i,j,1:km,1:2,3)
+        qz(ibz,1:km,1:2) = qs(iby,i,j,1:km,1:2,3)
+        qz(ibp,1:km,1:2) = qs(ibp,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ibx,i,j,1:km) = fz(iby,1:km)
-          f(iby,i,j,1:km) = fz(ibz,1:km)
-          f(ibz,i,j,1:km) = fz(ibx,1:km)
-          f(ibp,i,j,1:km) = fz(ibp,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+        f(3,ibx,i,j,1:km) = fz(iby,1:km)
+        f(3,iby,i,j,1:km) = fz(ibz,1:km)
+        f(3,ibz,i,j,1:km) = fz(ibx,1:km)
+        f(3,ibp,i,j,1:km) = fz(ibp,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -1947,92 +1816,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_mhd_iso
-!
-!===============================================================================
-!
-! subroutine STATES_MHD_ISO:
-! -------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_mhd_iso(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ibx, ibp
-    use equations      , only : cmax
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-    real(kind=8) :: bx, bp
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_mhd_iso
 !
 !===============================================================================
 !
@@ -2062,7 +1845,8 @@ module schemes
 ! include external variables and procedures
 !
     use equations      , only : nv
-    use equations      , only : ivx
+    use equations      , only : ivx, ibx, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -2071,14 +1855,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, srml
+    real(kind=8)                  :: bx, bp
 
 ! local arrays to store the states
 !
@@ -2093,6 +1878,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -2181,6 +1982,7 @@ module schemes
 !
     use equations      , only : nv
     use equations      , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -2189,15 +1991,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
-    real(kind=8)                  :: bx, b2, dn, dnl, dnr, dvl, dvr
+    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr
 
 ! local arrays to store the states
 !
@@ -2212,6 +2014,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -2549,6 +2367,7 @@ module schemes
 !
     use equations      , only : nv
     use equations      , only : idn, ivx, imx, imy, imz, ibx, iby, ibz, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -2557,15 +2376,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
-    real(kind=8)                  :: bx, b2, dn, dnl, dnr, dvl, dvr, ca
+    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr, ca
 
 ! local arrays to store the states
 !
@@ -2580,6 +2399,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -2919,6 +2754,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use equations      , only : imx, imy, imz
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed, eigensystem_roe
 
 ! local variables are not implicit by default
@@ -2927,14 +2763,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                        :: p, i
     real(kind=8)                   :: sdl, sdr, sds
+    real(kind=8)                   :: bx, bp
     real(kind=8)                   :: xx, yy
 
 ! local arrays to store the states
@@ -2950,6 +2787,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3080,14 +2933,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_mhd_adi(idir, dx, q, f)
+  subroutine update_flux_mhd_adi(dx, q, f)
 
 ! include external variables
 !
@@ -3102,10 +2954,9 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
@@ -3113,9 +2964,13 @@ module schemes
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -3127,138 +2982,122 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! reconstruct interfaces
 !
-    select case(idir)
-    case(1)
+    call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)                 &
+                                     , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ibx,1:im) = q(ibx,1:im,j,k)
-          qx(iby,1:im) = q(iby,1:im,j,k)
-          qx(ibz,1:im) = q(ibz,1:im,j,k)
-          qx(ibp,1:im) = q(ibp,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ibx,1:im,1:2) = qs(ibx,1:im,j,k,1:2,1)
+        qx(iby,1:im,1:2) = qs(iby,1:im,j,k,1:2,1)
+        qx(ibz,1:im,1:2) = qs(ibz,1:im,j,k,1:2,1)
+        qx(ibp,1:im,1:2) = qs(ibp,1:im,j,k,1:2,1)
+        qx(ipr,1:im,1:2) = qs(ipr,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ibx,1:im,j,k) = fx(ibx,1:im)
-          f(iby,1:im,j,k) = fx(iby,1:im)
-          f(ibz,1:im,j,k) = fx(ibz,1:im)
-          f(ibp,1:im,j,k) = fx(ibp,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+        f(1,ibx,1:im,j,k) = fx(ibx,1:im)
+        f(1,iby,1:im,j,k) = fx(iby,1:im)
+        f(1,ibz,1:im,j,k) = fx(ibz,1:im)
+        f(1,ibp,1:im,j,k) = fx(ibp,1:im)
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ibx,1:jm) = q(iby,i,1:jm,k)
-          qy(iby,1:jm) = q(ibz,i,1:jm,k)
-          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ibx,1:jm,1:2) = qs(iby,i,1:jm,k,1:2,2)
+        qy(iby,1:jm,1:2) = qs(ibz,i,1:jm,k,1:2,2)
+        qy(ibz,1:jm,1:2) = qs(ibx,i,1:jm,k,1:2,2)
+        qy(ibp,1:jm,1:2) = qs(ibp,i,1:jm,k,1:2,2)
+        qy(ipr,1:jm,1:2) = qs(ipr,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
-          f(iby,i,1:jm,k) = fy(ibx,1:jm)
-          f(ibz,i,1:jm,k) = fy(iby,1:jm)
-          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,ibx,i,1:jm,k) = fy(ibz,1:jm)
+        f(2,iby,i,1:jm,k) = fy(ibx,1:jm)
+        f(2,ibz,i,1:jm,k) = fy(iby,1:jm)
+        f(2,ibp,i,1:jm,k) = fy(ibp,1:jm)
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ibx,1:km) = q(ibz,i,j,1:km)
-          qz(iby,1:km) = q(ibx,i,j,1:km)
-          qz(ibz,1:km) = q(iby,i,j,1:km)
-          qz(ibp,1:km) = q(ibp,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ibx,1:km,1:2) = qs(ibz,i,j,1:km,1:2,3)
+        qz(iby,1:km,1:2) = qs(ibx,i,j,1:km,1:2,3)
+        qz(ibz,1:km,1:2) = qs(iby,i,j,1:km,1:2,3)
+        qz(ibp,1:km,1:2) = qs(ibp,i,j,1:km,1:2,3)
+        qz(ipr,1:km,1:2) = qs(ipr,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ibx,i,j,1:km) = fz(iby,1:km)
-          f(iby,i,j,1:km) = fz(ibz,1:km)
-          f(ibz,i,j,1:km) = fz(ibx,1:km)
-          f(ibp,i,j,1:km) = fz(ibp,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+        f(3,ibx,i,j,1:km) = fz(iby,1:km)
+        f(3,iby,i,j,1:km) = fz(ibz,1:km)
+        f(3,ibz,i,j,1:km) = fz(ibx,1:km)
+        f(3,ibp,i,j,1:km) = fz(ibp,1:km)
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -3269,93 +3108,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_mhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_MHD_ADI:
-! -------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_mhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ibx, ibp
-    use equations      , only : cmax
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-    real(kind=8) :: bx, bp
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do ! p = 1, nv
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_mhd_adi
 !
 !===============================================================================
 !
@@ -3385,7 +3137,8 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : ivx
+    use equations      , only : ivx, ibx, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3394,14 +3147,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, srml
+    real(kind=8)                  :: bx, bp
 
 ! local arrays to store the states
 !
@@ -3416,6 +3170,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3511,6 +3281,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3519,15 +3290,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
-    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
+    real(kind=8)                  :: dn, bx, bp, b2, pt, vy, vz, by, bz, vb
 
 ! local arrays to store the states
 !
@@ -3542,6 +3313,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -3785,6 +3572,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp, ipr
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -3793,15 +3581,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, srml, slmm, srmm
-    real(kind=8)                  :: dn, bx, b2, pt, vy, vz, by, bz, vb
+    real(kind=8)                  :: dn, bx, bp, b2, pt, vy, vz, by, bz, vb
     real(kind=8)                  :: dnl, dnr, cal, car, sml, smr
     real(kind=8)                  :: dv, dvl, dvr
 
@@ -3818,6 +3606,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -4361,6 +4165,7 @@ module schemes
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use equations      , only : imx, imy, imz, ien
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed, eigensystem_roe
 
 ! local variables are not implicit by default
@@ -4369,14 +4174,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                        :: p, i
     real(kind=8)                   :: sdl, sdr, sds
+    real(kind=8)                   :: bx, bp
     real(kind=8)                   :: pml, pmr
     real(kind=8)                   :: xx, yy
 
@@ -4393,6 +4199,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate corresponding conserved variables of the left and right states
 !
@@ -4533,14 +4355,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_srhd_adi(idir, dx, q, f)
+  subroutine update_flux_srhd_adi(dx, q, f)
 
 ! include external variables
 !
@@ -4554,20 +4375,25 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
-    integer                        :: i, j, k
+    integer                        :: i, j, k, l, p
+    real(kind=8)                   :: vm
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km)         :: qq
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -4579,114 +4405,151 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! apply reconstruction on variables using 4-vector or 3-vector
 !
-    select case(idir)
-    case(1)
+    if (states_4vec) then
+
+! convert velocities to four-velocities for physical reconstruction
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+
+            vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i,j,k)**2))
+
+            qq(idn,i,j,k) = q(idn,i,j,k) / vm
+            qq(ivx,i,j,k) = q(ivx,i,j,k) / vm
+            qq(ivy,i,j,k) = q(ivy,i,j,k) / vm
+            qq(ivz,i,j,k) = q(ivz,i,j,k) / vm
+            qq(ipr,i,j,k) = q(ipr,i,j,k)
+
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+! reconstruct interfaces
+!
+      call reconstruct_interfaces(dx(:), qq(1:nv,1:im,1:jm,1:km)               &
+                                       , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+! convert state four-velocities back to velocities
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+
+            do l = 1, 2
+              do p = 1, NDIMS
+
+                vm = sqrt(1.0d+00 + sum(qs(ivx:ivz,i,j,k,l,p)**2))
+
+                qs(idn,i,j,k,l,p) = qs(idn,i,j,k,l,p) / vm
+                qs(ivx,i,j,k,l,p) = qs(ivx,i,j,k,l,p) / vm
+                qs(ivy,i,j,k,l,p) = qs(ivy,i,j,k,l,p) / vm
+                qs(ivz,i,j,k,l,p) = qs(ivz,i,j,k,l,p) / vm
+
+              end do ! p = 1, ndims
+            end do ! l = 1, 2
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+    else
+
+! reconstruct interfaces
+!
+      call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)               &
+                                       , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+    end if
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ipr,1:im,1:2) = qs(ipr,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ipr,1:jm,1:2) = qs(ipr,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ipr,1:km,1:2) = qs(ipr,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -4697,183 +4560,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_srhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRHD_ADI:
-! --------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer :: p
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRHD_ADI_4VEC:
-! -------------------------------
-!
-!   Subroutine reconstructs the Riemann states using the 4-velocity vector.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srhd_adi_4vec(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ivx, ivy, ivz
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: p, i
-    real(kind=8) :: vm
-
-! local arrays
-!
-    real(kind=8), dimension(nv,n) :: qq
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! convert velocities to four-velocities for physical reconstruction
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i)**2))
-
-      qq(idn,i) = q(idn,i) / vm
-      qq(ivx,i) = q(ivx,i) / vm
-      qq(ivy,i) = q(ivy,i) / vm
-      qq(ivz,i) = q(ivz,i) / vm
-      qq(ipr,i) = q(ipr,i)
-
-    end do ! i = 1, n
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, qq(p,:), ql(p,:), qr(p,:))
-    end do
-
-! convert state four-velocities back to velocities
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 + sum(ql(ivx:ivz,i)**2))
-
-      ql(idn,i) = ql(idn,i) / vm
-      ql(ivx,i) = ql(ivx,i) / vm
-      ql(ivy,i) = ql(ivy,i) / vm
-      ql(ivz,i) = ql(ivz,i) / vm
-
-      vm = sqrt(1.0d+00 + sum(qr(ivx:ivz,i)**2))
-
-      qr(idn,i) = qr(idn,i) / vm
-      qr(ivx,i) = qr(ivx,i) / vm
-      qr(ivy,i) = qr(ivy,i) / vm
-      qr(ivz,i) = qr(ivz,i) / vm
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srhd_adi_4vec
 !
 !===============================================================================
 !
@@ -4912,9 +4598,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -5032,9 +4718,9 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
@@ -5231,14 +4917,13 @@ module schemes
 !
 !   Arguments:
 !
-!     idir - direction along which the flux is calculated;
 !     dx   - the spatial step;
 !     q    - the array of primitive variables;
 !     f    - the array of numerical fluxes;
 !
 !===============================================================================
 !
-  subroutine update_flux_srmhd_adi(idir, dx, q, f)
+  subroutine update_flux_srmhd_adi(dx, q, f)
 
 ! include external variables
 !
@@ -5253,20 +4938,25 @@ module schemes
 
 ! input arguments
 !
-    integer                             , intent(in)  :: idir
-    real(kind=8)                        , intent(in)  :: dx
-    real(kind=8), dimension(nv,im,jm,km), intent(in)  :: q
-    real(kind=8), dimension(nv,im,jm,km), intent(out) :: f
+    real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+    real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+    real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
 
 ! local variables
 !
-    integer                        :: i, j, k
+    integer                        :: i, j, k, l, p
+    real(kind=8)                   :: vm
 
 ! local temporary arrays
 !
-    real(kind=8), dimension(nv,im) :: qx, qxl, qxr, fx
-    real(kind=8), dimension(nv,jm) :: qy, qyl, qyr, fy
-    real(kind=8), dimension(nv,km) :: qz, qzl, qzr, fz
+    real(kind=8), dimension(nv,im,jm,km)         :: qq
+    real(kind=8), dimension(nv,im,jm,km,2,NDIMS) :: qs
+    real(kind=8), dimension(nv,im,2)             :: qx
+    real(kind=8), dimension(nv,jm,2)             :: qy
+    real(kind=8), dimension(nv,km,2)             :: qz
+    real(kind=8), dimension(nv,im)               :: fx
+    real(kind=8), dimension(nv,jm)               :: fy
+    real(kind=8), dimension(nv,km)               :: fz
 !
 !-------------------------------------------------------------------------------
 !
@@ -5278,138 +4968,180 @@ module schemes
 
 ! initialize fluxes
 !
-    f(1:nv,1:im,1:jm,1:km) = 0.0d+00
+    f(1:NDIMS,1:nv,1:im,1:jm,1:km) = 0.0d+00
 
-! select the directional flux to compute
+! apply reconstruction on variables using 4-vector or 3-vector
 !
-    select case(idir)
-    case(1)
+    if (states_4vec) then
+
+! convert velocities to four-velocities for physical reconstruction
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+
+            vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i,j,k)**2))
+
+            qq(idn,i,j,k) = q(idn,i,j,k) / vm
+            qq(ivx,i,j,k) = q(ivx,i,j,k) / vm
+            qq(ivy,i,j,k) = q(ivy,i,j,k) / vm
+            qq(ivz,i,j,k) = q(ivz,i,j,k) / vm
+            qq(ipr,i,j,k) = q(ipr,i,j,k)
+            qq(ibx,i,j,k) = q(ibx,i,j,k)
+            qq(iby,i,j,k) = q(iby,i,j,k)
+            qq(ibz,i,j,k) = q(ibz,i,j,k)
+            qq(ibp,i,j,k) = q(ibp,i,j,k)
+            qq(ipr,i,j,k) = q(ipr,i,j,k)
+
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+! reconstruct interfaces
+!
+      call reconstruct_interfaces(dx(:), qq(1:nv,1:im,1:jm,1:km)               &
+                                       , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+! convert state four-velocities back to velocities
+!
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+
+            do l = 1, 2
+              do p = 1, NDIMS
+
+                vm = sqrt(1.0d+00 + sum(qs(ivx:ivz,i,j,k,l,p)**2))
+
+                qs(idn,i,j,k,l,p) = qs(idn,i,j,k,l,p) / vm
+                qs(ivx,i,j,k,l,p) = qs(ivx,i,j,k,l,p) / vm
+                qs(ivy,i,j,k,l,p) = qs(ivy,i,j,k,l,p) / vm
+                qs(ivz,i,j,k,l,p) = qs(ivz,i,j,k,l,p) / vm
+
+              end do ! p = 1, ndims
+            end do ! l = 1, 2
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+    else
+
+! reconstruct interfaces
+!
+      call reconstruct_interfaces(dx(:), q (1:nv,1:im,1:jm,1:km)               &
+                                       , qs(1:nv,1:im,1:jm,1:km,1:2,1:NDIMS))
+
+    end if
 
 !  calculate the flux along the X-direction
 !
-      do k = kbl, keu
-        do j = jbl, jeu
+    do k = kbl, keu
+      do j = jbl, jeu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qx(idn,1:im) = q(idn,1:im,j,k)
-          qx(ivx,1:im) = q(ivx,1:im,j,k)
-          qx(ivy,1:im) = q(ivy,1:im,j,k)
-          qx(ivz,1:im) = q(ivz,1:im,j,k)
-          qx(ibx,1:im) = q(ibx,1:im,j,k)
-          qx(iby,1:im) = q(iby,1:im,j,k)
-          qx(ibz,1:im) = q(ibz,1:im,j,k)
-          qx(ibp,1:im) = q(ibp,1:im,j,k)
-          qx(ipr,1:im) = q(ipr,1:im,j,k)
-
-! reconstruct Riemann states
-!
-          call states(im, dx, qx(1:nv,1:im), qxl(1:nv,1:im), qxr(1:nv,1:im))
+        qx(idn,1:im,1:2) = qs(idn,1:im,j,k,1:2,1)
+        qx(ivx,1:im,1:2) = qs(ivx,1:im,j,k,1:2,1)
+        qx(ivy,1:im,1:2) = qs(ivy,1:im,j,k,1:2,1)
+        qx(ivz,1:im,1:2) = qs(ivz,1:im,j,k,1:2,1)
+        qx(ibx,1:im,1:2) = qs(ibx,1:im,j,k,1:2,1)
+        qx(iby,1:im,1:2) = qs(iby,1:im,j,k,1:2,1)
+        qx(ibz,1:im,1:2) = qs(ibz,1:im,j,k,1:2,1)
+        qx(ibp,1:im,1:2) = qs(ibp,1:im,j,k,1:2,1)
+        qx(ipr,1:im,1:2) = qs(ipr,1:im,j,k,1:2,1)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(im, qxl(1:nv,1:im), qxr(1:nv,1:im), fx(1:nv,1:im))
+        call riemann(im, qx(1:nv,1:im,1), qx(1:nv,1:im,2), fx(1:nv,1:im))
 
 ! update the array of fluxes
 !
-          f(idn,1:im,j,k) = fx(idn,1:im)
-          f(imx,1:im,j,k) = fx(imx,1:im)
-          f(imy,1:im,j,k) = fx(imy,1:im)
-          f(imz,1:im,j,k) = fx(imz,1:im)
-          f(ibx,1:im,j,k) = fx(ibx,1:im)
-          f(iby,1:im,j,k) = fx(iby,1:im)
-          f(ibz,1:im,j,k) = fx(ibz,1:im)
-          f(ibp,1:im,j,k) = fx(ibp,1:im)
-          f(ien,1:im,j,k) = fx(ien,1:im)
+        f(1,idn,1:im,j,k) = fx(idn,1:im)
+        f(1,imx,1:im,j,k) = fx(imx,1:im)
+        f(1,imy,1:im,j,k) = fx(imy,1:im)
+        f(1,imz,1:im,j,k) = fx(imz,1:im)
+        f(1,ibx,1:im,j,k) = fx(ibx,1:im)
+        f(1,iby,1:im,j,k) = fx(iby,1:im)
+        f(1,ibz,1:im,j,k) = fx(ibz,1:im)
+        f(1,ibp,1:im,j,k) = fx(ibp,1:im)
+        f(1,ien,1:im,j,k) = fx(ien,1:im)
 
-        end do ! j = jbl, jeu
-      end do ! k = kbl, keu
-
-    case(2)
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
 
 !  calculate the flux along the Y direction
 !
-      do k = kbl, keu
-        do i = ibl, ieu
+    do k = kbl, keu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qy(idn,1:jm) = q(idn,i,1:jm,k)
-          qy(ivx,1:jm) = q(ivy,i,1:jm,k)
-          qy(ivy,1:jm) = q(ivz,i,1:jm,k)
-          qy(ivz,1:jm) = q(ivx,i,1:jm,k)
-          qy(ibx,1:jm) = q(iby,i,1:jm,k)
-          qy(iby,1:jm) = q(ibz,i,1:jm,k)
-          qy(ibz,1:jm) = q(ibx,i,1:jm,k)
-          qy(ibp,1:jm) = q(ibp,i,1:jm,k)
-          qy(ipr,1:jm) = q(ipr,i,1:jm,k)
-
-! reconstruct Riemann states
-!
-          call states(jm, dx, qy(1:nv,1:jm), qyl(1:nv,1:jm), qyr(1:nv,1:jm))
+        qy(idn,1:jm,1:2) = qs(idn,i,1:jm,k,1:2,2)
+        qy(ivx,1:jm,1:2) = qs(ivy,i,1:jm,k,1:2,2)
+        qy(ivy,1:jm,1:2) = qs(ivz,i,1:jm,k,1:2,2)
+        qy(ivz,1:jm,1:2) = qs(ivx,i,1:jm,k,1:2,2)
+        qy(ibx,1:jm,1:2) = qs(iby,i,1:jm,k,1:2,2)
+        qy(iby,1:jm,1:2) = qs(ibz,i,1:jm,k,1:2,2)
+        qy(ibz,1:jm,1:2) = qs(ibx,i,1:jm,k,1:2,2)
+        qy(ibp,1:jm,1:2) = qs(ibp,i,1:jm,k,1:2,2)
+        qy(ipr,1:jm,1:2) = qs(ipr,i,1:jm,k,1:2,2)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(jm, qyl(1:nv,1:jm), qyr(1:nv,1:jm), fy(1:nv,1:jm))
+        call riemann(jm, qy(1:nv,1:jm,1), qy(1:nv,1:jm,2), fy(1:nv,1:jm))
 
 ! update the array of fluxes
 !
-          f(idn,i,1:jm,k) = fy(idn,1:jm)
-          f(imx,i,1:jm,k) = fy(imz,1:jm)
-          f(imy,i,1:jm,k) = fy(imx,1:jm)
-          f(imz,i,1:jm,k) = fy(imy,1:jm)
-          f(ibx,i,1:jm,k) = fy(ibz,1:jm)
-          f(iby,i,1:jm,k) = fy(ibx,1:jm)
-          f(ibz,i,1:jm,k) = fy(iby,1:jm)
-          f(ibp,i,1:jm,k) = fy(ibp,1:jm)
-          f(ien,i,1:jm,k) = fy(ien,1:jm)
+        f(2,idn,i,1:jm,k) = fy(idn,1:jm)
+        f(2,imx,i,1:jm,k) = fy(imz,1:jm)
+        f(2,imy,i,1:jm,k) = fy(imx,1:jm)
+        f(2,imz,i,1:jm,k) = fy(imy,1:jm)
+        f(2,ibx,i,1:jm,k) = fy(ibz,1:jm)
+        f(2,iby,i,1:jm,k) = fy(ibx,1:jm)
+        f(2,ibz,i,1:jm,k) = fy(iby,1:jm)
+        f(2,ibp,i,1:jm,k) = fy(ibp,1:jm)
+        f(2,ien,i,1:jm,k) = fy(ien,1:jm)
 
-        end do ! i = ibl, ieu
-      end do ! k = kbl, keu
+      end do ! i = ibl, ieu
+    end do ! k = kbl, keu
 
-    case(3)
-
+#if NDIMS == 3
 !  calculate the flux along the Z direction
 !
-      do j = jbl, jeu
-        do i = ibl, ieu
+    do j = jbl, jeu
+      do i = ibl, ieu
 
 ! copy directional variable vectors to pass to the one dimensional solver
 !
-          qz(idn,1:km) = q(idn,i,j,1:km)
-          qz(ivx,1:km) = q(ivz,i,j,1:km)
-          qz(ivy,1:km) = q(ivx,i,j,1:km)
-          qz(ivz,1:km) = q(ivy,i,j,1:km)
-          qz(ibx,1:km) = q(ibz,i,j,1:km)
-          qz(iby,1:km) = q(ibx,i,j,1:km)
-          qz(ibz,1:km) = q(iby,i,j,1:km)
-          qz(ibp,1:km) = q(ibp,i,j,1:km)
-          qz(ipr,1:km) = q(ipr,i,j,1:km)
-
-! reconstruct Riemann states
-!
-          call states(km, dx, qz(1:nv,1:km), qzl(1:nv,1:km), qzr(1:nv,1:km))
+        qz(idn,1:km,1:2) = qs(idn,i,j,1:km,1:2,3)
+        qz(ivx,1:km,1:2) = qs(ivz,i,j,1:km,1:2,3)
+        qz(ivy,1:km,1:2) = qs(ivx,i,j,1:km,1:2,3)
+        qz(ivz,1:km,1:2) = qs(ivy,i,j,1:km,1:2,3)
+        qz(ibx,1:km,1:2) = qs(ibz,i,j,1:km,1:2,3)
+        qz(iby,1:km,1:2) = qs(ibx,i,j,1:km,1:2,3)
+        qz(ibz,1:km,1:2) = qs(iby,i,j,1:km,1:2,3)
+        qz(ibp,1:km,1:2) = qs(ibp,i,j,1:km,1:2,3)
+        qz(ipr,1:km,1:2) = qs(ipr,i,j,1:km,1:2,3)
 
 ! call one dimensional Riemann solver in order to obtain numerical fluxes
 !
-          call riemann(km, qzl(1:nv,1:km), qzr(1:nv,1:km), fz(1:nv,1:km))
+        call riemann(km, qz(1:nv,1:km,1), qz(1:nv,1:km,2), fz(1:nv,1:km))
 
 ! update the array of fluxes
 !
-          f(idn,i,j,1:km) = fz(idn,1:km)
-          f(imx,i,j,1:km) = fz(imy,1:km)
-          f(imy,i,j,1:km) = fz(imz,1:km)
-          f(imz,i,j,1:km) = fz(imx,1:km)
-          f(ibx,i,j,1:km) = fz(iby,1:km)
-          f(iby,i,j,1:km) = fz(ibz,1:km)
-          f(ibz,i,j,1:km) = fz(ibx,1:km)
-          f(ibp,i,j,1:km) = fz(ibp,1:km)
-          f(ien,i,j,1:km) = fz(ien,1:km)
+        f(3,idn,i,j,1:km) = fz(idn,1:km)
+        f(3,imx,i,j,1:km) = fz(imy,1:km)
+        f(3,imy,i,j,1:km) = fz(imz,1:km)
+        f(3,imz,i,j,1:km) = fz(imx,1:km)
+        f(3,ibx,i,j,1:km) = fz(iby,1:km)
+        f(3,iby,i,j,1:km) = fz(ibz,1:km)
+        f(3,ibz,i,j,1:km) = fz(ibx,1:km)
+        f(3,ibp,i,j,1:km) = fz(ibp,1:km)
+        f(3,ien,i,j,1:km) = fz(ien,1:km)
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-
-    end select
+      end do ! i = ibl, ieu
+    end do ! j = jbl, jeu
+#endif /* NDIMS == 3 */
 
 #ifdef PROFILE
 ! stop accounting time for flux update
@@ -5420,223 +5152,6 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine update_flux_srmhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRMHD_ADI:
-! ---------------------------
-!
-!   Subroutine reconstructs the Riemann states.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srmhd_adi(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ibx, ibp
-    use equations      , only : cmax
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: i, p
-    real(kind=8) :: bx, bp
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, q(p,:), ql(p,:), qr(p,:))
-    end do ! p = 1, nv
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or density,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srmhd_adi
-!
-!===============================================================================
-!
-! subroutine STATES_SRMHD_ADI_4VEC:
-! --------------------------------
-!
-!   Subroutine reconstructs the Riemann states using the 4-velocity vector.
-!
-!   Arguments:
-!
-!     n      - the length of input vectors;
-!     h      - the spatial step;
-!     q      - the input array of primitive variables;
-!     ql, qr - the reconstructed Riemann states;
-!
-!===============================================================================
-!
-  subroutine states_srmhd_adi_4vec(n, h, q, ql, qr)
-
-! include external procedures
-!
-    use equations      , only : nv
-    use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
-    use equations      , only : cmax
-    use interpolations , only : reconstruct, fix_positivity
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! subroutine arguments
-!
-    integer                      , intent(in)  :: n
-    real(kind=8)                 , intent(in)  :: h
-    real(kind=8), dimension(nv,n), intent(in)  :: q
-    real(kind=8), dimension(nv,n), intent(out) :: ql, qr
-
-! local variables
-!
-    integer      :: p, i
-    real(kind=8) :: vm
-    real(kind=8) :: bx, bp
-
-! local arrays
-!
-    real(kind=8), dimension(nv,n) :: qq
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef PROFILE
-! start accounting time for the state reconstruction
-!
-    call start_timer(ims)
-#endif /* PROFILE */
-
-! convert velocities to four-velocities for physical reconstruction
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 - sum(q(ivx:ivz,i)**2))
-
-      qq(idn,i) = q(idn,i) / vm
-      qq(ivx,i) = q(ivx,i) / vm
-      qq(ivy,i) = q(ivy,i) / vm
-      qq(ivz,i) = q(ivz,i) / vm
-      qq(ibx,i) = q(ibx,i)
-      qq(iby,i) = q(iby,i)
-      qq(ibz,i) = q(ibz,i)
-      qq(ibp,i) = q(ibp,i)
-      qq(ipr,i) = q(ipr,i)
-
-    end do ! i = 1, n
-
-! reconstruct the left and right states of primitive variables
-!
-    do p = 1, nv
-      call reconstruct(n, h, qq(p,:), ql(p,:), qr(p,:))
-    end do
-
-! convert state four-velocities back to velocities
-!
-    do i = 1, n
-
-      vm = sqrt(1.0d+00 + sum(ql(ivx:ivz,i)**2))
-
-      ql(idn,i) = ql(idn,i) / vm
-      ql(ivx,i) = ql(ivx,i) / vm
-      ql(ivy,i) = ql(ivy,i) / vm
-      ql(ivz,i) = ql(ivz,i) / vm
-
-      vm = sqrt(1.0d+00 + sum(qr(ivx:ivz,i)**2))
-
-      qr(idn,i) = qr(idn,i) / vm
-      qr(ivx,i) = qr(ivx,i) / vm
-      qr(ivy,i) = qr(ivy,i) / vm
-      qr(ivz,i) = qr(ivz,i) / vm
-
-    end do ! i = 1, n
-
-! obtain the state values for Bx and Psi for the GLM-MHD equations
-!
-    do i = 1, n
-
-      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
-                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
-      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
-                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
-
-      ql(ibx,i) = bx
-      qr(ibx,i) = bx
-      ql(ibp,i) = bp
-      qr(ibp,i) = bp
-
-    end do ! i = 1, n
-
-! check if the reconstruction gives negative values of density or pressure,
-! if so, correct the states
-!
-    call fix_positivity(n, q(idn,:), ql(idn,:), qr(idn,:))
-    call fix_positivity(n, q(ipr,:), ql(ipr,:), qr(ipr,:))
-
-#ifdef PROFILE
-! stop accounting time for the state reconstruction
-!
-    call stop_timer(ims)
-#endif /* PROFILE */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine states_srmhd_adi_4vec
 !
 !===============================================================================
 !
@@ -5666,7 +5181,8 @@ module schemes
 ! include external procedures
 !
     use equations      , only : nv
-    use equations      , only : ivx
+    use equations      , only : ivx, ibx, ibp
+    use equations      , only : cmax
     use equations      , only : prim2cons, fluxspeed
 
 ! local variables are not implicit by default
@@ -5675,14 +5191,15 @@ module schemes
 
 ! subroutine arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=8), dimension(nv,n), intent(in)  :: ql, qr
-    real(kind=8), dimension(nv,n), intent(out) :: f
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
 
 ! local variables
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, srml
+    real(kind=8)                  :: bx, bp
 
 ! local arrays to store the states
 !
@@ -5697,6 +5214,22 @@ module schemes
 !
     call start_timer(imr)
 #endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
 
 ! calculate the conserved variables of the left and right states
 !

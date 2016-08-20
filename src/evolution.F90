@@ -1820,11 +1820,7 @@ module evolution
 
 ! local vectors
 !
-    real(kind=8), dimension(3) :: dx
-
-! local variables
-!
-    integer                    :: n
+    real(kind=8), dimension(NDIMS) :: dx
 !
 !-------------------------------------------------------------------------------
 !
@@ -1846,14 +1842,14 @@ module evolution
 !
       dx(1) = adx(pdata%meta%level)
       dx(2) = ady(pdata%meta%level)
+#if NDIMS == 3
       dx(3) = adz(pdata%meta%level)
+#endif /* NDIMS == 3 */
 
 ! update fluxes for the current block
 !
-      do n = 1, NDIMS
-        call update_flux(n, dx(n), pdata%q(1:nv,1:im,1:jm,1:km)                &
-                                             , pdata%f(n,1:nv,1:im,1:jm,1:km))
-      end do
+      call update_flux(dx(1:NDIMS), pdata%q(1:nv,1:im,1:jm,1:km)               &
+                                       , pdata%f(1:NDIMS,1:nv,1:im,1:jm,1:km))
 
 ! assign pdata to the next block
 !
