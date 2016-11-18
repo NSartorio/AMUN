@@ -860,8 +860,9 @@ module io
 !
     use error          , only : print_error
     use hdf5           , only : hid_t
-    use hdf5           , only : H5F_ACC_TRUNC_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
+                              , h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -924,6 +925,10 @@ module io
 !
     call write_datablocks_h5(fid)
 
+! flush the file
+!
+    call h5fflush_f(fid, H5F_SCOPE_GLOBAL_F, err)
+
 ! close the file
 !
     call h5fclose_f(fid, err)
@@ -972,8 +977,9 @@ module io
 !
     use error          , only : print_error
     use hdf5           , only : hid_t
-    use hdf5           , only : H5F_ACC_TRUNC_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fclose_f
+    use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
+    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
+                              , h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1055,6 +1061,10 @@ module io
       return
 
     end select
+
+! flush the file
+!
+    call h5fflush_f(fid, H5F_SCOPE_GLOBAL_F, err)
 
 ! close the file
 !
