@@ -665,10 +665,6 @@ program amun
 !
   call stop_timer(iev)
 
-! start time accounting for the termination
-!
-  call start_timer(itm)
-
 ! write down the restart snapshot
 !
   call write_restart_snapshot(1.0d+16, nrun, iret)
@@ -677,6 +673,10 @@ program amun
 ! initialized, we have to finalize them first
 !
 10 continue
+
+! start time accounting for the termination
+!
+  call start_timer(itm)
 
 ! finalize integrals module
 !
