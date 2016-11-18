@@ -450,11 +450,11 @@ program amun
 
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call read_restart_snapshot(iret)
+    call read_restart_snapshot(iterm)
 
 ! quit if there was a problem with reading restart snapshots
 !
-    if (iret > 0) go to 10
+    if (iterm > 0) go to 10
 
 ! update the list of leafs
 !
@@ -845,7 +845,7 @@ program amun
                                                             " execution time."
       write (*,"(1x,a)") "Restart files have been successfully written."
     end if
-    if (iterm >= 101) then
+    if (iterm >= 101 .and. iterm < 120) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "The initial conditions for the selected problem" //  &
                          " could not be set."
