@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2015 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -201,7 +201,7 @@ program amun
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2015 Grzegorz Kowal'
+                                        'Copyright (C) 2008-2016 Grzegorz Kowal'
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
@@ -444,9 +444,23 @@ program amun
 !
     call initialize_mesh(nrun, master, iret)
 
+! quit if mesh couldn't be initialized
+!
+    if (iret > 0) go to 10
+
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call read_restart_snapshot()
+    call read_restart_snapshot(iterm)
+
+#ifdef MPI
+! reduce termination flag over all processors
+!
+  call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
+
+! quit if there was a problem with reading restart snapshots
+!
+    if (iterm > 0) go to 10
 
 ! update the list of leafs
 !
@@ -457,6 +471,10 @@ program amun
 ! initialize the mesh module
 !
     call initialize_mesh(nrun, master, iret)
+
+! quit if mesh couldn't be initialized
+!
+    if (iret > 0) go to 10
 
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem
@@ -653,10 +671,6 @@ program amun
 !
   call stop_timer(iev)
 
-! start time accounting for the termination
-!
-  call start_timer(itm)
-
 ! write down the restart snapshot
 !
   call write_restart_snapshot(1.0d+16, nrun, iret)
@@ -665,6 +679,10 @@ program amun
 ! initialized, we have to finalize them first
 !
 10 continue
+
+! start time accounting for the termination
+!
+  call start_timer(itm)
 
 ! finalize integrals module
 !
@@ -833,7 +851,7 @@ program amun
                                                             " execution time."
       write (*,"(1x,a)") "Restart files have been successfully written."
     end if
-    if (iterm >= 101) then
+    if (iterm >= 101 .and. iterm < 120) then
       write (*,'(a)') ''
       write (*,"(1x,a)") "The initial conditions for the selected problem" //  &
                          " could not be set."
