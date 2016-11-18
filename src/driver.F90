@@ -452,6 +452,12 @@ program amun
 !
     call read_restart_snapshot(iterm)
 
+#ifdef MPI
+! reduce termination flag over all processors
+!
+  call reduce_maximum_integer(iterm, iret)
+#endif /* MPI */
+
 ! quit if there was a problem with reading restart snapshots
 !
     if (iterm > 0) go to 10
