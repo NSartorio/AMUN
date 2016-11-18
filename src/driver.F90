@@ -444,9 +444,17 @@ program amun
 !
     call initialize_mesh(nrun, master, iret)
 
+! quit if mesh couldn't be initialized
+!
+    if (iret > 0) go to 10
+
 ! reconstruct the meta and data block structures from a given restart file
 !
-    call read_restart_snapshot()
+    call read_restart_snapshot(iret)
+
+! quit if there was a problem with reading restart snapshots
+!
+    if (iret > 0) go to 10
 
 ! update the list of leafs
 !
@@ -457,6 +465,10 @@ program amun
 ! initialize the mesh module
 !
     call initialize_mesh(nrun, master, iret)
+
+! quit if mesh couldn't be initialized
+!
+    if (iret > 0) go to 10
 
 ! generate the initial mesh, refine that mesh to the desired level according to
 ! the initialized problem

@@ -309,10 +309,13 @@ module io
 !   Subroutine reads restart snapshot files in order to resume the job.
 !   This is a wrapper calling specific format subroutine.
 !
+!   Arguments:
+!
+!     iret - the return flag to inform if subroutine succeeded or failed;
 !
 !===============================================================================
 !
-  subroutine read_restart_snapshot()
+  subroutine read_restart_snapshot(iret)
 
 ! import external variables
 !
@@ -321,6 +324,10 @@ module io
 ! local variables are not implicit by default
 !
     implicit none
+
+! input and output arguments
+!
+    integer, intent(out) :: iret
 !
 !-------------------------------------------------------------------------------
 !
@@ -333,7 +340,7 @@ module io
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
 !
-    call read_restart_snapshot_h5()
+    call read_restart_snapshot_h5(iret)
 #endif /* HDF5 */
 
 ! calculate the shift of the snapshot counter, and the next snapshot time
@@ -510,10 +517,13 @@ module io
 !   stored in the HDF5 format restart files and reconstructs the data structure
 !   in order to resume a terminated job.
 !
+!   Arguments:
+!
+!     iret - the return flag to inform if subroutine succeeded or failed;
 !
 !===============================================================================
 !
-  subroutine read_restart_snapshot_h5()
+  subroutine read_restart_snapshot_h5(iret)
 
 ! import external procedures and variables
 !
@@ -531,6 +541,10 @@ module io
 ! local variables are not implicit by default
 !
     implicit none
+
+! input and output arguments
+!
+    integer, intent(out) :: iret
 
 ! local variables
 !
@@ -556,6 +570,7 @@ module io
     if (.not. info) then
       call print_error("io::read_restart_snapshot_h5"                          &
                                   , "File " // trim(fl) // " does not exist!")
+      iret = 120
       return
     end if ! file does not exist
 
@@ -568,6 +583,7 @@ module io
     if (err < 0) then
       call print_error("io::read_restart_snapshot_h5"                          &
                             , "Cannot initialize the HDF5 Fortran interface!")
+      iret = 121
       return
     end if
 
@@ -581,6 +597,7 @@ module io
       call print_error("io::read_restart_snapshot_h5"                          &
                                             , "Cannot check the file format!")
       call h5close_f(err)
+      iret = 122
       return
     end if
 
@@ -590,6 +607,7 @@ module io
       call print_error("io::read_restart_snapshot_h5"                          &
                              , "File " // trim(fl) // " is not an HDF5 file!")
       call h5close_f(err)
+      iret = 123
       return
     end if
 
@@ -603,6 +621,7 @@ module io
       call print_error("io::read_restart_snapshot_h5"                          &
                                            , "Cannot open file: " // trim(fl))
       call h5close_f(err)
+      iret = 124
       return
     end if
 
@@ -624,6 +643,7 @@ module io
       call print_error("io::read_restart_snapshot_h5"                          &
                                           , "Cannot close file: " // trim(fl))
       call h5close_f(err)
+      iret = 125
       return
     end if
 
@@ -651,6 +671,7 @@ module io
         call print_error("io::read_restart_snapshot_h5"                        &
                                   , "File " // trim(fl) // " does not exist!")
         call h5close_f(err)
+        iret = 120
         return
       end if ! file does not exist
 
@@ -664,6 +685,7 @@ module io
         call print_error("io::read_restart_snapshot_h5"                        &
                                             , "Cannot check the file format!")
         call h5close_f(err)
+        iret = 122
         return
       end if
 
@@ -673,6 +695,7 @@ module io
         call print_error("io::read_restart_snapshot_h5"                        &
                              , "File " // trim(fl) // " is not an HDF5 file!")
         call h5close_f(err)
+        iret = 123
         return
       end if
 
@@ -686,6 +709,7 @@ module io
         call print_error("io::read_restart_snapshot_h5"                        &
                                            , "Cannot open file: " // trim(fl))
         call h5close_f(err)
+        iret = 124
         return
       end if
 
@@ -703,6 +727,7 @@ module io
         call print_error("io::read_restart_snapshot_h5"                        &
                                           , "Cannot close file: " // trim(fl))
         call h5close_f(err)
+        iret = 125
         return
       end if
 
@@ -740,6 +765,7 @@ module io
             call print_error("io::read_restart_snapshot_h5"                    &
                                   , "File " // trim(fl) // " does not exist!")
             call h5close_f(err)
+            iret = 120
             return
           end if ! file does not exist
 
@@ -753,6 +779,7 @@ module io
             call print_error("io::read_restart_snapshot_h5"                    &
                                             , "Cannot check the file format!")
             call h5close_f(err)
+            iret = 122
             return
           end if
 
@@ -762,6 +789,7 @@ module io
             call print_error("io::read_restart_snapshot_h5"                    &
                              , "File " // trim(fl) // " is not an HDF5 file!")
             call h5close_f(err)
+            iret = 123
             return
           end if
 
@@ -775,6 +803,7 @@ module io
             call print_error("io::read_restart_snapshot_h5"                    &
                                            , "Cannot open file: " // trim(fl))
             call h5close_f(err)
+            iret = 124
             return
           end if
 
@@ -792,6 +821,7 @@ module io
             call print_error("io::read_restart_snapshot_h5"                    &
                                           , "Cannot close file: " // trim(fl))
             call h5close_f(err)
+            iret = 125
             return
           end if
 
@@ -828,8 +858,13 @@ module io
     if (err > 0) then
       call print_error("io::read_restart_snapshot_h5"                          &
                                  , "Cannot close the HDF5 Fortran interface!")
+      iret = 121
       return
     end if
+
+! return success flag
+!
+    iret = 0
 
 !-------------------------------------------------------------------------------
 !
