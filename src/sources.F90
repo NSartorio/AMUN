@@ -296,7 +296,7 @@ module sources
 !
       do k = 1, km
         do j = 1, jm
-          do i = 1, jm
+          do i = 1, im
 
 ! calculate distance from the origin
 !
@@ -370,7 +370,7 @@ module sources
 !
       do k = 1, km
         do j = 1, jm
-          do i = 1, jm
+          do i = 1, im
 
 ! prepare the νρ factor
 !
@@ -441,7 +441,7 @@ module sources
 !
         do k = 1, km
           do j = 1, jm
-            do i = 1, jm
+            do i = 1, im
 
 ! calculate scalar product of v and viscous stress tensor τ
 !
