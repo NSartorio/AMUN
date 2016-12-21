@@ -7368,11 +7368,7 @@ module io
 #endif /* NDIMS == 3 */
       bdim = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
 
-#if NDIMS == 3
-      write(stmp, "(1i8)") 1
-#else /* NDIMS == 3 */
       write(stmp, "(1i8)") kn
-#endif /* NDIMS == 3 */
       write(ttmp, "(1i8)") jn
       stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
       write(ttmp, "(1i8)") in
@@ -7569,7 +7565,6 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_snapshot_xdmf_master
-
 #endif /* HDF5 */
 
 !===============================================================================
