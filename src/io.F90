@@ -482,6 +482,7 @@ module io
     call write_snapshot_h5()
     if (with_xdmf) then
       call write_snapshot_xdmf()
+      if (master) call write_snapshot_xdmf_master()
     end if
 #endif /* HDF5 */
 
@@ -7497,6 +7498,78 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine write_snapshot_xdmf
+!
+!===============================================================================
+!
+! subroutine WRITE_SNAPSHOT_XDMF_MASTER:
+! -------------------------------------
+!
+! Subroutine writes one XDMF file per snapshot in root MPI process to gather
+! all MPI subdomains.
+!
+!
+!===============================================================================
+!
+  subroutine write_snapshot_xdmf_master()
+
+! import procedures and variables from other modules
+!
+    use mpitools       , only : npmax
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    character(len=64)  :: fname, pname
+    integer(kind=4)    :: np
+
+! local parameters
+!
+    integer, parameter :: xdmf = 102
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the XDMF and HDF5 file names
+
+    write(fname, "(a1,i6.6,'.xdmf')") ftype, isnap
+
+! open the XDMF file
+!
+    open (unit = xdmf, file = fname, status = 'replace')
+
+! write the header
+!
+    write(xdmf, "(a)") '<?xml version="1.0" encoding="UTF-8"?>'
+    write(xdmf, "(a)") '<Xdmf Version="2.2"'                                   &
+                               // ' xmlns:xi="http://www.w3.org/2003/XInclude">'
+    write(xdmf, "(a)") ' <Domain Name="GatherMPISubDomains">'
+    write(xdmf, "(a)") '  <Grid Name="FullDomain"'                             &
+                           // ' GridType="Collection" CollectionType="Spatial">'
+
+! write references to MPI subdomain files
+!
+    do np = 0, npmax
+      write(pname, "(a1,i6.6,'_',i5.5,'.xdmf')") ftype, isnap, np
+      write(xdmf, "(a)") '   <xi:include href="' // trim(pname)                &
+                               // '" xpointer="xpointer(//Xdmf/Domain/Grid)"/>'
+    end do
+
+! close the XDMF structures
+!
+    write(xdmf, "(a)") '  </Grid>'
+    write(xdmf, "(a)") ' </Domain>'
+    write(xdmf, "(a)") '</Xdmf>'
+
+! close the XDMF file
+!
+    close(xdmf)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_snapshot_xdmf_master
+
 #endif /* HDF5 */
 
 !===============================================================================
