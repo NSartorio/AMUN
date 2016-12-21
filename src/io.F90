@@ -126,6 +126,10 @@ module io
 !
   logical           , save :: with_ghosts = .true.
 
+! a flag to determine if XDMF files should be generated
+!
+  logical           , save :: with_xdmf   = .false.
+
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
@@ -195,6 +199,7 @@ module io
 ! local variables
 !
     character(len=255) :: ghosts = "on"
+    character(len=255) :: xdmf   = "off"
     integer            :: dd, hh, mm, ss
 !
 !-------------------------------------------------------------------------------
@@ -226,6 +231,10 @@ module io
 !
     call get_parameter_string ("include_ghosts"   , ghosts )
 
+! get the flag determining if the XDMF files should be generated
+!
+    call get_parameter_string ("generate_xdmf"    , xdmf   )
+
 ! check ghost cell storing flag
 !
     select case(trim(ghosts))
@@ -233,6 +242,15 @@ module io
       with_ghosts = .false.
     case default
       with_ghosts = .true.
+    end select
+
+! check flag for generating XDMF files
+!
+    select case(trim(xdmf))
+    case ("off", "OFF", "n", "N", "false", "FALSE", "no", "NO")
+      with_xdmf = .false.
+    case default
+      with_xdmf = .true.
     end select
 
 ! return the run number
@@ -250,6 +268,11 @@ module io
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "on"
       else
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "off"
+      end if
+      if (with_xdmf) then
+        write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "on"
+      else
+        write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "off"
       end if
       write (*,"(4x,a21,2x,'=',1x,e9.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
