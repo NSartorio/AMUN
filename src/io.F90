@@ -7503,6 +7503,9 @@ module io
 ! Subroutine writes one XDMF file per snapshot in root MPI process to gather
 ! all MPI subdomains.
 !
+!   Based on the subroutine by Pierre Kestener
+!   (see https://bitbucket.org/pkestene/amun-code).
+!
 !
 !===============================================================================
 !
