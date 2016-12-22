@@ -7338,8 +7338,8 @@ module io
     write(xdmf, "(a)") '<Xdmf Version="2.2"'                                   &
                                // ' xmlns:xi="http://www.w3.org/2003/XInclude">'
     write(xdmf, "(a)") ' <Domain>'
-    write(stmp, "(a,i5.5)") 'region_', nproc
-    write(xdmf, "(a)") '  <Grid Name="' // trim(adjustl(stmp))                 &
+    write(stmp, "(1i16)") nproc
+    write(xdmf, "(a)") '  <Grid Name="region_' // trim(adjustl(stmp))          &
                           // '" GridType="Collection" CollectionType="Spatial">'
     write(stmp, "(1g15.8)") time
     write(xdmf, "(a)") '   <Time TimeType="Single" Value="'                    &
@@ -7400,7 +7400,7 @@ module io
 
 ! store block geometry information
 !
-        write(stmp, "(1i9.9)") pdata%meta%id
+        write(stmp, "(1i16)") pdata%meta%id
         write(xdmf, "(a)") '    <Grid Name="block_'                            &
                               // trim(adjustl(stmp)) // '">'
 #if NDIMS == 3
