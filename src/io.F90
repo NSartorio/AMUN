@@ -126,6 +126,10 @@ module io
 !
   logical           , save :: with_ghosts = .true.
 
+! a flag to determine if XDMF files should be generated
+!
+  logical           , save :: with_xdmf   = .false.
+
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
@@ -195,6 +199,7 @@ module io
 ! local variables
 !
     character(len=255) :: ghosts = "on"
+    character(len=255) :: xdmf   = "off"
     integer            :: dd, hh, mm, ss
 !
 !-------------------------------------------------------------------------------
@@ -226,6 +231,10 @@ module io
 !
     call get_parameter_string ("include_ghosts"   , ghosts )
 
+! get the flag determining if the XDMF files should be generated
+!
+    call get_parameter_string ("generate_xdmf"    , xdmf   )
+
 ! check ghost cell storing flag
 !
     select case(trim(ghosts))
@@ -233,6 +242,15 @@ module io
       with_ghosts = .false.
     case default
       with_ghosts = .true.
+    end select
+
+! check flag for generating XDMF files
+!
+    select case(trim(xdmf))
+    case ("off", "OFF", "n", "N", "false", "FALSE", "no", "NO")
+      with_xdmf = .false.
+    case default
+      with_xdmf = .true.
     end select
 
 ! return the run number
@@ -250,6 +268,11 @@ module io
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "on"
       else
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "off"
+      end if
+      if (with_xdmf) then
+        write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "on"
+      else
+        write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "off"
       end if
       write (*,"(4x,a21,2x,'=',1x,e9.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
@@ -435,6 +458,7 @@ module io
 ! import external variables
 !
     use evolution      , only : time
+    use mpitools       , only : master
 
 ! local variables are not implicit by default
 !
@@ -456,6 +480,10 @@ module io
 ! store variable snapshot file
 !
     call write_snapshot_h5()
+    if (with_xdmf) then
+      call write_snapshot_xdmf()
+      if (master) call write_snapshot_xdmf_master()
+    end if
 #endif /* HDF5 */
 
 ! increase the snapshot counter and calculate the next snapshot time
@@ -7241,6 +7269,305 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine read_5d_array_double_h5
+!
+!===============================================================================
+!
+! subroutine WRITE_SNAPSHOT_XDMF:
+! ------------------------------
+!
+!   Subroutine writes an XDMF file per snapshot per MPI process.
+!   XDMF file is just a wrapper which helps to load data in a visualization
+!   tools like Paraview or Visit.
+!
+!   Based on the subroutine by Pierre Kestener
+!   (see https://bitbucket.org/pkestene/amun-code).
+!
+!
+!===============================================================================
+!
+  subroutine write_snapshot_xdmf()
+
+! import procedures and variables from other modules
+!
+    use blocks         , only : block_data, list_data
+    use blocks         , only : get_dblocks
+    use equations      , only : nv, pvars
+    use mpitools       , only : nproc
+    use coordinates    , only : in, jn, kn
+    use coordinates    , only : adx, ady, adz
+    use coordinates    , only : ng
+    use evolution      , only : time
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local pointers
+!
+    type(block_data), pointer  :: pdata
+
+! local variables
+!
+    character(len=64)  :: fname, hname
+    character(len=128) :: stmp, ttmp, sdim, bdim, pdim
+    integer(kind=4)    :: l, p
+    integer(kind=4)    :: ip, jp, kp
+
+! local arrays
+!
+    integer, dimension(12) :: slab
+
+! local parameters
+!
+    integer, parameter :: xdmf = 101
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the XDMF and HDF5 file names
+
+    write(fname, "(a1,i6.6,'_',i5.5,'.xdmf')") ftype, isnap, nproc
+    write(hname, "(a1,i6.6,'_',i5.5,'.h5'  )") ftype, isnap, nproc
+
+! open the XDMF file
+!
+    open (unit = xdmf, file = fname, status = 'replace')
+
+! write the header
+!
+    write(xdmf, "(a)") '<?xml version="1.0" encoding="UTF-8"?>'
+    write(xdmf, "(a)") '<Xdmf Version="2.2"'                                   &
+                               // ' xmlns:xi="http://www.w3.org/2003/XInclude">'
+    write(xdmf, "(a)") ' <Domain>'
+    write(stmp, "(1i16)") nproc
+    write(xdmf, "(a)") '  <Grid Name="region_' // trim(adjustl(stmp))          &
+                          // '" GridType="Collection" CollectionType="Spatial">'
+    write(stmp, "(1g15.8)") time
+    write(xdmf, "(a)") '   <Time TimeType="Single" Value="'                    &
+                                                 // trim(adjustl(stmp)) // '"/>'
+
+! do not proceed if there are not data block on this processor
+!
+    if (get_dblocks() > 0) then
+
+! prepare dimensions
+!
+      ip = in + 1
+      jp = jn + 1
+#if NDIMS == 3
+      kp = kn + 1
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+      write(stmp, "(1i8)") kn
+      write(ttmp, "(1i8)") jn
+      stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+      write(ttmp, "(1i8)") in
+#else /* NDIMS == 3 */
+      write(stmp, "(1i8)") jn
+      write(ttmp, "(1i8)") in
+#endif /* NDIMS == 3 */
+      bdim = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+
+      write(stmp, "(1i8)") kn
+      write(ttmp, "(1i8)") jn
+      stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+      write(ttmp, "(1i8)") in
+      stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+      write(ttmp, "(1i8)") get_dblocks()
+      sdim = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+
+! prepare slab indices
+!
+#if NDIMS == 3
+      if (with_ghosts) then
+        slab(:) = (/ ng, ng, ng, -1, 1, 1, 1, 1, kn, jn, in, 1 /)
+      else
+        slab(:) = (/  0,  0,  0, -1, 1, 1, 1, 1, kn, jn, in, 1 /)
+      end if
+#else /* NDIMS == 3 */
+      if (with_ghosts) then
+        slab(:) = (/  0, ng, ng, -1, 1, 1, 1, 1,  1, jn, in, 1 /)
+      else
+        slab(:) = (/  0,  0,  0, -1, 1, 1, 1, 1,  1, jn, in, 1 /)
+      end if
+#endif /* NDIMS == 3 */
+
+! iterate over all data blocks
+!
+      l = 0
+      pdata => list_data
+      do while(associated(pdata))
+
+! store block geometry information
+!
+        write(stmp, "(1i16)") pdata%meta%id
+        write(xdmf, "(a)") '    <Grid Name="block_'                            &
+                              // trim(adjustl(stmp)) // '">'
+#if NDIMS == 3
+        write(stmp, "(1i8)") kp
+        write(ttmp, "(1i8)") jp
+        stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+        write(ttmp, "(1i8)") ip
+        stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+        write(xdmf, "(a)") '     <Topology TopologyType="3DCoRectMesh"'        &
+                              // ' Dimensions="' // trim(adjustl(stmp)) // '"/>'
+        write(xdmf, "(a)") '     <Geometry GeometryType="ORIGIN_DXDYDZ">'
+        write(stmp, "(3e16.8)") pdata%meta%zmin, pdata%meta%ymin               &
+                                               , pdata%meta%xmin
+        write(xdmf, "(a)") '      <DataItem Name="Origin" NumberType="Float"'  &
+                              // ' Precision="4" Dimensions="3" Format="XML">' &
+                              // trim(adjustl(stmp)) // '</DataItem>'
+        write(stmp, "(3e16.8)") adz(pdata%meta%level), ady(pdata%meta%level)   &
+                                                     , adx(pdata%meta%level)
+        write(xdmf, "(a)") '      <DataItem Name="Spacing" NumberType="Float"' &
+                              // ' Precision="4" Dimensions="3" Format="XML">' &
+                              // trim(adjustl(stmp)) // '</DataItem>'
+#else /* NDIMS == 3 */
+        write(stmp, "(1i8)") jp
+        write(ttmp, "(1i8)") ip
+        stmp = trim(adjustl(stmp)) // ' ' // trim(adjustl(ttmp))
+        write(xdmf, "(a)") '     <Topology TopologyType="2DCoRectMesh"'        &
+                              // ' Dimensions="' // trim(adjustl(stmp)) // '"/>'
+        write(xdmf, "(a)") '     <Geometry GeometryType="ORIGIN_DXDY">'
+        write(stmp, "(2e16.8)") pdata%meta%ymin, pdata%meta%xmin
+        write(xdmf, "(a)") '      <DataItem Name="Origin" NumberType="Float"'  &
+                              // ' Precision="4" Dimensions="2" Format="XML">' &
+                              // trim(adjustl(stmp)) // '</DataItem>'
+        write(stmp, "(2e16.8)") ady(pdata%meta%level), adx(pdata%meta%level)
+        write(xdmf, "(a)") '      <DataItem Name="Spacing" NumberType="Float"' &
+                              // ' Precision="4" Dimensions="2" Format="XML">' &
+                              // trim(adjustl(stmp)) // '</DataItem>'
+#endif /* NDIMS == 3 */
+        write(xdmf, "(a)") '     </Geometry>'
+
+! convert slab dimensions to string
+!
+        slab(4) = l
+        write(pdim, "(1i8)") slab(1)
+        do p = 2, 12
+          write(ttmp, "(1i8)") slab(p)
+          pdim = trim(adjustl(pdim)) // ' ' // trim(adjustl(ttmp))
+        end do
+
+! loop over all variables and store their information
+!
+        do p = 1, nv
+
+          write(xdmf, "(a)") '     <Attribute Name="'                          &
+                               // trim(adjustl(pvars(p)))                      &
+                               // '" AttributeType="Scalar" Center="Cell">'
+          write(xdmf, "(a)") '      <DataItem ItemType="Hyperslab"'            &
+                               // ' Dimensions="'  // trim(adjustl(bdim))      &
+                               // '" Type="HyperSlab">'
+          write(xdmf, "(a)") '       <DataItem Dimensions="3 4" Format="XML">' &
+                               // trim(adjustl(pdim)) // '</DataItem>'
+          write(ttmp, "(a,':/variables/',a)") trim(hname), trim(pvars(p))
+          write(xdmf, "(a)") '       <DataItem NumberType="Float"'             &
+                               // ' Precision="8" Dimensions="'                &
+                               // trim(adjustl(sdim)) // '" Format="HDF">'     &
+                               // trim(adjustl(ttmp)) // '</DataItem>'
+          write(xdmf, "(a)") '      </DataItem>'
+          write(xdmf, "(a)") '     </Attribute>'
+
+        end do
+
+! close grid structure for the current block
+!
+        write(xdmf,"(a)") '    </Grid>'
+
+        l = l + 1
+        pdata => pdata%next
+      end do
+
+    end if ! get_dblocks() > 0
+
+! close the XDMF structures
+!
+    write(xdmf, "(a)") '  </Grid>'
+    write(xdmf, "(a)") ' </Domain>'
+    write(xdmf, "(a)") '</Xdmf>'
+
+! close the XDMF file
+!
+    close(xdmf)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_snapshot_xdmf
+!
+!===============================================================================
+!
+! subroutine WRITE_SNAPSHOT_XDMF_MASTER:
+! -------------------------------------
+!
+! Subroutine writes one XDMF file per snapshot in root MPI process to gather
+! all MPI subdomains.
+!
+!   Based on the subroutine by Pierre Kestener
+!   (see https://bitbucket.org/pkestene/amun-code).
+!
+!
+!===============================================================================
+!
+  subroutine write_snapshot_xdmf_master()
+
+! import procedures and variables from other modules
+!
+    use mpitools       , only : npmax
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! local variables
+!
+    character(len=64)  :: fname, pname
+    integer(kind=4)    :: np
+
+! local parameters
+!
+    integer, parameter :: xdmf = 102
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the XDMF and HDF5 file names
+
+    write(fname, "(a1,i6.6,'.xdmf')") ftype, isnap
+
+! open the XDMF file
+!
+    open (unit = xdmf, file = fname, status = 'replace')
+
+! write the header
+!
+    write(xdmf, "(a)") '<?xml version="1.0" encoding="UTF-8"?>'
+    write(xdmf, "(a)") '<Xdmf Version="2.2"'                                   &
+                               // ' xmlns:xi="http://www.w3.org/2003/XInclude">'
+    write(xdmf, "(a)") ' <Domain Name="GatherMPISubDomains">'
+    write(xdmf, "(a)") '  <Grid Name="FullDomain"'                             &
+                           // ' GridType="Collection" CollectionType="Spatial">'
+
+! write references to MPI subdomain files
+!
+    do np = 0, npmax
+      write(pname, "(a1,i6.6,'_',i5.5,'.xdmf')") ftype, isnap, np
+      write(xdmf, "(a)") '   <xi:include href="' // trim(pname)                &
+                               // '" xpointer="xpointer(//Xdmf/Domain/Grid)"/>'
+    end do
+
+! close the XDMF structures
+!
+    write(xdmf, "(a)") '  </Grid>'
+    write(xdmf, "(a)") ' </Domain>'
+    write(xdmf, "(a)") '</Xdmf>'
+
+! close the XDMF file
+!
+    close(xdmf)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine write_snapshot_xdmf_master
 #endif /* HDF5 */
 
 !===============================================================================
