@@ -43,6 +43,7 @@ program amun
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, new_time_step
   use evolution     , only : step, time, dt
+  use gravity       , only : initialize_gravity, finalize_gravity
   use integrals     , only : initialize_integrals, finalize_integrals
   use integrals     , only : store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
@@ -416,6 +417,10 @@ program amun
     write (*,"(1x,a)"         ) "Source terms:"
   end if
 
+! initialize module GRAVITY
+!
+  call initialize_gravity(master, iret)
+
 ! initialize module SOURCES
 !
   call initialize_sources(master, iret)
@@ -695,6 +700,10 @@ program amun
 ! finalize module SOURCES
 !
   call finalize_sources(iret)
+
+! finalize module GRAVITY
+!
+  call finalize_gravity(iret)
 
 ! finalize module SHAPES
 !
