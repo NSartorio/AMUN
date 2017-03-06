@@ -230,14 +230,12 @@ module gravity
 !
 !   Arguments:
 !
-!     time    - time at the moment of update;
-!     dt      - time step since the last update;
 !     x, y, z - rectangular coordinates;
 !     gacc    - vector of the gravitational acceleration;
 !
 !===============================================================================
 !
-  subroutine gacc_none(time, dt, x, y, z, gacc)
+  subroutine gacc_none(x, y, z, gacc)
 
 ! local variables are not implicit by default
 !
@@ -245,7 +243,7 @@ module gravity
 
 ! subroutine arguments
 !
-    real(kind=8)              , intent(in)  :: time, dt, x, y, z
+    real(kind=8)              , intent(in)  :: x, y, z
     real(kind=8), dimension(3), intent(out) :: gacc
 !
 !-------------------------------------------------------------------------------
