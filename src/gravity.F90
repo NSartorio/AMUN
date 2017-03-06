@@ -106,7 +106,6 @@ module gravity
 ! local variables
 !
     character(len=64) :: problem_name   = "none"
-    character(len=64) :: enable_gravity = "off"
 !
 !-------------------------------------------------------------------------------
 !
@@ -123,39 +122,18 @@ module gravity
 
 ! get the problem name
 !
-    call get_parameter_string("problem"       , problem_name  )
-    call get_parameter_string("enable_gravity", enable_gravity)
-
-! set the correct procedure pointer if gravity are enabled
-!
-    select case(trim(enable_gravity))
-    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+    call get_parameter_string("problem", problem_name)
 
 ! select the shape update subroutine depending on the problem
 !
-      select case(trim(problem_name))
-
-! no shape update
-!
-      case default
-        gravitational_acceleration => gacc_none
-
-      end select
-
-
-! print information about the Riemann solver
-!
-      if (verbose .and. gravity_enabled) then
-
-        write (*,"(4x,a,1x,a)") "gravity                =", trim(enable_gravity)
-
-      end if
+    select case(trim(problem_name))
 
     case default
 
 ! by default the gravity is turned off, so reset the procedure pointer
 !
       gravitational_acceleration => gacc_none
+      gravity_enabled = .false.
 
     end select
 
