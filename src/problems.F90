@@ -140,6 +140,9 @@ module problems
     case("kh", "kelvinhelmholtz", "kelvin-helmholtz")
       setup_problem => setup_problem_kelvin_helmholtz
 
+    case("rt", "rayleightaylor", "rayleigh-taylor")
+      setup_problem => setup_problem_rayleigh_taylor
+
     case("current_sheet")
       setup_problem => setup_problem_current_sheet
 
@@ -1199,6 +1202,193 @@ module problems
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_kelvin_helmholtz
+!
+!===============================================================================
+!
+! subroutine SETUP_PROBLEM_RAYLEIGH_TAYLOR:
+! ----------------------------------------
+!
+!   Subroutine sets the initial conditions for the Rayleigh-Taylor instability
+!   problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!===============================================================================
+!
+  subroutine setup_problem_rayleigh_taylor(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use constants  , only : d2r
+    use coordinates, only : im, jm, km
+    use coordinates, only : ay, ady
+    use equations  , only : prim2cons
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use parameters , only : get_parameter_real
+    use random     , only : randomn
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: ycut   =  0.00d-00
+    real(kind=8), save :: dens   =  1.00d+00
+    real(kind=8), save :: drat   =  2.00d+00
+    real(kind=8), save :: pres   =  2.50d+00
+    real(kind=8), save :: vper   =  1.00d-02
+    real(kind=8), save :: gacc   = -1.00d-01
+    real(kind=8), save :: buni   =  1.00d+00
+    real(kind=8), save :: bgui   =  0.00d+00
+    real(kind=8), save :: angle  =  0.00d+00
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: yl, yu, dy, dyh
+    real(kind=8)  :: sn, cs
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("ycut"  , ycut  )
+      call get_parameter_real("dens"  , dens  )
+      call get_parameter_real("drat"  , drat  )
+      call get_parameter_real("pres"  , pres  )
+      call get_parameter_real("vper"  , vper  )
+      call get_parameter_real("buni"  , buni  )
+      call get_parameter_real("bgui"  , bgui  )
+      call get_parameter_real("angle" , angle )
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+
+! calculate mesh intervals and areas
+!
+    dy   = ady(pdata%meta%level)
+    dyh  = 0.5d+00 * dy
+
+! set the ambient density and pressure
+!
+    q(idn,:) = dens
+    if (ipr > 0) q(ipr,:) = pres
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+! calculate the orientation angles
+!
+      sn = sin(d2r * angle)
+      cs = sqrt(1.0d+00 - sn * sn)
+
+! set magnetic field components
+!
+      q(ibx,:) = buni * cs
+      q(iby,:) = buni * sn
+      q(ibz,:) = bgui
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! calculate the corner Y coordinates
+!
+        yl = abs(y(j)) - dyh
+        yu = abs(y(j)) + dyh
+
+! set the primitive variables for two regions
+!
+        if (yu <= ycut) then
+          q(idn,1:im) =   dens
+        else if (yl >= ycut) then
+          q(idn,1:im) = dens * drat
+        else
+          q(idn,1:im) = dens * ((yu - ycut) + (ycut - yl) * drat) / dy
+        end if
+
+! set the pressure
+!
+        if (ipr > 0) q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
+
+! add a random seed velocity component
+!
+        do i = 1, im
+          q(ivx,i) = q(ivx,i) + vper * randomn()
+          q(ivy,i) = q(ivy,i) + vper * randomn()
+#if NDIMS == 3
+          q(ivz,i) = q(ivz,i) + vper * randomn()
+#endif /* NDIMS == 3 */
+        end do
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_rayleigh_taylor
 !
 !===============================================================================
 !
