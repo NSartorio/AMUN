@@ -1259,7 +1259,6 @@ module problems
 ! local variables
 !
     integer       :: i, j, k
-    real(kind=8)  :: yl, yu, dy, dyh
     real(kind=8)  :: sn, cs
 
 ! local arrays
@@ -1303,11 +1302,6 @@ module problems
 !
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
-! calculate mesh intervals and areas
-!
-    dy   = ady(pdata%meta%level)
-    dyh  = 0.5d+00 * dy
-
 ! set the ambient density and pressure
 !
     q(idn,:) = dens
@@ -1337,33 +1331,28 @@ module problems
     do k = 1, km
       do j = 1, jm
 
-! calculate the corner Y coordinates
-!
-        yl = abs(y(j)) - dyh
-        yu = abs(y(j)) + dyh
-
 ! set the primitive variables for two regions
 !
-        if (yu <= ycut) then
-          q(idn,1:im) =   dens
-        else if (yl >= ycut) then
-          q(idn,1:im) = dens * drat
+        if (y(j) <= ycut) then
+          q(idn,1:im) = dens
         else
-          q(idn,1:im) = dens * ((yu - ycut) + (ycut - yl) * drat) / dy
+          q(idn,1:im) = dens * drat
         end if
 
 ! set the pressure
 !
         if (ipr > 0) q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
 
+! reset the velocity components
+!
+        q(ivx,1:im) = 0.0d+00
+        q(ivy,1:im) = 0.0d+00
+        q(ivz,1:im) = 0.0d+00
+
 ! add a random seed velocity component
 !
         do i = 1, im
-          q(ivx,i) = q(ivx,i) + vper * randomn()
           q(ivy,i) = q(ivy,i) + vper * randomn()
-#if NDIMS == 3
-          q(ivz,i) = q(ivz,i) + vper * randomn()
-#endif /* NDIMS == 3 */
         end do
 
 ! convert the primitive variables to conservative ones
