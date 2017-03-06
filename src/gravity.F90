@@ -302,7 +302,7 @@ module gravity
 ! calculate gravitational acceleration components
 !
     gacc(1) = 0.0d+00
-    gacc(2) = gacc_const * y
+    gacc(2) = gacc_const
     gacc(3) = 0.0d+00
 
 #ifdef PROFILE
