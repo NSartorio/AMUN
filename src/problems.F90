@@ -1288,6 +1288,7 @@ module problems
       call get_parameter_real("drat"  , drat  )
       call get_parameter_real("pres"  , pres  )
       call get_parameter_real("vper"  , vper  )
+      call get_parameter_real("gacc"  , gacc  )
       call get_parameter_real("buni"  , buni  )
       call get_parameter_real("bgui"  , bgui  )
       call get_parameter_real("angle" , angle )
