@@ -46,6 +46,10 @@ module gravity
   integer, save :: imi, imc
 #endif /* PROFILE */
 
+! flag indicating if the gravitational source term is enabled
+!
+  logical, save :: gravity_enabled = .false.
+
 ! pointer to the gravitational acceleration subroutine
 !
   procedure(gacc_none), pointer, save :: gravitational_acceleration => null()
@@ -58,6 +62,7 @@ module gravity
 !
   public :: initialize_gravity, finalize_gravity
   public :: gravitational_acceleration
+  public :: gravity_enabled
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -140,7 +145,7 @@ module gravity
 
 ! print information about the Riemann solver
 !
-      if (verbose) then
+      if (verbose .and. gravity_enabled) then
 
         write (*,"(4x,a,1x,a)") "gravity                =", trim(enable_gravity)
 
