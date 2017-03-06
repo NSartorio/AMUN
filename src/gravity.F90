@@ -128,6 +128,10 @@ module gravity
 !
     select case(trim(problem_name))
 
+    case("rt", "rayleightaylor", "rayleigh-taylor")
+      gravitational_acceleration => gacc_rayleigh_taylor
+      gravity_enabled = .true.
+
     case default
 
 ! by default the gravity is turned off, so reset the procedure pointer
@@ -241,6 +245,75 @@ module gravity
 !-------------------------------------------------------------------------------
 !
   end subroutine gacc_none
+!
+!===============================================================================
+!
+! subroutine GACC_RAYLEIGH_TAYLOR:
+! -------------------------------
+!
+!   Subroutine returns the gravitational acceleration for the Rayleigh-Taylor
+!   instability problem.
+!
+!   Arguments:
+!
+!     x, y, z - rectangular coordinates;
+!     gacc    - vector of the gravitational acceleration;
+!
+!===============================================================================
+!
+  subroutine gacc_rayleigh_taylor(x, y, z, gacc)
+
+! include external procedures and variables
+!
+    use parameters , only : get_parameter_real
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8)              , intent(in)  :: x, y, z
+    real(kind=8), dimension(3), intent(out) :: gacc
+
+! gravitational acceleration constant
+!
+    logical     , save :: first      = .true.
+    real(kind=8), save :: gacc_const = -1.0d-01
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the gravitational acceleration calculation
+!
+    call start_timer(imc)
+#endif /* PROFILE */
+
+! read problem parameters during the first execution
+!
+    if (first) then
+
+      call get_parameter_real("gacc", gacc_const)
+
+      first = .false.
+
+    end if
+
+! calculate gravitational acceleration components
+!
+    gacc(1) = 0.0d+00
+    gacc(2) = gacc_const * y
+    gacc(3) = 0.0d+00
+
+#ifdef PROFILE
+! stop accounting time for the gravitational acceleration calculation
+!
+    call stop_timer(imc)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine gacc_rayleigh_taylor
 
 !===============================================================================
 !
