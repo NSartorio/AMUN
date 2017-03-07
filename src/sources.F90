@@ -223,7 +223,7 @@ module sources
 !
 !===============================================================================
 !
-  subroutine update_sources(pdata, du)
+  subroutine update_sources(pdata, t, dt, du)
 
 ! include external variables
 !
@@ -243,6 +243,7 @@ module sources
 ! subroutine arguments
 !
     type(block_data), pointer           , intent(inout) :: pdata
+    real(kind=8)                        , intent(in)    :: t, dt
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: du
 
 ! local variables
