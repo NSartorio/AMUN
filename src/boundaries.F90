@@ -1149,6 +1149,7 @@ module boundaries
 !
                   if (.not. associated(pmeta%edges(i,j,m)%ptr))                &
                             call block_boundary_specific(i, j, k, n            &
+                                          , t, dt, x(:), y(:), z(:)            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                 end do ! i = 1, sides
@@ -1177,6 +1178,7 @@ module boundaries
 !
                     if (.not. associated(pmeta%faces(i,j,k,n)%ptr))            &
                             call block_boundary_specific(i, j, k, n            &
+                                          , t, dt, x(:), y(:), z(:)            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                   end do ! i = 1, sides
@@ -4975,11 +4977,13 @@ module boundaries
 !
 !     nc         - the edge direction;
 !     ic, jc, kc - the corner position;
+!     t, dt      - time and time increment;
+!     x, y, z    - the block coordinates;
 !     qn         - the variable array;
 !
 !===============================================================================
 !
-  subroutine block_boundary_specific(ic, jc, kc, nc, qn)
+  subroutine block_boundary_specific(ic, jc, kc, nc, t, dt, x, y, z, qn)
 
 ! import external procedures and variables
 !
@@ -4998,6 +5002,10 @@ module boundaries
 !
     integer                                     , intent(in)    :: ic, jc, kc
     integer                                     , intent(in)    :: nc
+    real(kind=8)                                , intent(in)    :: t, dt
+    real(kind=8), dimension(1:im)               , intent(inout) :: x
+    real(kind=8), dimension(1:jm)               , intent(inout) :: y
+    real(kind=8), dimension(1:km)               , intent(inout) :: z
     real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
 
 ! local variables
