@@ -325,10 +325,13 @@ module boundaries
 !   Subroutine updates the ghost zones of the data blocks from their neighbors
 !   or applies the specific boundary conditions.
 !
+!   Arguments:
+!
+!     t, dt   - time and time increment;
 !
 !===============================================================================
 !
-  subroutine boundary_variables()
+  subroutine boundary_variables(t, dt)
 
 ! import external procedures and variables
 !
@@ -338,6 +341,10 @@ module boundaries
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    real(kind=8), intent(in) :: t, dt
 
 ! local variables
 !

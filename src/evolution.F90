@@ -2031,7 +2031,7 @@ module evolution
 
 ! update boundaries
 !
-    call boundary_variables()
+    call boundary_variables(tm, dtm)
 
 ! apply shapes in blocks which need it
 !

@@ -488,7 +488,7 @@ program amun
 
 ! update boundaries
 !
-    call boundary_variables()
+    call boundary_variables(0.0d+00, dtnext)
 
 ! calculate new timestep
 !
