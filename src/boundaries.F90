@@ -400,7 +400,7 @@ module boundaries
 
 ! update specific boundaries
 !
-      call boundaries_specific()
+      call boundaries_specific(t, dt)
 
 #if NDIMS == 3
 ! prolong face boundaries from lower level blocks
@@ -424,7 +424,7 @@ module boundaries
 
 ! update specific boundaries
 !
-    call boundaries_specific()
+    call boundaries_specific(t, dt)
 
 ! convert updated primitive variables to conservative ones in all ghost cells
 !
@@ -1042,10 +1042,13 @@ module boundaries
 !   neighbors and update the corresponding boundaries for the selected
 !   boundary type.
 !
+!   Arguments:
+!
+!     t, dt   - time and time increment;
 !
 !===============================================================================
 !
-  subroutine boundaries_specific()
+  subroutine boundaries_specific(t, dt)
 
 ! import external procedures and variables
 !
@@ -1062,6 +1065,10 @@ module boundaries
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    real(kind=8), intent(in) :: t, dt
 
 ! local pointers
 !
