@@ -5005,6 +5005,7 @@ module boundaries
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
     use equations      , only : nv
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use equations      , only : csnd2
     use error          , only : print_error, print_warning
     use gravity        , only : gravitational_acceleration
 
@@ -5166,11 +5167,31 @@ module boundaries
         else
           if (ic == 1) then
             do i = ibl, 1, -1
-              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+              ip1 = i + 1
+              xi  = x(i) + dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,ip1,j,k) * exp(- ga(1) * dx / csnd2)
+                end do
+              end do
             end do
           else
             do i = ieu, im
-              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+              im1 = i - 1
+              xi  = x(i) - dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,im1,j,k) * exp(  ga(1) * dx / csnd2)
+                end do
+              end do
             end do
           end if
         end if
@@ -5317,11 +5338,31 @@ module boundaries
         else
           if (jc == 1) then
             do j = jbl, 1, -1
-              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+              jp1 = j + 1
+              yi  = y(j) + dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,jp1,k) * exp(- ga(2) * dy / csnd2)
+                end do
+              end do
             end do
           else
             do j = jeu, jm
-              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+              jm1 = j - 1
+              yi  = y(j) - dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,jm1,k) * exp(  ga(2) * dy / csnd2)
+                end do
+              end do
             end do
           end if
         end if
@@ -5464,11 +5505,31 @@ module boundaries
         else
           if (kc == 1) then
             do k = kbl, 1, -1
-              qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
+              kp1 = k + 1
+              zi  = z(k) + dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,kb)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,j,kp1) * exp(- ga(3) * dz / csnd2)
+                end do
+              end do
             end do
           else
             do k = keu, km
-              qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
+              km1 = k - 1
+              zi  = z(k) - dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,ke)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,j,km1) * exp(  ga(3) * dz / csnd2)
+                end do
+              end do
             end do
           end if
         end if
