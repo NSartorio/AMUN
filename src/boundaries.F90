@@ -55,6 +55,7 @@ module boundaries
   integer, parameter            :: bnd_open       = 1
   integer, parameter            :: bnd_outflow    = 2
   integer, parameter            :: bnd_reflective = 3
+  integer, parameter            :: bnd_gravity    = 4
 
 ! variable to store boundary type flags
 !
@@ -172,6 +173,8 @@ module boundaries
       bnd_type(1,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,1) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(1,1) = bnd_gravity
     case default
       bnd_type(1,1) = bnd_periodic
     end select
@@ -183,6 +186,8 @@ module boundaries
       bnd_type(1,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,2) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(1,2) = bnd_gravity
     case default
       bnd_type(1,2) = bnd_periodic
     end select
@@ -194,6 +199,8 @@ module boundaries
       bnd_type(2,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,1) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(2,1) = bnd_gravity
     case default
       bnd_type(2,1) = bnd_periodic
     end select
@@ -205,6 +212,8 @@ module boundaries
       bnd_type(2,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,2) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(2,2) = bnd_gravity
     case default
       bnd_type(2,2) = bnd_periodic
     end select
@@ -216,6 +225,8 @@ module boundaries
       bnd_type(3,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,1) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(3,1) = bnd_gravity
     case default
       bnd_type(3,1) = bnd_periodic
     end select
@@ -227,6 +238,8 @@ module boundaries
       bnd_type(3,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,2) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(3,2) = bnd_gravity
     case default
       bnd_type(3,2) = bnd_periodic
     end select
@@ -4991,8 +5004,9 @@ module boundaries
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
     use equations      , only : nv
-    use equations      , only : idn, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use error          , only : print_error, print_warning
+    use gravity        , only : gravitational_acceleration
 
 ! local variables are not implicit by default
 !
@@ -5010,11 +5024,14 @@ module boundaries
 
 ! local variables
 !
-    integer :: i , j , k
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-    integer :: is, js, ks
-    integer :: it, jt, kt
+    integer      :: i, il, iu, is, it, im1, ip1
+    integer      :: j, jl, ju, js, jt, jm1, jp1
+    integer      :: k, kl, ku, ks, kt, km1, kp1
+    real(kind=8) :: dx, dy, dz, dxh, dyh, dzh, xi, yi, zi
+
+! local vectors
+!
+    real(kind=8), dimension(3) :: ga
 !
 !-------------------------------------------------------------------------------
 !
@@ -5105,6 +5122,57 @@ module boundaries
               qn(ibx ,it,jl:ju,kl:ku) = - qn(ibx ,is,jl:ju,kl:ku)
             end if
           end do
+        end if
+
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dx  = x(ib) - x(ibl)
+        dxh = 0.5d+00 * dx
+
+        if (ipr > 0) then
+          if (ic == 1) then
+            do i = ibl, 1, -1
+              ip1 = i + 1
+              xi  = x(i) + dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,ip1,j,k)                              &
+                             - (qn(idn,ip1,j,k) + qn(idn,i,j,k)) * ga(1) * dxh
+                end do
+              end do
+            end do
+          else
+            do i = ieu, im
+              im1 = i - 1
+              xi  = x(i) - dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,im1,j,k)                              &
+                             + (qn(idn,im1,j,k) + qn(idn,i,j,k)) * ga(1) * dxh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (ic == 1) then
+            do i = ibl, 1, -1
+              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+            end do
+          else
+            do i = ieu, im
+              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+            end do
+          end if
         end if
 
 ! wrong boundary conditions
@@ -5207,6 +5275,57 @@ module boundaries
           end do
         end if
 
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dy  = y(jb) - y(jbl)
+        dyh = 0.5d+00 * dy
+
+        if (ipr > 0) then
+          if (jc == 1) then
+            do j = jbl, 1, -1
+              jp1 = j + 1
+              yi  = y(j) + dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,jp1,k)                              &
+                             - (qn(idn,i,jp1,k) + qn(idn,i,j,k)) * ga(2) * dyh
+                end do
+              end do
+            end do
+          else
+            do j = jeu, jm
+              jm1 = j - 1
+              yi  = y(j) - dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,jm1,k)                              &
+                             + (qn(idn,i,jm1,k) + qn(idn,i,j,k)) * ga(2) * dyh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (jc == 1) then
+            do j = jbl, 1, -1
+              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+            end do
+          else
+            do j = jeu, jm
+              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+            end do
+          end if
+        end if
+
 ! wrong boundary conditions
 !
       case default
@@ -5301,6 +5420,57 @@ module boundaries
               qn(ibz ,il:iu,jl:ju,kt) = - qn(ibz ,il:iu,jl:ju,ks)
             end if
           end do
+        end if
+
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dz  = z(kb) - z(kbl)
+        dzh = 0.5d+00 * dz
+
+        if (ipr > 0) then
+          if (kc == 1) then
+            do k = kbl, 1, -1
+              kp1 = k + 1
+              zi  = z(k) + dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,kb)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,j,kp1)                              &
+                             - (qn(idn,i,j,kp1) + qn(idn,i,j,k)) * ga(3) * dzh
+                end do
+              end do
+            end do
+          else
+            do k = keu, km
+              km1 = k - 1
+              zi  = z(k) - dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,ke)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,j,km1)                              &
+                             + (qn(idn,i,j,km1) + qn(idn,i,j,k)) * ga(3) * dzh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (kc == 1) then
+            do k = kbl, 1, -1
+              qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,kb)
+            end do
+          else
+            do k = keu, km
+              qn(1:nv,il:iu,jl:ju,k) = qn(1:nv,il:iu,jl:ju,ke)
+            end do
+          end if
         end if
 
 ! wrong boundary conditions
