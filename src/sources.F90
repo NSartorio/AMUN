@@ -218,8 +218,9 @@ module sources
 !
 !   Arguments:
 !
-!     q    - the array of primitive variables;
-!     du   - the array of variable increment;
+!     pdata - the pointer to a data block;
+!     t, dt - the time and time increment;
+!     du    - the array of variable increment;
 !
 !===============================================================================
 !
