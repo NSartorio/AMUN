@@ -1229,6 +1229,7 @@ module problems
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use equations  , only : csnd2
     use parameters , only : get_parameter_real
     use random     , only : randomn
 
@@ -1331,17 +1332,22 @@ module problems
     do k = 1, km
       do j = 1, jm
 
-! set the primitive variables for two regions
+! set density and pressure
 !
-        if (y(j) <= ycut) then
-          q(idn,1:im) = dens
+        if (ipr > 0) then
+          if (y(j) <= ycut) then
+            q(idn,1:im) = dens
+          else
+            q(idn,1:im) = dens * drat
+          end if
+          q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
         else
-          q(idn,1:im) = dens * drat
+          if (y(j) <= ycut) then
+            q(idn,1:im) = dens        * exp(gacc * y(j) / csnd2)
+          else
+            q(idn,1:im) = dens * drat * exp(gacc * y(j) / csnd2)
+          end if
         end if
-
-! set the pressure
-!
-        if (ipr > 0) q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
 
 ! reset the velocity components
 !
