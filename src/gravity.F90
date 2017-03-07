@@ -212,12 +212,13 @@ module gravity
 !
 !   Arguments:
 !
+!     t, dt   - time and the time increment;
 !     x, y, z - rectangular coordinates;
 !     gacc    - vector of the gravitational acceleration;
 !
 !===============================================================================
 !
-  subroutine gacc_none(x, y, z, gacc)
+  subroutine gacc_none(t, dt, x, y, z, gacc)
 
 ! local variables are not implicit by default
 !
@@ -225,6 +226,7 @@ module gravity
 
 ! subroutine arguments
 !
+    real(kind=8)              , intent(in)  :: t, dt
     real(kind=8)              , intent(in)  :: x, y, z
     real(kind=8), dimension(3), intent(out) :: gacc
 !
@@ -256,12 +258,13 @@ module gravity
 !
 !   Arguments:
 !
+!     t, dt   - time and the time increment;
 !     x, y, z - rectangular coordinates;
 !     gacc    - vector of the gravitational acceleration;
 !
 !===============================================================================
 !
-  subroutine gacc_rayleigh_taylor(x, y, z, gacc)
+  subroutine gacc_rayleigh_taylor(t, dt, x, y, z, gacc)
 
 ! include external procedures and variables
 !
@@ -273,6 +276,7 @@ module gravity
 
 ! subroutine arguments
 !
+    real(kind=8)              , intent(in)  :: t, dt
     real(kind=8)              , intent(in)  :: x, y, z
     real(kind=8), dimension(3), intent(out) :: gacc
 

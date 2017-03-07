@@ -293,7 +293,7 @@ module sources
 
 ! get gravitational acceleration components
 !
-            call gravitational_acceleration(x(i), y(j), z(k), ga(1:3))
+            call gravitational_acceleration(t, dt, x(i), y(j), z(k), ga(1:3))
 
 ! calculate the gravitational source terms
 !
