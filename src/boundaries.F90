@@ -1056,6 +1056,7 @@ module boundaries
     use blocks         , only : list_meta, list_leaf
     use blocks         , only : ndims, nsides
     use coordinates    , only : im, jm, km
+    use coordinates    , only : ax, ay, az
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc
@@ -1078,6 +1079,12 @@ module boundaries
 ! local variables
 !
     integer                   :: i, j, k, n, m
+
+! local arrays
+!
+    real(kind=8), dimension(im) :: x
+    real(kind=8), dimension(jm) :: y
+    real(kind=8), dimension(km) :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -1108,6 +1115,16 @@ module boundaries
 !
         if (pmeta%process == nproc) then
 #endif /* MPI */
+
+! prepare block coordinates
+!
+        x(1:im) = pmeta%xmin + ax(pmeta%level,1:im)
+        y(1:jm) = pmeta%ymin + ay(pmeta%level,1:jm)
+#if NDIMS == 3
+        z(1:km) = pmeta%zmin + az(pmeta%level,1:km)
+#else /* NDIMS == 3 */
+        z(1:km) = 0.0d+00
+#endif /* NDIMS == 3 */
 
 #if NDIMS == 2
 ! iterate over all directions
