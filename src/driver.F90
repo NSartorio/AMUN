@@ -77,6 +77,7 @@ program amun
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
   use timers        , only : get_count, ntimers
+  use user_problem  , only : initialize_user_problem, finalize_user_problem
 
 ! module variables are not implicit by default
 !
@@ -294,6 +295,10 @@ program amun
 ! get integral calculation interval
 !
   call get_parameter_integer("ndat" , ndat)
+
+! initialize module USER_PROBLEM
+!
+  call initialize_user_problem(master, iret)
 
 ! initialize MPI module and print info
 !
@@ -724,6 +729,10 @@ program amun
 ! finalize the random number generator
 !
   call finalize_random()
+
+! finalize the user problem module
+!
+  call finalize_user_problem(iret)
 
 ! stop time accounting for the termination
 !

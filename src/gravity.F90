@@ -93,6 +93,8 @@ module gravity
 ! include external procedures and variables
 !
     use parameters     , only : get_parameter_string
+    use user_problem   , only : gravitational_acceleration_user                &
+                              , gravity_enabled_user
 
 ! local variables are not implicit by default
 !
@@ -134,10 +136,10 @@ module gravity
 
     case default
 
-! by default the gravity is turned off, so reset the procedure pointer
+! in case of other problems, gravity is calculated by user
 !
-      gravitational_acceleration => gacc_none
-      gravity_enabled = .false.
+      gravitational_acceleration => gravitational_acceleration_user
+      gravity_enabled            =  gravity_enabled_user
 
     end select
 

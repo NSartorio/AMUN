@@ -89,6 +89,7 @@ module shapes
 ! include external procedures and variables
 !
     use parameters     , only : get_parameter_string
+    use user_problem   , only : update_shapes_user
 
 ! local variables are not implicit by default
 !
@@ -142,7 +143,7 @@ module shapes
 ! no shape update
 !
       case default
-        update_shapes => update_shapes_none
+        update_shapes => update_shapes_user
 
       end select
 

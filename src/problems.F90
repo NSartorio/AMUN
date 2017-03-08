@@ -90,6 +90,7 @@ module problems
 !
     use error          , only : print_error
     use parameters     , only : get_parameter_string
+    use user_problem   , only : setup_problem_user
 
 ! local variables are not implicit by default
 !
@@ -150,9 +151,8 @@ module problems
       setup_problem => setup_problem_jet
 
     case default
-      call print_error("problems::initialize_problems()"                       &
-                     , "Setup subroutine is not implemented for this problem!")
-      iret = 600
+      setup_problem => setup_problem_user
+
     end select
 
 #ifdef PROFILE
