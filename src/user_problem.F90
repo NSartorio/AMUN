@@ -42,7 +42,7 @@ module user_problem
 #ifdef PROFILE
 ! timer indices
 !
-  integer, save :: imi, imp, ims, imu, img
+  integer, save :: imi, imp, ims, imu, img, imb
 #endif /* PROFILE */
 
 ! default problem parameter values are defined here
@@ -100,6 +100,7 @@ module user_problem
     call set_timer('user_problem:: shape'        , ims)
     call set_timer('user_problem:: sources'      , imu)
     call set_timer('user_problem:: gravity'      , img)
+    call set_timer('user_problem:: boundaries'   , imb)
 
 ! start accounting time for module initialization/finalization
 !
@@ -421,6 +422,183 @@ module user_problem
 !-------------------------------------------------------------------------------
 !
   end subroutine gravitational_acceleration_user
+!
+!===============================================================================
+!
+! subroutine BOUNDARY_USER_X:
+! --------------------------
+!
+!   Subroutine updates ghost zones within the specific region along
+!   the X direction.
+!
+!   Arguments:
+!
+!     ic      - the block side along the X direction for the ghost zone update;
+!     jl, ju  - the cell index limits for the Y direction;
+!     kl, ku  - the cell index limits for the Z direction;
+!     t, dt   - time and time increment;
+!     x, y, z - the block coordinates;
+!     qn      - the array of variables to update;
+!
+!===============================================================================
+!
+  subroutine boundary_user_x(ic, jl, ju, kl, ku, t, dt, x, y, z, qn)
+
+! import external procedures and variables
+!
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)    :: ic
+    integer                                     , intent(in)    :: jl, ju
+    integer                                     , intent(in)    :: kl, ku
+    real(kind=8)                                , intent(in)    :: t, dt
+    real(kind=8), dimension(1:im)               , intent(in)    :: x
+    real(kind=8), dimension(1:jm)               , intent(in)    :: y
+    real(kind=8), dimension(1:km)               , intent(in)    :: z
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the boundary update
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for the boundary update
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_user_x
+!
+!===============================================================================
+!
+! subroutine BOUNDARY_USER_Y:
+! --------------------------
+!
+!   Subroutine updates ghost zones within the specific region along
+!   the Y direction.
+!
+!   Arguments:
+!
+!     jc      - the block side along the Y direction for the ghost zone update;
+!     il, iu  - the cell index limits for the X direction;
+!     kl, ku  - the cell index limits for the Z direction;
+!     t, dt   - time and time increment;
+!     x, y, z - the block coordinates;
+!     qn      - the array of variables to update;
+!
+!===============================================================================
+!
+  subroutine boundary_user_y(jc, il, iu, kl, ku, t, dt, x, y, z, qn)
+
+! import external procedures and variables
+!
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)    :: jc
+    integer                                     , intent(in)    :: il, iu
+    integer                                     , intent(in)    :: kl, ku
+    real(kind=8)                                , intent(in)    :: t, dt
+    real(kind=8), dimension(1:im)               , intent(in)    :: x
+    real(kind=8), dimension(1:jm)               , intent(in)    :: y
+    real(kind=8), dimension(1:km)               , intent(in)    :: z
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the boundary update
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for the boundary update
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_user_y
+!
+!===============================================================================
+!
+! subroutine BOUNDARY_USER_Z:
+! --------------------------
+!
+!   Subroutine updates ghost zones within the specific region along
+!   the Z direction.
+!
+!   Arguments:
+!
+!     kc      - the block side along the Z direction for the ghost zone update;
+!     il, iu  - the cell index limits for the X direction;
+!     jl, ju  - the cell index limits for the Y direction;
+!     t, dt   - time and time increment;
+!     x, y, z - the block coordinates;
+!     qn      - the array of variables to update;
+!
+!===============================================================================
+!
+  subroutine boundary_user_z(kc, il, iu, jl, ju, t, dt, x, y, z, qn)
+
+! import external procedures and variables
+!
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                                     , intent(in)    :: kc
+    integer                                     , intent(in)    :: il, iu
+    integer                                     , intent(in)    :: jl, ju
+    real(kind=8)                                , intent(in)    :: t, dt
+    real(kind=8), dimension(1:im)               , intent(in)    :: x
+    real(kind=8), dimension(1:jm)               , intent(in)    :: y
+    real(kind=8), dimension(1:km)               , intent(in)    :: z
+    real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the boundary update
+!
+    call start_timer(imb)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for the boundary update
+!
+    call stop_timer(imb)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine boundary_user_z
 
 !===============================================================================
 !

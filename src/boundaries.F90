@@ -56,6 +56,7 @@ module boundaries
   integer, parameter            :: bnd_outflow    = 2
   integer, parameter            :: bnd_reflective = 3
   integer, parameter            :: bnd_gravity    = 4
+  integer, parameter            :: bnd_user       = 5
 
 ! variable to store boundary type flags
 !
@@ -175,6 +176,8 @@ module boundaries
       bnd_type(1,1) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(1,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(1,1) = bnd_user
     case default
       bnd_type(1,1) = bnd_periodic
     end select
@@ -188,6 +191,8 @@ module boundaries
       bnd_type(1,2) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(1,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(1,2) = bnd_user
     case default
       bnd_type(1,2) = bnd_periodic
     end select
@@ -201,6 +206,8 @@ module boundaries
       bnd_type(2,1) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(2,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(2,1) = bnd_user
     case default
       bnd_type(2,1) = bnd_periodic
     end select
@@ -214,6 +221,8 @@ module boundaries
       bnd_type(2,2) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(2,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(2,2) = bnd_user
     case default
       bnd_type(2,2) = bnd_periodic
     end select
@@ -227,6 +236,8 @@ module boundaries
       bnd_type(3,1) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(3,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(3,1) = bnd_user
     case default
       bnd_type(3,1) = bnd_periodic
     end select
@@ -240,6 +251,8 @@ module boundaries
       bnd_type(3,2) = bnd_reflective
     case("hydrostatic", "gravity")
       bnd_type(3,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(3,2) = bnd_user
     case default
       bnd_type(3,2) = bnd_periodic
     end select
@@ -5008,6 +5021,8 @@ module boundaries
     use equations      , only : csnd2
     use error          , only : print_error, print_warning
     use gravity        , only : gravitational_acceleration
+    use user_problem   , only : boundary_user_x, boundary_user_y               &
+                              , boundary_user_z
 
 ! local variables are not implicit by default
 !
@@ -5196,6 +5211,14 @@ module boundaries
           end if
         end if
 
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_x(ic, jl, ju, kl, ku                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
+
 ! wrong boundary conditions
 !
       case default
@@ -5367,6 +5390,14 @@ module boundaries
           end if
         end if
 
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_y(jc, il, iu, kl, ku                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
+
 ! wrong boundary conditions
 !
       case default
@@ -5533,6 +5564,14 @@ module boundaries
             end do
           end if
         end if
+
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_z(kc, il, iu, jl, ju                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
 
 ! wrong boundary conditions
 !
