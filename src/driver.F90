@@ -296,10 +296,6 @@ program amun
 !
   call get_parameter_integer("ndat" , ndat)
 
-! initialize module USER_PROBLEM
-!
-  call initialize_user_problem(master, iret)
-
 ! initialize MPI module and print info
 !
   if (master) then
@@ -345,6 +341,10 @@ program amun
 ! jump to the end if the equations could not be initialized
 !
   if (iret > 0) go to 60
+
+! initialize module USER_PROBLEM
+!
+  call initialize_user_problem(master, iret)
 
 ! initialize refinement module and print info
 !
