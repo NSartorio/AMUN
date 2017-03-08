@@ -58,6 +58,7 @@ module user_problem
   real(kind=8), save :: yth  = 1.00d-16
   real(kind=8), save :: pth  = 1.00d-02
   real(kind=8), save :: pmag = 5.00d-01
+  real(kind=8), save :: blim = 1.00d+00
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -86,7 +87,9 @@ module user_problem
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_string, get_parameter_real
+    use coordinates    , only : ng
+    use coordinates    , only : ady
+    use parameters     , only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -124,20 +127,25 @@ module user_problem
 
 ! get the reconnection problem parameters
 !
-    call get_parameter_real("dens", dens)
-    call get_parameter_real("pres", pres)
-    call get_parameter_real("bamp", bamp)
-    call get_parameter_real("bper", bper)
-    call get_parameter_real("bgui", bgui)
-    call get_parameter_real("vper", vper)
-    call get_parameter_real("xcut", xcut)
-    call get_parameter_real("ycut", ycut)
-    call get_parameter_real("yth" , yth )
-    call get_parameter_real("pth" , pth )
+    call get_parameter_real("dens"  , dens)
+    call get_parameter_real("pres"  , pres)
+    call get_parameter_real("bamp"  , bamp)
+    call get_parameter_real("bper"  , bper)
+    call get_parameter_real("bgui"  , bgui)
+    call get_parameter_real("vper"  , vper)
+    call get_parameter_real("xcut"  , xcut)
+    call get_parameter_real("ycut"  , ycut)
+    call get_parameter_real("yth"   , yth )
+    call get_parameter_real("pth"   , pth )
+    call get_parameter_real("blimit", blim)
 
 ! calculate the maximum magnetic pressure
 !
     pmag = 0.5d+00 * (bamp**2 + bgui**2)
+
+! upper limit for blim
+!
+    blim = max(blim, ng * ady(1))
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -763,7 +771,9 @@ module user_problem
 ! import external procedures and variables
 !
     use coordinates    , only : im, jm, km
+    use coordinates    , only : jb, jbl, je, jeu
     use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
 
 ! local variables are not implicit by default
 !
@@ -779,6 +789,14 @@ module user_problem
     real(kind=8), dimension(1:jm)               , intent(in)    :: y
     real(kind=8), dimension(1:km)               , intent(in)    :: z
     real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+
+! local variables
+!
+    integer      :: im2, im1, i, ip1, ip2
+    integer      :: jm2, jm1, j, jp1, jp2
+    integer      :: km2, km1, k, kp1, kp2
+    real(kind=8) :: dx, dy, dz, dyx, dyz
+    real(kind=8) :: fl, fr
 !
 !-------------------------------------------------------------------------------
 !
@@ -787,6 +805,145 @@ module user_problem
 !
     call start_timer(imb)
 #endif /* PROFILE */
+
+! process case with magnetic field, otherwise revert to standard outflow
+!
+    if (ibx > 0) then
+
+! get the cell sizes and their ratios
+!
+      dx  = x(2) - x(1)
+      dy  = y(2) - y(1)
+#if NDIMS == 3
+      dz  = z(2) - z(1)
+#endif /* NDIMS == 3 */
+      dyx = dy / dx
+#if NDIMS == 3
+      dyz = dy / dz
+#endif /* NDIMS == 3 */
+
+! process left and right side boundary separatelly
+!
+      if (jc == 1) then
+
+! iterate over left-side ghost layers
+!
+        do j = jbl, 1, -1
+
+! calculate neighbor cell indices
+!
+          jp1 = min(jm, j + 1)
+          jp2 = min(jm, j + 2)
+
+! calculate variable decay coefficients
+!
+          fr  = (dy * (jb - j - 5.0d-01)) / blim
+          fl  = 1.0d+00 - fr
+
+! iterate over boundary layer
+!
+          do k = kl, ku
+#if NDIMS == 3
+            km1 = max( 1, k - 1)
+            kp1 = min(km, k + 1)
+#endif /* NDIMS == 3 */
+            do i = il, iu
+              im1 = max( 1, i - 1)
+              ip1 = min(im, i + 1)
+
+! make normal derivatives zero
+!
+              qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+! decay density and pressure to their limits
+!
+              qn(idn,i,j,k) = fl * qn(idn,i,jb,k) + fr * dens
+              if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,jb,k) + fr * pres
+
+! decay magnetic field to its limit
+!
+              qn(ibx,i,j,k) = fl * qn(ibx,i,jb,k) - fr * bamp
+              qn(ibz,i,j,k) = fl * qn(ibz,i,jb,k) + fr * bgui
+
+! update By from div(B)=0
+!
+              qn(iby,i,j,k) = qn(iby,i,jp2,k)                              &
+                           + (qn(ibx,ip1,jp1,k) - qn(ibx,im1,jp1,k)) * dyx
+#if NDIMS == 3
+              qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
+                           + (qn(ibz,i,jp1,kp1) - qn(ibz,i,jp1,km1)) * dyz
+#endif /* NDIMS == 3 */
+              qn(ibp,i,j,k) = 0.0d+00
+            end do ! i = il, iu
+          end do ! k = kl, ku
+        end do ! j = jbl, 1, -1
+      else ! jc = 1
+
+! iterate over right-side ghost layers
+!
+        do j = jeu, jm
+
+! calculate neighbor cell indices
+!
+          jm1 = max( 1, j - 1)
+          jm2 = max( 1, j - 2)
+
+! calculate variable decay coefficients
+!
+          fr  = (dy * (j - je - 5.0d-01)) / blim
+          fl  = 1.0d+00 - fr
+
+! iterate over boundary layer
+!
+          do k = kl, ku
+#if NDIMS == 3
+            km1 = max( 1, k - 1)
+            kp1 = min(km, k + 1)
+#endif /* NDIMS == 3 */
+            do i = il, iu
+              im1 = max( 1, i - 1)
+              ip1 = min(im, i + 1)
+
+! make normal derivatives zero
+!
+              qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+! decay density and pressure to their limits
+!
+              qn(idn,i,j,k) = fl * qn(idn,i,je,k) + fr * dens
+              if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,je,k) + fr * pres
+
+! decay magnetic field to its limit
+!
+              qn(ibx,i,j,k) = fl * qn(ibx,i,je,k) + fr * bamp
+              qn(ibz,i,j,k) = fl * qn(ibz,i,je,k) + fr * bgui
+
+! update By from div(B)=0
+!
+              qn(iby,i,j,k) = qn(iby,i,jm2,k)                              &
+                           + (qn(ibx,im1,jm1,k) - qn(ibx,ip1,jm1,k)) * dyx
+#if NDIMS == 3
+              qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
+                           + (qn(ibz,i,jm1,km1) - qn(ibz,i,jm1,kp1)) * dyz
+#endif /* NDIMS == 3 */
+              qn(ibp,i,j,k) = 0.0d+00
+            end do ! i = il, iu
+          end do ! k = kl, ku
+        end do ! j = jeu, jm
+      end if ! jc = 1
+    else ! ibx > 0
+      if (jc == 1) then
+        do j = jbl, 1, -1
+          qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
+          qn(ivy ,il:iu,j,kl:ku) = min(0.0d+00, qn(ivy,il:iu,jb,kl:ku))
+        end do ! j = jbl, 1, -1
+      else
+        do j = jeu, jm
+          qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
+          qn(ivy ,il:iu,j,kl:ku) = max(0.0d+00, qn(ivy,il:iu,je,kl:ku))
+        end do ! j = jeu, jm
+      end if
+    end if ! ibx > 0
 
 #ifdef PROFILE
 ! stop accounting time for the boundary update
