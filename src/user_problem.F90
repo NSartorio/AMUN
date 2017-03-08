@@ -42,7 +42,7 @@ module user_problem
 #ifdef PROFILE
 ! timer indices
 !
-  integer, save :: imi, imp, ims, img
+  integer, save :: imi, imp, ims, imu, img
 #endif /* PROFILE */
 
 ! default problem parameter values are defined here
@@ -98,6 +98,7 @@ module user_problem
     call set_timer('user_problem:: initialize'   , imi)
     call set_timer('user_problem:: problem setup', imp)
     call set_timer('user_problem:: shape'        , ims)
+    call set_timer('user_problem:: sources'      , imu)
     call set_timer('user_problem:: gravity'      , img)
 
 ! start accounting time for module initialization/finalization
@@ -320,6 +321,57 @@ module user_problem
 !-------------------------------------------------------------------------------
 !
   end subroutine update_shapes_user
+!
+!===============================================================================
+!
+! subroutine UPDATE_SOURCES_USER:
+! ------------------------------
+!
+!   Subroutine adds the user defined source terms.
+!
+!   Arguments:
+!
+!     pdata - the pointer to a data block;
+!     t, dt - the time and time increment;
+!     du    - the array of variable increment;
+!
+!===============================================================================
+!
+  subroutine update_sources_user(pdata, t, dt, du)
+
+! include external variables
+!
+    use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    type(block_data), pointer           , intent(inout) :: pdata
+    real(kind=8)                        , intent(in)    :: t, dt
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: du
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for source terms
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for source terms
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine update_sources_user
 !
 !===============================================================================
 !

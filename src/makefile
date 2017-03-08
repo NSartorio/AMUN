@@ -164,7 +164,7 @@ user_problem.o   : user_problem.F90 blocks.o constants.o coordinates.o         \
 shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
                    parameters.o timers.o user_problem.o
 sources.o        : sources.F90 blocks.o coordinates.o equations.o gravity.o    \
-                   operators.o parameters.o timers.o
+                   operators.o parameters.o timers.o user_problem.o
 timers.o         : timers.F90
 utils.o          : utils.F90 error.o
 

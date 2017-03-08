@@ -236,6 +236,7 @@ module sources
     use equations      , only : ibx, iby, ibz, ibp
     use gravity        , only : gravity_enabled, gravitational_acceleration
     use operators      , only : divergence, gradient, laplace, curl
+    use user_problem   , only : update_sources_user
 
 ! local variables are not implicit by default
 !
@@ -592,6 +593,10 @@ module sources
       end if ! resistivity is not zero
 
     end if ! ibx > 0
+
+! add user defined source terms
+!
+    call update_sources_user(pdata, t, dt, du(1:nv,1:im,1:jm,1:km))
 
 #ifdef PROFILE
 ! stop accounting time for source terms
