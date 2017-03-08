@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -51,11 +51,12 @@ module boundaries
 
 ! parameters corresponding to the boundary type
 !
-  integer, parameter            :: bnd_periodic     = 0
-  integer, parameter            :: bnd_open         = 1
-  integer, parameter            :: bnd_outflow      = 2
-  integer, parameter            :: bnd_reflective   = 3
-  integer, parameter            :: bnd_reconnection = 4
+  integer, parameter            :: bnd_periodic   = 0
+  integer, parameter            :: bnd_open       = 1
+  integer, parameter            :: bnd_outflow    = 2
+  integer, parameter            :: bnd_reflective = 3
+  integer, parameter            :: bnd_gravity    = 4
+  integer, parameter            :: bnd_user       = 5
 
 ! variable to store boundary type flags
 !
@@ -173,8 +174,10 @@ module boundaries
       bnd_type(1,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,1) = bnd_reflective
-    case("reconnection", "recon", "rec")
-      bnd_type(1,1) = bnd_reconnection
+    case("hydrostatic", "gravity")
+      bnd_type(1,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(1,1) = bnd_user
     case default
       bnd_type(1,1) = bnd_periodic
     end select
@@ -186,8 +189,10 @@ module boundaries
       bnd_type(1,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(1,2) = bnd_reflective
-    case("reconnection", "recon", "rec")
-      bnd_type(1,2) = bnd_reconnection
+    case("hydrostatic", "gravity")
+      bnd_type(1,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(1,2) = bnd_user
     case default
       bnd_type(1,2) = bnd_periodic
     end select
@@ -199,8 +204,10 @@ module boundaries
       bnd_type(2,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,1) = bnd_reflective
-    case("reconnection", "recon", "rec")
-      bnd_type(2,1) = bnd_reconnection
+    case("hydrostatic", "gravity")
+      bnd_type(2,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(2,1) = bnd_user
     case default
       bnd_type(2,1) = bnd_periodic
     end select
@@ -212,8 +219,10 @@ module boundaries
       bnd_type(2,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(2,2) = bnd_reflective
-    case("reconnection", "recon", "rec")
-      bnd_type(2,2) = bnd_reconnection
+    case("hydrostatic", "gravity")
+      bnd_type(2,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(2,2) = bnd_user
     case default
       bnd_type(2,2) = bnd_periodic
     end select
@@ -225,6 +234,10 @@ module boundaries
       bnd_type(3,1) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,1) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(3,1) = bnd_gravity
+    case("user", "custom")
+      bnd_type(3,1) = bnd_user
     case default
       bnd_type(3,1) = bnd_periodic
     end select
@@ -236,6 +249,10 @@ module boundaries
       bnd_type(3,2) = bnd_outflow
     case("reflective", "reflecting", "reflect")
       bnd_type(3,2) = bnd_reflective
+    case("hydrostatic", "gravity")
+      bnd_type(3,2) = bnd_gravity
+    case("user", "custom")
+      bnd_type(3,2) = bnd_user
     case default
       bnd_type(3,2) = bnd_periodic
     end select
@@ -334,10 +351,13 @@ module boundaries
 !   Subroutine updates the ghost zones of the data blocks from their neighbors
 !   or applies the specific boundary conditions.
 !
+!   Arguments:
+!
+!     t, dt   - time and time increment;
 !
 !===============================================================================
 !
-  subroutine boundary_variables()
+  subroutine boundary_variables(t, dt)
 
 ! import external procedures and variables
 !
@@ -347,6 +367,10 @@ module boundaries
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    real(kind=8), intent(in) :: t, dt
 
 ! local variables
 !
@@ -402,7 +426,7 @@ module boundaries
 
 ! update specific boundaries
 !
-      call boundaries_specific()
+      call boundaries_specific(t, dt)
 
 #if NDIMS == 3
 ! prolong face boundaries from lower level blocks
@@ -426,7 +450,7 @@ module boundaries
 
 ! update specific boundaries
 !
-    call boundaries_specific()
+    call boundaries_specific(t, dt)
 
 ! convert updated primitive variables to conservative ones in all ghost cells
 !
@@ -1044,10 +1068,13 @@ module boundaries
 !   neighbors and update the corresponding boundaries for the selected
 !   boundary type.
 !
+!   Arguments:
+!
+!     t, dt   - time and time increment;
 !
 !===============================================================================
 !
-  subroutine boundaries_specific()
+  subroutine boundaries_specific(t, dt)
 
 ! import external procedures and variables
 !
@@ -1055,6 +1082,7 @@ module boundaries
     use blocks         , only : list_meta, list_leaf
     use blocks         , only : ndims, nsides
     use coordinates    , only : im, jm, km
+    use coordinates    , only : ax, ay, az
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc
@@ -1065,6 +1093,10 @@ module boundaries
 !
     implicit none
 
+! subroutine arguments
+!
+    real(kind=8), intent(in) :: t, dt
+
 ! local pointers
 !
     type(block_meta), pointer :: pmeta, pneigh
@@ -1073,6 +1105,12 @@ module boundaries
 ! local variables
 !
     integer                   :: i, j, k, n, m
+
+! local arrays
+!
+    real(kind=8), dimension(im) :: x
+    real(kind=8), dimension(jm) :: y
+    real(kind=8), dimension(km) :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -1104,6 +1142,16 @@ module boundaries
         if (pmeta%process == nproc) then
 #endif /* MPI */
 
+! prepare block coordinates
+!
+        x(1:im) = pmeta%xmin + ax(pmeta%level,1:im)
+        y(1:jm) = pmeta%ymin + ay(pmeta%level,1:jm)
+#if NDIMS == 3
+        z(1:km) = pmeta%zmin + az(pmeta%level,1:km)
+#else /* NDIMS == 3 */
+        z(1:km) = 0.0d+00
+#endif /* NDIMS == 3 */
+
 #if NDIMS == 2
 ! iterate over all directions
 !
@@ -1127,7 +1175,7 @@ module boundaries
 !
                   if (.not. associated(pmeta%edges(i,j,m)%ptr))                &
                             call block_boundary_specific(i, j, k, n            &
-                                          , pmeta%level                        &
+                                          , t, dt, x(:), y(:), z(:)            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                 end do ! i = 1, sides
@@ -1156,7 +1204,7 @@ module boundaries
 !
                     if (.not. associated(pmeta%faces(i,j,k,n)%ptr))            &
                             call block_boundary_specific(i, j, k, n            &
-                                          , pmeta%level                        &
+                                          , t, dt, x(:), y(:), z(:)            &
                                           , pmeta%data%q(1:nv,1:im,1:jm,1:km))
 
                   end do ! i = 1, sides
@@ -4955,23 +5003,26 @@ module boundaries
 !
 !     nc         - the edge direction;
 !     ic, jc, kc - the corner position;
-!     lv         - the block level;
+!     t, dt      - time and time increment;
+!     x, y, z    - the block coordinates;
 !     qn         - the variable array;
 !
 !===============================================================================
 !
-  subroutine block_boundary_specific(ic, jc, kc, nc, lv, qn)
+  subroutine block_boundary_specific(ic, jc, kc, nc, t, dt, x, y, z, qn)
 
 ! import external procedures and variables
 !
     use coordinates    , only : im , jm , km , ng
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
-    use coordinates    , only : adx, ady, adxi, adyi, adzi
     use equations      , only : nv
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
+    use equations      , only : csnd2
     use error          , only : print_error, print_warning
-    use parameters     , only : get_parameter_real
+    use gravity        , only : gravitational_acceleration
+    use user_problem   , only : boundary_user_x, boundary_user_y               &
+                              , boundary_user_z
 
 ! local variables are not implicit by default
 !
@@ -4980,60 +5031,26 @@ module boundaries
 ! subroutine arguments
 !
     integer                                     , intent(in)    :: ic, jc, kc
-    integer                                     , intent(in)    :: nc, lv
+    integer                                     , intent(in)    :: nc
+    real(kind=8)                                , intent(in)    :: t, dt
+    real(kind=8), dimension(1:im)               , intent(inout) :: x
+    real(kind=8), dimension(1:jm)               , intent(inout) :: y
+    real(kind=8), dimension(1:km)               , intent(inout) :: z
     real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
-
-! default parameter values
-!
-    real(kind=8), save :: dens = 1.00d+00
-    real(kind=8), save :: pres = 1.00d+00
-    real(kind=8), save :: bamp = 1.00d+00
-    real(kind=8), save :: bgui = 0.00d+00
-    real(kind=8), save :: blim = 1.00d+00
-
-! local saved parameters
-!
-    logical     , save :: first = .true.
 
 ! local variables
 !
-    integer :: i , j , k
-    integer :: il, jl, kl
-    integer :: iu, ju, ku
-    integer :: is, js, ks
-    integer :: it, jt, kt
-    integer :: im2, im1, ip1, ip2
-    integer :: jm2, jm1, jp1, jp2
-#if NDIMS == 3
-    integer :: km2, km1, kp1, kp2
-#endif /* NDIMS == 3 */
-    real(kind=8) :: dxy, dxz, dyx, dyz
-    real(kind=8) :: fl, fr
+    integer      :: i, il, iu, is, it, im1, ip1
+    integer      :: j, jl, ju, js, jt, jm1, jp1
+    integer      :: k, kl, ku, ks, kt, km1, kp1
+    real(kind=8) :: dx, dy, dz, dxh, dyh, dzh, xi, yi, zi
+
+! local vectors
+!
+    real(kind=8), dimension(3) :: ga
 !
 !-------------------------------------------------------------------------------
 !
-! prepare problem constants during the first subroutine call
-!
-    if (first) then
-
-! get problem parameters
-!
-      call get_parameter_real("dens"  , dens)
-      call get_parameter_real("pres"  , pres)
-      call get_parameter_real("bamp"  , bamp)
-      call get_parameter_real("bgui"  , bgui)
-      call get_parameter_real("blimit", blim)
-
-! upper limit for blim
-!
-      blim = max(blim, ng * ady(1))
-
-! reset the first execution flag
-!
-      first = .false.
-
-    end if ! first call
-
 ! apply specific boundaries depending on the direction
 !
     select case(nc)
@@ -5095,128 +5112,6 @@ module boundaries
           end do ! i = ieu, im
         end if
 
-! "reconnection" boundary conditions
-!
-      case(bnd_reconnection)
-
-! process case with magnetic field, otherwise revert to standard outflow
-!
-        if (ibx > 0) then
-
-! get the cell size ratios
-!
-          dxy = adx(lv) * adyi(lv)
-          dxz = adx(lv) * adzi(lv)
-
-! process left and right side boundary separatelly
-!
-          if (ic == 1) then
-
-! iterate over left-side ghost layers
-!
-            do i = ibl, 1, -1
-
-! calculate neighbor cell indices
-!
-              ip1 = min(im, i + 1)
-              ip2 = min(im, i + 2)
-
-! iterate over boundary layer
-!
-              do k = kl, ku
-#if NDIMS == 3
-                km2 = max( 1, k - 2)
-                km1 = max( 1, k - 1)
-                kp1 = min(km, k + 1)
-                kp2 = min(km, k + 2)
-#endif /* NDIMS == 3 */
-                do j = jl, ju
-                  jm2 = max( 1, j - 2)
-                  jm1 = max( 1, j - 1)
-                  jp1 = min(jm, j + 1)
-                  jp2 = min(jm, j + 2)
-
-! make the normal derivative zero
-!
-                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
-
-! prevent the inflow
-!
-                  qn(ivx,i,j,k) = min(0.0d+00, qn(ivx,ib,j,k))
-
-! update the normal component of magnetic field from divergence-free condition
-!
-                  qn(ibx,i,j,k) = qn(ibx,ip2,j,k)                              &
-                               + (qn(iby,ip1,jp1,k) - qn(iby,ip1,jm1,k)) * dxy
-#if NDIMS == 3
-                  qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                              &
-                               + (qn(ibz,ip1,j,kp1) - qn(ibz,ip1,j,km1)) * dxz
-#endif /* NDIMS == 3 */
-                  qn(ibp,i,j,k) = 0.0d+00
-                end do ! j = jl, ju
-              end do ! k = kl, ku
-            end do ! i = ibl, 1, -1
-          else ! ic == 1
-
-! iterate over right-side ghost layers
-!
-            do i = ieu, im
-
-! calculate neighbor cell indices
-!
-              im1 = max( 1, i - 1)
-              im2 = max( 1, i - 2)
-
-! iterate over boundary layer
-!
-              do k = kl, ku
-#if NDIMS == 3
-                km1 = max( 1, k - 1)
-                kp1 = min(km, k + 1)
-                km2 = max( 1, k - 2)
-                kp2 = min(km, k + 2)
-#endif /* NDIMS == 3 */
-                do j = jl, ju
-                  jm1 = max( 1, j - 1)
-                  jp1 = min(jm, j + 1)
-                  jm2 = max( 1, j - 2)
-                  jp2 = min(jm, j + 2)
-
-! make the normal derivative zero
-!
-                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
-
-! prevent the inflow
-!
-                  qn(ivx,i,j,k) = max(0.0d+00, qn(ivx,ie,j,k))
-
-! update the normal component of magnetic field from divergence-free condition
-!
-                  qn(ibx,i,j,k) = qn(ibx,im2,j,k)                              &
-                               + (qn(iby,im1,jm1,k) - qn(iby,im1,jp1,k)) * dxy
-#if NDIMS == 3
-                  qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                              &
-                               + (qn(ibz,im1,j,km1) - qn(ibz,im1,j,kp1)) * dxz
-#endif /* NDIMS == 3 */
-                  qn(ibp,i,j,k) = 0.0d+00
-                end do ! j = jl, ju
-              end do ! k = kl, ku
-            end do ! i = ieu, im
-          end if ! ic == 1
-        else ! ibx > 0
-          if (ic == 1) then
-            do i = ibl, 1, -1
-              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
-              qn(ivx ,i,jl:ju,kl:ku) = min(0.0d+00, qn(ivx,ib,jl:ju,kl:ku))
-            end do ! i = ibl, 1, -1
-          else
-            do i = ieu, im
-              qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
-              qn(ivx ,i,jl:ju,kl:ku) = max(0.0d+00, qn(ivx,ie,jl:ju,kl:ku))
-            end do ! i = ieu, im
-          end if
-        end if ! ibx > 0
-
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
@@ -5244,6 +5139,85 @@ module boundaries
             end if
           end do
         end if
+
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dx  = x(ib) - x(ibl)
+        dxh = 0.5d+00 * dx
+
+        if (ipr > 0) then
+          if (ic == 1) then
+            do i = ibl, 1, -1
+              ip1 = i + 1
+              xi  = x(i) + dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,ip1,j,k)                              &
+                             - (qn(idn,ip1,j,k) + qn(idn,i,j,k)) * ga(1) * dxh
+                end do
+              end do
+            end do
+          else
+            do i = ieu, im
+              im1 = i - 1
+              xi  = x(i) - dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,im1,j,k)                              &
+                             + (qn(idn,im1,j,k) + qn(idn,i,j,k)) * ga(1) * dxh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (ic == 1) then
+            do i = ibl, 1, -1
+              ip1 = i + 1
+              xi  = x(i) + dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,ip1,j,k) * exp(- ga(1) * dx / csnd2)
+                end do
+              end do
+            end do
+          else
+            do i = ieu, im
+              im1 = i - 1
+              xi  = x(i) - dxh
+              do k = kl, ku
+                do j = jl, ju
+                  qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+                  call gravitational_acceleration(t, dt, xi, y(j), z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,im1,j,k) * exp(  ga(1) * dx / csnd2)
+                end do
+              end do
+            end do
+          end if
+        end if
+
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_x(ic, jl, ju, kl, ku                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
 
 ! wrong boundary conditions
 !
@@ -5317,142 +5291,6 @@ module boundaries
           end do ! j = jeu, jm
         end if
 
-! "reconnection" boundary conditions
-!
-      case(bnd_reconnection)
-
-! process case with magnetic field, otherwise revert to standard outflow
-!
-        if (ibx > 0) then
-
-! get the cell size ratios
-!
-          dyx = ady(lv) * adxi(lv)
-          dyz = ady(lv) * adzi(lv)
-
-! process left and right side boundary separatelly
-!
-          if (jc == 1) then
-
-! iterate over left-side ghost layers
-!
-            do j = jbl, 1, -1
-
-! calculate neighbor cell indices
-!
-              jp1 = min(jm, j + 1)
-              jp2 = min(jm, j + 2)
-
-! calculate variable decay coefficients
-!
-              fr  = (ady(lv) * (jb - j - 5.0d-01)) / blim
-              fl  = 1.0d+00 - fr
-
-! iterate over boundary layer
-!
-              do k = kl, ku
-#if NDIMS == 3
-                km1 = max( 1, k - 1)
-                kp1 = min(km, k + 1)
-#endif /* NDIMS == 3 */
-                do i = il, iu
-                  im1 = max( 1, i - 1)
-                  ip1 = min(im, i + 1)
-
-! make normal derivatives zero
-!
-                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
-
-! decay density and pressure to their limits
-!
-                  qn(idn,i,j,k) = fl * qn(idn,i,jb,k) + fr * dens
-                  if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,jb,k) + fr * pres
-
-! decay magnetic field to its limit
-!
-                  qn(ibx,i,j,k) = fl * qn(ibx,i,jb,k) - fr * bamp
-                  qn(ibz,i,j,k) = fl * qn(ibz,i,jb,k) + fr * bgui
-
-! update By from div(B)=0
-!
-                  qn(iby,i,j,k) = qn(iby,i,jp2,k)                              &
-                               + (qn(ibx,ip1,jp1,k) - qn(ibx,im1,jp1,k)) * dyx
-#if NDIMS == 3
-                  qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
-                               + (qn(ibz,i,jp1,kp1) - qn(ibz,i,jp1,km1)) * dyz
-#endif /* NDIMS == 3 */
-                  qn(ibp,i,j,k) = 0.0d+00
-                end do ! i = il, iu
-              end do ! k = kl, ku
-            end do ! j = jbl, 1, -1
-          else ! jc = 1
-
-! iterate over right-side ghost layers
-!
-            do j = jeu, jm
-
-! calculate neighbor cell indices
-!
-              jm1 = max( 1, j - 1)
-              jm2 = max( 1, j - 2)
-
-! calculate variable decay coefficients
-!
-              fr  = (ady(lv) * (j - je - 5.0d-01)) / blim
-              fl  = 1.0d+00 - fr
-
-! iterate over boundary layer
-!
-              do k = kl, ku
-#if NDIMS == 3
-                km1 = max( 1, k - 1)
-                kp1 = min(km, k + 1)
-#endif /* NDIMS == 3 */
-                do i = il, iu
-                  im1 = max( 1, i - 1)
-                  ip1 = min(im, i + 1)
-
-! make normal derivatives zero
-!
-                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
-
-! decay density and pressure to their limits
-!
-                  qn(idn,i,j,k) = fl * qn(idn,i,je,k) + fr * dens
-                  if (ipr > 0) qn(ipr,i,j,k) = fl * qn(ipr,i,je,k) + fr * pres
-
-! decay magnetic field to its limit
-!
-                  qn(ibx,i,j,k) = fl * qn(ibx,i,je,k) + fr * bamp
-                  qn(ibz,i,j,k) = fl * qn(ibz,i,je,k) + fr * bgui
-
-! update By from div(B)=0
-!
-                  qn(iby,i,j,k) = qn(iby,i,jm2,k)                              &
-                               + (qn(ibx,im1,jm1,k) - qn(ibx,ip1,jm1,k)) * dyx
-#if NDIMS == 3
-                  qn(iby,i,j,k) = qn(iby,i,j  ,k)                              &
-                               + (qn(ibz,i,jm1,km1) - qn(ibz,i,jm1,kp1)) * dyz
-#endif /* NDIMS == 3 */
-                  qn(ibp,i,j,k) = 0.0d+00
-                end do ! i = il, iu
-              end do ! k = kl, ku
-            end do ! j = jeu, jm
-          end if ! jc = 1
-        else ! ibx > 0
-          if (jc == 1) then
-            do j = jbl, 1, -1
-              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,jb,kl:ku)
-              qn(ivy ,il:iu,j,kl:ku) = min(0.0d+00, qn(ivy,il:iu,jb,kl:ku))
-            end do ! j = jbl, 1, -1
-          else
-            do j = jeu, jm
-              qn(1:nv,il:iu,j,kl:ku) = qn(1:nv,il:iu,je,kl:ku)
-              qn(ivy ,il:iu,j,kl:ku) = max(0.0d+00, qn(ivy,il:iu,je,kl:ku))
-            end do ! j = jeu, jm
-          end if
-        end if ! ibx > 0
-
 ! "reflective" boundary conditions
 !
       case(bnd_reflective)
@@ -5480,6 +5318,85 @@ module boundaries
             end if
           end do
         end if
+
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dy  = y(jb) - y(jbl)
+        dyh = 0.5d+00 * dy
+
+        if (ipr > 0) then
+          if (jc == 1) then
+            do j = jbl, 1, -1
+              jp1 = j + 1
+              yi  = y(j) + dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,jp1,k)                              &
+                             - (qn(idn,i,jp1,k) + qn(idn,i,j,k)) * ga(2) * dyh
+                end do
+              end do
+            end do
+          else
+            do j = jeu, jm
+              jm1 = j - 1
+              yi  = y(j) - dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,jm1,k)                              &
+                             + (qn(idn,i,jm1,k) + qn(idn,i,j,k)) * ga(2) * dyh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (jc == 1) then
+            do j = jbl, 1, -1
+              jp1 = j + 1
+              yi  = y(j) + dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,jb,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,jp1,k) * exp(- ga(2) * dy / csnd2)
+                end do
+              end do
+            end do
+          else
+            do j = jeu, jm
+              jm1 = j - 1
+              yi  = y(j) - dyh
+              do k = kl, ku
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,je,k)
+
+                  call gravitational_acceleration(t, dt, x(i), yi, z(k), ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,jm1,k) * exp(  ga(2) * dy / csnd2)
+                end do
+              end do
+            end do
+          end if
+        end if
+
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_y(jc, il, iu, kl, ku                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
 
 ! wrong boundary conditions
 !
@@ -5576,6 +5493,85 @@ module boundaries
             end if
           end do
         end if
+
+! "gravity" or "hydrostatic" boundary conditions
+!
+      case(bnd_gravity)
+
+        dz  = z(kb) - z(kbl)
+        dzh = 0.5d+00 * dz
+
+        if (ipr > 0) then
+          if (kc == 1) then
+            do k = kbl, 1, -1
+              kp1 = k + 1
+              zi  = z(k) + dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,kb)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,j,kp1)                              &
+                             - (qn(idn,i,j,kp1) + qn(idn,i,j,k)) * ga(3) * dzh
+                end do
+              end do
+            end do
+          else
+            do k = keu, km
+              km1 = k - 1
+              zi  = z(k) - dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,ke)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(ipr,i,j,k) = qn(ipr,i,j,km1)                              &
+                             + (qn(idn,i,j,km1) + qn(idn,i,j,k)) * ga(3) * dzh
+                end do
+              end do
+            end do
+          end if
+        else
+          if (kc == 1) then
+            do k = kbl, 1, -1
+              kp1 = k + 1
+              zi  = z(k) + dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,kb)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,j,kp1) * exp(- ga(3) * dz / csnd2)
+                end do
+              end do
+            end do
+          else
+            do k = keu, km
+              km1 = k - 1
+              zi  = z(k) - dzh
+              do j = jl, ju
+                do i = il, iu
+                  qn(1:nv,i,j,k) = qn(1:nv,i,j,ke)
+
+                  call gravitational_acceleration(t, dt, x(i), y(j), zi, ga(:))
+
+                  qn(idn,i,j,k) = qn(idn,i,j,km1) * exp(  ga(3) * dz / csnd2)
+                end do
+              end do
+            end do
+          end if
+        end if
+
+! user specific boundary conditions
+!
+      case(bnd_user)
+
+        call boundary_user_z(kc, il, iu, jl, ju                                &
+                           , t, dt, x(1:im), y(1:jm), z(1:km)                  &
+                           , qn(1:nv,1:im,1:jm,1:km))
 
 ! wrong boundary conditions
 !

@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -48,10 +48,6 @@ module sources
 ! GLM-MHD source terms type (1 - EGLM, 2 - HEGLM)
 !
   integer     , save :: glm_type    = 0
-
-! gravitational acceleration coefficient
-!
-  real(kind=8), save :: gpoint      = 0.0d+00
 
 ! viscosity coefficient
 !
@@ -144,10 +140,6 @@ module sources
       glm_type = 0
     end select
 
-! get acceleration coefficient
-!
-      call get_parameter_real("gpoint"     , gpoint   )
-
 ! get viscosity coefficient
 !
       call get_parameter_real("viscosity"  , viscosity)
@@ -161,7 +153,6 @@ module sources
     if (verbose) then
 
       write (*,"(4x,a,1x,a)    ") "glm source terms       =", trim(tglm)
-      write (*,"(4x,a,1x,1e9.2)") "point mass constant    =", gpoint
       write (*,"(4x,a,1x,1e9.2)") "viscosity              =", viscosity
       write (*,"(4x,a,1x,1e9.2)") "resistivity            =", resistivity
 
@@ -227,12 +218,13 @@ module sources
 !
 !   Arguments:
 !
-!     q    - the array of primitive variables;
-!     du   - the array of variable increment;
+!     pdata - the pointer to a data block;
+!     t, dt - the time and time increment;
+!     du    - the array of variable increment;
 !
 !===============================================================================
 !
-  subroutine update_sources(pdata, du)
+  subroutine update_sources(pdata, t, dt, du)
 
 ! include external variables
 !
@@ -242,7 +234,9 @@ module sources
     use equations      , only : nv, inx, iny, inz
     use equations      , only : idn, ivx, ivy, ivz, imx, imy, imz, ien
     use equations      , only : ibx, iby, ibz, ibp
+    use gravity        , only : gravity_enabled, gravitational_acceleration
     use operators      , only : divergence, gradient, laplace, curl
+    use user_problem   , only : update_sources_user
 
 ! local variables are not implicit by default
 !
@@ -251,13 +245,14 @@ module sources
 ! subroutine arguments
 !
     type(block_data), pointer           , intent(inout) :: pdata
+    real(kind=8)                        , intent(in)    :: t, dt
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: du
 
 ! local variables
 !
     integer       :: i  , j  , k
     real(kind=8)  :: fc, gc
-    real(kind=8)  :: r2, r3, gx, gy, gz
+    real(kind=8)  :: gx, gy, gz
     real(kind=8)  :: dbx, dby, dbz
     real(kind=8)  :: dvxdx, dvxdy, dvxdz, divv
     real(kind=8)  :: dvydx, dvydy, dvydz
@@ -265,7 +260,7 @@ module sources
 
 ! local arrays
 !
-    real(kind=8), dimension(3)  :: dh
+    real(kind=8), dimension(3)  :: ga, dh
     real(kind=8), dimension(im) :: x
     real(kind=8), dimension(jm) :: y
     real(kind=8), dimension(km) :: z
@@ -280,9 +275,9 @@ module sources
     call start_timer(imu)
 #endif /* PROFILE */
 
-! proceed only if the gravitational acceleration coefficient is not zero
+! proceed only if the gravitational term is enabled
 !
-    if (gpoint /= 0.0d+00) then
+    if (gravity_enabled) then
 
 ! prepare block coordinates
 !
@@ -298,23 +293,16 @@ module sources
         do j = 1, jm
           do i = 1, im
 
-! calculate distance from the origin
+! get gravitational acceleration components
 !
-#if NDIMS == 2
-            r2 = x(i) * x(i) + y(j) * y(j)
-#endif /* NDIMS == 2 */
-#if NDIMS == 3
-            r2 = x(i) * x(i) + y(j) * y(j) + z(k) * z(k)
-#endif /* NDIMS == 3 */
-            r3 = r2 * sqrt(r2)
+            call gravitational_acceleration(t, dt, x(i), y(j), z(k), ga(1:3))
 
-! calculate gravitational acceleration factors
+! calculate the gravitational source terms
 !
-            gc = gpoint * pdata%q(idn,i,j,k) / max(1.0d-16, r3)
-            gx = gc * x(i)
-            gy = gc * y(j)
+            gx = pdata%q(idn,i,j,k) * ga(1)
+            gy = pdata%q(idn,i,j,k) * ga(2)
 #if NDIMS == 3
-            gz = gc * z(k)
+            gz = pdata%q(idn,i,j,k) * ga(3)
 #endif /* NDIMS == 3 */
 
 ! add source terms to momentum equations
@@ -345,7 +333,7 @@ module sources
         end do ! j = 1, jm
       end do ! k = 1, km
 
-    end if ! gpoint is not zero
+    end if ! gravity enabled
 
 ! proceed only if the viscosity coefficient is not zero
 !
@@ -605,6 +593,10 @@ module sources
       end if ! resistivity is not zero
 
     end if ! ibx > 0
+
+! add user defined source terms
+!
+    call update_sources_user(pdata, t, dt, du(1:nv,1:im,1:jm,1:km))
 
 #ifdef PROFILE
 ! stop accounting time for source terms

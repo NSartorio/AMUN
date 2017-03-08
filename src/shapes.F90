@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -89,6 +89,7 @@ module shapes
 ! include external procedures and variables
 !
     use parameters     , only : get_parameter_string
+    use user_problem   , only : update_shapes_user
 
 ! local variables are not implicit by default
 !
@@ -142,7 +143,7 @@ module shapes
 ! no shape update
 !
       case default
-        update_shapes => update_shapes_none
+        update_shapes => update_shapes_user
 
       end select
 
