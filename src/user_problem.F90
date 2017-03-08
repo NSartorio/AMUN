@@ -118,7 +118,7 @@ module user_problem
 
       write (*,*)
       write (*,"(1x,a)") "User problem:"
-      write (*,"(4x,a14, 9x,'=',1x,a)") "problem name  ", trim(problem_name)
+      write (*,"(4x,a14, 9x,'=',2x,a)") "problem name  ", trim(problem_name)
 
     end if
 
@@ -192,15 +192,10 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks     , only : block_data
-    use constants  , only : d2r
     use coordinates, only : im, jm, km
-    use coordinates, only : ay, ady
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
-    use equations  , only : csnd2
-    use parameters , only : get_parameter_real
-    use random     , only : randomn
 
 ! local variables are not implicit by default
 !
@@ -212,8 +207,7 @@ module user_problem
 
 ! local variables
 !
-    integer       :: i, j, k
-    real(kind=8)  :: sn, cs
+    integer :: i, j, k
 
 ! local arrays
 !
