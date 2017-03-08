@@ -66,11 +66,20 @@ module user_problem
   real(kind=8), save :: ecc      = 9.00d-01
   real(kind=8), save :: buni     = 1.00d-03
 
+  real(kind=8), save :: tol      = 1.00d-14
+  integer     , save :: maxit    = 20
+
   real(kind=8), save :: dcomp, pstar, pcomp
   real(kind=8), save :: r2star, r2comp
   real(kind=8), save :: acomp , bcomp
   real(kind=8), save :: xps, xpc, uys, uyc
   real(kind=8), save :: om
+
+  real(kind=8), save :: ms, mc
+  real(kind=8), save :: asemi, omega, ean
+  real(kind=8), save :: yps, ypc, xrs, yrs, xrc, yrc
+  real(kind=8), save :: uxs, uxc
+  real(kind=8), save :: tprev
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -102,7 +111,8 @@ module user_problem
     use constants  , only : pi2
     use equations  , only : ipr
     use equations  , only : gamma
-    use parameters , only : get_parameter_string, get_parameter_real
+    use parameters , only : get_parameter_string, get_parameter_real           &
+                          , get_parameter_integer
 
 ! local variables are not implicit by default
 !
@@ -169,6 +179,11 @@ module user_problem
 !
     call get_parameter_real("buni"        , buni  )
 
+! Kepler's equation solver parameters
+!
+    call get_parameter_real("tolerance", tol   )
+    call get_parameter_integer("maxit" , maxit )
+
 ! calculate the square of radia
 !
     r2star = rstar * rstar
@@ -199,6 +214,28 @@ module user_problem
 !
     if (tstar > 0.0d+00) omstar = 1.0d+00 / tstar
     if (tcomp > 0.0d+00) omcomp = 1.0d+00 / tcomp
+
+! calculate mass fractions
+!
+    ms = mcomp / (mstar + mcomp)
+    mc = mstar / (mstar + mcomp)
+
+! calculate orbit parameters
+!
+    asemi  = dist / (1.0d+00 - ecc)
+    omega  = pi2 / period
+    ean    = 0.0d+00
+
+! set the initial positions
+!
+    xrs = - ms * dist
+    yrs =   0.0d+00
+    xrc =   mc * dist
+    yrc =   0.0d+00
+
+! set the previous time
+!
+    tprev  = 0.0d+00
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -477,6 +514,11 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : ax, ay, az!, adx, ady, adz, advol
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use equations      , only : prim2cons
 
 ! local variables are not implicit by default
 !
@@ -486,6 +528,24 @@ module user_problem
 !
     type(block_data), pointer, intent(inout) :: pdata
     real(kind=8)             , intent(in)    :: time, dt
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: xs, ys, zs
+    real(kind=8)  :: xc, yc, zc
+    real(kind=8)  :: dv, ds
+    real(kind=8)  :: sn, cs, man, res
+    real(kind=8)  :: rs2, rc2, rs, rc, rd
+    real(kind=8)  :: dns, prs, vxs, vys, vzs
+    real(kind=8)  :: dnc, prc, vxc, vyc, vzc
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -494,6 +554,182 @@ module user_problem
 !
     call start_timer(ims)
 #endif /* PROFILE */
+
+! if time changes, we have to recalculate the star positions
+!
+    if (time /= tprev) then
+
+! solve the Kepler's equation to obtain the new value of eccentric anomaly
+!
+      man = omega * time
+      res = 1.0d+00
+      i   = 1
+      do while(abs(res) >= tol .and. i <= maxit)
+        res = (ean - ecc * sin(ean) - man) / (1.0d+00 - ecc * cos(ean))
+        ean = ean - res
+        i   = i + 1
+      end do
+      if (abs(res) >= tol) then
+        print *, "Kepler's equations could not be solved!"
+        print *, "it: ", i, ", E: ", ean, ", dE: ", res
+        print *, ""
+      end if
+
+! calculate trigonometric functions of the true anomaly
+!
+      dv = 1.0d+00 - ecc * cos(ean)
+      sn = sqrt(1.0d+00 - ecc**2) * sin(ean) / dv
+      cs = (cos(ean) - ecc) / dv
+
+! calculate the position and velocity of the companion star
+!
+      rd  =   asemi * dv
+      rs  =   ms * rd
+      rc  =   mc * rd
+      xps = - rs * cs
+      yps = - rs * sn
+      xpc =   rc * cs
+      ypc =   rc * sn
+      ds  = time - tprev
+      uxs = (xps - xrs) / ds
+      uys = (yps - yrs) / ds
+      uxc = (xpc - xrc) / ds
+      uyc = (ypc - yrc) / ds
+
+! update tprev, previous positions
+!
+      tprev = time
+      xrs   = xps
+      yrs   = yps
+      xrc   = xpc
+      yrc   = ypc
+
+    end if ! time /= tprev
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+#endif /* NDIMS == 3 */
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+
+! calculate the Z coordinates of the central and companion stars
+!
+      zs = z(k)
+      zc = z(k)
+
+      do j = 1, jm
+
+! calculate the Y coordinates of the central and companion stars
+!
+        ys = y(j) - yps
+        yc = y(j) - ypc
+
+! copy the primitive variable vector
+!
+        q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+
+! sweep along the X coordinate
+!
+        do i = 1, im
+
+! calculate the X coordinates of the central and companion stars
+!
+          xs = x(i) - xps
+          xc = x(i) - xpc
+
+! calculate the distances from the centers of the central and companion stars
+!
+          rs2 = max(xs * xs + ys * ys + zs * zs, 1.0d-16)
+          rc2 = max(xc * xc + yc * yc + zc * zc, 1.0d-16)
+          rs  = sqrt(rs2)
+          rc  = sqrt(rc2)
+
+! calculate profiles from the central star
+!
+#if NDIMS == 3
+          rd = max(r2star, rs2) / r2star
+#else /* NDIMS == 3 */
+          rd = max(rstar , rs ) / rstar
+#endif /* NDIMS == 3 */
+
+          dns = dstar / rd
+          if (ipr > 0) prs = pstar / rd
+
+! set the central star wind velocity
+!
+          vxs = vstar * xs / rs
+          vys = vstar * ys / rs
+          vzs = vstar * zs / rs
+
+! calculate profiles from the companion star
+!
+#if NDIMS == 3
+          rd = max(r2comp, rc2) / r2comp
+#else /* NDIMS == 3 */
+          rd = max(rcomp , rc ) / rcomp
+#endif /* NDIMS == 3 */
+
+          dnc = dcomp / rd
+          if (ipr > 0) prc = pcomp / rd
+
+! set the companion star wind velocity
+!
+          vxc = vcomp * xc / rc
+          vyc = vcomp * yc / rc
+          vzc = vcomp * zc / rc
+
+! set the variables
+!
+          if (rs2 <= r2star) then
+            q(idn,i) = dns
+            q(ivx,i) = vxs - omstar * ys / rs + uxs
+            q(ivy,i) = vys + omstar * xs / rs + uys
+            q(ivz,i) = vzs
+            if (ipr > 0) q(ipr,i) = prs
+            if (ibx > 0) then
+              q(ibx,i) = 0.0d+00
+              q(iby,i) = 0.0d+00
+              q(ibz,i) = buni
+              q(ibp,i) = 0.0d+00
+            end if
+          else if (rc2 <= r2comp) then
+            q(idn,i) = dnc
+            q(ivx,i) = vxc - omcomp * yc + uxc
+            q(ivy,i) = vyc + omcomp * xc + uyc
+            q(ivz,i) = vzc
+            if (ipr > 0) q(ipr,i) = prc
+            if (ibx > 0) then
+              q(ibx,i) = 0.0d+00
+              q(iby,i) = 0.0d+00
+              q(ibz,i) = buni
+              q(ibp,i) = 0.0d+00
+            end if
+          end if
+
+        end do ! i = 1, im
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
 
 #ifdef PROFILE
 ! stop accounting time for the shape update
