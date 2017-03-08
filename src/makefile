@@ -159,14 +159,14 @@ refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    operators.o parameters.o timers.o
 schemes.o        : schemes.F90 algebra.o coordinates.o equations.o             \
                    interpolations.o timers.o
-user_problem.o   : user_problem.F90 blocks.o constants.o coordinates.o         \
-                   equations.o error.o operators.o parameters.o random.o       \
-                   timers.o
 shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
                    parameters.o timers.o user_problem.o
 sources.o        : sources.F90 blocks.o coordinates.o equations.o gravity.o    \
                    operators.o parameters.o timers.o user_problem.o
 timers.o         : timers.F90
+user_problem.o   : user_problem.F90 blocks.o constants.o coordinates.o         \
+                   equations.o error.o operators.o parameters.o random.o       \
+                   timers.o
 utils.o          : utils.F90 error.o
 
 #-------------------------------------------------------------------------------
