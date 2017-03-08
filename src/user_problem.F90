@@ -569,7 +569,9 @@ module user_problem
 ! import external procedures and variables
 !
     use coordinates    , only : im, jm, km
+    use coordinates    , only : ib, ibl, ie, ieu
     use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
 
 ! local variables are not implicit by default
 !
@@ -585,6 +587,13 @@ module user_problem
     real(kind=8), dimension(1:jm)               , intent(in)    :: y
     real(kind=8), dimension(1:km)               , intent(in)    :: z
     real(kind=8), dimension(1:nv,1:im,1:jm,1:km), intent(inout) :: qn
+
+! local variables
+!
+    integer      :: im2, im1, i, ip1, ip2
+    integer      :: jm2, jm1, j, jp1, jp2
+    integer      :: km2, km1, k, kp1, kp2
+    real(kind=8) :: dx, dy, dz, dxy, dxz
 !
 !-------------------------------------------------------------------------------
 !
@@ -593,6 +602,132 @@ module user_problem
 !
     call start_timer(imb)
 #endif /* PROFILE */
+
+! process case with magnetic field, otherwise revert to standard outflow
+!
+    if (ibx > 0) then
+
+! get the cell sizes and their ratios
+!
+      dx  = x(2) - x(1)
+      dy  = y(2) - y(1)
+#if NDIMS == 3
+      dz  = z(2) - z(1)
+#endif /* NDIMS == 3 */
+      dxy = dx / dy
+#if NDIMS == 3
+      dxz = dx / dz
+#endif /* NDIMS == 3 */
+
+! process left and right side boundary separatelly
+!
+      if (ic == 1) then
+
+! iterate over left-side ghost layers
+!
+        do i = ibl, 1, -1
+
+! calculate neighbor cell indices
+!
+          ip1 = min(im, i + 1)
+          ip2 = min(im, i + 2)
+
+! iterate over boundary layer
+!
+          do k = kl, ku
+#if NDIMS == 3
+            km2 = max( 1, k - 2)
+            km1 = max( 1, k - 1)
+            kp1 = min(km, k + 1)
+            kp2 = min(km, k + 2)
+#endif /* NDIMS == 3 */
+            do j = jl, ju
+              jm2 = max( 1, j - 2)
+              jm1 = max( 1, j - 1)
+              jp1 = min(jm, j + 1)
+              jp2 = min(jm, j + 2)
+
+! make the normal derivative zero
+!
+              qn(1:nv,i,j,k) = qn(1:nv,ib,j,k)
+
+! prevent the inflow
+!
+              qn(ivx,i,j,k) = min(0.0d+00, qn(ivx,ib,j,k))
+
+! update the normal component of magnetic field from divergence-free condition
+!
+              qn(ibx,i,j,k) = qn(ibx,ip2,j,k)                                  &
+                            + (qn(iby,ip1,jp1,k) - qn(iby,ip1,jm1,k)) * dxy
+#if NDIMS == 3
+              qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                                  &
+                            + (qn(ibz,ip1,j,kp1) - qn(ibz,ip1,j,km1)) * dxz
+#endif /* NDIMS == 3 */
+              qn(ibp,i,j,k) = 0.0d+00
+            end do ! j = jl, ju
+          end do ! k = kl, ku
+        end do ! i = ibl, 1, -1
+
+      else ! ic == 1
+
+! iterate over right-side ghost layers
+!
+        do i = ieu, im
+
+! calculate neighbor cell indices
+!
+          im1 = max( 1, i - 1)
+          im2 = max( 1, i - 2)
+
+! iterate over boundary layer
+!
+          do k = kl, ku
+#if NDIMS == 3
+            km1 = max( 1, k - 1)
+            kp1 = min(km, k + 1)
+            km2 = max( 1, k - 2)
+            kp2 = min(km, k + 2)
+#endif /* NDIMS == 3 */
+            do j = jl, ju
+              jm1 = max( 1, j - 1)
+              jp1 = min(jm, j + 1)
+              jm2 = max( 1, j - 2)
+              jp2 = min(jm, j + 2)
+
+! make the normal derivative zero
+!
+              qn(1:nv,i,j,k) = qn(1:nv,ie,j,k)
+
+! prevent the inflow
+!
+              qn(ivx,i,j,k) = max(0.0d+00, qn(ivx,ie,j,k))
+
+! update the normal component of magnetic field from divergence-free condition
+!
+              qn(ibx,i,j,k) = qn(ibx,im2,j,k)                              &
+                            + (qn(iby,im1,jm1,k) - qn(iby,im1,jp1,k)) * dxy
+#if NDIMS == 3
+              qn(ibx,i,j,k) = qn(ibx,i  ,j,k)                              &
+                            + (qn(ibz,im1,j,km1) - qn(ibz,im1,j,kp1)) * dxz
+#endif /* NDIMS == 3 */
+              qn(ibp,i,j,k) = 0.0d+00
+            end do ! j = jl, ju
+          end do ! k = kl, ku
+        end do ! i = ieu, im
+      end if ! ic == 1
+    else ! ibx > 0
+      if (ic == 1) then
+        do i = ibl, 1, -1
+          qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ib,jl:ju,kl:ku)
+          qn(ivx ,i,jl:ju,kl:ku) = min(0.0d+00, qn(ivx,ib,jl:ju,kl:ku))
+        end do ! i = ibl, 1, -1
+      else
+        do i = ieu, im
+          qn(1:nv,i,jl:ju,kl:ku) = qn(1:nv,ie,jl:ju,kl:ku)
+          qn(ivx ,i,jl:ju,kl:ku) = max(0.0d+00, qn(ivx,ie,jl:ju,kl:ku))
+        end do ! i = ieu, im
+      end if
+    end if ! ibx > 0
 
 #ifdef PROFILE
 ! stop accounting time for the boundary update
