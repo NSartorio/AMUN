@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@ program amun
   use evolution     , only : initialize_evolution, finalize_evolution
   use evolution     , only : advance, new_time_step
   use evolution     , only : step, time, dt
+  use gravity       , only : initialize_gravity, finalize_gravity
   use integrals     , only : initialize_integrals, finalize_integrals
   use integrals     , only : store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
@@ -76,6 +77,7 @@ program amun
   use timers        , only : start_timer, stop_timer, set_timer, get_timer
   use timers        , only : get_timer_total, timer_enabled, timer_description
   use timers        , only : get_count, ntimers
+  use user_problem  , only : initialize_user_problem, finalize_user_problem
 
 ! module variables are not implicit by default
 !
@@ -201,7 +203,7 @@ program amun
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2016 Grzegorz Kowal'
+                                        'Copyright (C) 2008-2017 Grzegorz Kowal'
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
@@ -340,6 +342,10 @@ program amun
 !
   if (iret > 0) go to 60
 
+! initialize module USER_PROBLEM
+!
+  call initialize_user_problem(master, iret)
+
 ! initialize refinement module and print info
 !
   if (master) then
@@ -416,6 +422,10 @@ program amun
     write (*,"(1x,a)"         ) "Source terms:"
   end if
 
+! initialize module GRAVITY
+!
+  call initialize_gravity(master, iret)
+
 ! initialize module SOURCES
 !
   call initialize_sources(master, iret)
@@ -483,7 +493,7 @@ program amun
 
 ! update boundaries
 !
-    call boundary_variables()
+    call boundary_variables(0.0d+00, dtnext)
 
 ! calculate new timestep
 !
@@ -696,6 +706,10 @@ program amun
 !
   call finalize_sources(iret)
 
+! finalize module GRAVITY
+!
+  call finalize_gravity(iret)
+
 ! finalize module SHAPES
 !
   call finalize_shapes(iret)
@@ -715,6 +729,10 @@ program amun
 ! finalize the random number generator
 !
   call finalize_random()
+
+! finalize the user problem module
+!
+  call finalize_user_problem(iret)
 
 ! stop time accounting for the termination
 !

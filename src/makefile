@@ -83,14 +83,16 @@ default: $(name).x
 
 sources = algebra.F90 blocks.F90 boundaries.F90 constants.F90 coordinates.F90  \
           domains.F90 driver.F90 equations.F90 error.F90 evolution.F90         \
-          integrals.F90 interpolations.F90 io.F90 mesh.F90 mpitools.F90        \
-          operators.F90 parameters.F90 problems.F90 random.F90 refinement.F90  \
-          schemes.F90 shapes.F90 sources.F90 timers.F90 utils.F90
+          gravity.F90 integrals.F90 interpolations.F90 io.F90 mesh.F90         \
+          mpitools.F90 operators.F90 parameters.F90 problems.F90 random.F90    \
+          refinement.F90 schemes.F90 shapes.F90 sources.F90 timers.F90         \
+          user_problem.F90 utils.F90
+
 objects = algebra.o blocks.o boundaries.o constants.o coordinates.o domains.o  \
-          driver.o equations.o error.o evolution.o integrals.o                 \
+          driver.o equations.o error.o evolution.o gravity.o integrals.o       \
           interpolations.o io.o mesh.o mpitools.o operators.o parameters.o     \
           problems.o random.o refinement.o schemes.o shapes.o sources.o        \
-          timers.o utils.o
+          timers.o user_problem.o utils.o
 
 $(name).x: $(objects)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(name).x
@@ -123,19 +125,21 @@ clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
 algebra.o        : algebra.F90 constants.o error.o
 blocks.o         : blocks.F90 error.o timers.o
 boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
-                   interpolations.o mpitools.o timers.o
+                   gravity.o interpolations.o mpitools.o timers.o              \
+                   user_problem.o
 constants.o      : constants.F90
 coordinates.o    : coordinates.F90 parameters.o
 driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
-                   integrals.o interpolations.o io.o mesh.o mpitools.o         \
-                   operators.o parameters.o problems.o random.o refinement.o   \
-                   schemes.o shapes.o sources.o
+                   gravity.o integrals.o interpolations.o io.o mesh.o          \
+                   mpitools.o operators.o parameters.o problems.o random.o     \
+                   refinement.o schemes.o shapes.o sources.o user_problem.o
 equations.o      : equations.F90 algebra.o coordinates.o parameters.o timers.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
                    equations.o mesh.o mpitools.o parameters.o schemes.o        \
                    shapes.o sources.o
 domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
+gravity.o        : gravity.F90 parameters.o timers.o user_problem.o
 integrals.o      : integrals.F90 blocks.o coordinates.o equations.o error.o    \
                    evolution.o mpitools.o parameters.o timers.o
 interpolations.o : interpolations.F90 algebra.o blocks.o coordinates.o error.o \
@@ -149,17 +153,20 @@ mpitools.o       : mpitools.F90 error.o timers.o
 operators.o      : operators.F90 timers.o
 parameters.o     : parameters.F90 mpitools.o
 problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
-                   error.o parameters.o random.o timers.o
+                   error.o parameters.o random.o timers.o user_problem.o
 random.o         : random.F90 mpitools.o parameters.o
 refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
                    operators.o parameters.o timers.o
 schemes.o        : schemes.F90 algebra.o coordinates.o equations.o             \
                    interpolations.o timers.o
 shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
-                   parameters.o timers.o
-sources.o        : sources.F90 blocks.o coordinates.o equations.o operators.o  \
-                   parameters.o timers.o
+                   parameters.o timers.o user_problem.o
+sources.o        : sources.F90 blocks.o coordinates.o equations.o gravity.o    \
+                   operators.o parameters.o timers.o user_problem.o
 timers.o         : timers.F90
+user_problem.o   : user_problem.F90 blocks.o constants.o coordinates.o         \
+                   equations.o error.o operators.o parameters.o random.o       \
+                   timers.o
 utils.o          : utils.F90 error.o
 
 #-------------------------------------------------------------------------------

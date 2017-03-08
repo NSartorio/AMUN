@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2016 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -543,6 +543,11 @@ module evolution
     call start_timer(imu)
 #endif /* PROFILE */
 
+! prepare times
+!
+    tm  = time + dt
+    dtm = dt
+
 ! update fluxes
 !
     call update_fluxes()
@@ -561,7 +566,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the solution
 !
@@ -582,11 +587,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = dt
 
 ! update primitive variables
 !
@@ -656,6 +656,11 @@ module evolution
 
 != 1st step: U(1) = U(n) + dt * F[U(n)]
 !
+! prepare times
+!
+    tm  = time + dt
+    dtm = dt
+
 ! update fluxes
 !
     call update_fluxes()
@@ -674,7 +679,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -691,17 +696,17 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + dt
-    dtm = dt
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
 
 != 2nd step: U(n+1) = 1/2 U(n) + 1/2 U(1) + 1/2 dt * F[U(1)]
 !
+! prepare times
+!
+    tm  = time + dt
+    dtm = 0.5d+00 * dt
+
 ! update fluxes from the intermediate stage
 !
     call update_fluxes()
@@ -720,7 +725,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the final solution
 !
@@ -742,11 +747,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = 0.5d+00 * dt
 
 ! update primitive variables
 !
@@ -874,6 +874,11 @@ module evolution
 !
     do n = 1, stages - 1
 
+! prepare times
+!
+      tm  = time + n * ds
+      dtm = ds
+
 ! update fluxes
 !
       call update_fluxes()
@@ -892,7 +897,7 @@ module evolution
 
 ! add the source terms
 !
-        call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+        call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -905,11 +910,6 @@ module evolution
 
       end do ! over data blocks
 
-! prepare times
-!
-      tm  = time + n * ds
-      dtm = ds
-
 ! update primitive variables
 !
       call update_variables(tm, dtm)
@@ -918,6 +918,11 @@ module evolution
 
 != the final step: U(n+1) = 1/m U(0) + (m-1)/m [1 + dt/(m-1) L] U(m-1)
 !
+! prepare times
+!
+    tm  = time + dt
+    dtm = fl * dt
+
 ! update fluxes
 !
     call update_fluxes()
@@ -936,7 +941,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the final solution
 !
@@ -958,11 +963,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = fl * dt
 
 ! update primitive variables
 !
@@ -1043,6 +1043,11 @@ module evolution
 !
     ds = dt
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update fluxes
 !
     call update_fluxes()
@@ -1061,7 +1066,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the first intermediate solution
 !
@@ -1078,11 +1083,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + ds
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1092,6 +1092,11 @@ module evolution
 ! prepare the fractional time step
 !
     ds = f22 * dt
+
+! prepare times
+!
+    tm  = time + 0.5d+00 * dt
+    dtm = ds
 
 ! update fluxes
 !
@@ -1111,7 +1116,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the second intermediate solution
 !
@@ -1125,11 +1130,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + 0.5d+00 * dt
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1139,6 +1139,11 @@ module evolution
 ! prepare the fractional time step
 !
     ds = f32 * dt
+
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
 
 ! update fluxes
 !
@@ -1158,7 +1163,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the final solution
 !
@@ -1180,11 +1185,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = ds
 
 ! update primitive variables
 !
@@ -1266,6 +1266,11 @@ module evolution
 !
     ds = b1 * dt
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update fluxes
 !
     call update_fluxes()
@@ -1284,7 +1289,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1300,11 +1305,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + ds
-    dtm = ds
 
 ! update primitive variables
 !
@@ -1330,7 +1330,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1358,6 +1358,11 @@ module evolution
 !
     ds = b3 * dt
 
+! prepare times
+!
+    tm  = time + 0.5d+00 * dt
+    dtm = ds
+
 ! update fluxes
 !
     call update_fluxes()
@@ -1376,7 +1381,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1390,11 +1395,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + 0.5d+00 * dt
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1404,6 +1404,11 @@ module evolution
 ! calculate fractional time step
 !
     ds = b1 * dt
+
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
 
 ! update fluxes
 !
@@ -1423,7 +1428,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the final solution
 !
@@ -1444,11 +1449,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = ds
 
 ! update primitive variables
 !
@@ -1538,6 +1538,11 @@ module evolution
 !
     ds = b1 * dt
 
+! prepare times
+!
+    tm  = time + ds
+    dtm = ds
+
 ! update fluxes
 !
     call update_fluxes()
@@ -1556,7 +1561,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1573,17 +1578,17 @@ module evolution
 
     end do
 
-! prepare times
-!
-    tm  = time + ds
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
 
 != 2nd step: U(2) = U(1) + b1 dt F[U(1)]
 !
+! prepare times
+!
+    tm  = time + 2.0d+00 * ds
+    dtm = ds
+
 ! update fluxes
 !
     call update_fluxes()
@@ -1602,7 +1607,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1615,11 +1620,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + 2.0d+00 * ds
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1629,6 +1629,11 @@ module evolution
 ! calculate the fractional time step
 !
     ds = b3 * dt
+
+! prepare times
+!
+    tm  = time + (2.0d+00 * a33 * b1 + b3) * dt
+    dtm = ds
 
 ! update fluxes
 !
@@ -1648,7 +1653,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1662,11 +1667,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + (2.0d+00 * a33 * b1 + b3) * dt
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1676,6 +1676,11 @@ module evolution
 ! calculate the fractional time step
 !
     ds = b4 * dt
+
+! prepare times
+!
+    tm  = time + ((2.0d+00 * b1 * a33 + b3) * a44 + b4) * dt
+    dtm = ds
 
 ! update fluxes
 !
@@ -1695,7 +1700,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the intermediate solution
 !
@@ -1713,11 +1718,6 @@ module evolution
 
     end do ! over data blocks
 
-! prepare times
-!
-    tm  = time + ((2.0d+00 * b1 * a33 + b3) * a44 + b4) * dt
-    dtm = ds
-
 ! update primitive variables
 !
     call update_variables(tm, dtm)
@@ -1727,6 +1727,12 @@ module evolution
 ! calculate the fractional time step
 !
     ds = b5 * dt
+
+! prepare times
+!
+    tm  = time + dt
+    dtm = ds
+
 
 ! update fluxes
 !
@@ -1746,7 +1752,7 @@ module evolution
 
 ! add the source terms
 !
-      call update_sources(pdata, du(1:nv,1:im,1:jm,1:km))
+      call update_sources(pdata, tm, dtm, du(1:nv,1:im,1:jm,1:km))
 
 ! update the final solution
 !
@@ -1764,11 +1770,6 @@ module evolution
       pdata => pdata%next
 
     end do ! over data blocks
-
-! prepare times
-!
-    tm  = time + dt
-    dtm = ds
 
 ! update primitive variables
 !
@@ -2030,7 +2031,7 @@ module evolution
 
 ! update boundaries
 !
-    call boundary_variables()
+    call boundary_variables(tm, dtm)
 
 ! apply shapes in blocks which need it
 !

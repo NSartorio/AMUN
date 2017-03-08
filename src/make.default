@@ -17,10 +17,8 @@ SIGNALS      = N
 # parallelization flags:
 #
 #   MPI          - enable or disable MPI parallelization
-#   OMP          - enable or disable OpenMP parallelization
 #
 MPI          = N
-OMP          = N
 
 # output data format
 #
