@@ -360,6 +360,10 @@ module io
     call start_timer(ios)
 #endif /* PROFILE */
 
+! reset the return flag
+!
+    iret = 0
+
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
 !
@@ -411,6 +415,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! reset the return flag
+!
+    iret = 0
+
 ! check if conditions for storing the restart snapshot have been met
 !
     if (hrest < 5.0d-02 .or. thrs < irest * hrest) return
