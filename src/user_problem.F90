@@ -407,6 +407,10 @@ module user_problem
     call start_timer(img)
 #endif /* PROFILE */
 
+! reset gravitational acceleration
+!
+    acc(:) = 0.0d+00
+
 #ifdef PROFILE
 ! stop accounting time for the gravitational acceleration calculation
 !
