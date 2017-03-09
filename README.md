@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 # **The AMUN Code**
-## Copyright (C) 2008-2016 Grzegorz Kowal ##
+## Copyright (C) 2008-2017 Grzegorz Kowal ##
 --------------------------------------------------------------------------------
 
 AMUN is a parallel code to perform numerical simulations in fluid approximation
@@ -49,10 +49,9 @@ Requirements
 * Fortran 2003 compiler (tested compilers include
   [GNU Fortran](http://gcc.gnu.org/fortran/) version 4.5 or newer,
   [Intel Fortran](https://software.intel.com/en-us/fortran-compilers) compiler
-  version 9.0 or newer,
-  [PathScale EKOPath(tm)](http://www.pathscale.com/ekopath.html) compiler
-  version 1.0 or newer)
+  version 9.0 or newer)
 * [HDF5 libraries](http://www.hdfgroup.org/HDF5/) version 1.8 or newer.
+* [OpenMPI](https://www.open-mpi.org/) version 1.8 or newer for parallel runs.
 
 
 Environment Variables
