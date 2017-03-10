@@ -360,6 +360,10 @@ module io
     call start_timer(ios)
 #endif /* PROFILE */
 
+! reset the return flag
+!
+    iret = 0
+
 ! start accounting time for I/O
 !
     call start_timer(iio)
@@ -419,6 +423,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! reset the return flag
+!
+    iret = 0
+
 ! check if conditions for storing the restart snapshot have been met
 !
     if (hrest < 5.0d-02 .or. thrs < irest * hrest) return
