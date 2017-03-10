@@ -33,9 +33,7 @@ module io
 ! import external subroutines
 !
   use blocks, only : pointer_meta
-#ifdef PROFILE
   use timers, only : set_timer, start_timer, stop_timer
-#endif /* PROFILE */
 
 ! module variables are not implicit by default
 !
@@ -89,9 +87,10 @@ module io
 #endif /* HDF5 */
   end interface
 
-#ifdef PROFILE
 ! timer indices
 !
+  integer            , save :: iio
+#ifdef PROFILE
   integer            , save :: ioi, iow, ios
 #endif /* PROFILE */
 
@@ -204,9 +203,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-#ifdef PROFILE
 ! set timer descriptions
 !
+    call set_timer('SNAPSHOTS I/O'        , iio)
+#ifdef PROFILE
     call set_timer('io:: initialization'  , ioi)
     call set_timer('io:: snapshot writing', iow)
     call set_timer('io:: snapshot reading', ios)
@@ -360,11 +360,23 @@ module io
     call start_timer(ios)
 #endif /* PROFILE */
 
+! reset the return flag
+!
+    iret = 0
+
+! start accounting time for I/O
+!
+    call start_timer(iio)
+
 #ifdef HDF5
 ! read HDF5 restart file and rebuild the meta and data block structures
 !
     call read_restart_snapshot_h5(iret)
 #endif /* HDF5 */
+
+! stop accounting time for I/O
+!
+    call stop_timer(iio)
 
 ! calculate the shift of the snapshot counter, and the next snapshot time
 !
@@ -411,6 +423,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! reset the return flag
+!
+    iret = 0
+
 ! check if conditions for storing the restart snapshot have been met
 !
     if (hrest < 5.0d-02 .or. thrs < irest * hrest) return
@@ -421,11 +437,19 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
+! start accounting time for I/O
+!
+    call start_timer(iio)
+
 #ifdef HDF5
 ! store restart file
 !
     call write_restart_snapshot_h5(nrun, iret)
 #endif /* HDF5 */
+
+! stop accounting time for I/O
+!
+    call stop_timer(iio)
 
 ! increase the restart snapshot counter
 !
@@ -476,6 +500,10 @@ module io
     call start_timer(iow)
 #endif /* PROFILE */
 
+! start accounting time for I/O
+!
+    call start_timer(iio)
+
 #ifdef HDF5
 ! store variable snapshot file
 !
@@ -485,6 +513,10 @@ module io
       if (master) call write_snapshot_xdmf_master()
     end if
 #endif /* HDF5 */
+
+! stop accounting time for I/O
+!
+    call stop_timer(iio)
 
 ! increase the snapshot counter and calculate the next snapshot time
 !
