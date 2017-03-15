@@ -868,7 +868,7 @@ module interpolations
 ! -------------------------
 !
 !   Subroutine reconstructs both side interfaces of variable using
-!   multidimentional Gaussian Process method.
+!   multidimensional Gaussian Process method.
 !
 !   Arguments:
 !
