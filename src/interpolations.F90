@@ -86,6 +86,7 @@ module interpolations
 
 ! flags for reconstruction corrections
 !
+  logical     , save :: mlp        = .false.
   logical     , save :: positivity = .false.
   logical     , save :: clip       = .false.
 
@@ -137,6 +138,7 @@ module interpolations
     character(len=255) :: tlimiter        = "mm"
     character(len=255) :: plimiter        = "mm"
     character(len=255) :: climiter        = "mm"
+    character(len=255) :: mlp_limiting    = "off"
     character(len=255) :: positivity_fix  = "off"
     character(len=255) :: clip_extrema    = "off"
     character(len=255) :: name_rec        = ""
@@ -169,6 +171,7 @@ module interpolations
     call get_parameter_string ("clip_extrema"        , clip_extrema   )
     call get_parameter_string ("extrema_limiter"     , climiter       )
     call get_parameter_string ("prolongation_limiter", plimiter       )
+    call get_parameter_string ("mlp_limiting"        , mlp_limiting   )
     call get_parameter_integer("nghosts"             , ng             )
     call get_parameter_integer("ngp"                 , ngp            )
     call get_parameter_real   ("sgp"                 , sgp            )
@@ -390,6 +393,12 @@ module interpolations
 
 ! check additional reconstruction limiting
 !
+    select case(trim(mlp_limiting))
+    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
+      mlp = .true.
+    case default
+      mlp = .false.
+    end select
     select case(trim(positivity_fix))
     case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
       positivity = .true.
@@ -410,6 +419,7 @@ module interpolations
       write (*,"(4x,a14, 9x,'=',1x,a)") "reconstruction"      , trim(name_rec)
       write (*,"(4x,a11,12x,'=',1x,a)") "TVD limiter"         , trim(name_tlim)
       write (*,"(4x,a20, 3x,'=',1x,a)") "prolongation limiter", trim(name_plim)
+      write (*,"(4x,a12,11x,'=',1x,a)") "MLP limiting"        , trim(mlp_limiting)
       write (*,"(4x,a14, 9x,'=',1x,a)") "fix positivity"      , trim(positivity_fix)
       write (*,"(4x,a12,11x,'=',1x,a)") "clip extrema"        , trim(clip_extrema)
       if (clip) then
@@ -673,9 +683,12 @@ module interpolations
 
 ! local variables
 !
-    integer                        :: i, im1, ip1
-    integer                        :: j, jm1, jp1
-    integer                        :: k, km1, kp1
+    integer :: i, im1, ip1
+    integer :: j, jm1, jp1
+    integer :: k, km1, kp1
+
+! local vectors
+!
     real(kind=8), dimension(NDIMS) :: dql, dqr, dq
 !
 !-------------------------------------------------------------------------------
@@ -750,6 +763,10 @@ module interpolations
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
     end do ! k = kbl, keu
+
+! apply Multi-dimensional Limiting Process
+!
+    if (mlp) call mlp_limiting(q(:,:,:), qi(:,:,:,:,:))
 
 !-------------------------------------------------------------------------------
 !
@@ -857,6 +874,10 @@ module interpolations
 #endif /* NDIMS == 3 */
 
     end if
+
+! apply Multi-dimensional Limiting Process
+!
+    if (mlp) call mlp_limiting(q(:,:,:), qi(:,:,:,:,:))
 
 !-------------------------------------------------------------------------------
 !
@@ -1028,9 +1049,188 @@ module interpolations
       end do ! j = jbl, jeu
     end do ! k = kbl, keu
 
+! apply Multi-dimensional Limiting Process
+!
+    if (mlp) call mlp_limiting(q(:,:,:), qi(:,:,:,:,:))
+
 !-------------------------------------------------------------------------------
 !
   end subroutine interfaces_mgp
+!
+!===============================================================================
+!
+! subroutine MLP_LIMITING:
+! -----------------------
+!
+!   Subroutine applies the multi-dimensional limiting process to
+!   the reconstructed states in order to control oscillations due to
+!   the Gibbs phenomena near discontinuities.
+!
+!   Arguments:
+!
+!     q        - the variable array;
+!     qi       - the array of reconstructed interfaces (2 in each direction);
+!
+!   References:
+!
+!     [1] Gerlinger, P.,
+!         "Multi-dimensional limiting for high-order schemes including
+!          turbulence and combustion",
+!         Journal of Computational Physics,
+!         2012, vol. 231, pp. 2199-2228,
+!         http://dx.doi.org/10.1016/j.jcp.2011.10.024
+!
+!===============================================================================
+!
+  subroutine mlp_limiting(q, qi)
+
+! include external procedures
+!
+    use coordinates    , only : im , jm , km
+    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    real(kind=8), dimension(im,jm,km)        , intent(in)    :: q
+    real(kind=8), dimension(im,jm,km,2,NDIMS), intent(inout) :: qi
+
+! local variables
+!
+    integer      :: i, im1, ip1
+    integer      :: j, jm1, jp1
+    integer      :: k, km1, kp1
+    integer      :: m
+#if NDIMS == 3
+    integer      :: n, np1, np2
+#endif /* NDIMS == 3 */
+    real(kind=8) :: qmn, qmx, dqc
+    real(kind=8) :: fc, fl
+
+! local vectors
+!
+    real(kind=8), dimension(NDIMS) :: dql, dqr, dq
+    real(kind=8), dimension(NDIMS) :: dqm, ap
+#if NDIMS == 3
+    real(kind=8), dimension(NDIMS) :: hh, uu
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+    do k = kbl, keu
+#if NDIMS == 3
+      km1 = k - 1
+      kp1 = k + 1
+#endif /* NDIMS == 3 */
+      do j = jbl, jeu
+        jm1 = j - 1
+        jp1 = j + 1
+        do i = ibl, ieu
+          im1 = i - 1
+          ip1 = i + 1
+
+! calculate the minmod TVD derivatives
+!
+          dql(1) = q(i  ,j,k) - q(im1,j,k)
+          dqr(1) = q(ip1,j,k) - q(i  ,j,k)
+          dq (1) = minmod(dql(1), dqr(1))
+
+          dql(2) = q(i,j  ,k) - q(i,jm1,k)
+          dqr(2) = q(i,jp1,k) - q(i,j  ,k)
+          dq (2) = minmod(dql(2), dqr(2))
+
+#if NDIMS == 3
+          dql(3) = q(i,j,k  ) - q(i,j,km1)
+          dqr(3) = q(i,j,kp1) - q(i,j,k  )
+          dq (3) = minmod(dql(3), dqr(3))
+#endif /* NDIMS == 3 */
+
+! calculate dqc
+!
+#if NDIMS == 3
+          qmn = minval(q(im1:ip1,jm1:jp1,km1:kp1))
+          qmx = maxval(q(im1:ip1,jm1:jp1,km1:kp1))
+#else /* NDIMS == 3 */
+          qmn = minval(q(im1:ip1,jm1:jp1,k))
+          qmx = maxval(q(im1:ip1,jm1:jp1,k))
+#endif /* NDIMS == 3 */
+          dqc = min(qmx - q(i,j,k), q(i,j,k) - qmn)
+
+! if needed, apply the multi-dimensional limiting process
+!
+          if (sum(abs(dq(1:NDIMS))) > dqc) then
+
+            dqm(1) = abs(q(ip1,j,k) - q(im1,j,k))
+            dqm(2) = abs(q(i,jp1,k) - q(i,jm1,k))
+#if NDIMS == 3
+            dqm(3) = abs(q(i,j,kp1) - q(i,j,km1))
+#endif /* NDIMS == 3 */
+
+            fc = dqc / max(1.0d-16, sum(abs(dqm(1:NDIMS))))
+            do m = 1, NDIMS
+              ap(m) = fc * abs(dqm(m))
+            end do
+
+#if NDIMS == 3
+            do n = 1, NDIMS
+              hh(n)   = max(ap(n) - abs(dq(n)), 0.0d+00)
+              np1     = mod(n    , NDIMS) + 1
+              np2     = mod(n + 1, NDIMS) + 1
+              uu(n)   = ap(n)   -           hh(n)
+              uu(np1) = ap(np1) + 0.5d+00 * hh(n)
+              uu(np2) = ap(np2) + 0.5d+00 * hh(n)
+              fc      = hh(n) / (hh(n) + 1.0d-16)
+              fl      = fc * (max(ap(np1) - abs(dq(np1)), 0.0d+00)             &
+                            - max(ap(np2) - abs(dq(np2)), 0.0d+00))
+              ap(n  ) = uu(n)
+              ap(np1) = uu(np1) - fl
+              ap(np2) = uu(np2) + fl
+            end do
+#else /* NDIMS == 3 */
+            fl     = max(ap(1) - abs(dq(1)), 0.0d+00)                          &
+                   - max(ap(2) - abs(dq(2)), 0.0d+00)
+            ap(1)  = ap(1) - fl
+            ap(2)  = ap(2) + fl
+#endif /* NDIMS == 3 */
+
+            do m = 1, NDIMS
+              dq(m)  = sign(ap(m), dq(m))
+            end do
+          end if
+
+! calculate the limited variable increments
+!
+          dql(1) = minmod(dq(1),   qi(i  ,j,k,1,1) - q(i,j,k))
+          dqr(1) = minmod(dq(1), - qi(im1,j,k,2,1) + q(i,j,k))
+          dql(2) = minmod(dq(2),   qi(i,j  ,k,1,2) - q(i,j,k))
+          dqr(2) = minmod(dq(2), - qi(i,jm1,k,2,2) + q(i,j,k))
+#if NDIMS == 3
+          dql(3) = minmod(dq(3),   qi(i,j,k  ,1,3) - q(i,j,k))
+          dqr(3) = minmod(dq(3), - qi(i,j,km1,2,3) + q(i,j,k))
+#endif /* NDIMS == 3 */
+
+! update the interpolated states
+!
+          qi(i  ,j,k,1,1) = q(i,j,k) + dql(1)
+          qi(im1,j,k,2,1) = q(i,j,k) - dqr(1)
+
+          qi(i,j  ,k,1,2) = q(i,j,k) + dql(2)
+          qi(i,jm1,k,2,2) = q(i,j,k) - dqr(2)
+#if NDIMS == 3
+          qi(i,j,k  ,1,3) = q(i,j,k) + dql(3)
+          qi(i,j,km1,2,3) = q(i,j,k) - dqr(3)
+#endif /* NDIMS == 3 */
+
+        end do ! i = ibl, ieu
+      end do ! j = jbl, jeu
+    end do ! k = kbl, keu
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mlp_limiting
 !
 !===============================================================================
 !
