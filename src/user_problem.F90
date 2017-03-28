@@ -59,6 +59,7 @@ module user_problem
   real(kind=8), save :: pth  = 1.00d-02
   real(kind=8), save :: pmag = 5.00d-01
   real(kind=8), save :: blim = 1.00d+00
+  real(kind=8), save :: zeta = 0.00d+00
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -138,6 +139,7 @@ module user_problem
     call get_parameter_real("yth"   , yth )
     call get_parameter_real("pth"   , pth )
     call get_parameter_real("blimit", blim)
+    call get_parameter_real("zeta"  , zeta)
 
 ! calculate the maximum magnetic pressure
 !
@@ -249,7 +251,8 @@ module user_problem
 ! local variables
 !
     integer      :: i, j, k
-    real(kind=8) :: yt, yp
+    real(kind=8) :: yt, yp, yl, yu
+    real(kind=8) :: yrat, itanh
 
 ! local arrays
 !
@@ -278,6 +281,10 @@ module user_problem
     dh(1) = adx(pdata%meta%level)
     dh(2) = ady(pdata%meta%level)
     dh(3) = adz(pdata%meta%level)
+
+! ratio of the current sheet thickness to the cell size
+!
+    yrat  = yth / dh(2)
 
 ! calculate the perturbation of magnetic field
 !
@@ -322,23 +329,25 @@ module user_problem
 !
         if (ibx > 0) then
 
-! set antiparallel magnetic field component
+! set the magnetic field configuration
 !
           do j = 1, jm
-            q(ibx,j) = bamp * tanh(y(j) / yth)
+            yl    = (y(j) - 0.5d+00 * dh(2)) / yth
+            yu    = (y(j) + 0.5d+00 * dh(2)) / yth
+
+            itanh = (log_cosh(yu) - log_cosh(yl)) * yrat
+
+            q(ibx,j) = bamp * sign(min(1.0d+00, abs(itanh)), itanh)
+            q(iby,j) = 0.0d+00
+            q(ibz,j) = (sqrt(2.0d+00 * pmag - q(ibx,j)**2) - bgui) * zeta + bgui
+            q(ibp,j) = 0.0d+00
           end do ! j = 1, jm
 
-! set tangential magnetic field components
-!
-          q(iby,1:jm) = 0.0d+00
-          q(ibz,1:jm) = bgui
-          q(ibp,1:jm) = 0.0d+00
-
-! calculate local magnetic pressure
+! calculate the local magnetic pressure
 !
           pm(1:jm)    = 0.5d+00 * sum(q(ibx:ibz,:) * q(ibx:ibz,:), 1)
 
-! add magnetic field perturbation
+! add the magnetic field perturbation
 !
           if (bper /= 0.0d+00) then
             q(ibx,1:jm) = q(ibx,1:jm) + pdata%q(ibx,i,1:jm,k)
@@ -346,24 +355,33 @@ module user_problem
             q(ibz,1:jm) = q(ibz,1:jm) + pdata%q(ibz,i,1:jm,k)
           end if ! bper /= 0.0
 
+! set the density and pressure profiles
+!
+          if (ipr > 0) then
+            q(idn,1:jm) = dens
+            q(ipr,1:jm) = pres + (pmag - pm(1:jm))
+          else
+            q(idn,1:jm) = dens + (pmag - pm(1:jm)) / csnd2
+          end if
+
+        else ! ibx > 0
+
+          if (ipr > 0) then
+            q(idn,1:jm) = dens
+            q(ipr,1:jm) = pres
+          else
+            q(idn,1:jm) = dens
+          end if
+
         end if ! ibx > 0
 
-! set the uniform density and pressure
-!
-        if (ipr > 0) then
-          q(idn,1:jm) = dens
-          q(ipr,1:jm) = pres + (pmag - pm(1:jm))
-        else
-          q(idn,1:jm) = dens + (pmag - pm(1:jm)) / csnd2
-        end if
-
-! reset velocity components
+! reset the velocity components
 !
         q(ivx,1:jm) = 0.0d+00
         q(ivy,1:jm) = 0.0d+00
         q(ivz,1:jm) = 0.0d+00
 
-! set the random velocity field in a layer near current sheet
+! set the random velocity field near the current sheet
 !
         if (abs(x(i)) <= xcut) then
           do j = 1, jm
@@ -379,7 +397,7 @@ module user_problem
           end do ! j = 1, jm
         end if ! |x| < xcut
 
-! convert the primitive variables to conservative ones
+! convert the primitive variables to the conservative ones
 !
         call prim2cons(jm, q(1:nv,1:jm), u(1:nv,1:jm))
 
@@ -403,6 +421,50 @@ module user_problem
 !-------------------------------------------------------------------------------
 !
   end subroutine setup_problem_user
+!
+!===============================================================================
+!
+! subroutine LOG_COSH:
+! -------------------
+!
+!   Function calculates the logarithm of the hyperbolic cosine, which is
+!   the result of the integration of tanh(x). Direct calculation using
+!   Fortran intrinsic subroutines fails for large values of x, therefore
+!   the logarithm of cosh is approximated as |x| + log(1/2) for
+!   |x| > threshold.
+!
+!   Arguments:
+!
+!     x - function argument;
+!
+!===============================================================================
+!
+  function log_cosh(x) result(y)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! function arguments
+!
+    real(kind=8), intent(in) :: x
+    real(kind=8)             :: y
+
+! local parameters
+!
+    real(kind=8), parameter :: th = acosh(huge(x)), lh = log(0.5d+00)
+!
+!-------------------------------------------------------------------------------
+!
+    if (abs(x) < th) then
+      y = log(cosh(x))
+    else
+      y = abs(x) + lh
+    end if
+
+!-------------------------------------------------------------------------------
+!
+  end function log_cosh
 !
 !===============================================================================
 !
