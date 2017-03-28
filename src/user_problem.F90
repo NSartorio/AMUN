@@ -253,6 +253,7 @@ module user_problem
     integer      :: i, j, k
     real(kind=8) :: yt, yp, yl, yu
     real(kind=8) :: yrat, itanh
+    real(kind=8) :: vx, vy, vz, vv
 
 ! local arrays
 !
@@ -387,10 +388,25 @@ module user_problem
           do j = 1, jm
             if (abs(y(j)) <= ycut) then
 
-              q(ivx,j) = vper * randomn()
-              q(ivy,j) = vper * randomn()
+              vv = 0.0d+00
+              do while(vv == 0.0d+00)
+                vx = randomn()
+                vy = randomn()
 #if NDIMS == 3
-              q(ivz,j) = vper * randomn()
+                vz = randomn()
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+                vv = sqrt(vx * vx + vy * vy + vz * vz)
+#else /* NDIMS == 3 */
+                vv = sqrt(vx * vx + vy * vy)
+#endif /* NDIMS == 3 */
+              end do
+
+              q(ivx,j) = vper * (vx / vv)
+              q(ivy,j) = vper * (vy / vv)
+#if NDIMS == 3
+              q(ivz,j) = vper * (vz / vv)
 #endif /* NDIMS == 3 */
 
             end if ! |y| < ycut
