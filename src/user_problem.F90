@@ -53,6 +53,7 @@ module user_problem
   real(kind=8), save :: bper = 0.00d+00
   real(kind=8), save :: bgui = 0.00d+00
   real(kind=8), save :: vper = 1.00d-02
+  real(kind=8), save :: kper = 1.00d+00
   real(kind=8), save :: xcut = 4.00d-01
   real(kind=8), save :: ycut = 1.00d-02
   real(kind=8), save :: yth  = 1.00d-16
@@ -60,6 +61,7 @@ module user_problem
   real(kind=8), save :: pmag = 5.00d-01
   real(kind=8), save :: blim = 1.00d+00
   real(kind=8), save :: zeta = 0.00d+00
+  integer     , save :: pert = 1
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -104,6 +106,7 @@ module user_problem
 ! local variables
 !
     character(len=64) :: problem_name   = "none"
+    character(len=64) :: perturbation   = "noise"
 !
 !-------------------------------------------------------------------------------
 !
@@ -124,7 +127,19 @@ module user_problem
 
 ! get the problem name
 !
-    call get_parameter_string("problem", problem_name)
+    call get_parameter_string("problem"     , problem_name)
+    call get_parameter_string("perturbation", perturbation)
+
+! choose the perturbation type
+!
+    select case(perturbation)
+    case('noise', 'random')
+      pert = 1
+    case('vel', 'velocity_mode')
+      pert = 2
+    case('mag', 'magnetic_mode')
+      pert = 3
+    end select
 
 ! get the reconnection problem parameters
 !
@@ -134,6 +149,7 @@ module user_problem
     call get_parameter_real("bper"  , bper)
     call get_parameter_real("bgui"  , bgui)
     call get_parameter_real("vper"  , vper)
+    call get_parameter_real("kper"  , kper)
     call get_parameter_real("xcut"  , xcut)
     call get_parameter_real("ycut"  , ycut)
     call get_parameter_real("yth"   , yth )
@@ -238,7 +254,7 @@ module user_problem
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
     use equations  , only : csnd2
     use operators  , only : curl
-    use random     , only : randomn
+    use random     , only : randomn, randomu
 
 ! local variables are not implicit by default
 !
@@ -251,7 +267,7 @@ module user_problem
 ! local variables
 !
     integer      :: i, j, k
-    real(kind=8) :: yt, yp, yl, yu
+    real(kind=8) :: xp, yp, yt, yl, yu
     real(kind=8) :: yrat, itanh
     real(kind=8) :: vx, vy, vz, vv
 
@@ -289,7 +305,7 @@ module user_problem
 
 ! calculate the perturbation of magnetic field
 !
-    if (bper /= 0.0d+00) then
+    if (bper /= 0.0d+00 .and. pert == 3) then
 
 ! initiate the vector potential (we use velocity components to store vector
 ! potential temporarily, and we store magnetic field perturbation in U)
@@ -350,7 +366,7 @@ module user_problem
 
 ! add the magnetic field perturbation
 !
-          if (bper /= 0.0d+00) then
+          if (bper /= 0.0d+00 .and. pert == 3) then
             q(ibx,1:jm) = q(ibx,1:jm) + pdata%q(ibx,i,1:jm,k)
             q(iby,1:jm) = q(iby,1:jm) + pdata%q(iby,i,1:jm,k)
             q(ibz,1:jm) = q(ibz,1:jm) + pdata%q(ibz,i,1:jm,k)
@@ -384,34 +400,49 @@ module user_problem
 
 ! set the random velocity field near the current sheet
 !
-        if (abs(x(i)) <= xcut) then
-          do j = 1, jm
-            if (abs(y(j)) <= ycut) then
+        if (pert == 1) then
+          if (abs(x(i)) <= xcut) then
+            do j = 1, jm
+              if (abs(y(j)) <= ycut) then
 
-              vv = 0.0d+00
-              do while(vv == 0.0d+00)
-                vx = randomn()
-                vy = randomn()
+                vv = 0.0d+00
+                do while(vv == 0.0d+00)
+                  vx = randomn()
+                  vy = randomn()
 #if NDIMS == 3
-                vz = randomn()
+                  vz = randomn()
 #endif /* NDIMS == 3 */
 
 #if NDIMS == 3
-                vv = sqrt(vx * vx + vy * vy + vz * vz)
+                  vv = sqrt(vx * vx + vy * vy + vz * vz)
 #else /* NDIMS == 3 */
-                vv = sqrt(vx * vx + vy * vy)
+                  vv = sqrt(vx * vx + vy * vy)
 #endif /* NDIMS == 3 */
-              end do
+                end do
 
-              q(ivx,j) = vper * (vx / vv)
-              q(ivy,j) = vper * (vy / vv)
+                q(ivx,j) = vper * (vx / vv)
+                q(ivy,j) = vper * (vy / vv)
 #if NDIMS == 3
-              q(ivz,j) = vper * (vz / vv)
+                q(ivz,j) = vper * (vz / vv)
 #endif /* NDIMS == 3 */
 
-            end if ! |y| < ycut
+              end if ! |y| < ycut
+            end do ! j = 1, jm
+          end if ! |x| < xcut
+        end if ! pert == 1
+
+        if (pert == 2) then
+          xp = pi2 * kper * (x(i) + 0.5d+00)
+          do j = 1, jm
+            yp = y(j) / pth
+            vx = (2.0d+00 * yp * tanh(yp) - 1.0d+00 / cosh(yp)**2)             &
+               * exp(- yp**2) * sin(xp) / (pi2 * kper * pth)
+            vy = tanh(yp) * exp(- yp**2) * cos(xp)
+
+            q(ivx,j) = vper * vx
+            q(ivy,j) = vper * vy
           end do ! j = 1, jm
-        end if ! |x| < xcut
+        end if ! pert == 2
 
 ! convert the primitive variables to the conservative ones
 !
