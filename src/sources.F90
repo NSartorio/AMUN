@@ -582,11 +582,17 @@ module sources
           call curl(dh(:), pdata%q(ibx:ibz,1:im,1:jm,1:km)                     &
                                             , tmp(inz,inx:inz,1:im,1:jm,1:km))
 
+! calculate J²
+!
+          db(1:im,1:jm,1:km) = tmp(inz,inx,1:im,1:jm,1:km)**2                  &
+                             + tmp(inz,iny,1:im,1:jm,1:km)**2                  &
+                             + tmp(inz,inz,1:im,1:jm,1:km)**2
+
 ! add the second resistive source term to the energy equation, i.e.
 !     d/dt E + ∇.F = η J²
 !
           du(ien,1:im,1:jm,1:km) = du(ien,1:im,1:jm,1:km)                      &
-                    + resistivity * sum(tmp(inz,inx:inz,1:im,1:jm,1:km)**2, 2)
+                                 + resistivity * db(1:im,1:jm,1:km)
 
         end if ! energy equation present
 
