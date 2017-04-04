@@ -54,6 +54,7 @@ module user_problem
   real(kind=8), save :: bgui = 0.00d+00
   real(kind=8), save :: vper = 1.00d-02
   real(kind=8), save :: kper = 1.00d+00
+  real(kind=8), save :: kvec = 1.00d+00
   real(kind=8), save :: xcut = 4.00d-01
   real(kind=8), save :: ycut = 1.00d-02
   real(kind=8), save :: yth  = 1.00d-16
@@ -90,6 +91,7 @@ module user_problem
 
 ! include external procedures and variables
 !
+    use constants      , only : pi2
     use coordinates    , only : ng
     use coordinates    , only : ady
     use parameters     , only : get_parameter_string, get_parameter_real
@@ -139,6 +141,8 @@ module user_problem
       pert = 2
     case('mag', 'magnetic_mode')
       pert = 3
+    case('both')
+      pert = 4
     end select
 
 ! get the reconnection problem parameters
@@ -160,6 +164,10 @@ module user_problem
 ! calculate the maximum magnetic pressure
 !
     pmag = 0.5d+00 * (bamp**2 + bgui**2)
+
+! prepare the wave vector of the perturbation
+!
+    kvec = pi2 * kper
 
 ! upper limit for blim
 !
@@ -246,7 +254,6 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks     , only : block_data
-    use constants  , only : pi2
     use coordinates, only : im, jm, km
     use coordinates, only : ax, ay, adx, ady, adz
     use equations  , only : prim2cons
@@ -273,12 +280,13 @@ module user_problem
 
 ! local arrays
 !
-    real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(im)    :: x
-    real(kind=8), dimension(jm)    :: y
-    real(kind=8), dimension(km)    :: z
-    real(kind=8), dimension(jm)    :: pm
-    real(kind=8), dimension(3)     :: dh
+    real(kind=8), dimension(3 ,im,jm,km) :: tmp
+    real(kind=8), dimension(nv,im)       :: q, u
+    real(kind=8), dimension(im)          :: x
+    real(kind=8), dimension(jm)          :: y
+    real(kind=8), dimension(km)          :: z
+    real(kind=8), dimension(jm)          :: pm
+    real(kind=8), dimension(3)           :: dh
 !
 !-------------------------------------------------------------------------------
 !
@@ -303,39 +311,122 @@ module user_problem
 !
     yrat  = yth / dh(2)
 
+! reset the velocity components
+!
+    pdata%q(ivx:ivz,1:im,1:jm,1:km) = 0.0d+00
+
+! prepare the random perturbation of velocity
+!
+    if (pert == 1) then
+
+      if (vper /= 0.0d+00) then
+
+! initiate the random velocity components
+!
+        do k = 1, km
+          do j = 1, jm
+            if (abs(y(j)) <= ycut) then
+              do i = 1, im
+                if (abs(x(i)) <= xcut) then
+
+                  vv = 0.0d+00
+                  do while(vv == 0.0d+00)
+                    vx = randomn()
+                    vy = randomn()
+#if NDIMS == 3
+                    vz = randomn()
+#endif /* NDIMS == 3 */
+
+#if NDIMS == 3
+                    vv = sqrt(vx * vx + vy * vy + vz * vz)
+#else /* NDIMS == 3 */
+                    vv = sqrt(vx * vx + vy * vy)
+#endif /* NDIMS == 3 */
+                  end do
+
+                  pdata%q(ivx,i,j,k) = vper * (vx / vv)
+                  pdata%q(ivy,i,j,k) = vper * (vy / vv)
+#if NDIMS == 3
+                  pdata%q(ivz,i,j,k) = vper * (vz / vv)
+#endif /* NDIMS == 3 */
+
+                end if ! |x| < xcut
+              end do ! i = 1, im
+            end if ! |y| < ycut
+          end do ! j = 1, jm
+        end do ! k = 1, km
+
+      end if ! vper /= 0.0
+
+    end if ! pert == 1
+
+! prepare the wave-like perturbation of velocity
+!
+    if (pert == 2 .or. pert == 4) then
+
+      if (vper /= 0.0d+00) then
+
+! initiate the potential to calculate the divergence-free velocity components
+!
+        do k = 1, km
+          do j = 1, jm
+            do i = 1, im
+              xp = kvec * x(i)
+              yp = y(j) / pth
+              yt = - 0.5d+00 * yp**2
+
+              tmp(1,i,j,k) = 0.0d+00
+              tmp(2,i,j,k) = 0.0d+00
+              tmp(3,i,j,k) = vper * sin(xp) * tanh(yp) * exp(yt) / kvec
+            end do ! i = 1, im
+          end do ! j = 1, jm
+        end do ! k = 1, km
+
+! calculate velocity components from the potential
+!
+        call curl(dh(1:3), tmp(1:3,1:im,1:jm,1:km)                             &
+                                            , pdata%q(ivx:ivz,1:im,1:jm,1:km))
+
+      end if ! vper /= 0.0
+
+    end if ! pert == 2
+
 ! calculate the perturbation of magnetic field
 !
-    if (bper /= 0.0d+00 .and. pert == 3) then
-
-! initiate the vector potential (we use velocity components to store vector
-! potential temporarily, and we store magnetic field perturbation in U)
-!
-      do k = 1, km
-        do j = 1, jm
-          do i = 1, im
-            yt = abs(y(j) / yth)
-            yt = log(exp(yt) + exp(- yt))
-            yp = y(j) / pth
-
-            pdata%q(ivx,i,j,k) = 0.0d+00
-            pdata%q(ivy,i,j,k) = 0.0d+00
-            pdata%q(ivz,i,j,k) = bper * cos(pi2 * x(i)) * exp(- yp * yp) / pi2
-          end do ! i = 1, im
-        end do ! j = 1, jm
-      end do ! k = 1, km
-
-! calculate magnetic field components from vector potential
-!
-      call curl(dh(1:3), pdata%q(ivx:ivz,1:im,1:jm,1:km)                       &
-                                            , pdata%q(ibx:ibz,1:im,1:jm,1:km))
-
-    else
+    if (ibx > 0) then
 
 ! reset magnetic field components
 !
       pdata%q(ibx:ibz,:,:,:) = 0.0d+00
 
-    end if ! bper /= 0.0
+! prepare the wave-like perturbation of magnetic field
+!
+      if (bper /= 0.0d+00 .and. pert >= 3) then
+
+! initiate the vector potential to calculate the divergence-free magnetic field
+! components
+!
+        do k = 1, km
+          do j = 1, jm
+            do i = 1, im
+              xp = kvec * x(i)
+              yp = - 0.5d+00 * (y(j) / pth)**2
+
+              tmp(1,i,j,k) = 0.0d+00
+              tmp(2,i,j,k) = 0.0d+00
+              tmp(3,i,j,k) = vper * cos(xp) * exp(yp) / kvec
+            end do ! i = 1, im
+          end do ! j = 1, jm
+        end do ! k = 1, km
+
+! calculate magnetic field components from vector potential
+!
+        call curl(dh(1:3), tmp(1:3,1:im,1:jm,1:km)                             &
+                                            , pdata%q(ibx:ibz,1:im,1:jm,1:km))
+
+      end if ! bper /= 0.0
+
+    end if ! ibx > 0
 
 ! iterate over all positions in the XZ plane
 !
@@ -366,11 +457,9 @@ module user_problem
 
 ! add the magnetic field perturbation
 !
-          if (bper /= 0.0d+00 .and. pert == 3) then
-            q(ibx,1:jm) = q(ibx,1:jm) + pdata%q(ibx,i,1:jm,k)
-            q(iby,1:jm) = q(iby,1:jm) + pdata%q(iby,i,1:jm,k)
-            q(ibz,1:jm) = q(ibz,1:jm) + pdata%q(ibz,i,1:jm,k)
-          end if ! bper /= 0.0
+          q(ibx,1:jm) = q(ibx,1:jm) + pdata%q(ibx,i,1:jm,k)
+          q(iby,1:jm) = q(iby,1:jm) + pdata%q(iby,i,1:jm,k)
+          q(ibz,1:jm) = q(ibz,1:jm) + pdata%q(ibz,i,1:jm,k)
 
 ! set the density and pressure profiles
 !
@@ -392,57 +481,11 @@ module user_problem
 
         end if ! ibx > 0
 
-! reset the velocity components
+! add the velocity field perturbation
 !
-        q(ivx,1:jm) = 0.0d+00
-        q(ivy,1:jm) = 0.0d+00
-        q(ivz,1:jm) = 0.0d+00
-
-! set the random velocity field near the current sheet
-!
-        if (pert == 1) then
-          if (abs(x(i)) <= xcut) then
-            do j = 1, jm
-              if (abs(y(j)) <= ycut) then
-
-                vv = 0.0d+00
-                do while(vv == 0.0d+00)
-                  vx = randomn()
-                  vy = randomn()
-#if NDIMS == 3
-                  vz = randomn()
-#endif /* NDIMS == 3 */
-
-#if NDIMS == 3
-                  vv = sqrt(vx * vx + vy * vy + vz * vz)
-#else /* NDIMS == 3 */
-                  vv = sqrt(vx * vx + vy * vy)
-#endif /* NDIMS == 3 */
-                end do
-
-                q(ivx,j) = vper * (vx / vv)
-                q(ivy,j) = vper * (vy / vv)
-#if NDIMS == 3
-                q(ivz,j) = vper * (vz / vv)
-#endif /* NDIMS == 3 */
-
-              end if ! |y| < ycut
-            end do ! j = 1, jm
-          end if ! |x| < xcut
-        end if ! pert == 1
-
-        if (pert == 2) then
-          xp = pi2 * kper * (x(i) + 0.5d+00)
-          do j = 1, jm
-            yp = y(j) / pth
-            vx = (2.0d+00 * yp * tanh(yp) - 1.0d+00 / cosh(yp)**2)             &
-               * exp(- yp**2) * sin(xp) / (pi2 * kper * pth)
-            vy = tanh(yp) * exp(- yp**2) * cos(xp)
-
-            q(ivx,j) = vper * vx
-            q(ivy,j) = vper * vy
-          end do ! j = 1, jm
-        end if ! pert == 2
+        q(ivx,1:jm) = pdata%q(ivx,i,1:jm,k)
+        q(ivy,1:jm) = pdata%q(ivy,i,1:jm,k)
+        q(ivz,1:jm) = pdata%q(ivz,i,1:jm,k)
 
 ! convert the primitive variables to the conservative ones
 !
