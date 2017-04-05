@@ -1136,16 +1136,16 @@ module interpolations
 !
           dql(1) = q(i  ,j,k) - q(im1,j,k)
           dqr(1) = q(ip1,j,k) - q(i  ,j,k)
-          dq (1) = minmod(dql(1), dqr(1))
+          dq (1) = limiter_minmod(0.5d+00, dql(1), dqr(1))
 
           dql(2) = q(i,j  ,k) - q(i,jm1,k)
           dqr(2) = q(i,jp1,k) - q(i,j  ,k)
-          dq (2) = minmod(dql(2), dqr(2))
+          dq (2) = limiter_minmod(0.5d+00, dql(2), dqr(2))
 
 #if NDIMS == 3
           dql(3) = q(i,j,k  ) - q(i,j,km1)
           dqr(3) = q(i,j,kp1) - q(i,j,k  )
-          dq (3) = minmod(dql(3), dqr(3))
+          dq (3) = limiter_minmod(0.5d+00, dql(3), dqr(3))
 #endif /* NDIMS == 3 */
 
 ! calculate dqc
@@ -1197,32 +1197,35 @@ module interpolations
 #endif /* NDIMS == 3 */
 
             do m = 1, NDIMS
-              dq(m)  = sign(ap(m), dq(m))
+              dq(m) = sign(ap(m), dq(m))
             end do
-          end if
-
-! calculate the limited variable increments
-!
-          dql(1) = minmod(dq(1),   qi(i  ,j,k,1,1) - q(i,j,k))
-          dqr(1) = minmod(dq(1), - qi(im1,j,k,2,1) + q(i,j,k))
-          dql(2) = minmod(dq(2),   qi(i,j  ,k,1,2) - q(i,j,k))
-          dqr(2) = minmod(dq(2), - qi(i,jm1,k,2,2) + q(i,j,k))
-#if NDIMS == 3
-          dql(3) = minmod(dq(3),   qi(i,j,k  ,1,3) - q(i,j,k))
-          dqr(3) = minmod(dq(3), - qi(i,j,km1,2,3) + q(i,j,k))
-#endif /* NDIMS == 3 */
 
 ! update the interpolated states
 !
-          qi(i  ,j,k,1,1) = q(i,j,k) + dql(1)
-          qi(im1,j,k,2,1) = q(i,j,k) - dqr(1)
+            dql(1) = qi(i  ,j,k,1,1) - q(i,j,k)
+            dqr(1) = qi(im1,j,k,2,1) - q(i,j,k)
+            if (max(abs(dql(1)), abs(dqr(1))) > abs(dq(1))) then
+              qi(i  ,j,k,1,1) = q(i,j,k) + dq(1)
+              qi(im1,j,k,2,1) = q(i,j,k) - dq(1)
+            end if
 
-          qi(i,j  ,k,1,2) = q(i,j,k) + dql(2)
-          qi(i,jm1,k,2,2) = q(i,j,k) - dqr(2)
+            dql(2) = qi(i,j  ,k,1,2) - q(i,j,k)
+            dqr(2) = qi(i,jm1,k,2,2) - q(i,j,k)
+            if (max(abs(dql(2)), abs(dqr(2))) > abs(dq(2))) then
+              qi(i,j  ,k,1,2) = q(i,j,k) + dq(2)
+              qi(i,jm1,k,2,2) = q(i,j,k) - dq(2)
+            end if
+
 #if NDIMS == 3
-          qi(i,j,k  ,1,3) = q(i,j,k) + dql(3)
-          qi(i,j,km1,2,3) = q(i,j,k) - dqr(3)
+            dql(3) = qi(i,j,k  ,1,3) - q(i,j,k))
+            dqr(3) = qi(i,j,km1,2,3) - q(i,j,k))
+            if (max(abs(dql(3)), abs(dqr(3))) > abs(dq(3))) then
+              qi(i,j,k  ,1,3) = q(i,j,k) + dq(3)
+              qi(i,j,km1,2,3) = q(i,j,k) - dq(3)
+            end if
 #endif /* NDIMS == 3 */
+
+          end if
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
