@@ -2266,19 +2266,14 @@ module schemes
 
         else ! Bₓ² = 0
 
-! in the vase of vanishing Bₓ there is no Alfvén wave, density is constant, and
-! still we can have a discontinuity in the perpendicular components
-!
-          dn   = dn / srml
-
 ! take the right flux depending on the sign of the advection speed
 !
           if (sm > 0.0d+00) then ! sm > 0
 
 ! conservative variables for the left intermediate state
 !
-            ui(idn) = dn
-            ui(imx) = dn *  sm
+            ui(idn) = dnl
+            ui(imx) = dnl * sm
             ui(imy) = wl(imy) / slmm
             ui(imz) = wl(imz) / slmm
             ui(ibx) = 0.0d+00
@@ -2294,8 +2289,8 @@ module schemes
 
 ! conservative variables for the right intermediate state
 !
-            ui(idn) = dn
-            ui(imx) = dn *  sm
+            ui(idn) = dnr
+            ui(imx) = dnr * sm
             ui(imy) = wr(imy) / srmm
             ui(imz) = wr(imz) / srmm
             ui(ibx) = 0.0d+00
@@ -2310,16 +2305,9 @@ module schemes
           else ! sm = 0
 
 ! the intermediate flux; since the advection speed is zero, perpendicular
-! components do not change
+! components do not change, so revert it to HLL
 !
-            f(idn,i) = (sl * wr(idn) - sr * wl(idn)) / srml
-            f(imx,i) = (sl * wr(imx) - sr * wl(imx)) / srml
-            f(imy,i) = 0.0d+00
-            f(imz,i) = 0.0d+00
-            f(ibx,i) = (sl * wr(ibx) - sr * wl(ibx)) / srml
-            f(iby,i) = 0.0d+00
-            f(ibz,i) = 0.0d+00
-            f(ibp,i) = (sl * wr(ibp) - sr * wl(ibp)) / srml
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
