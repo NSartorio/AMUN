@@ -2380,7 +2380,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
-    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr, ca
+    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr, ca, ca2
 
 ! local arrays to store the states
 !
@@ -2471,14 +2471,17 @@ module schemes
 !
         dn = dn / srml
 
-! if there is an Alvén wave, apply the full HLLD solver, otherwise revert to
-! the HLL one
+! get the square of the Alfvén speed
 !
-        if (b2 > 0.0d+00) then ! Bₓ² > 0
+        ca2 = b2 / dn
+
+! apply full HLLD solver only if the Alfvén wave is strong enough
+!
+        if (ca2 > 1.0d-08 * max(sl**2, sr**2)) then ! Bₓ² > ε
 
 ! left and right Alfvén speeds
 !
-          ca   = sqrt(b2 / dn)
+          ca   = sqrt(ca2)
           sml  = sm - ca
           smr  = sm + ca
 
@@ -2504,7 +2507,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! the outer left intermediate flux
 !
@@ -2521,7 +2524,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! the outer right intermediate flux
 !
@@ -2538,7 +2541,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! vector of the left-going Alfvén wave
 !
@@ -2553,7 +2556,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! vector of the right-going Alfvén wave
 !
@@ -2580,7 +2583,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2613,7 +2616,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2645,6 +2648,15 @@ module schemes
 
           end if ! one degeneracy
 
+        else if (b2 > 0.0d+00) then ! Bₓ² > 0
+
+! the Alfvén wave is very weak, so ignore it in order to not introduce any
+! numerical instabilities; since Bₓ is not zero, the perpendicular components
+! of velocity and magnetic field are continuous; we have only one intermediate
+! state, therefore simply apply the HLL solver
+!
+          f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+
         else ! Bₓ² = 0
 
 ! in the vase of vanishing Bₓ there is no Alfvén wave, density is constant, and
@@ -2663,7 +2675,7 @@ module schemes
             ui(ibx) = 0.0d+00
             ui(iby) = wl(iby) / slmm
             ui(ibz) = wl(ibz) / slmm
-            ui(ibp) = ql(ibp,i)
+            ui(ibp) = ul(ibp,i)
 
 ! the left intermediate flux
 !
@@ -2680,7 +2692,7 @@ module schemes
             ui(ibx) = 0.0d+00
             ui(iby) = wr(iby) / srmm
             ui(ibz) = wr(ibz) / srmm
-            ui(ibp) = qr(ibp,i)
+            ui(ibp) = ur(ibp,i)
 
 ! the right intermediate flux
 !
@@ -2688,17 +2700,9 @@ module schemes
 
           else ! sm = 0
 
-! the intermediate flux; since the advection speed is zero, perpendicular
-! components do not change
+! both states are equal so revert to the HLL flux
 !
-            f(idn,i) = (sl * wr(idn) - sr * wl(idn)) / srml
-            f(imx,i) = (sl * wr(imx) - sr * wl(imx)) / srml
-            f(imy,i) = 0.0d+00
-            f(imz,i) = 0.0d+00
-            f(ibx,i) = (sl * wr(ibx) - sr * wl(ibx)) / srml
-            f(iby,i) = 0.0d+00
-            f(ibz,i) = 0.0d+00
-            f(ibp,i) = (sl * wr(ibp) - sr * wl(ibp)) / srml
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
