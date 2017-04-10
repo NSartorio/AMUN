@@ -216,11 +216,11 @@ module gravity
 !
 !     t, dt   - time and the time increment;
 !     x, y, z - rectangular coordinates;
-!     gacc    - vector of the gravitational acceleration;
+!     acc     - vector of the gravitational acceleration;
 !
 !===============================================================================
 !
-  subroutine gacc_none(t, dt, x, y, z, gacc)
+  subroutine gacc_none(t, dt, x, y, z, acc)
 
 ! local variables are not implicit by default
 !
@@ -230,7 +230,7 @@ module gravity
 !
     real(kind=8)              , intent(in)  :: t, dt
     real(kind=8)              , intent(in)  :: x, y, z
-    real(kind=8), dimension(3), intent(out) :: gacc
+    real(kind=8), dimension(3), intent(out) :: acc
 !
 !-------------------------------------------------------------------------------
 !
@@ -239,6 +239,10 @@ module gravity
 !
     call start_timer(imc)
 #endif /* PROFILE */
+
+! reset gravitational acceleration
+!
+    acc(:) = 0.0d+00
 
 #ifdef PROFILE
 ! stop accounting time for the gravitational acceleration calculation

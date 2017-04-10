@@ -2091,10 +2091,9 @@ module schemes
         dnl = wl(idn) / slmm
         dnr = wr(idn) / srmm
 
-! if there is an Alvén wave, apply the full HLLD solver, otherwise revert to
-! the HLL one
+! apply full HLLD solver only if the Alfvén wave is strong enough
 !
-        if (b2 > 0.0d+00) then ! Bₓ² > 0
+        if (b2 > 1.0d-08 * max(dnl * sl**2, dnr * sr**2)) then ! Bₓ² > ε
 
 ! left and right Alfvén speeds
 !
@@ -2123,7 +2122,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! the outer left intermediate flux
 !
@@ -2140,7 +2139,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! the outer right intermediate flux
 !
@@ -2157,7 +2156,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! vector of the left-going Alfvén wave
 !
@@ -2172,7 +2171,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! vector of the right-going Alfvén wave
 !
@@ -2199,7 +2198,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wl(idn) * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (wl(idn) * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2232,7 +2231,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (wr(idn) * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (wr(idn) * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2264,12 +2263,16 @@ module schemes
 
           end if ! one degeneracy
 
-        else ! Bₓ² = 0
+        else if (b2 > 0.0d+00) then ! Bₓ² > 0
 
-! in the vase of vanishing Bₓ there is no Alfvén wave, density is constant, and
-! still we can have a discontinuity in the perpendicular components
+! the Alfvén wave is too weak, so ignore it in order to not introduce any
+! numerical instabilities; since Bₓ is not zero, the perpendicular components
+! of velocity and magnetic field are continuous; we have only one intermediate
+! state, therefore simply apply the HLL solver
 !
-          dn   = dn / srml
+          f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+
+        else ! Bₓ² = 0
 
 ! take the right flux depending on the sign of the advection speed
 !
@@ -2277,14 +2280,14 @@ module schemes
 
 ! conservative variables for the left intermediate state
 !
-            ui(idn) = dn
-            ui(imx) = dn *  sm
+            ui(idn) = dnl
+            ui(imx) = dnl * sm
             ui(imy) = wl(imy) / slmm
             ui(imz) = wl(imz) / slmm
             ui(ibx) = 0.0d+00
             ui(iby) = wl(iby) / slmm
             ui(ibz) = wl(ibz) / slmm
-            ui(ibp) = ql(ibp,i)
+            ui(ibp) = ul(ibp,i)
 
 ! the left intermediate flux
 !
@@ -2294,14 +2297,14 @@ module schemes
 
 ! conservative variables for the right intermediate state
 !
-            ui(idn) = dn
-            ui(imx) = dn *  sm
+            ui(idn) = dnr
+            ui(imx) = dnr * sm
             ui(imy) = wr(imy) / srmm
             ui(imz) = wr(imz) / srmm
             ui(ibx) = 0.0d+00
             ui(iby) = wr(iby) / srmm
             ui(ibz) = wr(ibz) / srmm
-            ui(ibp) = qr(ibp,i)
+            ui(ibp) = ur(ibp,i)
 
 ! the right intermediate flux
 !
@@ -2310,16 +2313,9 @@ module schemes
           else ! sm = 0
 
 ! the intermediate flux; since the advection speed is zero, perpendicular
-! components do not change
+! components do not change, so revert it to HLL
 !
-            f(idn,i) = (sl * wr(idn) - sr * wl(idn)) / srml
-            f(imx,i) = (sl * wr(imx) - sr * wl(imx)) / srml
-            f(imy,i) = 0.0d+00
-            f(imz,i) = 0.0d+00
-            f(ibx,i) = (sl * wr(ibx) - sr * wl(ibx)) / srml
-            f(iby,i) = 0.0d+00
-            f(ibz,i) = 0.0d+00
-            f(ibp,i) = (sl * wr(ibp) - sr * wl(ibp)) / srml
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
@@ -2384,7 +2380,7 @@ module schemes
 !
     integer                       :: i
     real(kind=8)                  :: sl, sr, sm, sml, smr, srml, slmm, srmm
-    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr, ca
+    real(kind=8)                  :: bx, bp, b2, dn, dnl, dnr, dvl, dvr, ca, ca2
 
 ! local arrays to store the states
 !
@@ -2475,14 +2471,17 @@ module schemes
 !
         dn = dn / srml
 
-! if there is an Alvén wave, apply the full HLLD solver, otherwise revert to
-! the HLL one
+! get the square of the Alfvén speed
 !
-        if (b2 > 0.0d+00) then ! Bₓ² > 0
+        ca2 = b2 / dn
+
+! apply full HLLD solver only if the Alfvén wave is strong enough
+!
+        if (ca2 > 1.0d-08 * max(sl**2, sr**2)) then ! Bₓ² > ε
 
 ! left and right Alfvén speeds
 !
-          ca   = sqrt(b2 / dn)
+          ca   = sqrt(ca2)
           sml  = sm - ca
           smr  = sm + ca
 
@@ -2508,7 +2507,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! the outer left intermediate flux
 !
@@ -2525,7 +2524,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! the outer right intermediate flux
 !
@@ -2542,7 +2541,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! vector of the left-going Alfvén wave
 !
@@ -2557,7 +2556,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! vector of the right-going Alfvén wave
 !
@@ -2584,7 +2583,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (slmm * dn * wl(iby) - bx * wl(imy)) / dvl
               ui(ibz) = (slmm * dn * wl(ibz) - bx * wl(imz)) / dvl
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2617,7 +2616,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = (srmm * dn * wr(iby) - bx * wr(imy)) / dvr
               ui(ibz) = (srmm * dn * wr(ibz) - bx * wr(imz)) / dvr
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
 
 ! choose the correct state depending on the speed signs
 !
@@ -2649,6 +2648,15 @@ module schemes
 
           end if ! one degeneracy
 
+        else if (b2 > 0.0d+00) then ! Bₓ² > 0
+
+! the Alfvén wave is very weak, so ignore it in order to not introduce any
+! numerical instabilities; since Bₓ is not zero, the perpendicular components
+! of velocity and magnetic field are continuous; we have only one intermediate
+! state, therefore simply apply the HLL solver
+!
+          f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+
         else ! Bₓ² = 0
 
 ! in the vase of vanishing Bₓ there is no Alfvén wave, density is constant, and
@@ -2667,7 +2675,7 @@ module schemes
             ui(ibx) = 0.0d+00
             ui(iby) = wl(iby) / slmm
             ui(ibz) = wl(ibz) / slmm
-            ui(ibp) = ql(ibp,i)
+            ui(ibp) = ul(ibp,i)
 
 ! the left intermediate flux
 !
@@ -2684,7 +2692,7 @@ module schemes
             ui(ibx) = 0.0d+00
             ui(iby) = wr(iby) / srmm
             ui(ibz) = wr(ibz) / srmm
-            ui(ibp) = qr(ibp,i)
+            ui(ibp) = ur(ibp,i)
 
 ! the right intermediate flux
 !
@@ -2692,17 +2700,9 @@ module schemes
 
           else ! sm = 0
 
-! the intermediate flux; since the advection speed is zero, perpendicular
-! components do not change
+! both states are equal so revert to the HLL flux
 !
-            f(idn,i) = (sl * wr(idn) - sr * wl(idn)) / srml
-            f(imx,i) = (sl * wr(imx) - sr * wl(imx)) / srml
-            f(imy,i) = 0.0d+00
-            f(imz,i) = 0.0d+00
-            f(ibx,i) = (sl * wr(ibx) - sr * wl(ibx)) / srml
-            f(iby,i) = 0.0d+00
-            f(ibz,i) = 0.0d+00
-            f(ibp,i) = (sl * wr(ibp) - sr * wl(ibp)) / srml
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
@@ -3668,35 +3668,35 @@ module schemes
         dn =  wr(idn) - wl(idn)
         sm = (wr(imx) - wl(imx)) / dn
 
+! speed differences
+!
+        slmm = sl - sm
+        srmm = sr - sm
+
+! left and right state densities
+!
+        dnl = wl(idn) / slmm
+        dnr = wr(idn) / srmm
+
 ! square of Bₓ, i.e. Bₓ²
 !
         bx = ql(ibx,i)
         b2 = ql(ibx,i) * qr(ibx,i)
 
-! if there is an Alvén wave, apply the full HLLD solver, otherwise revert to
-! the HLLC solver
-!
-        if (b2 > 0.0d+00) then ! Bₓ² > 0
-
 ! the total pressure, constant across the contact discontinuity and Alfvén waves
 !
-          pt = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn + b2
+        pt = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn + b2
 
-! speed differences
+! if Alfvén wave is strong enough, apply the full HLLD solver, otherwise
+! revert to the HLLC one
 !
-          slmm = sl - sm
-          srmm = sr - sm
-
-! left and right state densities
-!
-          dnl = wl(idn) / slmm
-          dnr = wr(idn) / srmm
+        if (b2 > 1.0d-08 * max(dnl * sl**2, dnr * sr**2)) then ! Bₓ² > ε
 
 ! left and right Alfvén speeds
 !
-          cal = - sqrt(b2 / dnl)
-          car =   sqrt(b2 / dnr)
-          sml = sm + cal
+          cal = sqrt(b2 / dnl)
+          car = sqrt(b2 / dnr)
+          sml = sm - cal
           smr = sm + car
 
 ! calculate division factors (also used to determine degeneracies)
@@ -3729,7 +3729,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
               ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
 
 ! the outer left intermediate flux
@@ -3755,7 +3755,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
               ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
 
 ! the outer right intermediate flux
@@ -3781,7 +3781,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
               ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
 
 ! vector of the left-going Alfvén wave
@@ -3805,7 +3805,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
               ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
 
 ! vector of the right-going Alfvén wave
@@ -3814,10 +3814,10 @@ module schemes
 
 ! prepare constant primitive variables of the intermediate states
 !
-              dv      = car * dnr - cal * dnl
+              dv      = car * dnr + cal * dnl
               vy      = (wcr(imy) - wcl(imy)) / dv
               vz      = (wcr(imz) - wcl(imz)) / dv
-              dv      = car       - cal
+              dv      = car       + cal
               by      = (wcr(iby) - wcl(iby)) / dv
               bz      = (wcr(ibz) - wcl(ibz)) / dv
               vb      = sm * bx + vy * by + vz * bz
@@ -3836,8 +3836,8 @@ module schemes
                 ui(ibx) = bx
                 ui(iby) = by
                 ui(ibz) = bz
-                ui(ibp) = ql(ibp,i)
-                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / cal
+                ui(ibp) = ul(ibp,i)
+                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / (sml - sm)
 
 ! the inmost left intermediate flux
 !
@@ -3854,8 +3854,8 @@ module schemes
                 ui(ibx) = bx
                 ui(iby) = by
                 ui(ibz) = bz
-                ui(ibp) = qr(ibp,i)
-                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / car
+                ui(ibp) = ur(ibp,i)
+                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / (smr - sm)
 
 ! the inmost right intermediate flux
 !
@@ -3895,7 +3895,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = ql(ibp,i)
+              ui(ibp) = ul(ibp,i)
               ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
 
 ! choose the correct state depending on the speed signs
@@ -3914,7 +3914,7 @@ module schemes
 
 ! primitive variables for the inner left intermediate state
 !
-                dv      = srmm * dnr - cal * dnl
+                dv      = srmm * dnr + cal * dnl
                 vy      = (wr(imy) - wcl(imy)) / dv
                 vz      = (wr(imz) - wcl(imz)) / dv
                 dv      = sr - sml
@@ -3922,22 +3922,22 @@ module schemes
                 bz      = (wr(ibz) - wcl(ibz)) / dv
                 vb      = sm * bx + vy * by + vz * bz
 
+! conservative variables for the inner left intermediate state
+!
+                ui(idn) = dnl
+                ui(imx) = dnl * sm
+                ui(imy) = dnl * vy
+                ui(imz) = dnl * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = ul(ibp,i)
+                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / (sml - sm)
+
 ! choose the correct state depending on the sign of contact discontinuity
 ! advection speed
 !
                 if (sm >= 0.0d+00) then ! sm ≥ 0
-
-! conservative variables for the inner left intermediate state
-!
-                  ui(idn) = dnl
-                  ui(imx) = dnl * sm
-                  ui(imy) = dnl * vy
-                  ui(imz) = dnl * vz
-                  ui(ibx) = bx
-                  ui(iby) = by
-                  ui(ibz) = bz
-                  ui(ibp) = ql(ibp,i)
-                  ui(ien) = (wcl(ien) + sm * pt - bx * vb) / cal
 
 ! the inner left intermediate flux
 !
@@ -3947,11 +3947,11 @@ module schemes
 
 ! vector of the left-going Alfvén wave
 !
-                  wcl(:)  = (sm - sml) * ui(:) + wcl(:)
+                  wcr(:)  = (sm - sml) * ui(:) + wcl(:)
 
 ! calculate the average flux over the right inner intermediate state
 !
-                  f(:,i)  = (sm * wr(:) - sr * wcl(:)) / srmm
+                  f(:,i)  = (sm * wr(:) - sr * wcr(:)) / srmm
 
                 end if ! sm < 0
 
@@ -3976,7 +3976,7 @@ module schemes
               ui(ibx) = bx
               ui(iby) = by
               ui(ibz) = bz
-              ui(ibp) = qr(ibp,i)
+              ui(ibp) = ur(ibp,i)
               ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
 
 ! choose the correct state depending on the speed signs
@@ -4003,22 +4003,22 @@ module schemes
                 bz      = (wl(ibz) - wcr(ibz)) / dv
                 vb      = sm * bx + vy * by + vz * bz
 
+! conservative variables for the inner left intermediate state
+!
+                ui(idn) = dnr
+                ui(imx) = dnr * sm
+                ui(imy) = dnr * vy
+                ui(imz) = dnr * vz
+                ui(ibx) = bx
+                ui(iby) = by
+                ui(ibz) = bz
+                ui(ibp) = ur(ibp,i)
+                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / (smr - sm)
+
 ! choose the correct state depending on the sign of contact discontinuity
 ! advection speed
 !
                 if (sm <= 0.0d+00) then ! sm ≤ 0
-
-! conservative variables for the inner left intermediate state
-!
-                  ui(idn) = dnr
-                  ui(imx) = dnr * sm
-                  ui(imy) = dnr * vy
-                  ui(imz) = dnr * vz
-                  ui(ibx) = bx
-                  ui(iby) = by
-                  ui(ibz) = bz
-                  ui(ibp) = qr(ibp,i)
-                  ui(ien) = (wcr(ien) + sm * pt - bx * vb) / car
 
 ! the inner right intermediate flux
 !
@@ -4028,11 +4028,11 @@ module schemes
 
 ! vector of the right-going Alfvén wave
 !
-                  wcr(:)  = (sm - smr) * ui(:) + wcr(:)
+                  wcl(:)  = (sm - smr) * ui(:) + wcr(:)
 
 ! calculate the average flux over the left inner intermediate state
 !
-                  f(:,i)  = (sm * wl(:) - sl * wcr(:)) / slmm
+                  f(:,i)  = (sm * wl(:) - sl * wcl(:)) / slmm
 
                 end if ! sm > 0
 
@@ -4048,30 +4048,83 @@ module schemes
 
           end if ! one degeneracy
 
-        else ! Bₓ² = 0
+        else if (b2 > 0.0d+00) then ! Bₓ² > 0
 
-! the total pressure, constant across the contact discontinuity
+! constant intermediate state tangential components of velocity and
+! magnetic field
 !
-          pt = (wl(idn) * wr(imx) - wr(idn) * wl(imx)) / dn
+          vy = (wr(imy) - wl(imy)) / dn
+          vz = (wr(imz) - wl(imz)) / dn
+          by = (wr(iby) - wl(iby)) / srml
+          bz = (wr(ibz) - wl(ibz)) / srml
+
+! scalar product of velocity and magnetic field for the intermediate states
+!
+          vb = sm * bx + vy * by + vz * bz
 
 ! separate intermediate states depending on the sign of the advection speed
 !
           if (sm > 0.0d+00) then ! sm > 0
 
-! the left speed difference
+! conservative variables for the left intermediate state
 !
-            slmm    =  sl - sm
+            ui(idn) =  dnl
+            ui(imx) =  dnl * sm
+            ui(imy) =  dnl * vy
+            ui(imz) =  dnl * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  ul(ibp,i)
+            ui(ien) = (wl(ien) + sm * pt - bx * vb) / slmm
+
+! the left intermediate flux
+!
+            f(:,i)  = sl * ui(:) - wl(:)
+
+          else if (sm < 0.0d+00) then ! sm < 0
+
+! conservative variables for the right intermediate state
+!
+            ui(idn) =  dnr
+            ui(imx) =  dnr * sm
+            ui(imy) =  dnr * vy
+            ui(imz) =  dnr * vz
+            ui(ibx) =  bx
+            ui(iby) =  by
+            ui(ibz) =  bz
+            ui(ibp) =  ur(ibp,i)
+            ui(ien) = (wr(ien) + sm * pt - bx * vb) / srmm
+
+! the right intermediate flux
+!
+            f(:,i)  = sr * ui(:) - wr(:)
+
+          else ! sm = 0
+
+! when Sₘ = 0 all variables are continuous, therefore the flux reduces
+! to the HLL one
+!
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
+
+          end if ! sm = 0
+
+        else ! Bₓ² = 0
+
+! separate intermediate states depending on the sign of the advection speed
+!
+          if (sm > 0.0d+00) then ! sm > 0
 
 ! conservative variables for the left intermediate state
 !
-            ui(idn) =  wl(idn) / slmm
-            ui(imx) =  ui(idn) * sm
-            ui(imy) =  ui(idn) * ql(ivy,i)
-            ui(imz) =  ui(idn) * ql(ivz,i)
+            ui(idn) =  dnl
+            ui(imx) =  dnl * sm
+            ui(imy) =  wl(imy) / slmm
+            ui(imz) =  wl(imz) / slmm
             ui(ibx) =  0.0d+00
             ui(iby) =  wl(iby) / slmm
             ui(ibz) =  wl(ibz) / slmm
-            ui(ibp) =  ql(ibp,i)
+            ui(ibp) =  ul(ibp,i)
             ui(ien) = (wl(ien) + sm * pt) / slmm
 
 ! the left intermediate flux
@@ -4080,20 +4133,16 @@ module schemes
 
           else if (sm < 0.0d+00) then ! sm < 0
 
-! the right speed difference
-!
-            srmm    =  sr - sm
-
 ! conservative variables for the right intermediate state
 !
-            ui(idn) =  wr(idn) / srmm
-            ui(imx) =  ui(idn) * sm
-            ui(imy) =  ui(idn) * qr(ivy,i)
-            ui(imz) =  ui(idn) * qr(ivz,i)
+            ui(idn) =  dnr
+            ui(imx) =  dnr * sm
+            ui(imy) =  wr(imy) / srmm
+            ui(imz) =  wr(imz) / srmm
             ui(ibx) =  0.0d+00
             ui(iby) =  wr(iby) / srmm
             ui(ibz) =  wr(ibz) / srmm
-            ui(ibp) =  qr(ibp,i)
+            ui(ibp) =  ur(ibp,i)
             ui(ien) = (wr(ien) + sm * pt) / srmm
 
 ! the right intermediate flux
@@ -4102,18 +4151,10 @@ module schemes
 
           else ! sm = 0
 
-! intermediate flux is constant across the contact discontinuity and all except
-! the parallel momentum flux are zero
+! when Sₘ = 0 all variables are continuous, therefore the flux reduces
+! to the HLL one
 !
-            f(idn,i) =   0.0d+00
-            f(imx,i) = - 0.5d+00 * (wl(imx) + wr(imx))
-            f(imy,i) =   0.0d+00
-            f(imz,i) =   0.0d+00
-            f(ibx,i) = fl(ibx,i)
-            f(iby,i) =   0.0d+00
-            f(ibz,i) =   0.0d+00
-            f(ibp,i) = fl(ibp,i)
-            f(ien,i) =   0.0d+00
+            f(:,i) = (sl * wr(:) - sr * wl(:)) / srml
 
           end if ! sm = 0
 
