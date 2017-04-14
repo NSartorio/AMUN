@@ -1217,8 +1217,8 @@ module interpolations
             end if
 
 #if NDIMS == 3
-            dql(3) = qi(i,j,k  ,1,3) - q(i,j,k))
-            dqr(3) = qi(i,j,km1,2,3) - q(i,j,k))
+            dql(3) = qi(i,j,k  ,1,3) - q(i,j,k)
+            dqr(3) = qi(i,j,km1,2,3) - q(i,j,k)
             if (max(abs(dql(3)), abs(dqr(3))) > abs(dq(3))) then
               qi(i,j,k  ,1,3) = q(i,j,k) + dq(3)
               qi(i,j,km1,2,3) = q(i,j,k) - dq(3)
