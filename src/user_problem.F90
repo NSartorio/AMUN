@@ -55,18 +55,25 @@ module user_problem
   real(kind=8), save :: vper = 1.00d-02
   real(kind=8), save :: kper = 1.00d+00
   real(kind=8), save :: kvec = 1.00d+00
-  real(kind=8), save :: xcut = 4.00d-01
-  real(kind=8), save :: ycut = 1.00d-02
+  real(kind=8), save :: xcut = 5.00d-01
+  real(kind=8), save :: ycut = 1.00d-01
+  real(kind=8), save :: xdec = 1.00d-01
+  real(kind=8), save :: ydec = 1.00d-01
   real(kind=8), save :: yth  = 1.00d-16
   real(kind=8), save :: pth  = 1.00d-02
   real(kind=8), save :: pmag = 5.00d-01
   real(kind=8), save :: blim = 1.00d+00
   real(kind=8), save :: zeta = 0.00d+00
-  integer     , save :: pert = 1
+  integer     , save :: pert = 0
+  integer     , save :: nper = 10
 
 ! flag indicating if the gravitational source term is enabled
 !
   logical     , save :: gravity_enabled_user = .false.
+
+! allocatable arrays for velocity perturbation
+!
+  real(kind=8), dimension(:), allocatable :: kx, ky, kz, ux, uy, uz, ph
 
 !- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 !
@@ -91,10 +98,12 @@ module user_problem
 
 ! include external procedures and variables
 !
-    use constants      , only : pi2
+    use constants      , only : pi, pi2
     use coordinates    , only : ng
     use coordinates    , only : ady
-    use parameters     , only : get_parameter_string, get_parameter_real
+    use parameters     , only : get_parameter_string, get_parameter_real       &
+                              , get_parameter_integer
+    use random         , only : randomu, randomn
 
 ! local variables are not implicit by default
 !
@@ -109,6 +118,11 @@ module user_problem
 !
     character(len=64) :: problem_name   = "none"
     character(len=64) :: perturbation   = "noise"
+    integer           :: n
+    real(kind=8)      :: thh, fc
+#if NDIMS == 3
+    real(kind=8)      :: thv, tx, ty, tz
+#endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -136,6 +150,8 @@ module user_problem
 !
     select case(perturbation)
     case('noise', 'random')
+      pert = 0
+    case('wave')
       pert = 1
     case('vel', 'velocity_mode')
       pert = 2
@@ -156,10 +172,13 @@ module user_problem
     call get_parameter_real("kper"  , kper)
     call get_parameter_real("xcut"  , xcut)
     call get_parameter_real("ycut"  , ycut)
+    call get_parameter_real("xdec"  , xdec)
+    call get_parameter_real("ydec"  , ydec)
     call get_parameter_real("yth"   , yth )
     call get_parameter_real("pth"   , pth )
     call get_parameter_real("blimit", blim)
     call get_parameter_real("zeta"  , zeta)
+    call get_parameter_integer("nper", nper)
 
 ! calculate the maximum magnetic pressure
 !
@@ -172,6 +191,52 @@ module user_problem
 ! upper limit for blim
 !
     blim = max(blim, ng * ady(1))
+
+! prepare the random perturbation of velocity
+!
+    if (pert == 1) then
+
+! allocate phase and wave vector components
+!
+      allocate(kx(nper), ky(nper), kz(nper))
+      allocate(ux(nper), uy(nper), uz(nper))
+      allocate(ph(nper))
+
+! choose random wave vector directions
+!
+      fc = 1.0d+00 / sqrt(1.0d+00 * nper)
+      do n = 1, nper
+        thh   = pi2 * randomu()
+#if NDIMS == 3
+        thv   = pi  * randomn()
+        ux(n) = cos(thh) * cos(thv)
+        uy(n) = sin(thh) * cos(thv)
+        uz(n) =            sin(thv)
+        kx(n) = pi2 * kper * ux(n)
+        ky(n) = pi2 * kper * uy(n)
+        kz(n) = pi2 * kper * uz(n)
+        tx    = cos(thh) * cos(thv)
+        ty    = sin(thh) * cos(thv)
+        tz    = sin(thv)
+        ux(n) = ty * kz(n) - tz * ky(n)
+        uy(n) = tz * kx(n) - tx * kz(n)
+        uz(n) = tx * ky(n) - ty * kx(n)
+        tx    = sqrt(ux(n)**2 + uy(n)**2 + uz(n)**2)
+        ux(n) = fc * ux(n) / tx
+        uy(n) = fc * uy(n) / tx
+        uz(n) = fc * uz(n) / tx
+#else /* NDIMS == 3 */
+        kx(n) = pi2 * kper * cos(thh)
+        ky(n) = pi2 * kper * sin(thh)
+        kz(n) = 0.0d+00
+        ux(n) = fc * sin(thh)
+        uy(n) = fc * cos(thh)
+        uz(n) = 0.0d+00
+#endif /* NDIMS == 3 */
+        ph(n) = pi2 * randomu()
+      end do
+
+    end if
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -225,6 +290,12 @@ module user_problem
     call start_timer(imi)
 #endif /* PROFILE */
 
+! deallocate wave vector components, random directions, and random phase
+!
+    if (allocated(kx)) deallocate(kx, ky, kz)
+    if (allocated(ux)) deallocate(ux, uy, uz)
+    if (allocated(ph)) deallocate(ph)
+
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
 !
@@ -254,8 +325,9 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks     , only : block_data
+    use constants  , only : pi
     use coordinates, only : im, jm, km
-    use coordinates, only : ax, ay, adx, ady, adz
+    use coordinates, only : ax, ay, az, adx, ady, adz
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
@@ -273,17 +345,17 @@ module user_problem
 
 ! local variables
 !
-    integer      :: i, j, k
+    integer      :: i, j, k, n
     real(kind=8) :: xp, yp, yt, yl, yu
     real(kind=8) :: yrat, itanh
-    real(kind=8) :: vx, vy, vz, vv
+    real(kind=8) :: vx, vy, vz, vv, kv, fv, va
 
 ! local arrays
 !
     real(kind=8), dimension(3 ,im,jm,km) :: tmp
     real(kind=8), dimension(nv,im)       :: q, u
-    real(kind=8), dimension(im)          :: x
-    real(kind=8), dimension(jm)          :: y
+    real(kind=8), dimension(im)          :: x, fx
+    real(kind=8), dimension(jm)          :: y, fy
     real(kind=8), dimension(km)          :: z
     real(kind=8), dimension(jm)          :: pm
     real(kind=8), dimension(3)           :: dh
@@ -300,6 +372,9 @@ module user_problem
 !
     x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%ymin + az(pdata%meta%level,1:km)
+#endif /* NDIMS == 3 */
 
 ! prepare cell sizes
 !
@@ -311,13 +386,25 @@ module user_problem
 !
     yrat  = yth / dh(2)
 
+! prepare decaying factors
+!
+    fv = 0.5d+00 * pi
+    do i = 1, im
+      xp    = fv * min(1.0d+00, max(0.0d+00, abs(x(i)) - xcut) / xdec)
+      fx(i) = cos(xp)**2
+    end do ! i = 1, im
+    do j = 1, jm
+      yp    = fv * min(1.0d+00, max(0.0d+00, abs(y(j)) - ycut) / ydec)
+      fy(j) = cos(yp)**2
+    end do ! i = 1, im
+
 ! reset the velocity components
 !
     pdata%q(ivx:ivz,1:im,1:jm,1:km) = 0.0d+00
 
 ! prepare the random perturbation of velocity
 !
-    if (pert == 1) then
+    if (pert == 0) then
 
       if (vper /= 0.0d+00) then
 
@@ -325,10 +412,16 @@ module user_problem
 !
         do k = 1, km
           do j = 1, jm
-            if (abs(y(j)) <= ycut) then
+            if (fy(j) > 0.0d+00) then
               do i = 1, im
-                if (abs(x(i)) <= xcut) then
+                if (fx(i) > 0.0d+00) then
 
+! calculate the velocity amplitude profile
+!
+                  va = vper * fx(i) * fy(j)
+
+! get the random direction
+!
                   vv = 0.0d+00
                   do while(vv == 0.0d+00)
                     vx = randomn()
@@ -344,15 +437,56 @@ module user_problem
 #endif /* NDIMS == 3 */
                   end do
 
-                  pdata%q(ivx,i,j,k) = vper * (vx / vv)
-                  pdata%q(ivy,i,j,k) = vper * (vy / vv)
+                  pdata%q(ivx,i,j,k) = va * (vx / vv)
+                  pdata%q(ivy,i,j,k) = va * (vy / vv)
 #if NDIMS == 3
-                  pdata%q(ivz,i,j,k) = vper * (vz / vv)
+                  pdata%q(ivz,i,j,k) = va * (vz / vv)
 #endif /* NDIMS == 3 */
 
                 end if ! |x| < xcut
               end do ! i = 1, im
             end if ! |y| < ycut
+          end do ! j = 1, jm
+        end do ! k = 1, km
+
+      end if ! vper /= 0.0
+
+    end if ! pert == 0
+
+! prepare the random perturbation of velocity
+!
+    if (pert == 1) then
+
+      if (vper /= 0.0d+00) then
+
+! iterate over the block position and initiate the velocity perturbation
+!
+        do k = 1, km
+          do j = 1, jm
+            if (fy(j) > 0.0d+00) then
+              do i = 1, im
+                if (fx(i) > 0.0d+00) then
+
+! calculate the velocity amplitude profile
+!
+                  fv = vper * fx(i) * fy(j)
+
+! add perturbation components
+!
+                  do n = 1, nper
+                    kv = kx(n) * x(i) + ky(n) * y(j) + kz(n) * z(k) + ph(n)
+                    va = fv * sin(kv)
+
+                    pdata%q(ivx,i,j,k) = pdata%q(ivx,i,j,k) + va * ux(n)
+                    pdata%q(ivy,i,j,k) = pdata%q(ivy,i,j,k) + va * uy(n)
+#if NDIMS == 3
+                    pdata%q(ivz,i,j,k) = pdata%q(ivz,i,j,k) + va * uz(n)
+#endif /* NDIMS == 3 */
+                  end do
+
+                end if ! fx > 0.0
+              end do ! i = 1, im
+            end if ! fy > 0.0
           end do ! j = 1, jm
         end do ! k = 1, km
 
