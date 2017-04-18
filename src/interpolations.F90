@@ -71,13 +71,13 @@ module interpolations
 
 ! number of cells used in the Gaussian process reconstruction
 !
-  integer     , save :: ngp        = 3
+  integer     , save :: ngp        = 5
   integer     , save :: mgp        = 1
   integer     , save :: dgp        = 9
 
 ! normal distribution width in the Gaussian process reconstruction
 !
-  real(kind=8), save :: sgp        = 3.0d+00
+  real(kind=8), save :: sgp        = 9.0d+00
 
 ! Gaussian process reconstruction coefficients vector
 !
@@ -4148,12 +4148,12 @@ module interpolations
 ! local variables
 !
     logical       :: flag
-    integer       :: i, j
-    real(kind=16) :: sig, z, fc
+    integer       :: i, j, ip, jp
+    real(kind=16) :: sig, zl, zr, fc
 
 ! local arrays for derivatives
 !
-    real(kind=16), dimension(:,:), allocatable :: cov, mgp
+    real(kind=16), dimension(:,:), allocatable :: cov, agp
     real(kind=16), dimension(:)  , allocatable :: xgp
 !
 !-------------------------------------------------------------------------------
@@ -4165,40 +4165,63 @@ module interpolations
 ! allocate the convariance matrix and interpolation position vector
 !
     allocate(cov(ngp,ngp))
-    allocate(mgp(ngp,ngp))
+    allocate(agp(ngp,ngp))
     allocate(xgp(ngp))
 
 ! prepare the covariance matrix
 !
     fc = 0.5d+00 * sqrt(pi) * sig
-    do i = 1, ngp
-      do j = 1, ngp
-          z = (1.0d+00 * (i - j) + 0.5d+00) / sig
-          cov(i,j) = erf(z)
-          z = (1.0d+00 * (i - j) - 0.5d+00) / sig
-          cov(i,j) = fc * (cov(i,j) - erf(z))
+    i  = 0
+    do ip = - mgp, mgp
+      i = i + 1
+      j = 0
+      do jp = - mgp, mgp
+        j = j + 1
+        zl = (1.0d+00 * (ip - jp) - 0.5d+00) / sig
+        zr = (1.0d+00 * (ip - jp) + 0.5d+00) / sig
+        cov(i,j) = fc * (erf(zr) - erf(zl))
       end do
     end do
 
 ! invert the matrix
 !
-    call invert(ngp, cov(1:ngp,1:ngp), mgp(1:ngp,1:ngp), flag)
+    call invert(ngp, cov(:,:), agp(:,:), flag)
+
+! continue if the matrix inversion was successful
+!
+    if (flag) then
+
+! make the inversed matrix symmetric
+!
+      do j = 1, ngp
+        do i = 1, ngp
+          if (i /= j) then
+            fc       = 0.5d+00 * (agp(i,j) + agp(j,i))
+            agp(i,j) = fc
+            agp(j,i) = fc
+          end if
+        end do
+      end do
 
 ! prepare the interpolation position vector
 !
-    do i = 1, ngp
-      z = (0.5d+00 * (2 * i - 2 - ngp)) / sig
-      xgp(i) = exp(- z**2)
-    end do
+      j = 0
+      do jp = - mgp, mgp
+        j      = j + 1
+        zr     = (0.5d+00 - 1.0d+00 * jp) / sig
+        xgp(j) = exp(- zr**2)
+      end do
 
 ! prepare the interpolation coefficients vector
 !
-    cgp(1:ngp) = matmul(xgp(1:ngp), mgp(1:ngp,1:ngp))
+      cgp(1:ngp) = matmul(xgp(1:ngp), agp(1:ngp,1:ngp))
+
+    end if
 
 ! deallocate the convariance matrix and interpolation position vector
 !
     deallocate(cov)
-    deallocate(mgp)
+    deallocate(agp)
     deallocate(xgp)
 
 ! check if the matrix was inverted successfully
@@ -4247,7 +4270,8 @@ module interpolations
 
 ! local arrays for derivatives
 !
-    real(kind=8), dimension(n) :: dfm, dfp
+    real(kind=8), dimension(n)   :: dfm, dfp
+    real(kind=8), dimension(ngp) :: u
 !
 !-------------------------------------------------------------------------------
 !
@@ -4297,8 +4321,9 @@ module interpolations
       im2 = i - m
       ip2 = i + m
 
-      fl(i)  = sum(cgp(1:ngp) * f(im2:ip2   ))
-      fr(i)  = sum(cgp(1:ngp) * f(ip2:im2:-1))
+      u(1:ngp) = f(im2:ip2) - f(i)
+      fl(i)    = sum(cgp(1:ngp) * u(  1:ngp   )) + f(i)
+      fr(i)    = sum(cgp(1:ngp) * u(ngp:  1:-1)) + f(i)
 
     end do ! i = 1 + m, n - m
 
