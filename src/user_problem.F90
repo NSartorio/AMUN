@@ -121,7 +121,7 @@ module user_problem
     integer           :: n
     real(kind=8)      :: thh, fc
 #if NDIMS == 3
-    real(kind=8)      :: thv, tx, ty, tz
+    real(kind=8)      :: thv, tx, ty, tz, tt
 #endif /* NDIMS == 3 */
 !
 !-------------------------------------------------------------------------------
@@ -215,16 +215,21 @@ module user_problem
         kx(n) = pi2 * kper * ux(n)
         ky(n) = pi2 * kper * uy(n)
         kz(n) = pi2 * kper * uz(n)
-        tx    = cos(thh) * cos(thv)
-        ty    = sin(thh) * cos(thv)
-        tz    = sin(thv)
-        ux(n) = ty * kz(n) - tz * ky(n)
-        uy(n) = tz * kx(n) - tx * kz(n)
-        uz(n) = tx * ky(n) - ty * kx(n)
-        tx    = sqrt(ux(n)**2 + uy(n)**2 + uz(n)**2)
-        ux(n) = fc * ux(n) / tx
-        uy(n) = fc * uy(n) / tx
-        uz(n) = fc * uz(n) / tx
+        tt = 0.0d+00
+        do while(tt == 0.0d+00)
+          thh   = pi2 * randomu()
+          thv   = pi  * randomn()
+          tx    = cos(thh) * cos(thv)
+          ty    = sin(thh) * cos(thv)
+          tz    =            sin(thv)
+          ux(n) = ty * kz(n) - tz * ky(n)
+          uy(n) = tz * kx(n) - tx * kz(n)
+          uz(n) = tx * ky(n) - ty * kx(n)
+          tt    = sqrt(ux(n)**2 + uy(n)**2 + uz(n)**2)
+        end do
+        ux(n) = fc * ux(n) / tt
+        uy(n) = fc * uy(n) / tt
+        uz(n) = fc * uz(n) / tt
 #else /* NDIMS == 3 */
         kx(n) = pi2 * kper * cos(thh)
         ky(n) = pi2 * kper * sin(thh)
