@@ -969,38 +969,38 @@ module interpolations
           ip1 = i + 1
 
 #if NDIMS == 3
-          u(:) = reshape(q(il:iu,jl:ju,kl:ku), (/ dgp /))
+          u(:) = reshape(q(il:iu,jl:ju,kl:ku), (/ dgp /)) - q(i,j,k)
 
-          qi(i  ,j,k,1,1) = sum(ugp(1:dgp,1,1) * u(1:dgp))
-          qi(im1,j,k,2,1) = sum(ugp(1:dgp,2,1) * u(1:dgp))
-          qi(i,j  ,k,1,2) = sum(ugp(1:dgp,1,2) * u(1:dgp))
-          qi(i,jm1,k,2,2) = sum(ugp(1:dgp,2,2) * u(1:dgp))
-          qi(i,j,k  ,1,3) = sum(ugp(1:dgp,1,3) * u(1:dgp))
-          qi(i,j,km1,2,3) = sum(ugp(1:dgp,2,3) * u(1:dgp))
+          qi(i  ,j,k,1,1) = sum(ugp(1:dgp,1,1) * u(1:dgp)) + q(i,j,k)
+          qi(im1,j,k,2,1) = sum(ugp(1:dgp,2,1) * u(1:dgp)) + q(i,j,k)
+          qi(i,j  ,k,1,2) = sum(ugp(1:dgp,1,2) * u(1:dgp)) + q(i,j,k)
+          qi(i,jm1,k,2,2) = sum(ugp(1:dgp,2,2) * u(1:dgp)) + q(i,j,k)
+          qi(i,j,k  ,1,3) = sum(ugp(1:dgp,1,3) * u(1:dgp)) + q(i,j,k)
+          qi(i,j,km1,2,3) = sum(ugp(1:dgp,2,3) * u(1:dgp)) + q(i,j,k)
 #else /* NDIMS == 3 */
-          u(:) = reshape(q(il:iu,jl:ju,k    ), (/ dgp /))
+          u(:) = reshape(q(il:iu,jl:ju,k    ), (/ dgp /)) - q(i,j,k)
 
-          qi(i  ,j,k,1,1) = sum(ugp(1:dgp,1,1) * u(1:dgp))
-          qi(im1,j,k,2,1) = sum(ugp(1:dgp,2,1) * u(1:dgp))
-          qi(i,j  ,k,1,2) = sum(ugp(1:dgp,1,2) * u(1:dgp))
-          qi(i,jm1,k,2,2) = sum(ugp(1:dgp,2,2) * u(1:dgp))
+          qi(i  ,j,k,1,1) = sum(ugp(1:dgp,1,1) * u(1:dgp)) + q(i,j,k)
+          qi(im1,j,k,2,1) = sum(ugp(1:dgp,2,1) * u(1:dgp)) + q(i,j,k)
+          qi(i,j  ,k,1,2) = sum(ugp(1:dgp,1,2) * u(1:dgp)) + q(i,j,k)
+          qi(i,jm1,k,2,2) = sum(ugp(1:dgp,2,2) * u(1:dgp)) + q(i,j,k)
 #endif /* NDIMS == 3 */
 
 ! if the interpolation is not monotonic, apply a TVD slope
 !
           flag =           ((qi(i  ,j,k,1,1) - q(ip1,j,k))                     &
-                          * (qi(i  ,j,k,1,1) - q(i  ,j,k)) > 0.0d+00)
+                          * (qi(i  ,j,k,1,1) - q(i  ,j,k)) > eps)
           flag = flag .or. ((qi(im1,j,k,2,1) - q(im1,j,k))                     &
-                          * (qi(im1,j,k,2,1) - q(i  ,j,k)) > 0.0d+00)
+                          * (qi(im1,j,k,2,1) - q(i  ,j,k)) > eps)
           flag = flag .or. ((qi(i,j  ,k,1,2) - q(i,jp1,k))                     &
-                          * (qi(i,j  ,k,1,2) - q(i,j  ,k)) > 0.0d+00)
+                          * (qi(i,j  ,k,1,2) - q(i,j  ,k)) > eps)
           flag = flag .or. ((qi(i,jm1,k,2,2) - q(i,jm1,k))                     &
-                          * (qi(i,jm1,k,2,2) - q(i,j  ,k)) > 0.0d+00)
+                          * (qi(i,jm1,k,2,2) - q(i,j  ,k)) > eps)
 #if NDIMS == 3
           flag = flag .or. ((qi(i,j,k  ,1,3) - q(i,j,kp1))                     &
-                          * (qi(i,j,k  ,1,3) - q(i,j,k  )) > 0.0d+00)
+                          * (qi(i,j,k  ,1,3) - q(i,j,k  )) > eps)
           flag = flag .or. ((qi(i,j,km1,2,3) - q(i,j,km1))                     &
-                          * (qi(i,j,km1,2,3) - q(i,j,k  )) > 0.0d+00)
+                          * (qi(i,j,km1,2,3) - q(i,j,k  )) > eps)
 #endif /* NDIMS == 3 */
 
           if (flag) then
