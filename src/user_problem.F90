@@ -378,7 +378,9 @@ module user_problem
     x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 #if NDIMS == 3
-    z(1:km) = pdata%meta%ymin + az(pdata%meta%level,1:km)
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
 #endif /* NDIMS == 3 */
 
 ! prepare cell sizes
