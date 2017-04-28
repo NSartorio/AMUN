@@ -45,8 +45,17 @@ module user_problem
   integer, save :: imi, imp, ims, imu, img, imb
 #endif /* PROFILE */
 
-! default problem parameter values are defined here
+! default parameter values
 !
+  real(kind=8), save :: djet  = 1.00d-01
+  real(kind=8), save :: damb  = 1.00d+01
+  real(kind=8), save :: bamb  = 1.00d-08
+  real(kind=8), save :: pres  = 1.00d-02
+  real(kind=8), save :: vjet  = 0.99d+00
+  real(kind=8), save :: bjet  = 1.00d-03
+  real(kind=8), save :: ljet  = 1.00d-00
+  real(kind=8), save :: rjet  = 1.00d+00
+  real(kind=8), save :: rjet2 = 1.00d+00
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -75,7 +84,7 @@ module user_problem
 
 ! include external procedures and variables
 !
-    use parameters, only : get_parameter_string
+    use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -110,6 +119,21 @@ module user_problem
 ! get the problem name
 !
     call get_parameter_string("problem", problem_name)
+
+! get problem parameters
+!
+    call get_parameter_real("djet", djet)
+    call get_parameter_real("damb", damb)
+    call get_parameter_real("pres", pres)
+    call get_parameter_real("bamb", bamb)
+    call get_parameter_real("bjet", bjet)
+    call get_parameter_real("vjet", vjet)
+    call get_parameter_real("ljet", ljet)
+    call get_parameter_real("rjet", rjet)
+
+! calculate Rjet²
+!
+    rjet2 = rjet * rjet
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -193,6 +217,7 @@ module user_problem
 !
     use blocks     , only : block_data
     use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
@@ -207,11 +232,13 @@ module user_problem
 
 ! local variables
 !
-    integer :: i, j, k
+    integer      :: i, j, k
+    real(kind=8) :: dx, dy, dz, rm, rr
 
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(nv)    :: qj
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -224,36 +251,83 @@ module user_problem
     call start_timer(imp)
 #endif /* PROFILE */
 
-! set the variables
+! set the conditions inside the jet radius
 !
-    q(idn,:) = 1.0d+00
-    if (ipr > 0) q(ipr,:) = 1.0d+00
-    q(ivx,:) = 0.0d+00
-    q(ivy,:) = 0.0d+00
-    q(ivz,:) = 0.0d+00
+    qj(idn) = djet
+    if (ipr > 0) qj(ipr) = pres
+    qj(ivx) = vjet
+    qj(ivy) = 0.0d+00
+    qj(ivz) = 0.0d+00
     if (ibx > 0) then
-      q(ibx,:) = 0.0d+00
-      q(iby,:) = 0.0d+00
-      q(ibz,:) = 0.0d+00
-      q(ibp,:) = 0.0d+00
-    end if
+      qj(ibx) = 0.0d+00
+      qj(iby) = 0.0d+00
+      qj(ibz) = bjet
+      qj(ibp) = 0.0d+00
+    end if ! ibx > 0
 
-! convert the primitive variables to conservative ones
+! prepare block coordinates
 !
-    call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    dx = x(2) - x(1)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+    dy = y(2) - y(1)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+    dz = z(2) - z(1)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+    dz      = 0.0d+00
+#endif /* NDIMS == 3 */
+    rm = dy * dy + dz * dz
 
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
       do j = 1, jm
 
-! copy the primitive variables to the current block
+! calculate radius
 !
-        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+        rr = y(j) * y(j) + z(k) * z(k)
+
+! set the ambient density, pressure, and velocity
+!
+        q(idn,1:im) = damb
+        if (ipr > 0) q(ipr,1:im) = pres
+        q(ivx,1:im) = 0.0d+00
+        q(ivy,1:im) = 0.0d+00
+        q(ivz,1:im) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+        if (ibx > 0) then
+          q(ibx,1:im) = 0.0d+00
+          q(iby,1:im) = 0.0d+00
+          q(ibz,1:im) = bamb
+          q(ibp,1:im) = 0.0d+00
+        end if ! ibx > 0
+
+! set the jet injection
+!
+        if (rr <= max(rm, rjet2)) then
+          do i = 1, im
+            if (x(i) <= max(dx, ljet)) then
+              q(1:nv,i) = qj(1:nv)
+            end if
+          end do ! i = 1, im
+        end if ! R < Rjet
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
 
 ! copy the conserved variables to the current block
 !
         pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
 
       end do ! j = 1, jm
     end do ! k = 1, km
@@ -289,6 +363,11 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks         , only : block_data
+    use coordinates    , only : im, jm, km
+    use coordinates    , only : ax, ay, az
+    use equations      , only : prim2cons
+    use equations      , only : nv
+    use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
 
 ! local variables are not implicit by default
 !
@@ -298,6 +377,19 @@ module user_problem
 !
     type(block_data), pointer, intent(inout) :: pdata
     real(kind=8)             , intent(in)    :: time, dt
+
+! local variables
+!
+    integer       :: i, j, k
+    real(kind=8)  :: dx, dy, dz, rm, rr
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(nv)    :: qj, uj
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -306,6 +398,70 @@ module user_problem
 !
     call start_timer(ims)
 #endif /* PROFILE */
+
+! set the conditions inside the jet radius
+!
+    qj(idn) = djet
+    if (ipr > 0) qj(ipr) = pres
+    qj(ivx) = vjet
+    qj(ivy) = 0.0d+00
+    qj(ivz) = 0.0d+00
+    if (ibx > 0) then
+      qj(ibx) = 0.0d+00
+      qj(iby) = 0.0d+00
+      qj(ibz) = bjet
+      qj(ibp) = 0.0d+00
+    end if ! ibx > 0
+    call prim2cons(1, qj(1:nv), uj(1:nv))
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    dx = x(2) - x(1)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+    dy = y(2) - y(1)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+    dz = z(2) - z(1)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+    dz      = 0.0d+00
+#endif /* NDIMS == 3 */
+    rm = dy * dy + dz * dz
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+      do j = 1, jm
+
+! copy the primitive variable vector
+!
+        q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+        u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
+
+! calculate radius
+!
+        rr = y(j) * y(j) + z(k) * z(k)
+
+        if (rr <= max(rm, rjet2)) then
+          do i = 1, im
+            if (x(i) <= max(dx, ljet)) then
+              q(1:nv,i) = qj(1:nv)
+              u(1:nv,i) = uj(1:nv)
+            end if
+          end do ! i = 1, im
+        end if ! R < Rjet
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
 
 #ifdef PROFILE
 ! stop accounting time for the shape update
