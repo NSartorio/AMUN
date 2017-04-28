@@ -56,6 +56,10 @@ module user_problem
   real(kind=8), save :: ljet  = 1.00d-00
   real(kind=8), save :: rjet  = 1.00d+00
   real(kind=8), save :: rjet2 = 1.00d+00
+  real(kind=8), save :: ajet  = 0.00d+00
+  real(kind=8), save :: pjet  = 1.00d+08
+  real(kind=8), save :: sina  = 0.00d+00
+  real(kind=8), save :: cosa  = 1.00d+00
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -84,6 +88,7 @@ module user_problem
 
 ! include external procedures and variables
 !
+    use constants , only : d2r
     use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
@@ -130,10 +135,18 @@ module user_problem
     call get_parameter_real("vjet", vjet)
     call get_parameter_real("ljet", ljet)
     call get_parameter_real("rjet", rjet)
+    call get_parameter_real("ajet", ajet)
+    call get_parameter_real("pjet", pjet)
 
 ! calculate Rjet²
 !
     rjet2 = rjet * rjet
+
+! convert jet precession angle to radians
+!
+    ajet  = d2r * ajet
+    sina  = sin(ajet)
+    cosa  = cos(ajet)
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -255,8 +268,8 @@ module user_problem
 !
     qj(idn) = djet
     if (ipr > 0) qj(ipr) = pres
-    qj(ivx) = vjet
-    qj(ivy) = 0.0d+00
+    qj(ivx) = vjet * cosa
+    qj(ivy) = vjet * sina
     qj(ivz) = 0.0d+00
     if (ibx > 0) then
       qj(ibx) = 0.0d+00
@@ -363,6 +376,7 @@ module user_problem
 ! include external procedures and variables
 !
     use blocks         , only : block_data
+    use constants      , only : pi2
     use coordinates    , only : im, jm, km
     use coordinates    , only : ax, ay, az
     use equations      , only : prim2cons
@@ -382,6 +396,7 @@ module user_problem
 !
     integer       :: i, j, k
     real(kind=8)  :: dx, dy, dz, rm, rr
+    real(kind=8)  :: tph, sint, cost
 
 ! local arrays
 !
@@ -399,13 +414,19 @@ module user_problem
     call start_timer(ims)
 #endif /* PROFILE */
 
+! calculate the precession angle in the perpendicular direction
+!
+    tph  = pi2 * time / pjet
+    sint = sin(tph)
+    cost = cos(tph)
+
 ! set the conditions inside the jet radius
 !
     qj(idn) = djet
     if (ipr > 0) qj(ipr) = pres
-    qj(ivx) = vjet
-    qj(ivy) = 0.0d+00
-    qj(ivz) = 0.0d+00
+    qj(ivx) = vjet * cosa
+    qj(ivy) = vjet * sina * cost
+    qj(ivz) = vjet * sina * sint
     if (ibx > 0) then
       qj(ibx) = 0.0d+00
       qj(iby) = 0.0d+00
