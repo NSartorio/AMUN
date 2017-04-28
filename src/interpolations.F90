@@ -1200,32 +1200,32 @@ module interpolations
               dq(m) = sign(ap(m), dq(m))
             end do
 
+          end if
+
 ! update the interpolated states
 !
-            dql(1) = qi(i  ,j,k,1,1) - q(i,j,k)
-            dqr(1) = qi(im1,j,k,2,1) - q(i,j,k)
-            if (max(abs(dql(1)), abs(dqr(1))) > abs(dq(1))) then
-              qi(i  ,j,k,1,1) = q(i,j,k) + dq(1)
-              qi(im1,j,k,2,1) = q(i,j,k) - dq(1)
-            end if
+          dql(1) = qi(i  ,j,k,1,1) - q(i,j,k)
+          dqr(1) = qi(im1,j,k,2,1) - q(i,j,k)
+          if (max(abs(dql(1)), abs(dqr(1))) > abs(dq(1))) then
+            qi(i  ,j,k,1,1) = q(i,j,k) + dq(1)
+            qi(im1,j,k,2,1) = q(i,j,k) - dq(1)
+          end if
 
-            dql(2) = qi(i,j  ,k,1,2) - q(i,j,k)
-            dqr(2) = qi(i,jm1,k,2,2) - q(i,j,k)
-            if (max(abs(dql(2)), abs(dqr(2))) > abs(dq(2))) then
-              qi(i,j  ,k,1,2) = q(i,j,k) + dq(2)
-              qi(i,jm1,k,2,2) = q(i,j,k) - dq(2)
-            end if
+          dql(2) = qi(i,j  ,k,1,2) - q(i,j,k)
+          dqr(2) = qi(i,jm1,k,2,2) - q(i,j,k)
+          if (max(abs(dql(2)), abs(dqr(2))) > abs(dq(2))) then
+            qi(i,j  ,k,1,2) = q(i,j,k) + dq(2)
+            qi(i,jm1,k,2,2) = q(i,j,k) - dq(2)
+          end if
 
 #if NDIMS == 3
-            dql(3) = qi(i,j,k  ,1,3) - q(i,j,k)
-            dqr(3) = qi(i,j,km1,2,3) - q(i,j,k)
-            if (max(abs(dql(3)), abs(dqr(3))) > abs(dq(3))) then
-              qi(i,j,k  ,1,3) = q(i,j,k) + dq(3)
-              qi(i,j,km1,2,3) = q(i,j,k) - dq(3)
-            end if
-#endif /* NDIMS == 3 */
-
+          dql(3) = qi(i,j,k  ,1,3) - q(i,j,k)
+          dqr(3) = qi(i,j,km1,2,3) - q(i,j,k)
+          if (max(abs(dql(3)), abs(dqr(3))) > abs(dq(3))) then
+            qi(i,j,k  ,1,3) = q(i,j,k) + dq(3)
+            qi(i,j,km1,2,3) = q(i,j,k) - dq(3)
           end if
+#endif /* NDIMS == 3 */
 
         end do ! i = ibl, ieu
       end do ! j = jbl, jeu
