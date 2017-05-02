@@ -4853,11 +4853,7 @@ module schemes
 
 ! get the contact dicontinuity speed
 !
-          if (a(3) >= 0.0d+00) then
-            sm = x(1)
-          else
-            sm = x(2)
-          end if
+          sm = x(1)
 
 ! if the contact discontinuity speed exceeds the sonic speeds, use the HLL flux
 !
