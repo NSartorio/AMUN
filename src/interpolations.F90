@@ -278,6 +278,13 @@ module interpolations
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
+    case ("crmp7", "CRMP7")
+      name_rec           =  "7th order Compact Monotonicity Preserving"
+      interfaces         => interfaces_dir
+      reconstruct_states => reconstruct_crmp7
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
     case ("gp", "GP")
       write(stmp, '(f16.1)') sgp
       write(name_rec, '("Gaussian Process (",i1,"-point, δ=",a,")")') ngp      &
@@ -4123,6 +4130,184 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crmp5ld
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRMP7:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the seventh order
+!   Compact Reconstruction Monotonicity Preserving (CRMP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine reconstruct_crmp7(n, h, fc, fl, fr)
+
+! include external procedures
+!
+    use algebra   , only : tridiag
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: fc
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer :: i
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: a, b, c
+    real(kind=8), dimension(n) :: r
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(3), parameter ::                                   &
+                                di  = (/ 2.0d+00, 4.0d+00, 1.0d+00/) / 7.0d+00
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ci  = (/-1.0d+00, 1.9d+01, 2.39d+02            &
+                                              , 1.59d+02, 4.0d+00 /) / 4.2d+02
+    real(kind=8), dimension(7), parameter ::                                   &
+                                ce7 = (/-3.0d+00, 2.5d+01,-1.01d+02, 3.19d+02  &
+                                      , 2.14d+02,-3.8d+01, 4.0d+00/) / 4.2d+02
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.70d+01            &
+                                               , 2.70d+01,-3.0d+00/) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00/) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the diagonals of the tridiagonal matrix
+!
+    do i = 1, ng
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
+    do i = ng + 1, n - ng - 1
+      a(i) = di(1)
+      b(i) = di(2)
+      c(i) = di(3)
+    end do
+    do i = n - ng, n
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
+
+!! === left-side interpolation ===
+!!
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum( ci(:) * fc(i-2:i+2))
+    end do
+
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fc(  1:  2))
+    r(  2) = sum(ce3(:) * fc(  1:  3))
+    r(  3) = sum(ce5(:) * fc(  1:  5))
+    do i = 4, ng
+      r(i) = sum(ce7(:) * fc(i-3:i+3))
+    end do
+    do i = n - ng, n - 3
+      r(i) = sum(ce7(:) * fc(i-3:i+3))
+    end do
+    r(n-2) = sum(ce5(:) * fc(n-4:  n))
+    r(n-1) = sum(ce3(:) * fc(n-2:  n))
+    r(n  ) =              fc(n      )
+
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fc(1:n), u(1:n))
+
+! copy the interpolation to the respective vector
+!
+    fl(1:n) = u(1:n)
+
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
+!
+    fi(1:n) = fc(n:1:-1)
+
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum( ci(:) * fi(i-2:i+2))
+    end do ! i = ng, n - ng + 1
+
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fi(  1:  2))
+    r(  2) = sum(ce3(:) * fi(  1:  3))
+    r(  3) = sum(ce5(:) * fi(  1:  5))
+    do i = 4, ng
+      r(i) = sum(ce7(:) * fi(i-3:i+3))
+    end do
+    do i = n - ng, n - 3
+      r(i) = sum(ce7(:) * fi(i-3:i+3))
+    end do
+    r(n-2) = sum(ce5(:) * fi(n-4:  n))
+    r(n-1) = sum(ce3(:) * fi(n-2:  n))
+    r(n  ) =              fi(n      )
+
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fi(1:n), u(1:n))
+
+! copy the interpolation to the respective vector
+!
+    fr(1:n-1) = u(n-1:1:-1)
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crmp7
 !
 !===============================================================================
 !
