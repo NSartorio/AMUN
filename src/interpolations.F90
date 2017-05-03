@@ -278,6 +278,13 @@ module interpolations
       if (verbose .and. ng < 4)                                                &
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 4).")
+    case ("crmp7", "CRMP7")
+      name_rec           =  "7th order Compact Monotonicity Preserving"
+      interfaces         => interfaces_dir
+      reconstruct_states => reconstruct_crmp7
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
     case ("gp", "GP")
       write(stmp, '(f16.1)') sgp
       write(name_rec, '("Gaussian Process (",i1,"-point, δ=",a,")")') ngp      &
@@ -3560,7 +3567,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine reconstruct_crmp5(n, h, f, fl, fr)
+  subroutine reconstruct_crmp5(n, h, fc, fl, fr)
 
 ! include external procedures
 !
@@ -3574,250 +3581,129 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8)              , intent(in)  :: h
-    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(in)  :: fc
     real(kind=8), dimension(n), intent(out) :: fl, fr
-
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
-    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma
+    integer :: i
 
 ! local arrays for derivatives
 !
-    real(kind=8), dimension(n)   :: dfm, dfp
-    real(kind=8), dimension(n)   :: u
-    real(kind=8), dimension(n,2) :: a, b, c, r
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: a, b, c
+    real(kind=8), dimension(n) :: r
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(3), parameter ::                                   &
+                                di  = (/ 3.0d-01, 6.0d-01, 1.0d-01 /)
+    real(kind=8), dimension(3), parameter ::                                   &
+                                ci5 = (/ 1.0d+00, 1.9d+01, 1.0d+01 /) / 3.0d+01
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.7d+01             &
+                                                , 2.7d+01,-3.0d+00 /) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00 /) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the left and right derivatives
+! prepare the diagonals of the tridiagonal matrix
 !
-    do i = 1, n - 1
-      ip1      = i + 1
-      dfp(i  ) = f(ip1) - f(i)
-      dfm(ip1) = dfp(i)
+    do i = 1, ng
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
     end do
-    dfm(1) = dfp(1)
-    dfp(n) = dfm(n)
+    do i = ng + 1, n - ng - 1
+      a(i) = di(1)
+      b(i) = di(2)
+      c(i) = di(3)
+    end do
+    do i = n - ng, n
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
 
-! prepare the tridiagonal system coefficients for the interior
+!! === left-side interpolation ===
+!!
+! prepare the tridiagonal system coefficients for the interior part
 !
     do i = ng, n - ng + 1
+      r(i) = sum(ci5(:) * fc(i-1:i+1))
+    end do
 
-      im1 = i - 1
-      ip1 = i + 1
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fc(  1:  2))
+    r(  2) = sum(ce3(:) * fc(  1:  3))
+    do i = 3, ng
+      r(i) = sum(ce5(:) * fc(i-2:i+2))
+    end do
+    do i = n - ng, n - 2
+      r(i) = sum(ce5(:) * fc(i-2:i+2))
+    end do
+    r(n-1) = sum(ce3(:) * fc(n-2:  n))
+    r(n  ) =              fc(n      )
 
-      a(i,1) = 3.0d-01
-      b(i,1) = 6.0d-01
-      c(i,1) = 1.0d-01
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
 
-      a(i,2) = 1.0d-01
-      b(i,2) = 6.0d-01
-      c(i,2) = 3.0d-01
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fc(1:n), u(1:n))
 
-      r(i,1) = (f(im1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(ip1)) / 3.0d+01
-      r(i,2) = (f(ip1) + 1.9d+01 * f(i  ) + 1.0d+01 * f(im1)) / 3.0d+01
+! copy the interpolation to the respective vector
+!
+    fl(1:n) = u(1:n)
 
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
+!
+    fi(1:n) = fc(n:1:-1)
+
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum(ci5(:) * fi(i-1:i+1))
     end do ! i = ng, n - ng + 1
 
-! interpolate ghost zones using explicit method (left-side reconstruction)
+! interpolate ghost zones using the explicit method
 !
-    do i = 2, ng
+    r(  1) = sum(ce2(:) * fi(  1:  2))
+    r(  2) = sum(ce3(:) * fi(  1:  3))
+    do i = 3, ng
+      r(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    do i = n - ng, n - 2
+      r(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    r(n-1) = sum(ce3(:) * fi(n-2:  n))
+    r(n  ) =              fi(n      )
 
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
-
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-
-      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
-                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = 2, ng
-    a(1,1) = 0.0d+00
-    b(1,1) = 1.0d+00
-    c(1,1) = 0.0d+00
-    r(1,1) = 0.5d+00 * (f(1) + f(2))
-
-    do i = n - ng, n - 1
-
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-
-      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
-                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng, n - 1
-    a(n,1) = 0.0d+00
-    b(n,1) = 1.0d+00
-    c(n,1) = 0.0d+00
-    r(n,1) = f(n)
-
-! interpolate ghost zones using explicit method (right-side reconstruction)
+! solve the tridiagonal system of equations
 !
-    do i = 2, ng + 1
-
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
-
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-
-      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
-                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = 2, ng + 1
-    a(1,2) = 0.0d+00
-    b(1,2) = 1.0d+00
-    c(1,2) = 0.0d+00
-    r(1,2) = f(1)
-
-    do i = n - ng + 1, n - 1
-
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-
-      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
-                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng + 1, n - 1
-    a(n,2) = 0.0d+00
-    b(n,2) = 1.0d+00
-    c(n,2) = 0.0d+00
-    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
-
-! solve the tridiagonal system of equations for the left-side interpolation
-!
-    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
-    do i = 2, n - 1
+    call mp_limiting(n, fi(1:n), u(1:n))
 
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-      df    = sigma * dfm(i)
-      fmp   = f(i) + minmod(dfp(i), df)
-      ds    = (u(i) - f(i)) * (u(i) - fmp)
-
-      if (ds <= eps) then
-
-        fl(i) = u(i)
-
-      else
-
-        dm1   = dfp(im1) - dfm(im1)
-        dc0   = dfp(i  ) - dfm(i  )
-        dp1   = dfp(ip1) - dfm(ip1)
-        dc4   = 4.0d+00 * dc0
-
-        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
-        ful   = f(i) +           df
-        flc   = f(i) + 0.5d+00 * df     + dml
-
-        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
-
-        fl(i) = median(u(i), fmn, fmx)
-
-      end if
-
-    end do ! i = 2, n - 1
-
-! solve the tridiagonal system of equations for the right-side interpolation
+! copy the interpolation to the respective vector
 !
-    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
-
-! apply the monotonicity preserving limiting
-!
-    do i = 2, n - 1
-
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-      df    = sigma * dfp(i)
-      fmp   = f(i) - minmod(dfm(i), df)
-
-      ds    = (u(i) - f(i)) * (u(i) - fmp)
-
-      if (ds <= eps) then
-
-        fr(i) = u(i)
-
-      else
-
-        dm1 = dfp(im1) - dfm(im1)
-        dc0 = dfp(i  ) - dfm(i  )
-        dp1 = dfp(ip1) - dfm(ip1)
-        dc4 = 4.0d+00 * dc0
-
-        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
-        ful   = f(i) -           df
-        flc   = f(i) - 0.5d+00 * df     + dmr
-
-        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
-
-        fr(i) = median(u(i), fmn, fmx)
-
-      end if
-
-! shift the right state
-!
-      fr(im1) = fr(i)
-
-    end do ! i = 2, n - 1
+    fr(1:n-1) = u(n-1:1:-1)
 
 ! update the interpolation of the first and last points
 !
     i     = n - 1
-    fl(1) = 0.5d+00 * (f(1) + f(2))
-    fr(i) = 0.5d+00 * (f(i) + f(n))
-    fl(n) = f(n)
-    fr(n) = f(n)
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -3857,7 +3743,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine reconstruct_crmp5ld(n, h, f, fl, fr)
+  subroutine reconstruct_crmp5ld(n, h, fc, fl, fr)
 
 ! include external procedures
 !
@@ -3871,258 +3757,313 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8)              , intent(in)  :: h
-    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(in)  :: fc
     real(kind=8), dimension(n), intent(out) :: fl, fr
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
-    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma
+    integer :: i
 
 ! local arrays for derivatives
 !
-    real(kind=8), dimension(n)   :: dfm, dfp
-    real(kind=8), dimension(n)   :: u
-    real(kind=8), dimension(n,2) :: a, b, c, r
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: a, b, c
+    real(kind=8), dimension(n) :: r
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(3), parameter ::                                   &
+                                di  = (/ 2.5d-01, 6.0d-01, 1.5d-01 /)
+    real(kind=8), dimension(4), parameter ::                                   &
+                                ci5 = (/ 3.0d+00, 6.7d+01, 4.9d+01             &
+                                                         , 1.0d+00 /) / 1.2d+02
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.7d+01             &
+                                                , 2.7d+01,-3.0d+00 /) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00 /) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the left and right derivatives
+! prepare the diagonals of the tridiagonal matrix
 !
-    do i = 1, n - 1
-      ip1      = i + 1
-      dfp(i  ) = f(ip1) - f(i)
-      dfm(ip1) = dfp(i)
+    do i = 1, ng
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
     end do
-    dfm(1) = dfp(1)
-    dfp(n) = dfm(n)
+    do i = ng + 1, n - ng - 1
+      a(i) = di(1)
+      b(i) = di(2)
+      c(i) = di(3)
+    end do
+    do i = n - ng, n
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
 
-! prepare the tridiagonal system coefficients for the interior (eq. 3.6 in [3])
+!! === left-side interpolation ===
+!!
+! prepare the tridiagonal system coefficients for the interior part
 !
     do i = ng, n - ng + 1
+      r(i) = sum(ci5(:) * fc(i-1:i+2))
+    end do
 
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fc(  1:  2))
+    r(  2) = sum(ce3(:) * fc(  1:  3))
+    do i = 3, ng
+      r(i) = sum(ce5(:) * fc(i-2:i+2))
+    end do
+    do i = n - ng, n - 2
+      r(i) = sum(ce5(:) * fc(i-2:i+2))
+    end do
+    r(n-1) = sum(ce3(:) * fc(n-2:  n))
+    r(n  ) =              fc(n      )
 
-      a(i,1) = 2.5d-01
-      b(i,1) = 6.0d-01
-      c(i,1) = 1.5d-01
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
 
-      a(i,2) = 1.5d-01
-      b(i,2) = 6.0d-01
-      c(i,2) = 2.5d-01
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fc(1:n), u(1:n))
 
-      r(i,1) = (3.0d+00 * f(im1) + 6.7d+01 * f(i  )                            &
-                                 + 4.9d+01 * f(ip1) + f(ip2)) / 1.2d+02
-      r(i,2) = (3.0d+00 * f(ip1) + 6.7d+01 * f(i  )                            &
-                                 + 4.9d+01 * f(im1) + f(im2)) / 1.2d+02
+! copy the interpolation to the respective vector
+!
+    fl(1:n) = u(1:n)
 
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
+!
+    fi(1:n) = fc(n:1:-1)
+
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum(ci5(:) * fi(i-1:i+2))
     end do ! i = ng, n - ng + 1
 
-! interpolate ghost zones using explicit method (left-side reconstruction)
+! interpolate ghost zones using the explicit method
 !
-    do i = 2, ng
+    r(  1) = sum(ce2(:) * fi(  1:  2))
+    r(  2) = sum(ce3(:) * fi(  1:  3))
+    do i = 3, ng
+      r(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    do i = n - ng, n - 2
+      r(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    r(n-1) = sum(ce3(:) * fi(n-2:  n))
+    r(n  ) =              fi(n      )
 
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
-
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-
-      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
-                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = 2, ng
-    a(1,1) = 0.0d+00
-    b(1,1) = 1.0d+00
-    c(1,1) = 0.0d+00
-    r(1,1) = 0.5d+00 * (f(1) + f(2))
-
-    do i = n - ng, n - 1
-
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      a(i,1) = 0.0d+00
-      b(i,1) = 1.0d+00
-      c(i,1) = 0.0d+00
-
-      r(i,1) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))       &
-                                 - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng, n - 1
-    a(n,1) = 0.0d+00
-    b(n,1) = 1.0d+00
-    c(n,1) = 0.0d+00
-    r(n,1) = f(n)
-
-! interpolate ghost zones using explicit method (right-side reconstruction)
+! solve the tridiagonal system of equations
 !
-    do i = 2, ng + 1
-
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = i + 2
-
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-
-      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
-                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = 2, ng + 1
-    a(1,2) = 0.0d+00
-    b(1,2) = 1.0d+00
-    c(1,2) = 0.0d+00
-    r(1,2) = f(1)
-
-    do i = n - ng + 1, n - 1
-
-      im2 = i - 2
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      a(i,2) = 0.0d+00
-      b(i,2) = 1.0d+00
-      c(i,2) = 0.0d+00
-
-      r(i,2) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))       &
-                                 - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))      &
-                                                                     / 6.0d+01
-
-    end do ! i = n - ng + 1, n - 1
-    a(n,2) = 0.0d+00
-    b(n,2) = 1.0d+00
-    c(n,2) = 0.0d+00
-    r(n,2) = 0.5d+00 * (f(n-1) + f(n))
-
-! solve the tridiagonal system of equations for the left-side interpolation
-!
-    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
 
 ! apply the monotonicity preserving limiting
 !
-    do i = 2, n - 1
+    call mp_limiting(n, fi(1:n), u(1:n))
 
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-      df    = sigma * dfm(i)
-      fmp   = f(i) + minmod(dfp(i), df)
-      ds    = (u(i) - f(i)) * (u(i) - fmp)
-
-      if (ds <= eps) then
-
-        fl(i) = u(i)
-
-      else
-
-        dm1   = dfp(im1) - dfm(im1)
-        dc0   = dfp(i  ) - dfm(i  )
-        dp1   = dfp(ip1) - dfm(ip1)
-        dc4   = 4.0d+00 * dc0
-
-        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
-        ful   = f(i) +           df
-        flc   = f(i) + 0.5d+00 * df     + dml
-
-        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
-
-        fl(i) = median(u(i), fmn, fmx)
-
-      end if
-
-    end do ! i = 2, n - 1
-
-! solve the tridiagonal system of equations for the right-side interpolation
+! copy the interpolation to the respective vector
 !
-    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
-
-! apply the monotonicity preserving limiting
-!
-    do i = 2, n - 1
-
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-      df    = sigma * dfp(i)
-      fmp   = f(i) - minmod(dfm(i), df)
-
-      ds    = (u(i) - f(i)) * (u(i) - fmp)
-
-      if (ds <= eps) then
-
-        fr(i) = u(i)
-
-      else
-
-        dm1 = dfp(im1) - dfm(im1)
-        dc0 = dfp(i  ) - dfm(i  )
-        dp1 = dfp(ip1) - dfm(ip1)
-        dc4 = 4.0d+00 * dc0
-
-        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
-        ful   = f(i) -           df
-        flc   = f(i) - 0.5d+00 * df     + dmr
-
-        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
-
-        fr(i) = median(u(i), fmn, fmx)
-
-      end if
-
-! shift the right state
-!
-      fr(im1) = fr(i)
-
-    end do ! i = 2, n - 1
+    fr(1:n-1) = u(n-1:1:-1)
 
 ! update the interpolation of the first and last points
 !
     i     = n - 1
-    fl(1) = 0.5d+00 * (f(1) + f(2))
-    fr(i) = 0.5d+00 * (f(i) + f(n))
-    fl(n) = f(n)
-    fr(n) = f(n)
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
 
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_crmp5ld
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_CRMP7:
+! ----------------------------
+!
+!   Subroutine reconstructs the interface states using the seventh order
+!   Compact Reconstruction Monotonicity Preserving (CRMP) method.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine reconstruct_crmp7(n, h, fc, fl, fr)
+
+! include external procedures
+!
+    use algebra   , only : tridiag
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: fc
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    integer :: i
+
+! local arrays for derivatives
+!
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: a, b, c
+    real(kind=8), dimension(n) :: r
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(3), parameter ::                                   &
+                                di  = (/ 2.0d+00, 4.0d+00, 1.0d+00/) / 7.0d+00
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ci  = (/-1.0d+00, 1.9d+01, 2.39d+02            &
+                                              , 1.59d+02, 4.0d+00 /) / 4.2d+02
+    real(kind=8), dimension(7), parameter ::                                   &
+                                ce7 = (/-3.0d+00, 2.5d+01,-1.01d+02, 3.19d+02  &
+                                      , 2.14d+02,-3.8d+01, 4.0d+00/) / 4.2d+02
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.70d+01            &
+                                               , 2.70d+01,-3.0d+00/) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00/) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
+!
+!-------------------------------------------------------------------------------
+!
+! prepare the diagonals of the tridiagonal matrix
+!
+    do i = 1, ng
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
+    do i = ng + 1, n - ng - 1
+      a(i) = di(1)
+      b(i) = di(2)
+      c(i) = di(3)
+    end do
+    do i = n - ng, n
+      a(i) = 0.0d+00
+      b(i) = 1.0d+00
+      c(i) = 0.0d+00
+    end do
+
+!! === left-side interpolation ===
+!!
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum( ci(:) * fc(i-2:i+2))
+    end do
+
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fc(  1:  2))
+    r(  2) = sum(ce3(:) * fc(  1:  3))
+    r(  3) = sum(ce5(:) * fc(  1:  5))
+    do i = 4, ng
+      r(i) = sum(ce7(:) * fc(i-3:i+3))
+    end do
+    do i = n - ng, n - 3
+      r(i) = sum(ce7(:) * fc(i-3:i+3))
+    end do
+    r(n-2) = sum(ce5(:) * fc(n-4:  n))
+    r(n-1) = sum(ce3(:) * fc(n-2:  n))
+    r(n  ) =              fc(n      )
+
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fc(1:n), u(1:n))
+
+! copy the interpolation to the respective vector
+!
+    fl(1:n) = u(1:n)
+
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
+!
+    fi(1:n) = fc(n:1:-1)
+
+! prepare the tridiagonal system coefficients for the interior part
+!
+    do i = ng, n - ng + 1
+      r(i) = sum( ci(:) * fi(i-2:i+2))
+    end do ! i = ng, n - ng + 1
+
+! interpolate ghost zones using the explicit method
+!
+    r(  1) = sum(ce2(:) * fi(  1:  2))
+    r(  2) = sum(ce3(:) * fi(  1:  3))
+    r(  3) = sum(ce5(:) * fi(  1:  5))
+    do i = 4, ng
+      r(i) = sum(ce7(:) * fi(i-3:i+3))
+    end do
+    do i = n - ng, n - 3
+      r(i) = sum(ce7(:) * fi(i-3:i+3))
+    end do
+    r(n-2) = sum(ce5(:) * fi(n-4:  n))
+    r(n-1) = sum(ce3(:) * fi(n-2:  n))
+    r(n  ) =              fi(n      )
+
+! solve the tridiagonal system of equations
+!
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+
+! apply the monotonicity preserving limiting
+!
+    call mp_limiting(n, fi(1:n), u(1:n))
+
+! copy the interpolation to the respective vector
+!
+    fr(1:n-1) = u(n-1:1:-1)
+
+! update the interpolation of the first and last points
+!
+    i     = n - 1
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_crmp7
 !
 !===============================================================================
 !
@@ -4922,6 +4863,115 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine clip_extrema
+!
+!===============================================================================
+!
+! subroutine MP_LIMITING:
+! ----------------------
+!
+!   Subroutine applies the monotonicity preserving (MP) limiter to a vector of
+!   high order reconstructed interface values.
+!
+!   Arguments:
+!
+!     n - the length of vectors;
+!     f - the vector of cell-centered values;
+!     v - the vector of interface values obtained from the high order
+!         interpolation as input and its monotonicity limited values as output;
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine mp_limiting(n, f, v)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(in)    :: f
+    real(kind=8), dimension(n), intent(inout) :: v
+
+! local variables
+!
+    integer      :: i, im1, ip1, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+
+! local vectors
+!
+    real(kind=8), dimension(0:n+2) :: dm
+!
+!-------------------------------------------------------------------------------
+!
+! calculate derivatives
+!
+    dm(0  ) = 0.0d+00
+    dm(1  ) = 0.0d+00
+    dm(2:n) = f(2:n) - f(1:n-1)
+    dm(n+1) = 0.0d+00
+    dm(n+2) = 0.0d+00
+
+! check monotonicity condition for all elements and apply limiting if required
+!
+    do i = 1, n - 1
+
+      ip1 = i + 1
+
+      if (dm(i) * dm(ip1) >= 0.0d+00) then
+        df = kappa * dm(i)
+      else
+        df = kbeta * dm(i)
+      end if
+
+      fmp  = f(i) + minmod(dm(ip1), df)
+      ds   = (v(i) - f(i)) * (v(i) - fmp)
+
+      if (ds > eps) then
+
+        im1 = i - 1
+        ip2 = i + 2
+
+        dm1   = dm(i  ) - dm(im1)
+        dc0   = dm(ip1) - dm(i  )
+        dp1   = dm(ip2) - dm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dm(ip1) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df      + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        v(i) = median(v(i), fmn, fmx)
+
+      end if
+
+    end do ! i = 1, n - 1
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mp_limiting
 
 !===============================================================================
 !

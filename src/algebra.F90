@@ -65,7 +65,8 @@ module algebra
 !   Arguments:
 !
 !     a₂, a₁, a₀ - the quadratic equation coefficients;
-!     x          - the root array;
+!     x          - the root array; if there are two roots, x(1) corresponds to
+!                  the one with '-' and x(2) to the one with '+';
 !
 !   Return value:
 !
@@ -127,26 +128,22 @@ module algebra
 
 ! Δ > 0, so the quadratic has two real roots
 !
-          if (b(2) /= 0.0d+00) then
-            tm   = - (bh + sign(dr, bh))
+          if (b(2) > 0.0d+00) then
+            tm   = - bh - dr
+            x(1) = b(1) / tm
+            x(2) =   tm / b(3)
+          else if (b(2) < 0.0d+00) then
+            tm   = - bh + dr
             x(1) =   tm / b(3)
             x(2) = b(1) / tm
           else
-            x(2) = dr / b(3)
-            x(1) = - x(2)
+            x(1) = dr / b(3)
+            x(2) = - x(1)
           end if
 
 ! update the number of roots
 !
           nr   = 2
-
-! sort roots
-!
-          if (x(1) > x(2)) then
-            tm   = x(1)
-            x(1) = x(2)
-            x(2) = tm
-          end if
 
         else if (dl == 0.0d+00) then ! Δ = 0
 
@@ -180,12 +177,12 @@ module algebra
 !   (a₂ x + a₁) x = 0
 !
         tm   = - b(2) / b(3)
-        if (tm < 0.0d+00) then
-          x(1) = tm
-          x(2) = 0.0d+00
-        else
+        if (tm >= 0.0d+00) then
           x(1) = 0.0d+00
           x(2) = tm
+        else
+          x(1) = tm
+          x(2) = 0.0d+00
         end if
 
 ! update the number of roots
