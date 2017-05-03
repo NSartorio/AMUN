@@ -3895,7 +3895,7 @@ module interpolations
 ! local parameters
 !
     real(kind=8), dimension(3), parameter ::                                   &
-                                di  = (/ 5.0d+00, 1.2d+00, 3.0d+00 /) / 2.0d+01
+                                di  = (/ 2.5d-01, 6.0d-01, 1.5d-01 /)
     real(kind=8), dimension(4), parameter ::                                   &
                                 ci5 = (/ 3.0d+00, 6.7d+01, 4.9d+01             &
                                                          , 1.0d+00 /) / 1.2d+02
