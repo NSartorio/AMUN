@@ -4922,6 +4922,115 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine clip_extrema
+!
+!===============================================================================
+!
+! subroutine MP_LIMITING:
+! ----------------------
+!
+!   Subroutine applies the monotonicity preserving (MP) limiter to a vector of
+!   high order reconstructed interface values.
+!
+!   Arguments:
+!
+!     n - the length of vectors;
+!     f - the vector of cell-centered values;
+!     v - the vector of interface values obtained from the high order
+!         interpolation as input and its monotonicity limited values as output;
+!
+!   References:
+!
+!     [1] Suresh, A. & Huynh, H. T.,
+!         "Accurate Monotonicity-Preserving Schemes with Runge-Kutta
+!          Time Stepping"
+!         Journal on Computational Physics,
+!         1997, vol. 136, pp. 83-99,
+!         http://dx.doi.org/10.1006/jcph.1997.5745
+!     [2] He, ZhiWei, Li, XinLiang, Fu, DeXun, & Ma, YanWen,
+!         "A 5th order monotonicity-preserving upwind compact difference
+!          scheme",
+!         Science China Physics, Mechanics and Astronomy,
+!         Volume 54, Issue 3, pp. 511-522,
+!         http://dx.doi.org/10.1007/s11433-010-4220-x
+!
+!===============================================================================
+!
+  subroutine mp_limiting(n, f, v)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)    :: n
+    real(kind=8), dimension(n), intent(in)    :: f
+    real(kind=8), dimension(n), intent(inout) :: v
+
+! local variables
+!
+    integer      :: i, im1, ip1, ip2
+    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
+    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
+
+! local vectors
+!
+    real(kind=8), dimension(0:n+2) :: dm
+!
+!-------------------------------------------------------------------------------
+!
+! calculate derivatives
+!
+    dm(0  ) = 0.0d+00
+    dm(1  ) = 0.0d+00
+    dm(2:n) = f(2:n) - f(1:n-1)
+    dm(n+1) = 0.0d+00
+    dm(n+2) = 0.0d+00
+
+! check monotonicity condition for all elements and apply limiting if required
+!
+    do i = 1, n - 1
+
+      ip1 = i + 1
+
+      if (dm(i) * dm(ip1) >= 0.0d+00) then
+        df = kappa * dm(i)
+      else
+        df = kbeta * dm(i)
+      end if
+
+      fmp  = f(i) + minmod(dm(ip1), df)
+      ds   = (v(i) - f(i)) * (v(i) - fmp)
+
+      if (ds > eps) then
+
+        im1 = i - 1
+        ip2 = i + 2
+
+        dm1   = dm(i  ) - dm(im1)
+        dc0   = dm(ip1) - dm(i  )
+        dp1   = dm(ip2) - dm(ip1)
+        dc4   = 4.0d+00 * dc0
+
+        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
+        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
+
+        fmd   = f(i) + 0.5d+00 * dm(ip1) - dmr
+        ful   = f(i) +           df
+        flc   = f(i) + 0.5d+00 * df      + dml
+
+        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
+        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
+
+        v(i) = median(v(i), fmn, fmx)
+
+      end if
+
+    end do ! i = 1, n - 1
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine mp_limiting
 
 !===============================================================================
 !
