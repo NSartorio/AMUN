@@ -4275,14 +4275,14 @@ module interpolations
 ! subroutine RECONSTRUCT_GP:
 ! -------------------------
 !
-!   Subroutine reconstructs the interface states using the fifth order
-!   Gaussian Process (GP) method.
+!   Subroutine reconstructs the interface states using one dimensional
+!   high order Gaussian Process (GP) method.
 !
 !   Arguments are described in subroutine reconstruct().
 !
 !===============================================================================
 !
-  subroutine reconstruct_gp(n, h, f, fl, fr)
+  subroutine reconstruct_gp(n, h, fc, fl, fr)
 
 ! local variables are not implicit by default
 !
@@ -4292,159 +4292,100 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8)              , intent(in)  :: h
-    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(in)  :: fc
     real(kind=8), dimension(n), intent(out) :: fl, fr
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2, j, m
-    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
-    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma
+    integer :: i
 
 ! local arrays for derivatives
 !
-    real(kind=8), dimension(n)   :: dfm, dfp
-    real(kind=8), dimension(ngp) :: u
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.70d+01            &
+                                               , 2.70d+01,-3.0d+00/) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00/) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the left and right derivatives
+!! === left-side interpolation ===
+!!
+! interpolate the interface state of the ghost zones using the interpolations
+! of lower orders
 !
-    do i = 1, n - 1
-      ip1      = i + 1
-      dfp(i  ) = f(ip1) - f(i)
-      dfm(ip1) = dfp(i)
+    u(  1) = sum(ce2(:) * fc(  1:  2))
+    u(  2) = sum(ce3(:) * fc(  1:  3))
+    do i = 3, mgp
+      u(i) = sum(ce5(:) * fc(i-2:i+2))
     end do
-    dfm(1) = dfp(1)
-    dfp(n) = dfm(n)
+    do i = n + 1 - mgp, n - 2
+      u(i) = sum(ce5(:) * fc(i-2:i+2))
+    end do
+    u(n-1) = sum(ce3(:) * fc(n-2:  n))
+    u(n  ) =              fc(n      )
 
-! obtain the face values using high order interpolation
+! reconstruct the interface state using the Gauss process interpolation
 !
-    m = (ngp - 1) / 2
-    do i = 2, m
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
+    do i = 1 + mgp, n - mgp
+      u(i) = sum(cgp(1:ngp) * (fc(i-mgp:i+mgp) - fc(i))) + fc(i)
+    end do
 
-      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
-                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
-                                                                     / 6.0d+01
-      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
-                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
-                                                                     / 6.0d+01
-    end do ! i = 2, m
-
-    do i = n - m + 1, n - 1
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
-                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
-                                                                     / 6.0d+01
-      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
-                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
-                                                                     / 6.0d+01
-    end do ! i = n - m + 1, n - 1
-
-    do i = 1 + m, n - m
-
-      im2 = i - m
-      ip2 = i + m
-
-      u(1:ngp) = f(im2:ip2) - f(i)
-      fl(i)    = sum(cgp(1:ngp) * u(  1:ngp   )) + f(i)
-      fr(i)    = sum(cgp(1:ngp) * u(ngp:  1:-1)) + f(i)
-
-    end do ! i = 1 + m, n - m
-
-! apply monotonicity preserving limiting
+! apply the monotonicity preserving limiting
 !
-    do i = 2, n - 1
+    call mp_limiting(n, fc(1:n), u(1:n))
 
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-! get the limiting condition for the left state
+! copy the interpolation to the respective vector
 !
-      df    = sigma * dfm(i)
-      fmp   = f(i) + minmod(dfp(i), df)
-      ds    = (fl(i) - f(i)) * (fl(i) - fmp)
+    fl(1:n) = u(1:n)
 
-! limit the left state
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
 !
-      if (ds > eps) then
+    fi(1:n) = fc(n:1:-1)
 
-        dm1   = dfp(im1) - dfm(im1)
-        dc0   = dfp(i  ) - dfm(i  )
-        dp1   = dfp(ip1) - dfm(ip1)
-        dc4   = 4.0d+00 * dc0
-
-        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
-        ful   = f(i) +           df
-        flc   = f(i) + 0.5d+00 * df     + dml
-
-        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
-
-        fl(i) = median(fl(i), fmn, fmx)
-
-      end if
-
-! get the limiting condition for the right state
+! interpolate the interface state of the ghost zones using the interpolations
+! of lower orders
 !
-      df    = sigma * dfp(i)
-      fmp   = f(i) - minmod(dfm(i), df)
-      ds    = (fr(i) - f(i)) * (fr(i) - fmp)
+    u(  1) = sum(ce2(:) * fi(  1:  2))
+    u(  2) = sum(ce3(:) * fi(  1:  3))
+    do i = 3, mgp
+      u(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    do i = n + 1 - mgp, n - 2
+      u(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
+    u(n-1) = sum(ce3(:) * fi(n-2:  n))
+    u(n  ) =              fi(n      )
 
-! limit the right state
+! reconstruct the interface state using the Gauss process interpolation
 !
-      if (ds > eps) then
+    do i = 1 + mgp, n - mgp
+      u(i) = sum(cgp(1:ngp) * (fi(i-mgp:i+mgp) - fi(i))) + fi(i)
+    end do
 
-        dm1 = dfp(im1) - dfm(im1)
-        dc0 = dfp(i  ) - dfm(i  )
-        dp1 = dfp(ip1) - dfm(ip1)
-        dc4 = 4.0d+00 * dc0
-
-        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
-        ful   = f(i) -           df
-        flc   = f(i) - 0.5d+00 * df     + dmr
-
-        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
-
-        fr(i) = median(fr(i), fmn, fmx)
-
-      end if
-
-! shift the right state
+! apply the monotonicity preserving limiting
 !
-      fr(im1) = fr(i)
+    call mp_limiting(n, fi(1:n), u(1:n))
 
-    end do ! n = 2, n - 1
+! copy the interpolation to the respective vector
+!
+    fr(1:n-1) = u(n-1:1:-1)
 
 ! update the interpolation of the first and last points
 !
     i     = n - 1
-    fl(1) = 0.5d+00 * (f(1) + f(2))
-    fr(i) = 0.5d+00 * (f(i) + f(n))
-    fl(n) = f(n)
-    fr(n) = f(n)
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
 
 !-------------------------------------------------------------------------------
 !
