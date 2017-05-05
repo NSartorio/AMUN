@@ -3397,7 +3397,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine reconstruct_mp5(n, h, f, fl, fr)
+  subroutine reconstruct_mp5(n, h, fc, fl, fr)
 
 ! local variables are not implicit by default
 !
@@ -3407,134 +3407,88 @@ module interpolations
 !
     integer                   , intent(in)  :: n
     real(kind=8)              , intent(in)  :: h
-    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(in)  :: fc
     real(kind=8), dimension(n), intent(out) :: fl, fr
 
 ! local variables
 !
-    integer      :: i, im1, ip1, im2, ip2
-    real(kind=8) :: df, ds, dc0, dc4, dm1, dp1, dml, dmr
-    real(kind=8) :: flc, fmd, fmp, fmn, fmx, ful
-    real(kind=8) :: sigma
+    integer :: i
 
 ! local arrays for derivatives
 !
-    real(kind=8), dimension(n) :: dfm, dfp
+    real(kind=8), dimension(n) :: fi
+    real(kind=8), dimension(n) :: u
+
+! local parameters
+!
+    real(kind=8), dimension(5), parameter ::                                   &
+                                ce5 = (/ 2.0d+00,-1.3d+01, 4.7d+01             &
+                                                , 2.7d+01,-3.0d+00 /) / 6.0d+01
+    real(kind=8), dimension(3), parameter :: &
+                                ce3 = (/-1.0d+00, 5.0d+00, 2.0d+00 /) / 6.0d+00
+    real(kind=8), dimension(2), parameter :: ce2 = (/ 5.0d-01, 5.0d-01 /)
 !
 !-------------------------------------------------------------------------------
 !
-! calculate the left and right derivatives
+!! === left-side interpolation ===
+!!
+! reconstruct the interface state using the 5th order interpolation
 !
-    do i = 1, n - 1
-      ip1      = i + 1
-      dfp(i  ) = f(ip1) - f(i)
-      dfm(ip1) = dfp(i)
+    do i = 3, n - 2
+      u(i) = sum(ce5(:) * fc(i-2:i+2))
     end do
-    dfm(1) = dfp(1)
-    dfp(n) = dfm(n)
 
-! obtain the face values using high order interpolation
+! interpolate the interface state of the ghost zones using the interpolations
+! of lower orders
 !
-    do i = 2, n - 1
+    u(  1) = sum(ce2(:) * fc(  1:  2))
+    u(  2) = sum(ce3(:) * fc(  1:  3))
+    u(n-1) = sum(ce3(:) * fc(n-2:  n))
+    u(n  ) =              fc(n      )
 
-      im2 = max(1, i - 2)
-      im1 = i - 1
-      ip1 = i + 1
-      ip2 = min(n, i + 2)
-
-      fl(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(ip1) - 1.3d+01 * f(im1))        &
-                                - (3.0d+00 * f(ip2) - 2.0d+00 * f(im2)))       &
-                                                                     / 6.0d+01
-      fr(i) = (4.7d+01 * f(i  ) + (2.7d+01 * f(im1) - 1.3d+01 * f(ip1))        &
-                                - (3.0d+00 * f(im2) - 2.0d+00 * f(ip2)))       &
-                                                                     / 6.0d+01
-
-    end do ! i = 2, n - 1
-
-! apply monotonicity preserving limiting
+! apply the monotonicity preserving limiting
 !
-    do i = 2, n - 1
+    call mp_limiting(n, fc(1:n), u(1:n))
 
-      im1 = i - 1
-      ip1 = i + 1
-
-      if (dfm(i) * dfp(i) >= 0.0d+00) then
-        sigma = kappa
-      else
-        sigma = kbeta
-      end if
-
-! get the limiting condition for the left state
+! copy the interpolation to the respective vector
 !
-      df    = sigma * dfm(i)
-      fmp   = f(i) + minmod(dfp(i), df)
-      ds    = (fl(i) - f(i)) * (fl(i) - fmp)
+    fl(1:n) = u(1:n)
 
-! limit the left state
+!! === right-side interpolation ===
+!!
+! invert the cell-centered value vector
 !
-      if (ds > eps) then
+    fi(1:n) = fc(n:1:-1)
 
-        dm1   = dfp(im1) - dfm(im1)
-        dc0   = dfp(i  ) - dfm(i  )
-        dp1   = dfp(ip1) - dfm(ip1)
-        dc4   = 4.0d+00 * dc0
-
-        dml   = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr   = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) + 0.5d+00 * dfp(i) - dmr
-        ful   = f(i) +           df
-        flc   = f(i) + 0.5d+00 * df     + dml
-
-        fmx   = max(min(f(i), f(ip1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(ip1), fmd), max(f(i), ful, flc))
-
-        fl(i) = median(fl(i), fmn, fmx)
-
-      end if
-
-! get the limiting condition for the right state
+! reconstruct the interface state using the 5th order interpolation
 !
-      df    = sigma * dfp(i)
-      fmp   = f(i) - minmod(dfm(i), df)
-      ds    = (fr(i) - f(i)) * (fr(i) - fmp)
+    do i = 3, n - 2
+      u(i) = sum(ce5(:) * fi(i-2:i+2))
+    end do
 
-! limit the right state
+! interpolate the interface state of the ghost zones using the interpolations
+! of lower orders
 !
-      if (ds > eps) then
+    u(  1) = sum(ce2(:) * fi(  1:  2))
+    u(  2) = sum(ce3(:) * fi(  1:  3))
+    u(n-1) = sum(ce3(:) * fi(n-2:  n))
+    u(n  ) =              fi(n      )
 
-        dm1 = dfp(im1) - dfm(im1)
-        dc0 = dfp(i  ) - dfm(i  )
-        dp1 = dfp(ip1) - dfm(ip1)
-        dc4 = 4.0d+00 * dc0
-
-        dml = 0.5d+00 * minmod4(dc4 - dm1, 4.0d+00 * dm1 - dc0, dc0, dm1)
-        dmr = 0.5d+00 * minmod4(dc4 - dp1, 4.0d+00 * dp1 - dc0, dc0, dp1)
-
-        fmd   = f(i) - 0.5d+00 * dfm(i) - dml
-        ful   = f(i) -           df
-        flc   = f(i) - 0.5d+00 * df     + dmr
-
-        fmx   = max(min(f(i), f(im1), fmd), min(f(i), ful, flc))
-        fmn   = min(max(f(i), f(im1), fmd), max(f(i), ful, flc))
-
-        fr(i) = median(fr(i), fmn, fmx)
-
-      end if
-
-! shift the right state
+! apply the monotonicity preserving limiting
 !
-      fr(im1) = fr(i)
+    call mp_limiting(n, fi(1:n), u(1:n))
 
-    end do ! n = 2, n - 1
+! copy the interpolation to the respective vector
+!
+    fr(1:n-1) = u(n-1:1:-1)
 
 ! update the interpolation of the first and last points
 !
     i     = n - 1
-    fl(1) = 0.5d+00 * (f(1) + f(2))
-    fr(i) = 0.5d+00 * (f(i) + f(n))
-    fl(n) = f(n)
-    fr(n) = f(n)
+    fl(1) = 0.5d+00 * (fc(1) + fc(2))
+    fr(i) = 0.5d+00 * (fc(i) + fc(n))
+    fl(n) = fc(n)
+    fr(n) = fc(n)
 
 !-------------------------------------------------------------------------------
 !
@@ -3583,6 +3537,7 @@ module interpolations
     real(kind=8)              , intent(in)  :: h
     real(kind=8), dimension(n), intent(in)  :: fc
     real(kind=8), dimension(n), intent(out) :: fl, fr
+
 ! local variables
 !
     integer :: i
