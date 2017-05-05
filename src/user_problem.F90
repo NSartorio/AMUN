@@ -555,7 +555,7 @@ module user_problem
 
               tmp(1,i,j,k) = 0.0d+00
               tmp(2,i,j,k) = 0.0d+00
-              tmp(3,i,j,k) = vper * cos(xp) * exp(yp) / kvec
+              tmp(3,i,j,k) = bper * cos(xp) * exp(yp) / kvec
             end do ! i = 1, im
           end do ! j = 1, jm
         end do ! k = 1, km
