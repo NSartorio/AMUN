@@ -118,6 +118,7 @@ module user_problem
 !
     character(len=64) :: problem_name   = "none"
     character(len=64) :: perturbation   = "noise"
+    character(len=64) :: sfmts, sfmtf, sfmti
     integer           :: n
     real(kind=8)      :: thh, fc
 #if NDIMS == 3
@@ -250,7 +251,40 @@ module user_problem
 
       write (*,*)
       write (*,"(1x,a)") "User problem:"
-      write (*,"(4x,a14, 9x,'=',2x,a)") "problem name  ", trim(problem_name)
+      sfmts = "(4x,a14,9x,'=',2x,a)"
+      write (*,sfmts) "problem name  ", trim(problem_name)
+      sfmts = "(6x,a12,9x)"
+      write (*,sfmts)          "parameters: "
+      sfmtf = "(8x,a10,9x,'=',1pe12.4)"
+      sfmti = "(8x,a10,9x,'=',1i12)"
+      write (*,sfmtf) "dens      ", dens
+      write (*,sfmtf) "bamp      ", bamp
+      write (*,sfmtf) "bgui      ", bgui
+      write (*,sfmtf) "zeta      ", zeta
+      write (*,sfmtf) "yth       ", yth
+      sfmts = "(8x,a12,7x,'=',2x,a)"
+      write (*,sfmts) "perturbation", trim(perturbation)
+      if (pert /= 3) then
+        write (*,sfmtf) "vper      ", vper
+      end if
+      if (pert >= 3) then
+        write (*,sfmtf) "bper      ", bper
+      end if
+      if (pert >= 1) then
+        write (*,sfmtf) "kper      ", kper
+      end if
+      if (pert == 1) then
+        write (*,sfmti) "nper      ", nper
+      end if
+      if (pert >= 3) then
+        write (*,sfmtf) "pth       ", pth
+      end if
+      if (pert <= 1) then
+        write (*,sfmtf) "xcut      ", xcut
+        write (*,sfmtf) "ycut      ", ycut
+        write (*,sfmtf) "xdec      ", xdec
+        write (*,sfmtf) "ydec      ", ydec
+      end if
 
     end if
 
