@@ -1101,7 +1101,6 @@ module interpolations
 ! include external procedures
 !
     use coordinates    , only : im , jm , km
-    use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
 
 ! local variables are not implicit by default
 !
@@ -1134,17 +1133,17 @@ module interpolations
 !
 !-------------------------------------------------------------------------------
 !
-    do k = kbl, keu
+    do k = 1, km
 #if NDIMS == 3
-      km1 = k - 1
-      kp1 = k + 1
+      km1 = max( 1, k - 1)
+      kp1 = min(km, k + 1)
 #endif /* NDIMS == 3 */
-      do j = jbl, jeu
-        jm1 = j - 1
-        jp1 = j + 1
-        do i = ibl, ieu
-          im1 = i - 1
-          ip1 = i + 1
+      do j = 1, jm
+        jm1 = max( 1, j - 1)
+        jp1 = min(jm, j + 1)
+        do i = 1, im
+          im1 = max( 1, i - 1)
+          ip1 = min(im, i + 1)
 
 ! calculate the minmod TVD derivatives
 !
@@ -1241,9 +1240,9 @@ module interpolations
           end if
 #endif /* NDIMS == 3 */
 
-        end do ! i = ibl, ieu
-      end do ! j = jbl, jeu
-    end do ! k = kbl, keu
+        end do ! i = 1, im
+      end do ! j = 1, jm
+    end do ! k = 1, km
 
 !-------------------------------------------------------------------------------
 !
