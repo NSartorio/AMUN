@@ -342,6 +342,13 @@ program amun
 !
   if (iret > 0) go to 60
 
+! print information about the problem
+!
+  if (master) then
+    write (*,*)
+    write (*,"(1x,a)"         ) "Problem:"
+  end if
+
 ! initialize module USER_PROBLEM
 !
   call initialize_user_problem(master, iret)
