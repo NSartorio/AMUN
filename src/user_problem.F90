@@ -186,8 +186,6 @@ module user_problem
       write (*,sfmtf) "lf_jet    ", lf_jet, "(jet Lorentz factor)"
       if (ipr > 0) &
         write (*,sfmtf) "pr_jet      ", pr_jet, "(jet pressure)"
-      if (ibx > 0) &
-        write (*,sfmtf) "bt_jet      ", bt_jet, "(jet plasma-β)"
       if (ibx > 0) then
         if (bjet == 0.0d+00) then
           sfmti = "(8x,a10,9x,'=',2x,'infinity',4x,a)"
