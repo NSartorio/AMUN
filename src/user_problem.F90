@@ -47,19 +47,24 @@ module user_problem
 
 ! default parameter values
 !
-  real(kind=8), save :: djet  = 1.00d-01
-  real(kind=8), save :: damb  = 1.00d+01
-  real(kind=8), save :: bamb  = 1.00d-08
-  real(kind=8), save :: pres  = 1.00d-02
-  real(kind=8), save :: vjet  = 0.99d+00
-  real(kind=8), save :: bjet  = 1.00d-03
-  real(kind=8), save :: ljet  = 1.00d-00
-  real(kind=8), save :: rjet  = 1.00d+00
-  real(kind=8), save :: rjet2 = 1.00d+00
-  real(kind=8), save :: ajet  = 0.00d+00
-  real(kind=8), save :: pjet  = 1.00d+08
-  real(kind=8), save :: sina  = 0.00d+00
-  real(kind=8), save :: cosa  = 1.00d+00
+  real(kind=8), save :: rjet   = 1.00d+00
+  real(kind=8), save :: ljet   = 0.00d+00
+  real(kind=8), save :: dn_jet = 1.00d-01
+  real(kind=8), save :: pr_jet = 1.00d-02
+  real(kind=8), save :: lf_jet = 1.00d+01
+  real(kind=8), save :: bt_jet = 1.00d+99
+  real(kind=8), save :: an_jet = 0.00d+00
+  real(kind=8), save :: tm_jet = 1.00d+99
+  real(kind=8), save :: dn_amb = 1.00d+01
+  real(kind=8), save :: pr_amb = 1.00d-02
+  real(kind=8), save :: bt_amb = 1.00d+99
+  real(kind=8), save :: rjet2  = 1.00d+00
+  real(kind=8), save :: vjet   = 0.00d+00
+  real(kind=8), save :: bjet   = 0.00d+00
+  real(kind=8), save :: ajet   = 0.00d+00
+  real(kind=8), save :: bamb   = 0.00d+00
+  real(kind=8), save :: sina   = 0.00d+00
+  real(kind=8), save :: cosa   = 1.00d+00
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -89,6 +94,7 @@ module user_problem
 ! include external procedures and variables
 !
     use constants , only : d2r
+    use equations , only : ipr, ibx
     use parameters, only : get_parameter_string, get_parameter_real
 
 ! local variables are not implicit by default
@@ -103,6 +109,7 @@ module user_problem
 ! local variables
 !
     character(len=64) :: problem_name   = "none"
+    character(len=64) :: sfmts, sfmtf, sfmti
 !
 !-------------------------------------------------------------------------------
 !
@@ -127,24 +134,39 @@ module user_problem
 
 ! get problem parameters
 !
-    call get_parameter_real("djet", djet)
-    call get_parameter_real("damb", damb)
-    call get_parameter_real("pres", pres)
-    call get_parameter_real("bamb", bamb)
-    call get_parameter_real("bjet", bjet)
-    call get_parameter_real("vjet", vjet)
-    call get_parameter_real("ljet", ljet)
-    call get_parameter_real("rjet", rjet)
-    call get_parameter_real("ajet", ajet)
-    call get_parameter_real("pjet", pjet)
+    call get_parameter_real("rjet"  , rjet  )
+    call get_parameter_real("ljet"  , ljet  )
+    call get_parameter_real("dn_jet", dn_jet)
+    call get_parameter_real("lf_jet", lf_jet)
+    call get_parameter_real("pr_jet", pr_jet)
+    call get_parameter_real("bt_jet", bt_jet)
+    call get_parameter_real("an_jet", an_jet)
+    call get_parameter_real("tm_jet", tm_jet)
+    call get_parameter_real("dn_amb", dn_amb)
+    call get_parameter_real("pr_amb", pr_amb)
+    call get_parameter_real("bt_amb", bt_amb)
 
 ! calculate Rjet²
 !
     rjet2 = rjet * rjet
 
+! calculate plasma parameters
+!
+    vjet  = sqrt(1.0d+00 - 1.0d+00 / lf_jet**2)
+    if (bt_jet > 0.0d+00 .and. bt_jet < 1.0d+30) then
+      bjet  = sqrt(2.0d+00 * pr_jet / bt_jet)
+    else
+      bjet  = 0.0d+00
+    end if
+    if (bt_amb > 0.0d+00 .and. bt_amb < 1.0d+30) then
+      bamb  = sqrt(2.0d+00 * pr_amb / bt_amb)
+    else
+      bamb  = 0.0d+00
+    end if
+
 ! convert jet precession angle to radians
 !
-    ajet  = d2r * ajet
+    ajet  = d2r * an_jet
     sina  = sin(ajet)
     cosa  = cos(ajet)
 
@@ -154,8 +176,44 @@ module user_problem
     if (verbose) then
 
       write (*,*)
-      write (*,"(1x,a)") "User problem:"
-      write (*,"(4x,a14, 9x,'=',2x,a)") "problem name  ", trim(problem_name)
+      sfmts = "(4x,a14,9x,'=',2x,a)"
+      write (*,sfmts) "problem name  ", trim(problem_name)
+      sfmts = "(6x,a24)"
+      write (*,sfmts)          "jet parameters:         "
+      sfmtf = "(8x,a10,9x,'=',1pe12.4,2x,a)"
+      write (*,sfmtf) "rjet      ", rjet  , "(jet radius)"
+      write (*,sfmtf) "ljet      ", ljet  , "(jet length)"
+      write (*,sfmtf) "dn_jet    ", dn_jet, "(jet density)"
+      write (*,sfmtf) "lf_jet    ", lf_jet, "(jet Lorentz factor)"
+      if (ipr > 0) &
+        write (*,sfmtf) "pr_jet      ", pr_jet, "(jet pressure)"
+      if (ibx > 0) &
+        write (*,sfmtf) "bt_jet      ", bt_jet, "(jet plasma-β)"
+      if (ibx > 0) then
+        if (bjet == 0.0d+00) then
+          sfmti = "(8x,a10,9x,'=',2x,'infinity',4x,a)"
+          write (*,sfmti) "bt_jet      ", "(jet plasma-β)"
+        else
+          write (*,sfmtf) "bt_jet      ", bt_jet, "(jet plasma-β)"
+        end if
+        write (*,sfmtf) "Bjet      ", bjet  , "(jet magnetic field amplitude)"
+      end if
+      write (*,sfmts)          "precession parameters:  "
+      write (*,sfmtf) "an_jet    ", an_jet, "(inclination angle in deg.)"
+      write (*,sfmtf) "tm_jet    ", tm_jet, "(precession period)"
+      write (*,sfmts)          "ambient parameters:     "
+      write (*,sfmtf) "dn_amb    ", dn_amb, "(ambient density)"
+      if (ipr > 0) &
+        write (*,sfmtf) "pr_amb      ", pr_amb, "(ambient pressure)"
+      if (ibx > 0) then
+        if (bamb == 0.0d+00) then
+          sfmti = "(8x,a10,9x,'=',2x,'infinity',4x,a)"
+          write (*,sfmti) "bt_amb      ", "(ambient plasma-β)"
+        else
+          write (*,sfmtf) "bt_amb      ", bt_amb, "(ambient plasma-β)"
+        end if
+        write (*,sfmtf) "Bamb      ", bamb  , "(ambient magnetic field amplitude)"
+      end if
 
     end if
 
@@ -266,8 +324,8 @@ module user_problem
 
 ! set the conditions inside the jet radius
 !
-    qj(idn) = djet
-    if (ipr > 0) qj(ipr) = pres
+    qj(idn) = dn_jet
+    if (ipr > 0) qj(ipr) = pr_jet
     qj(ivx) = vjet * cosa
     qj(ivy) = vjet * sina
     qj(ivz) = 0.0d+00
@@ -304,8 +362,8 @@ module user_problem
 
 ! set the ambient density, pressure, and velocity
 !
-        q(idn,1:im) = damb
-        if (ipr > 0) q(ipr,1:im) = pres
+        q(idn,1:im) = dn_amb
+        if (ipr > 0) q(ipr,1:im) = pr_amb
         q(ivx,1:im) = 0.0d+00
         q(ivy,1:im) = 0.0d+00
         q(ivz,1:im) = 0.0d+00
@@ -416,14 +474,14 @@ module user_problem
 
 ! calculate the precession angle in the perpendicular direction
 !
-    tph  = pi2 * time / pjet
+    tph  = pi2 * time / tm_jet
     sint = sin(tph)
     cost = cos(tph)
 
 ! set the conditions inside the jet radius
 !
-    qj(idn) = djet
-    if (ipr > 0) qj(ipr) = pres
+    qj(idn) = dn_jet
+    if (ipr > 0) qj(ipr) = pr_jet
     qj(ivx) = vjet * cosa
     qj(ivy) = vjet * sina * cost
     qj(ivz) = vjet * sina * sint
