@@ -116,7 +116,6 @@ module user_problem
 !
     if (verbose) then
 
-      write (*,*)
       write (*,"(1x,a)") "User problem:"
       write (*,"(4x,a14, 9x,'=',2x,a)") "problem name  ", trim(problem_name)
 
