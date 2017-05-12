@@ -58,6 +58,12 @@ module user_problem
   real(kind=8), save :: dn_amb = 1.00d+01
   real(kind=8), save :: pr_amb = 1.00d-02
   real(kind=8), save :: bt_amb = 1.00d+99
+  real(kind=8), save :: tm_on  = 1.00d+99
+  real(kind=8), save :: tm_off = 0.00d+00
+
+! module parameters
+!
+  logical     , save :: state  = .true.
   real(kind=8), save :: rjet2  = 1.00d+00
   real(kind=8), save :: vjet   = 0.00d+00
   real(kind=8), save :: bjet   = 0.00d+00
@@ -65,6 +71,7 @@ module user_problem
   real(kind=8), save :: bamb   = 0.00d+00
   real(kind=8), save :: sina   = 0.00d+00
   real(kind=8), save :: cosa   = 1.00d+00
+  real(kind=8), save :: tnext  = 1.00d+99
 
 ! flag indicating if the gravitational source term is enabled
 !
@@ -96,6 +103,7 @@ module user_problem
     use constants , only : d2r
     use equations , only : ipr, ibx
     use parameters, only : get_parameter_string, get_parameter_real
+    use random    , only : randomu
 
 ! local variables are not implicit by default
 !
@@ -134,17 +142,19 @@ module user_problem
 
 ! get problem parameters
 !
-    call get_parameter_real("rjet"  , rjet  )
-    call get_parameter_real("ljet"  , ljet  )
-    call get_parameter_real("dn_jet", dn_jet)
-    call get_parameter_real("lf_jet", lf_jet)
-    call get_parameter_real("pr_jet", pr_jet)
-    call get_parameter_real("bt_jet", bt_jet)
-    call get_parameter_real("an_jet", an_jet)
-    call get_parameter_real("tm_jet", tm_jet)
-    call get_parameter_real("dn_amb", dn_amb)
-    call get_parameter_real("pr_amb", pr_amb)
-    call get_parameter_real("bt_amb", bt_amb)
+    call get_parameter_real("rjet"   , rjet  )
+    call get_parameter_real("ljet"   , ljet  )
+    call get_parameter_real("dn_jet" , dn_jet)
+    call get_parameter_real("lf_jet" , lf_jet)
+    call get_parameter_real("pr_jet" , pr_jet)
+    call get_parameter_real("bt_jet" , bt_jet)
+    call get_parameter_real("an_jet" , an_jet)
+    call get_parameter_real("tm_jet" , tm_jet)
+    call get_parameter_real("dn_amb" , dn_amb)
+    call get_parameter_real("pr_amb" , pr_amb)
+    call get_parameter_real("bt_amb" , bt_amb)
+    call get_parameter_real("tactive", tm_on )
+    call get_parameter_real("tquiet" , tm_off)
 
 ! calculate Rjet²
 !
@@ -169,6 +179,11 @@ module user_problem
     ajet  = d2r * an_jet
     sina  = sin(ajet)
     cosa  = cos(ajet)
+
+! update the next jet engine switch moment
+!
+    state = .true.
+    if (tm_on > 0.0d+00 .and. tm_off > 0.0d+00) tnext = tm_on  * randomu()
 
 ! print information about the user problem such as problem name, its
 ! parameters, etc.
@@ -211,6 +226,9 @@ module user_problem
         end if
         write (*,sfmtf) "Bamb      ", bamb  , "(ambient magnetic field amplitude)"
       end if
+      write (*,sfmts)          "engine parameters:      "
+      write (*,sfmtf) "tactive   ", tm_on , "(maximum active period length)"
+      write (*,sfmtf) "tquiet    ", tm_off, "(maximum quiet period length)"
 
     end if
 
@@ -437,6 +455,7 @@ module user_problem
     use equations      , only : prim2cons
     use equations      , only : nv
     use equations      , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use random         , only : randomu
 
 ! local variables are not implicit by default
 !
@@ -475,13 +494,30 @@ module user_problem
     sint = sin(tph)
     cost = cos(tph)
 
+! get the next engine switch moment
+!
+    if (time >= tnext) then
+      if (state) then
+        tnext = tnext + tm_off * randomu()
+      else
+        tnext = tnext + tm_on  * randomu()
+      end if
+      state = .not. state
+    end if
+
 ! set the conditions inside the jet radius
 !
     qj(idn) = dn_jet
     if (ipr > 0) qj(ipr) = pr_jet
-    qj(ivx) = vjet * cosa
-    qj(ivy) = vjet * sina * cost
-    qj(ivz) = vjet * sina * sint
+    if (state) then
+      qj(ivx) = vjet * cosa
+      qj(ivy) = vjet * sina * cost
+      qj(ivz) = vjet * sina * sint
+    else
+      qj(ivx) = 0.0d+00
+      qj(ivy) = 0.0d+00
+      qj(ivz) = 0.0d+00
+    end if
     if (ibx > 0) then
       qj(ibx) = 0.0d+00
       qj(iby) = 0.0d+00
