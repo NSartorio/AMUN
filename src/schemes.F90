@@ -3642,13 +3642,13 @@ module schemes
       sl = min(clm(i), crm(i))
       sr = max(clp(i), crp(i))
 
-! calculate the HLLC flux
+! calculate the HLLD flux
 !
-      if (sl >= 0.0d+00) then
+      if (sl >= 0.0d+00) then ! sl ≥ 0
 
         f(:,i) = fl(:,i)
 
-      else if (sr <= 0.0d+00) then
+      else if (sr <= 0.0d+00) then ! sr ≤ 0
 
         f(:,i) = fr(:,i)
 
@@ -3837,7 +3837,7 @@ module schemes
                 ui(iby) = by
                 ui(ibz) = bz
                 ui(ibp) = ul(ibp,i)
-                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / (sml - sm)
+                ui(ien) = - (wcl(ien) + sm * pt - bx * vb) / cal
 
 ! the inmost left intermediate flux
 !
@@ -3855,7 +3855,7 @@ module schemes
                 ui(iby) = by
                 ui(ibz) = bz
                 ui(ibp) = ur(ibp,i)
-                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / (smr - sm)
+                ui(ien) =   (wcr(ien) + sm * pt - bx * vb) / car
 
 ! the inmost right intermediate flux
 !
@@ -3932,7 +3932,7 @@ module schemes
                 ui(iby) = by
                 ui(ibz) = bz
                 ui(ibp) = ul(ibp,i)
-                ui(ien) = (wcl(ien) + sm * pt - bx * vb) / (sml - sm)
+                ui(ien) = - (wcl(ien) + sm * pt - bx * vb) / cal
 
 ! choose the correct state depending on the sign of contact discontinuity
 ! advection speed
@@ -4013,7 +4013,7 @@ module schemes
                 ui(iby) = by
                 ui(ibz) = bz
                 ui(ibp) = ur(ibp,i)
-                ui(ien) = (wcr(ien) + sm * pt - bx * vb) / (smr - sm)
+                ui(ien) =   (wcr(ien) + sm * pt - bx * vb) / car
 
 ! choose the correct state depending on the sign of contact discontinuity
 ! advection speed
