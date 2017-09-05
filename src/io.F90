@@ -200,6 +200,7 @@ module io
     use error          , only : print_error
     use hdf5           , only : H5P_DATASET_CREATE_F
     use hdf5           , only : h5open_f, h5zfilter_avail_f, h5pcreate_f
+    use hdf5           , only : h5pset_deflate_f
 #endif /* HDF5 */
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
@@ -221,6 +222,10 @@ module io
 #ifdef HDF5
     logical            :: status = .false.
     integer            :: err
+
+! compression level
+!
+    integer            :: clevel = 9
 
 ! local parameters
 !
@@ -315,6 +320,18 @@ module io
       call h5zfilter_avail_f(H5Z_DEFLATE, status, err)
       if (status) compression = H5Z_DEFLATE
     end if
+
+! get compression_level
+!
+    call get_parameter_integer("compression_level", clevel)
+
+! initialize proper compressor
+!
+    select case(compression)
+    case(H5Z_DEFLATE)
+      call h5pset_deflate_f(pid, clevel, iret)
+    case default
+    end select
 #endif /* HDF5 */
 
 ! return the run number
@@ -337,8 +354,10 @@ module io
       select case(compression)
       case(H5Z_ZSTANDARD)
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "zstd"
+        write (*,"(4x,a21,2x,'=',  i3)") "compression level    ", clevel
       case(H5Z_DEFLATE)
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "deflate"
+        write (*,"(4x,a21,2x,'=',  i3)") "compression level    ", clevel
       case default
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "none"
       end select
@@ -4028,22 +4047,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -4121,29 +4129,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -4251,22 +4236,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -4336,30 +4310,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:2)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -4467,22 +4417,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -4552,30 +4491,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:3)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -4684,21 +4599,12 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
 #endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -4768,30 +4674,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:4)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -4900,21 +4782,12 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
 #endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -4984,30 +4857,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:5)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -5116,22 +4965,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -5209,29 +5047,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -5339,22 +5154,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -5424,30 +5228,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:2)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -5555,22 +5335,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -5640,30 +5409,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:3)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -5771,22 +5516,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -5856,30 +5590,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:4)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
@@ -5987,22 +5697,11 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
 #ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
+    use hdf5           , only : h5pset_chunk_f
 #endif /* COMPRESS */
 
 ! local variables are not implicit by default
@@ -6072,30 +5771,6 @@ module io
       call print_warning(fname, "Cannot set the size of the chunk!")
 
 ! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:5)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
 !
       compress = .false.
 
