@@ -296,6 +296,16 @@ module io
       else
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "off"
       end if
+#ifdef HDF5
+      select case(compression)
+      case(32015)
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "zstd"
+      case(1)
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "deflate"
+      case default
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "none"
+      end select
+#endif /* HDF5 */
       if (with_xdmf) then
         write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "on"
       else
