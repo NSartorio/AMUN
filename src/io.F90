@@ -221,6 +221,10 @@ module io
 #ifdef HDF5
     logical            :: status = .false.
     integer            :: err
+
+! local parameters
+!
+    integer, parameter :: H5Z_DEFLATE = 1, H5Z_ZSTANDARD = 32015
 #endif /* HDF5 */
 !
 !-------------------------------------------------------------------------------
@@ -304,12 +308,12 @@ module io
 !
     status = .false.
     if (.not. status) then
-      call h5zfilter_avail_f(32015, status, err)
-      if (status) compression = 32015
+      call h5zfilter_avail_f(H5Z_ZSTANDARD, status, err)
+      if (status) compression = H5Z_ZSTANDARD
     end if
     if (.not. status) then
-      call h5zfilter_avail_f(    1, status, err)
-      if (status) compression = 1
+      call h5zfilter_avail_f(H5Z_DEFLATE, status, err)
+      if (status) compression = H5Z_DEFLATE
     end if
 #endif /* HDF5 */
 
@@ -331,9 +335,9 @@ module io
       end if
 #ifdef HDF5
       select case(compression)
-      case(32015)
+      case(H5Z_ZSTANDARD)
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "zstd"
-      case(1)
+      case(H5Z_DEFLATE)
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "deflate"
       case default
         write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "none"
