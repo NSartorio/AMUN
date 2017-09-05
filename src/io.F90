@@ -33,6 +33,9 @@ module io
 ! import external subroutines
 !
   use blocks, only : pointer_meta
+#ifdef HDF5
+  use hdf5  , only : hid_t
+#endif /* HDF5 */
   use timers, only : set_timer, start_timer, stop_timer
 
 ! module variables are not implicit by default
@@ -133,6 +136,10 @@ module io
 ! compression type (0 for no compressions, 1 for deflate, 32015 for zstandard)
 !
   integer           , save :: compression = 0
+
+! HDF5 property object identifier
+!
+  integer(hid_t)    , save :: pid
 #endif /* HDF5 */
 
 ! local variables to store the number of processors and maximum level read from
@@ -4273,7 +4280,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4509,7 +4516,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4745,7 +4752,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4981,7 +4988,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5218,7 +5225,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! array dimensions
 !
@@ -5461,7 +5468,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5697,7 +5704,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5933,7 +5940,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -6169,7 +6176,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
