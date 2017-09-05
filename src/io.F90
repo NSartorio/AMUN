@@ -198,9 +198,10 @@ module io
 !
 #ifdef HDF5
     use error          , only : print_error
-    use hdf5           , only : H5P_DATASET_CREATE_F
+    use hdf5           , only : hsize_t
+    use hdf5           , only : H5P_DATASET_CREATE_F, H5Z_FLAG_OPTIONAL_F
     use hdf5           , only : h5open_f, h5zfilter_avail_f, h5pcreate_f
-    use hdf5           , only : h5pset_deflate_f
+    use hdf5           , only : h5pset_deflate_f, h5pset_filter_f
 #endif /* HDF5 */
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
@@ -216,16 +217,18 @@ module io
 
 ! local variables
 !
-    character(len=255) :: ghosts = "on"
-    character(len=255) :: xdmf   = "off"
-    integer            :: dd, hh, mm, ss
+    character(len=255)    :: ghosts = "on"
+    character(len=255)    :: xdmf   = "off"
+    integer               :: dd, hh, mm, ss
 #ifdef HDF5
-    logical            :: status = .false.
-    integer            :: err
+    logical               :: status = .false.
+    integer               :: err
+    integer(hsize_t)      :: cd_nelmts = 1
+    integer, dimension(1) :: cd_values = 3
 
 ! compression level
 !
-    integer            :: clevel = 9
+    integer               :: clevel    = 0
 
 ! local parameters
 !
@@ -328,7 +331,12 @@ module io
 ! initialize proper compressor
 !
     select case(compression)
+    case(H5Z_ZSTANDARD)
+      if (clevel >= 1 .and. clevel <= 20) cd_values(:) = clevel
+      call h5pset_filter_f(pid, H5Z_ZSTANDARD, H5Z_FLAG_OPTIONAL_F, cd_nelmts  &
+                         , cd_values, iret)
     case(H5Z_DEFLATE)
+      if (clevel < 1 .or. clevel > 9) clevel = 9
       call h5pset_deflate_f(pid, clevel, iret)
     case default
     end select
