@@ -189,11 +189,12 @@ module io
 
 ! import external procedures
 !
+#ifdef HDF5
+    use error          , only : print_error
+    use hdf5           , only : h5open_f, h5zfilter_avail_f
+#endif /* HDF5 */
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
-#ifdef HDF5
-    use hdf5           , only : h5zfilter_avail_f
-#endif /* HDF5 */
 
 ! local variables are not implicit by default
 !
@@ -267,6 +268,18 @@ module io
     end select
 
 #ifdef HDF5
+! initialize the FORTRAN interface
+!
+    call h5open_f(iret)
+
+! in the case of error, print a message and quit the subroutine
+!
+    if (iret < 0) then
+      call print_error("io::initialize_io"                                     &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
+
 ! detect available compressions
 !
     status = .false.
@@ -351,6 +364,13 @@ module io
 !
   subroutine finalize_io(iret)
 
+! import external procedures
+!
+#ifdef HDF5
+    use error          , only : print_error
+    use hdf5           , only : h5close_f
+#endif /* HDF5 */
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -366,6 +386,20 @@ module io
 !
     call start_timer(ioi)
 #endif /* PROFILE */
+
+#ifdef HDF5
+! close the FORTRAN interface
+!
+    call h5close_f(iret)
+
+! check if the interface has been closed successfuly
+!
+    if (iret > 0) then
+      call print_error("io::finalize_io"                                       &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
+    end if
+#endif /* HDF5 */
 
 #ifdef PROFILE
 ! stop accounting time for module initialization/finalization
@@ -669,7 +703,6 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_RDONLY_F
-    use hdf5           , only : h5open_f, h5close_f
     use hdf5           , only : h5fis_hdf5_f, h5fopen_f, h5fclose_f
 #ifdef MPI
     use mesh           , only : redistribute_blocks
@@ -697,24 +730,87 @@ module io
 !
     iret = 0
 
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! quit, if the FORTRAN interface initialization failed
-!
-    if (err < 0) then
-
-      iret = 120
-      msg  = "Cannot initialize the HDF5 Fortran interface!"
-
-    else ! the FORTRAN interface
-
 !! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
 !!
 ! prepare the filename
 !
-      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
+    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
+
+! check if the HDF5 file exists
+!
+    inquire(file = fl, exist = info)
+
+! quit, if file does not exist
+!
+    if (.not. info) then
+
+      iret = 121
+      msg  = "File " // trim(fl) // " does not exist!"
+
+    else ! file does exist
+
+! check if this file is in the HDF5 format
+!
+      call h5fis_hdf5_f(fl, info, err)
+
+! quit, if the format verification failed or file is not in HDF5 format
+!
+      if (err < 0 .or. .not. info) then
+
+        iret = 122
+        if (err < 0)    msg = "Cannot check the file format!"
+        if (.not. info) msg = "File " // trim(fl) // " is not an HDF5 file!"
+
+      else ! file is HDF5
+
+! open the HDF5 file
+!
+        call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! quit, if file could not be opened
+!
+        if (err < 0) then
+
+          iret = 123
+          msg = "Cannot open file: " // trim(fl)
+
+        else ! file is opened
+
+! read global attributes
+!
+          call read_attributes_h5(fid)
+
+! read meta blocks and recreate the meta block hierarchy
+!
+          call read_metablocks_h5(fid)
+
+! close the file
+!
+          call h5fclose_f(fid, err)
+
+! quit, if file could not be closed
+!
+          if (err > 0) then
+            iret = 124
+            msg  = "Cannot close file: " // trim(fl)
+          end if
+        end if ! file is opened
+      end if ! file is HDF5
+    end if ! file does exist
+
+!! 1. RESTORE DATA BLOCKS
+!!
+! separate data blocks reading into two cases, when the number of processors is
+! larger or equal to the number of files, and when we have less processors than
+! files
+!
+! first, read data blocks to processes which have corresponding restart file
+!
+    if (nproc < nfiles) then
+
+! prepare the filename
+!
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, nproc
 
 ! check if the HDF5 file exists
 !
@@ -756,13 +852,9 @@ module io
 
           else ! file is opened
 
-! read global attributes
+! read data blocks
 !
-            call read_attributes_h5(fid)
-
-! read meta blocks and recreate the meta block hierarchy
-!
-            call read_metablocks_h5(fid)
+            call read_datablocks_h5(fid)
 
 ! close the file
 !
@@ -776,173 +868,90 @@ module io
             end if
           end if ! file is opened
         end if ! file is HDF5
-      end if ! file does exist
-
-!! 1. RESTORE DATA BLOCKS
-!!
-! separate data blocks reading into two cases, when the number of processors is
-! larger or equal to the number of files, and when we have less processors than
-! files
-!
-! first, read data blocks to processes which have corresponding restart file
-!
-      if (nproc < nfiles) then
-
-! prepare the filename
-!
-        write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, nproc
-
-! check if the HDF5 file exists
-!
-        inquire(file = fl, exist = info)
-
-! quit, if file does not exist
-!
-        if (.not. info) then
-
-          iret = 121
-          msg  = "File " // trim(fl) // " does not exist!"
-
-        else ! file does exist
-
-! check if this file is in the HDF5 format
-!
-          call h5fis_hdf5_f(fl, info, err)
-
-! quit, if the format verification failed or file is not in HDF5 format
-!
-          if (err < 0 .or. .not. info) then
-
-            iret = 122
-            if (err < 0)    msg = "Cannot check the file format!"
-            if (.not. info) msg = "File " // trim(fl) // " is not an HDF5 file!"
-
-          else ! file is HDF5
-
-! open the HDF5 file
-!
-            call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
-
-! quit, if file could not be opened
-!
-            if (err < 0) then
-
-              iret = 123
-              msg = "Cannot open file: " // trim(fl)
-
-            else ! file is opened
-
-! read data blocks
-!
-              call read_datablocks_h5(fid)
-
-! close the file
-!
-              call h5fclose_f(fid, err)
-
-! quit, if file could not be closed
-!
-              if (err > 0) then
-                iret = 124
-                msg  = "Cannot close file: " // trim(fl)
-              end if
-            end if ! file is opened
-          end if ! file is HDF5
-        end if ! file exists
-      end if ! nproc < nfiles
+      end if ! file exists
+    end if ! nproc < nfiles
 
 ! if there are more files than processes, read the remaining files by
 ! the last process and redistribute blocks after each processed file,
 ! otherwise only redistribute blocks
 !
-      if (nprocs < nfiles) then
+    if (nprocs < nfiles) then
 
 ! iterate over remaining files and read one by one to the last block
 !
-        do lfile = nprocs, nfiles - 1
+      do lfile = nprocs, nfiles - 1
 
 ! switch meta blocks from the read file to belong to the reading process
 !
-          call change_blocks_process(lfile, npmax)
+        call change_blocks_process(lfile, npmax)
 
 ! read the remaining files by the last process only
 !
-          if (nproc == npmax) then
+        if (nproc == npmax) then
 
 ! prepare the filename
 !
-            write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath)            &
-                                                                , nrest, lfile
+          write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, lfile
 
 ! check if the HDF5 file exists
 !
-            inquire(file = fl, exist = info)
+          inquire(file = fl, exist = info)
 
 ! quit, if file does not exist
 !
-            if (.not. info) then
+          if (.not. info) then
 
-              iret = 121
-              msg  = "File " // trim(fl) // " does not exist!"
+            iret = 121
+            msg  = "File " // trim(fl) // " does not exist!"
 
-            else ! file does exist
+          else ! file does exist
 
 ! check if this file is in the HDF5 format
 !
-              call h5fis_hdf5_f(fl, info, err)
+            call h5fis_hdf5_f(fl, info, err)
 
 ! quit, if the format verification failed or file is not in HDF5 format
 !
-              if (err < 0 .or. .not. info) then
+            if (err < 0 .or. .not. info) then
 
-                iret = 122
-                if (err < 0)    msg = "Cannot check the file format!"
-                if (.not. info) msg = "File " // trim(fl) //                   &
+              iret = 122
+              if (err < 0)    msg = "Cannot check the file format!"
+              if (.not. info) msg = "File " // trim(fl) //                     &
                                                        " is not an HDF5 file!"
 
-              else ! file is HDF5
+            else ! file is HDF5
 
 ! open the HDF5 file
 !
-                call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+              call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
 
 ! quit, if file could not be opened
 !
-                if (err < 0) then
+              if (err < 0) then
 
-                  iret = 123
-                  msg = "Cannot open file: " // trim(fl)
+                iret = 123
+                msg = "Cannot open file: " // trim(fl)
 
-                else ! file is opened
+              else ! file is opened
 
 ! read data blocks
 !
-                  call read_datablocks_h5(fid)
+                call read_datablocks_h5(fid)
 
 ! close the file
 !
-                  call h5fclose_f(fid, err)
+                call h5fclose_f(fid, err)
 
 ! quit, if file could not be closed
 !
-                  if (err > 0) then
-                    iret = 124
-                    msg  = "Cannot close file: " // trim(fl)
-                  end if
-                end if ! file is opened
-              end if ! file is HDF5
-            end if ! file exists
-          end if ! nproc == npmax
-
-#ifdef MPI
-! redistribute blocks between processors
-!
-          call redistribute_blocks()
-#endif /* MPI */
-
-        end do ! lfile = nprocs, nfiles - 1
-
-      else ! nprocs < nfiles
+                if (err > 0) then
+                  iret = 124
+                  msg  = "Cannot close file: " // trim(fl)
+                end if
+              end if ! file is opened
+            end if ! file is HDF5
+          end if ! file exists
+        end if ! nproc == npmax
 
 #ifdef MPI
 ! redistribute blocks between processors
@@ -950,24 +959,21 @@ module io
         call redistribute_blocks()
 #endif /* MPI */
 
-      end if ! nprocs < nfiles
+      end do ! lfile = nprocs, nfiles - 1
+
+    else ! nprocs < nfiles
+
+#ifdef MPI
+! redistribute blocks between processors
+!
+      call redistribute_blocks()
+#endif /* MPI */
+
+    end if ! nprocs < nfiles
 
 ! deallocate the array of block pointers
 !
-      if (allocated(block_array)) deallocate(block_array)
-
-! close the FORTRAN interface
-!
-      call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-      if (err > 0) then
-          iret = 120
-          msg  = "Cannot close the HDF5 Fortran interface!"
-      end if
-
-    end if ! the FORTRAN interface
+    if (allocated(block_array)) deallocate(block_array)
 
 ! if there was any problem, print the message
 !
@@ -999,8 +1005,7 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
-                              , h5fclose_f
+    use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1020,19 +1025,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! in the case of error, print a message and quit the subroutine
-!
-    if (err < 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                            , "Cannot initialize the HDF5 Fortran interface!")
-      iret = 200
-      return
-    end if
-
 ! prepare the restart snapshot filename
 !
     write (fl, "('r',i6.6,'_',i5.5,'.h5')") nrun, nproc
@@ -1046,7 +1038,6 @@ module io
     if (err < 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                                          , "Cannot create file: " // trim(fl))
-      call h5close_f(err)
       iret = 201
       return
     end if
@@ -1076,21 +1067,7 @@ module io
     if (err > 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                                           , "Cannot close file: " // trim(fl))
-      call h5close_f(err)
       iret = 203
-      return
-    end if
-
-! close the FORTRAN interface
-!
-    call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-    if (err > 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                                 , "Cannot close the HDF5 Fortran interface!")
-      iret = 204
       return
     end if
 
@@ -1116,8 +1093,7 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
-                              , h5fclose_f
+    use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1132,18 +1108,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! in the case of error, print a message and quit the subroutine
-!
-    if (err < 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                            , "Cannot initialize the HDF5 Fortran interface!")
-      return
-    end if
-
 ! prepare the restart snapshot filename
 !
     write (fl, "(a1,i6.6,'_',i5.5,'.h5')") ftype, isnap, nproc
@@ -1157,7 +1121,6 @@ module io
     if (err < 0) then
       call print_error("io::write_snapshot_h5"                                 &
                                          , "Cannot create file: " // trim(fl))
-      call h5close_f(err)
       return
     end if
 
@@ -1195,7 +1158,6 @@ module io
 !
       call print_error("io::write_snapshot_h5", "File type is not suppoerted!")
       call h5fclose_f(fid, err)
-      call h5close_f(err)
       return
 
     end select
@@ -1213,19 +1175,6 @@ module io
     if (err > 0) then
       call print_error("io::write_snapshot_h5"                                 &
                                           , "Cannot close file: " // trim(fl))
-      call h5close_f(err)
-      return
-    end if
-
-! close the FORTRAN interface
-!
-    call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-    if (err > 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                                 , "Cannot close the HDF5 Fortran interface!")
       return
     end if
 
