@@ -129,6 +129,12 @@ module io
 !
   logical           , save :: with_xdmf   = .false.
 
+#ifdef HDF5
+! compression type (0 for no compressions, 1 for deflate, 32015 for zstandard)
+!
+  integer           , save :: compression = 0
+#endif /* HDF5 */
+
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
@@ -185,6 +191,9 @@ module io
 !
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
+#ifdef HDF5
+    use hdf5           , only : h5zfilter_avail_f
+#endif /* HDF5 */
 
 ! local variables are not implicit by default
 !
@@ -200,6 +209,10 @@ module io
     character(len=255) :: ghosts = "on"
     character(len=255) :: xdmf   = "off"
     integer            :: dd, hh, mm, ss
+#ifdef HDF5
+    logical            :: status = .false.
+    integer            :: err
+#endif /* HDF5 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -252,6 +265,20 @@ module io
     case default
       with_xdmf = .true.
     end select
+
+#ifdef HDF5
+! detect available compressions
+!
+    status = .false.
+    if (.not. status) then
+      call h5zfilter_avail_f(32015, status, err)
+      if (status) compression = 32015
+    end if
+    if (.not. status) then
+      call h5zfilter_avail_f(    1, status, err)
+      if (status) compression = 1
+    end if
+#endif /* HDF5 */
 
 ! return the run number
 !
