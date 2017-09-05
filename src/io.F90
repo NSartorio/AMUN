@@ -155,7 +155,7 @@ module io
 
 ! declare public subroutines
 !
-  public :: initialize_io
+  public :: initialize_io, finalize_io
   public :: read_restart_snapshot, write_restart_snapshot, write_snapshot
   public :: restart_from_snapshot
   public :: next_tout
@@ -335,6 +335,47 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_io
+!
+!===============================================================================
+!
+! subroutine FINALIZE_IO:
+! ----------------------
+!
+!   Subroutine releases memory used by the module.
+!
+!   Arguments:
+!
+!     iret    - an integer flag for error return value;
+!
+!===============================================================================
+!
+  subroutine finalize_io(iret)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(ioi)
+#endif /* PROFILE */
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(ioi)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_io
 !
 !===============================================================================
 !
