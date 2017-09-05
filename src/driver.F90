@@ -47,7 +47,7 @@ program amun
   use integrals     , only : initialize_integrals, finalize_integrals
   use integrals     , only : store_integrals
   use interpolations, only : initialize_interpolations, finalize_interpolations
-  use io            , only : initialize_io
+  use io            , only : initialize_io, finalize_io
   use io            , only : restart_from_snapshot
   use io            , only : read_restart_snapshot, write_restart_snapshot
   use io            , only : write_snapshot, next_tout
@@ -704,6 +704,10 @@ program amun
 ! finalize integrals module
 !
   call finalize_integrals()
+
+! finalize I/O module
+!
+  call finalize_io(iret)
 
 ! finalize module PROBLEMS
 !
