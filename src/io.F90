@@ -4037,7 +4037,7 @@ module io
 
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! array dimensions
 !
