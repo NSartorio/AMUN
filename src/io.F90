@@ -33,6 +33,9 @@ module io
 ! import external subroutines
 !
   use blocks, only : pointer_meta
+#ifdef HDF5
+  use hdf5  , only : hid_t
+#endif /* HDF5 */
   use timers, only : set_timer, start_timer, stop_timer
 
 ! module variables are not implicit by default
@@ -129,6 +132,16 @@ module io
 !
   logical           , save :: with_xdmf   = .false.
 
+#ifdef HDF5
+! compression type (0 for no compressions, 1 for deflate, 32015 for zstandard)
+!
+  integer           , save :: compression = 0
+
+! HDF5 property object identifier
+!
+  integer(hid_t)    , save :: pid
+#endif /* HDF5 */
+
 ! local variables to store the number of processors and maximum level read from
 ! the restart file
 !
@@ -149,7 +162,7 @@ module io
 
 ! declare public subroutines
 !
-  public :: initialize_io
+  public :: initialize_io, finalize_io
   public :: read_restart_snapshot, write_restart_snapshot, write_snapshot
   public :: restart_from_snapshot
   public :: next_tout
@@ -183,6 +196,13 @@ module io
 
 ! import external procedures
 !
+#ifdef HDF5
+    use error          , only : print_error
+    use hdf5           , only : hsize_t
+    use hdf5           , only : H5P_DATASET_CREATE_F, H5Z_FLAG_OPTIONAL_F
+    use hdf5           , only : h5open_f, h5zfilter_avail_f, h5pcreate_f
+    use hdf5           , only : h5pset_deflate_f, h5pset_filter_f
+#endif /* HDF5 */
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
 
@@ -197,9 +217,23 @@ module io
 
 ! local variables
 !
-    character(len=255) :: ghosts = "on"
-    character(len=255) :: xdmf   = "off"
-    integer            :: dd, hh, mm, ss
+    character(len=255)    :: ghosts = "on"
+    character(len=255)    :: xdmf   = "off"
+    integer               :: dd, hh, mm, ss
+#ifdef HDF5
+    logical               :: status = .false.
+    integer               :: err
+    integer(hsize_t)      :: cd_nelmts = 1
+    integer, dimension(1) :: cd_values = 3
+
+! compression level
+!
+    integer               :: clevel    = 0
+
+! local parameters
+!
+    integer, parameter :: H5Z_DEFLATE = 1, H5Z_ZSTANDARD = 32015
+#endif /* HDF5 */
 !
 !-------------------------------------------------------------------------------
 !
@@ -253,6 +287,62 @@ module io
       with_xdmf = .true.
     end select
 
+#ifdef HDF5
+! initialize the FORTRAN interface
+!
+    call h5open_f(iret)
+
+! in the case of error, print a message and quit the subroutine
+!
+    if (iret < 0) then
+      call print_error("io::initialize_io"                                     &
+                            , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
+
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+      call print_error("io::initialize_io"                                     &
+                     , "Cannot create the compression property for datasets!")
+      return
+    end if
+
+! detect available compressions
+!
+    status = .false.
+    if (.not. status) then
+      call h5zfilter_avail_f(H5Z_ZSTANDARD, status, err)
+      if (status) compression = H5Z_ZSTANDARD
+    end if
+    if (.not. status) then
+      call h5zfilter_avail_f(H5Z_DEFLATE, status, err)
+      if (status) compression = H5Z_DEFLATE
+    end if
+
+! get compression_level
+!
+    call get_parameter_integer("compression_level", clevel)
+
+! initialize proper compressor
+!
+    select case(compression)
+    case(H5Z_ZSTANDARD)
+      if (clevel < 1 .or. clevel > 20) clevel = 3
+      cd_values(:) = clevel
+      call h5pset_filter_f(pid, H5Z_ZSTANDARD, H5Z_FLAG_OPTIONAL_F, cd_nelmts  &
+                         , cd_values, iret)
+    case(H5Z_DEFLATE)
+      if (clevel < 1 .or. clevel  > 9) clevel = 6
+      call h5pset_deflate_f(pid, clevel, iret)
+    case default
+    end select
+#endif /* HDF5 */
+
 ! return the run number
 !
     irun = max(1, nrest)
@@ -269,6 +359,18 @@ module io
       else
         write (*,"(4x,a21,2x,'=',1x,a)") "with ghosts cells    ", "off"
       end if
+#ifdef HDF5
+      select case(compression)
+      case(H5Z_ZSTANDARD)
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "zstd"
+        write (*,"(4x,a21,2x,'=',  i3)") "compression level    ", clevel
+      case(H5Z_DEFLATE)
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "deflate"
+        write (*,"(4x,a21,2x,'=',  i3)") "compression level    ", clevel
+      case default
+        write (*,"(4x,a21,2x,'=',1x,a)") "HDF5 compression     ", "none"
+      end select
+#endif /* HDF5 */
       if (with_xdmf) then
         write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "on"
       else
@@ -298,6 +400,80 @@ module io
 !-------------------------------------------------------------------------------
 !
   end subroutine initialize_io
+!
+!===============================================================================
+!
+! subroutine FINALIZE_IO:
+! ----------------------
+!
+!   Subroutine releases memory used by the module.
+!
+!   Arguments:
+!
+!     iret    - an integer flag for error return value;
+!
+!===============================================================================
+!
+  subroutine finalize_io(iret)
+
+! import external procedures
+!
+#ifdef HDF5
+    use error          , only : print_error
+    use hdf5           , only : h5pclose_f, h5close_f
+#endif /* HDF5 */
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for module initialization/finalization
+!
+    call start_timer(ioi)
+#endif /* PROFILE */
+
+#ifdef HDF5
+! close the property object for compression
+!
+    call h5pclose_f(pid, iret)
+
+! check if the object has been closed properly
+!
+    if (iret < 0) then
+      call print_error("io::finalize_io"                                       &
+                      , "Cannot close the compression property for datasets!")
+      return
+    end if
+
+! close the FORTRAN interface
+!
+    call h5close_f(iret)
+
+! check if the interface has been closed successfuly
+!
+    if (iret > 0) then
+      call print_error("io::finalize_io"                                       &
+                                 , "Cannot close the HDF5 Fortran interface!")
+      return
+    end if
+#endif /* HDF5 */
+
+#ifdef PROFILE
+! stop accounting time for module initialization/finalization
+!
+    call stop_timer(ioi)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine finalize_io
 !
 !===============================================================================
 !
@@ -591,7 +767,6 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_RDONLY_F
-    use hdf5           , only : h5open_f, h5close_f
     use hdf5           , only : h5fis_hdf5_f, h5fopen_f, h5fclose_f
 #ifdef MPI
     use mesh           , only : redistribute_blocks
@@ -619,24 +794,87 @@ module io
 !
     iret = 0
 
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! quit, if the FORTRAN interface initialization failed
-!
-    if (err < 0) then
-
-      iret = 120
-      msg  = "Cannot initialize the HDF5 Fortran interface!"
-
-    else ! the FORTRAN interface
-
 !! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
 !!
 ! prepare the filename
 !
-      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
+    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
+
+! check if the HDF5 file exists
+!
+    inquire(file = fl, exist = info)
+
+! quit, if file does not exist
+!
+    if (.not. info) then
+
+      iret = 121
+      msg  = "File " // trim(fl) // " does not exist!"
+
+    else ! file does exist
+
+! check if this file is in the HDF5 format
+!
+      call h5fis_hdf5_f(fl, info, err)
+
+! quit, if the format verification failed or file is not in HDF5 format
+!
+      if (err < 0 .or. .not. info) then
+
+        iret = 122
+        if (err < 0)    msg = "Cannot check the file format!"
+        if (.not. info) msg = "File " // trim(fl) // " is not an HDF5 file!"
+
+      else ! file is HDF5
+
+! open the HDF5 file
+!
+        call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+
+! quit, if file could not be opened
+!
+        if (err < 0) then
+
+          iret = 123
+          msg = "Cannot open file: " // trim(fl)
+
+        else ! file is opened
+
+! read global attributes
+!
+          call read_attributes_h5(fid)
+
+! read meta blocks and recreate the meta block hierarchy
+!
+          call read_metablocks_h5(fid)
+
+! close the file
+!
+          call h5fclose_f(fid, err)
+
+! quit, if file could not be closed
+!
+          if (err > 0) then
+            iret = 124
+            msg  = "Cannot close file: " // trim(fl)
+          end if
+        end if ! file is opened
+      end if ! file is HDF5
+    end if ! file does exist
+
+!! 1. RESTORE DATA BLOCKS
+!!
+! separate data blocks reading into two cases, when the number of processors is
+! larger or equal to the number of files, and when we have less processors than
+! files
+!
+! first, read data blocks to processes which have corresponding restart file
+!
+    if (nproc < nfiles) then
+
+! prepare the filename
+!
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, nproc
 
 ! check if the HDF5 file exists
 !
@@ -678,13 +916,9 @@ module io
 
           else ! file is opened
 
-! read global attributes
+! read data blocks
 !
-            call read_attributes_h5(fid)
-
-! read meta blocks and recreate the meta block hierarchy
-!
-            call read_metablocks_h5(fid)
+            call read_datablocks_h5(fid)
 
 ! close the file
 !
@@ -698,173 +932,90 @@ module io
             end if
           end if ! file is opened
         end if ! file is HDF5
-      end if ! file does exist
-
-!! 1. RESTORE DATA BLOCKS
-!!
-! separate data blocks reading into two cases, when the number of processors is
-! larger or equal to the number of files, and when we have less processors than
-! files
-!
-! first, read data blocks to processes which have corresponding restart file
-!
-      if (nproc < nfiles) then
-
-! prepare the filename
-!
-        write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, nproc
-
-! check if the HDF5 file exists
-!
-        inquire(file = fl, exist = info)
-
-! quit, if file does not exist
-!
-        if (.not. info) then
-
-          iret = 121
-          msg  = "File " // trim(fl) // " does not exist!"
-
-        else ! file does exist
-
-! check if this file is in the HDF5 format
-!
-          call h5fis_hdf5_f(fl, info, err)
-
-! quit, if the format verification failed or file is not in HDF5 format
-!
-          if (err < 0 .or. .not. info) then
-
-            iret = 122
-            if (err < 0)    msg = "Cannot check the file format!"
-            if (.not. info) msg = "File " // trim(fl) // " is not an HDF5 file!"
-
-          else ! file is HDF5
-
-! open the HDF5 file
-!
-            call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
-
-! quit, if file could not be opened
-!
-            if (err < 0) then
-
-              iret = 123
-              msg = "Cannot open file: " // trim(fl)
-
-            else ! file is opened
-
-! read data blocks
-!
-              call read_datablocks_h5(fid)
-
-! close the file
-!
-              call h5fclose_f(fid, err)
-
-! quit, if file could not be closed
-!
-              if (err > 0) then
-                iret = 124
-                msg  = "Cannot close file: " // trim(fl)
-              end if
-            end if ! file is opened
-          end if ! file is HDF5
-        end if ! file exists
-      end if ! nproc < nfiles
+      end if ! file exists
+    end if ! nproc < nfiles
 
 ! if there are more files than processes, read the remaining files by
 ! the last process and redistribute blocks after each processed file,
 ! otherwise only redistribute blocks
 !
-      if (nprocs < nfiles) then
+    if (nprocs < nfiles) then
 
 ! iterate over remaining files and read one by one to the last block
 !
-        do lfile = nprocs, nfiles - 1
+      do lfile = nprocs, nfiles - 1
 
 ! switch meta blocks from the read file to belong to the reading process
 !
-          call change_blocks_process(lfile, npmax)
+        call change_blocks_process(lfile, npmax)
 
 ! read the remaining files by the last process only
 !
-          if (nproc == npmax) then
+        if (nproc == npmax) then
 
 ! prepare the filename
 !
-            write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath)            &
-                                                                , nrest, lfile
+          write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, lfile
 
 ! check if the HDF5 file exists
 !
-            inquire(file = fl, exist = info)
+          inquire(file = fl, exist = info)
 
 ! quit, if file does not exist
 !
-            if (.not. info) then
+          if (.not. info) then
 
-              iret = 121
-              msg  = "File " // trim(fl) // " does not exist!"
+            iret = 121
+            msg  = "File " // trim(fl) // " does not exist!"
 
-            else ! file does exist
+          else ! file does exist
 
 ! check if this file is in the HDF5 format
 !
-              call h5fis_hdf5_f(fl, info, err)
+            call h5fis_hdf5_f(fl, info, err)
 
 ! quit, if the format verification failed or file is not in HDF5 format
 !
-              if (err < 0 .or. .not. info) then
+            if (err < 0 .or. .not. info) then
 
-                iret = 122
-                if (err < 0)    msg = "Cannot check the file format!"
-                if (.not. info) msg = "File " // trim(fl) //                   &
+              iret = 122
+              if (err < 0)    msg = "Cannot check the file format!"
+              if (.not. info) msg = "File " // trim(fl) //                     &
                                                        " is not an HDF5 file!"
 
-              else ! file is HDF5
+            else ! file is HDF5
 
 ! open the HDF5 file
 !
-                call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
+              call h5fopen_f(fl, H5F_ACC_RDONLY_F, fid, err)
 
 ! quit, if file could not be opened
 !
-                if (err < 0) then
+              if (err < 0) then
 
-                  iret = 123
-                  msg = "Cannot open file: " // trim(fl)
+                iret = 123
+                msg = "Cannot open file: " // trim(fl)
 
-                else ! file is opened
+              else ! file is opened
 
 ! read data blocks
 !
-                  call read_datablocks_h5(fid)
+                call read_datablocks_h5(fid)
 
 ! close the file
 !
-                  call h5fclose_f(fid, err)
+                call h5fclose_f(fid, err)
 
 ! quit, if file could not be closed
 !
-                  if (err > 0) then
-                    iret = 124
-                    msg  = "Cannot close file: " // trim(fl)
-                  end if
-                end if ! file is opened
-              end if ! file is HDF5
-            end if ! file exists
-          end if ! nproc == npmax
-
-#ifdef MPI
-! redistribute blocks between processors
-!
-          call redistribute_blocks()
-#endif /* MPI */
-
-        end do ! lfile = nprocs, nfiles - 1
-
-      else ! nprocs < nfiles
+                if (err > 0) then
+                  iret = 124
+                  msg  = "Cannot close file: " // trim(fl)
+                end if
+              end if ! file is opened
+            end if ! file is HDF5
+          end if ! file exists
+        end if ! nproc == npmax
 
 #ifdef MPI
 ! redistribute blocks between processors
@@ -872,24 +1023,21 @@ module io
         call redistribute_blocks()
 #endif /* MPI */
 
-      end if ! nprocs < nfiles
+      end do ! lfile = nprocs, nfiles - 1
+
+    else ! nprocs < nfiles
+
+#ifdef MPI
+! redistribute blocks between processors
+!
+      call redistribute_blocks()
+#endif /* MPI */
+
+    end if ! nprocs < nfiles
 
 ! deallocate the array of block pointers
 !
-      if (allocated(block_array)) deallocate(block_array)
-
-! close the FORTRAN interface
-!
-      call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-      if (err > 0) then
-          iret = 120
-          msg  = "Cannot close the HDF5 Fortran interface!"
-      end if
-
-    end if ! the FORTRAN interface
+    if (allocated(block_array)) deallocate(block_array)
 
 ! if there was any problem, print the message
 !
@@ -921,8 +1069,7 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
-                              , h5fclose_f
+    use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -942,19 +1089,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! in the case of error, print a message and quit the subroutine
-!
-    if (err < 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                            , "Cannot initialize the HDF5 Fortran interface!")
-      iret = 200
-      return
-    end if
-
 ! prepare the restart snapshot filename
 !
     write (fl, "('r',i6.6,'_',i5.5,'.h5')") nrun, nproc
@@ -968,7 +1102,6 @@ module io
     if (err < 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                                          , "Cannot create file: " // trim(fl))
-      call h5close_f(err)
       iret = 201
       return
     end if
@@ -998,21 +1131,7 @@ module io
     if (err > 0) then
       call print_error("io::write_restart_snapshot_h5"                         &
                                           , "Cannot close file: " // trim(fl))
-      call h5close_f(err)
       iret = 203
-      return
-    end if
-
-! close the FORTRAN interface
-!
-    call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-    if (err > 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                                 , "Cannot close the HDF5 Fortran interface!")
-      iret = 204
       return
     end if
 
@@ -1038,8 +1157,7 @@ module io
     use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
-    use hdf5           , only : h5open_f, h5close_f, h5fcreate_f, h5fflush_f   &
-                              , h5fclose_f
+    use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1054,18 +1172,6 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
-! initialize the FORTRAN interface
-!
-    call h5open_f(err)
-
-! in the case of error, print a message and quit the subroutine
-!
-    if (err < 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                            , "Cannot initialize the HDF5 Fortran interface!")
-      return
-    end if
-
 ! prepare the restart snapshot filename
 !
     write (fl, "(a1,i6.6,'_',i5.5,'.h5')") ftype, isnap, nproc
@@ -1079,7 +1185,6 @@ module io
     if (err < 0) then
       call print_error("io::write_snapshot_h5"                                 &
                                          , "Cannot create file: " // trim(fl))
-      call h5close_f(err)
       return
     end if
 
@@ -1117,7 +1222,6 @@ module io
 !
       call print_error("io::write_snapshot_h5", "File type is not suppoerted!")
       call h5fclose_f(fid, err)
-      call h5close_f(err)
       return
 
     end select
@@ -1135,19 +1239,6 @@ module io
     if (err > 0) then
       call print_error("io::write_snapshot_h5"                                 &
                                           , "Cannot close file: " // trim(fl))
-      call h5close_f(err)
-      return
-    end if
-
-! close the FORTRAN interface
-!
-    call h5close_f(err)
-
-! check if the interface has been closed successfuly
-!
-    if (err > 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                                 , "Cannot close the HDF5 Fortran interface!")
       return
     end if
 
@@ -3965,24 +4056,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -3995,15 +4072,9 @@ module io
     integer(hsize_t)              , intent(in) :: ln
     integer(kind=4) , dimension(:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! array dimensions
 !
@@ -4041,30 +4112,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 1, dm(1:1), iret)
@@ -4077,55 +4124,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4208,24 +4211,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -4238,15 +4227,9 @@ module io
     integer(hsize_t), dimension(2)  , intent(in) :: dm
     integer(kind=4) , dimension(:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4276,30 +4259,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 2, dm(1:2), iret)
@@ -4312,56 +4271,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:2)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4444,24 +4358,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -4474,15 +4374,9 @@ module io
     integer(hsize_t), dimension(3)    , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4512,30 +4406,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 3, dm(1:3), iret)
@@ -4548,56 +4418,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:3)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4680,24 +4505,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -4710,15 +4521,9 @@ module io
     integer(hsize_t), dimension(4)      , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4748,30 +4553,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 4, dm(1:4), iret)
@@ -4784,56 +4565,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:4)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4916,24 +4652,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -4946,15 +4668,9 @@ module io
     integer(hsize_t), dimension(5)        , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -4984,30 +4700,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 5, dm(1:5), iret)
@@ -5020,56 +4712,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:5)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5153,24 +4800,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -5183,15 +4816,9 @@ module io
     integer(hsize_t)              , intent(in) :: ln
     real(kind=8)    , dimension(:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! array dimensions
 !
@@ -5229,30 +4856,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 1, dm(1:1), iret)
@@ -5265,55 +4868,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (dm >= 32) call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5396,24 +4955,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -5426,15 +4971,9 @@ module io
     integer(hsize_t), dimension(2)  , intent(in) :: dm
     real(kind=8)    , dimension(:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5464,30 +5003,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 2, dm(1:2), iret)
@@ -5500,56 +5015,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:2)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5632,24 +5102,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -5662,15 +5118,9 @@ module io
     integer(hsize_t), dimension(3)    , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5700,30 +5150,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 3, dm(1:3), iret)
@@ -5736,56 +5162,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:3)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5868,24 +5249,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -5898,15 +5265,9 @@ module io
     integer(hsize_t), dimension(4)      , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -5936,30 +5297,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 4, dm(1:4), iret)
@@ -5972,56 +5309,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:4)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -6104,24 +5396,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
-#ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
-#ifdef SZIP
-    use hdf5           , only : H5_SZIP_NN_OM_F
-#endif /* SZIP */
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
-    use hdf5           , only : h5pcreate_f, h5pset_chunk_f, h5pclose_f
-#ifdef DEFLATE
-    use hdf5           , only : h5pset_deflate_f
-#endif /* DEFLATE */
-#ifdef SZIP
-    use hdf5           , only : h5pset_szip_f
-#endif /* SZIP */
-#endif /* COMPRESS */
+    use hdf5           , only : h5pset_chunk_f
 
 ! local variables are not implicit by default
 !
@@ -6134,15 +5412,9 @@ module io
     integer(hsize_t), dimension(5)        , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:,:,:), intent(in) :: var
 
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
-
 ! HDF5 object identifiers
 !
-    integer(hid_t) :: sid, pid, did
+    integer(hid_t) :: sid, did
 
 ! procedure return value
 !
@@ -6172,30 +5444,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 5, dm(1:5), iret)
@@ -6208,56 +5456,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
-
-! set the compression algorithm
-!
-#ifdef DEFLATE
-    call h5pset_deflate_f(pid, 9, iret)
-#endif /* DEFLATE */
-#ifdef SZIP
-    if (product(dm(1:5)) >= 32)                                                &
-                            call h5pset_szip_f(pid, H5_SZIP_NN_OM_F, 32, iret)
-#endif /* SZIP */
-
-! check if the compression algorithm has been set properly
-!
-    if (iret > 0) then
-
-! print error about the problem with setting the compression method
-!
-      call print_warning(fname, "Cannot set the compression method!")
-
-! setting compression method failed, so turn off the compression
-!
-      compress = .false.
-
-    end if
-
-! check if it is safe to use compression
-!
-    if (compress) then
 
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !

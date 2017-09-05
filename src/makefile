@@ -61,12 +61,6 @@ FFLAGS  += ${CPPPREFIX}-DNDIMS=${NDIMS}
 #
 FFLAGS  += ${CPPPREFIX}-D${OUTPUT}
 
-# compression
-#
-ifneq ($(COMPRESS),NONE)
-FFLAGS  += ${CPPPREFIX}-DCOMPRESS ${CPPPREFIX}-D${COMPRESS}
-endif
-
 #-------------------------------------------------------------------------------
 
 .SUFFIXES:
