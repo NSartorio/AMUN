@@ -198,7 +198,8 @@ module io
 !
 #ifdef HDF5
     use error          , only : print_error
-    use hdf5           , only : h5open_f, h5zfilter_avail_f
+    use hdf5           , only : H5P_DATASET_CREATE_F
+    use hdf5           , only : h5open_f, h5zfilter_avail_f, h5pcreate_f
 #endif /* HDF5 */
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
@@ -284,6 +285,18 @@ module io
     if (iret < 0) then
       call print_error("io::initialize_io"                                     &
                             , "Cannot initialize the HDF5 Fortran interface!")
+      return
+    end if
+
+! prepare the property object for compression
+!
+    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
+
+! check if the object has been created properly, if not quit
+!
+    if (iret < 0) then
+      call print_error("io::initialize_io"                                     &
+                     , "Cannot create the compression property for datasets!")
       return
     end if
 
@@ -375,7 +388,7 @@ module io
 !
 #ifdef HDF5
     use error          , only : print_error
-    use hdf5           , only : h5close_f
+    use hdf5           , only : h5pclose_f, h5close_f
 #endif /* HDF5 */
 
 ! local variables are not implicit by default
@@ -395,6 +408,18 @@ module io
 #endif /* PROFILE */
 
 #ifdef HDF5
+! close the property object for compression
+!
+    call h5pclose_f(pid, iret)
+
+! check if the object has been closed properly
+!
+    if (iret < 0) then
+      call print_error("io::finalize_io"                                       &
+                      , "Cannot close the compression property for datasets!")
+      return
+    end if
+
 ! close the FORTRAN interface
 !
     call h5close_f(iret)
@@ -4000,7 +4025,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -4076,25 +4100,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -4243,7 +4248,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -4311,25 +4315,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -4479,7 +4464,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -4547,25 +4531,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -4715,7 +4680,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -4783,25 +4747,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -4951,7 +4896,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -5019,25 +4963,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -5188,7 +5113,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -5264,25 +5188,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -5431,7 +5336,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -5499,25 +5403,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -5667,7 +5552,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -5735,25 +5619,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -5903,7 +5768,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -5971,25 +5835,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
@@ -6139,7 +5984,6 @@ module io
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
 #ifdef COMPRESS
-    use hdf5           , only : H5P_DATASET_CREATE_F
 #ifdef SZIP
     use hdf5           , only : H5_SZIP_NN_OM_F
 #endif /* SZIP */
@@ -6207,25 +6051,6 @@ module io
     end if
 
 #ifdef COMPRESS
-! prepare the property object for compression
-!
-    call h5pcreate_f(H5P_DATASET_CREATE_F, pid, iret)
-
-! check if the object has been created properly, if not quit
-!
-    if (iret < 0) then
-
-! print error about the problem with creating the compression property
-!
-      call print_error(fname, "Cannot create property for dataset: "           &
-                                                                // trim(name))
-
-! quit the subroutine
-!
-      return
-
-    end if
-
 ! so far ok, so turn on the compression
 !
     compress = .true.
