@@ -332,11 +332,12 @@ module io
 !
     select case(compression)
     case(H5Z_ZSTANDARD)
-      if (clevel >= 1 .and. clevel <= 20) cd_values(:) = clevel
+      if (clevel < 1 .or. clevel > 20) clevel = 3
+      cd_values(:) = clevel
       call h5pset_filter_f(pid, H5Z_ZSTANDARD, H5Z_FLAG_OPTIONAL_F, cd_nelmts  &
                          , cd_values, iret)
     case(H5Z_DEFLATE)
-      if (clevel < 1 .or. clevel > 9) clevel = 9
+      if (clevel < 1 .or. clevel  > 9) clevel = 6
       call h5pset_deflate_f(pid, clevel, iret)
     case default
     end select
