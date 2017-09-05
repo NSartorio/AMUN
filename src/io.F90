@@ -4058,9 +4058,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4072,12 +4070,6 @@ module io
     character(len=*)              , intent(in) :: name
     integer(hsize_t)              , intent(in) :: ln
     integer(kind=4) , dimension(:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -4119,11 +4111,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 1, dm(1:1), iret)
@@ -4136,32 +4123,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4247,9 +4213,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4261,12 +4225,6 @@ module io
     character(len=*)                , intent(in) :: name
     integer(hsize_t), dimension(2)  , intent(in) :: dm
     integer(kind=4) , dimension(:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -4300,11 +4258,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 2, dm(1:2), iret)
@@ -4317,32 +4270,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4428,9 +4360,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4442,12 +4372,6 @@ module io
     character(len=*)                  , intent(in) :: name
     integer(hsize_t), dimension(3)    , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -4481,11 +4405,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 3, dm(1:3), iret)
@@ -4498,32 +4417,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4606,14 +4504,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4625,12 +4519,6 @@ module io
     character(len=*)                    , intent(in) :: name
     integer(hsize_t), dimension(4)      , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -4664,11 +4552,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 4, dm(1:4), iret)
@@ -4681,32 +4564,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4789,14 +4651,10 @@ module io
 !
     use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
-#ifdef COMPRESS
-#endif /* COMPRESS */
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4808,12 +4666,6 @@ module io
     character(len=*)                      , intent(in) :: name
     integer(hsize_t), dimension(5)        , intent(in) :: dm
     integer(kind=4) , dimension(:,:,:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -4847,11 +4699,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 5, dm(1:5), iret)
@@ -4864,32 +4711,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_INTEGER, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -4976,9 +4802,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -4990,12 +4814,6 @@ module io
     character(len=*)              , intent(in) :: name
     integer(hsize_t)              , intent(in) :: ln
     real(kind=8)    , dimension(:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -5037,11 +4855,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 1, dm(1:1), iret)
@@ -5054,32 +4867,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5165,9 +4957,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -5179,12 +4969,6 @@ module io
     character(len=*)                , intent(in) :: name
     integer(hsize_t), dimension(2)  , intent(in) :: dm
     real(kind=8)    , dimension(:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -5218,11 +5002,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 2, dm(1:2), iret)
@@ -5235,32 +5014,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5346,9 +5104,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -5360,12 +5116,6 @@ module io
     character(len=*)                  , intent(in) :: name
     integer(hsize_t), dimension(3)    , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -5399,11 +5149,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 3, dm(1:3), iret)
@@ -5416,32 +5161,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5527,9 +5251,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -5541,12 +5263,6 @@ module io
     character(len=*)                    , intent(in) :: name
     integer(hsize_t), dimension(4)      , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -5580,11 +5296,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 4, dm(1:4), iret)
@@ -5597,32 +5308,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
@@ -5708,9 +5398,7 @@ module io
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
-#ifdef COMPRESS
     use hdf5           , only : h5pset_chunk_f
-#endif /* COMPRESS */
 
 ! local variables are not implicit by default
 !
@@ -5722,12 +5410,6 @@ module io
     character(len=*)                      , intent(in) :: name
     integer(hsize_t), dimension(5)        , intent(in) :: dm
     real(kind=8)    , dimension(:,:,:,:,:), intent(in) :: var
-
-#ifdef COMPRESS
-! test for compression
-!
-    logical        :: compress = .false.
-#endif /* COMPRESS */
 
 ! HDF5 object identifiers
 !
@@ -5761,11 +5443,6 @@ module io
 
     end if
 
-#ifdef COMPRESS
-! so far ok, so turn on the compression
-!
-    compress = .true.
-
 ! set the chunk size
 !
     call h5pset_chunk_f(pid, 5, dm(1:5), iret)
@@ -5778,32 +5455,11 @@ module io
 !
       call print_warning(fname, "Cannot set the size of the chunk!")
 
-! setting the size of the chunk failed, so turn off the compression
-!
-      compress = .false.
-
     end if
 
-! check if it is safe to use compression
-!
-    if (compress) then
-
 ! create the dataset
 !
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
-
-    else
-
-! create the dataset
-!
-      call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-
-    end if
-#else /* COMPRESS */
-! create the dataset
-!
-    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret)
-#endif /* COMPRESS */
+    call h5dcreate_f(gid, name, H5T_NATIVE_DOUBLE, sid, did, iret, pid)
 
 ! check if the dataset has been created successfuly
 !
