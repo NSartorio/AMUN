@@ -1269,7 +1269,7 @@ module io
     use coordinates    , only : minlev, maxlev, toplev
     use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use equations      , only : eqsys, eos
+    use equations      , only : eqsys, eos, gamma, csnd
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
@@ -1352,6 +1352,12 @@ module io
     call write_attribute(gid, 'time', time)
     call write_attribute(gid, 'dt'  , dt  )
     call write_attribute(gid, 'dtn' , dtn )
+    if (eos == 'adi') then
+      call write_attribute(gid, 'gamma', gamma)
+    end if
+    if (eos == 'iso') then
+      call write_attribute(gid, 'csnd' , csnd )
+    end if
 
 ! store the vector attributes
 !
