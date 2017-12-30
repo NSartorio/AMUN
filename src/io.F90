@@ -1274,7 +1274,7 @@ module io
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
-    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : nprocs, nproc, periodic
     use random         , only : nseeds, get_seeds
 
 ! local variables are not implicit by default
@@ -1289,6 +1289,10 @@ module io
 !
     integer(hid_t)                :: gid
     integer                       :: err
+
+! local vectors
+!
+    integer, dimension(3)         :: per
 
 ! local allocatable arrays
 !
@@ -1318,6 +1322,10 @@ module io
 
     end if
 
+! convert periodic(:) to an integer vector
+!
+    per(:) = merge(1, 0, periodic(:))
+
 ! store string attributes
 !
     call write_attribute(gid, 'eqsys'  , eqsys        )
@@ -1325,21 +1333,22 @@ module io
 
 ! store the integer attributes
 !
-    call write_attribute(gid, 'ndims'  , NDIMS        )
-    call write_attribute(gid, 'last_id', get_last_id())
-    call write_attribute(gid, 'mblocks', get_mblocks())
-    call write_attribute(gid, 'dblocks', get_dblocks())
-    call write_attribute(gid, 'nleafs' , get_nleafs() )
-    call write_attribute(gid, 'ncells' , nc           )
-    call write_attribute(gid, 'nghosts', ng           )
-    call write_attribute(gid, 'minlev' , minlev       )
-    call write_attribute(gid, 'maxlev' , maxlev       )
-    call write_attribute(gid, 'toplev' , toplev       )
-    call write_attribute(gid, 'nprocs' , nprocs       )
-    call write_attribute(gid, 'nproc'  , nproc        )
-    call write_attribute(gid, 'nseeds' , nseeds       )
-    call write_attribute(gid, 'step'   , step         )
-    call write_attribute(gid, 'isnap'  , isnap        )
+    call write_attribute(gid, 'ndims'   , NDIMS        )
+    call write_attribute(gid, 'last_id' , get_last_id())
+    call write_attribute(gid, 'mblocks' , get_mblocks())
+    call write_attribute(gid, 'dblocks' , get_dblocks())
+    call write_attribute(gid, 'nleafs'  , get_nleafs() )
+    call write_attribute(gid, 'ncells'  , nc           )
+    call write_attribute(gid, 'nghosts' , ng           )
+    call write_attribute(gid, 'minlev'  , minlev       )
+    call write_attribute(gid, 'maxlev'  , maxlev       )
+    call write_attribute(gid, 'toplev'  , toplev       )
+    call write_attribute(gid, 'nprocs'  , nprocs       )
+    call write_attribute(gid, 'nproc'   , nproc        )
+    call write_attribute(gid, 'nseeds'  , nseeds       )
+    call write_attribute(gid, 'step'    , step         )
+    call write_attribute(gid, 'isnap'   , isnap        )
+    call write_attribute(gid, 'periodic', per(:)       )
 
 ! store the real attributes
 !
