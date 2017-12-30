@@ -1296,6 +1296,10 @@ module io
 !
 !-------------------------------------------------------------------------------
 !
+! store the code name in order to determine the format of data
+!
+    call write_attribute(fid, 'code'   , 'AMUN'       )
+
 ! create a group to store the global attributes
 !
     call h5gcreate_f(fid, 'attributes', gid, err)
