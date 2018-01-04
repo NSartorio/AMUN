@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 # **The AMUN Code**
-## Copyright (C) 2008-2017 Grzegorz Kowal ##
+## Copyright (C) 2008-2018 Grzegorz Kowal ##
 --------------------------------------------------------------------------------
 
 AMUN is a parallel code to perform numerical simulations in fluid approximation
