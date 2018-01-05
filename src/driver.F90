@@ -122,7 +122,7 @@ program amun
   character(len=80)     :: fmt, tmp
 
   real(kind=8)          :: tbeg, thrs
-  real(kind=8)          :: tm_curr, tm_exec, tm_conv
+  real(kind=8)          :: tm_curr, tm_exec, tm_conv, tm_last = 0.0d+00
 
 #ifdef INTEL
 ! the type of the function SIGNAL should be defined for Intel compiler
@@ -642,30 +642,36 @@ program amun
 !
     if (thrs > trun) iterm = 100
 
-! print progress info to console
+! print progress info to console, but not too often
 !
     if (master) then
+      if (time >= tmax .or. (tm_curr - tm_last) >= 1.0d+00) then
 
 ! calculate days, hours, seconds
 !
-      ec   = int(tm_curr * (tmax - time) / max(1.0d-08, time - tbeg), kind = 4)
-      es   = max(0, int(mod(ec, 60)))
-      em   = int(mod(ec / 60, 60))
-      eh   = int(ec / 3600)
-      ed   = int(eh / 24)
-      eh   = int(mod(eh, 24))
-      ed   = min(9999,ed)
+        ec   = int(tm_curr * (tmax - time) / max(1.0d-08, time - tbeg), kind = 4)
+        es   = max(0, int(mod(ec, 60)))
+        em   = int(mod(ec / 60, 60))
+        eh   = int(ec / 3600)
+        ed   = int(eh / 24)
+        eh   = int(mod(eh, 24))
+        ed   = min(9999,ed)
 
 #ifdef INTEL
-      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",15x,a1,$)')                                          &
+        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+                ',1i2.2,"s",15x,a1,$)')                                        &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL */
-      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",15x,a1)',advance="no")                               &
+        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+                ',1i2.2,"s",15x,a1)',advance="no")                             &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL */
 
+! update the timestamp
+!
+        tm_last = tm_curr
+
+      end if
     end if
 
 ! prepare iterm
