@@ -1680,6 +1680,14 @@ module problems
 !     pdata - pointer to the datablock structure of the currently initialized
 !             block;
 !
+!   References:
+!
+!     [1] Almgren, A. S. et al.,
+!         "CASTRO: A New Compressible Astrophysical Solver.
+!          I. Hydrodynamics and Self-Gravity",
+!         The Astrophysical Journal, 2010, vol. 715, pp. 1221-1238,
+!         http://dx.doi.org/10.1088/0004-637X/715/2/1221
+!
 !===============================================================================
 !
   subroutine setup_problem_rayleigh_taylor(pdata)
@@ -1687,9 +1695,10 @@ module problems
 ! include external procedures and variables
 !
     use blocks     , only : block_data
-    use constants  , only : d2r
+    use constants  , only : pi2, d2r
+    use coordinates, only : xmin, xlen
     use coordinates, only : im, jm, km
-    use coordinates, only : ay, ady
+    use coordinates, only : ax, ay, ady
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
@@ -1707,12 +1716,16 @@ module problems
 
 ! default parameter values
 !
-    real(kind=8), save :: ycut   =  0.00d-00
     real(kind=8), save :: dens   =  1.00d+00
     real(kind=8), save :: drat   =  2.00d+00
-    real(kind=8), save :: pres   =  2.50d+00
-    real(kind=8), save :: vper   =  1.00d-02
-    real(kind=8), save :: gacc   = -1.00d-01
+    real(kind=8), save :: damp   =  5.00d-01
+    real(kind=8), save :: pres   =  5.00d+00
+    real(kind=8), save :: ycut   =  0.00d+00
+    real(kind=8), save :: vper   =  0.00d+00
+    real(kind=8), save :: lper   =  1.00d-02
+    real(kind=8), save :: kper   =  1.00d+00
+    real(kind=8), save :: hdel   =  5.00d-03
+    real(kind=8), save :: gacc   = -1.00d+00
     real(kind=8), save :: buni   =  1.00d+00
     real(kind=8), save :: bgui   =  0.00d+00
     real(kind=8), save :: angle  =  0.00d+00
@@ -1729,9 +1742,8 @@ module problems
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(im)    :: x, yp
     real(kind=8), dimension(jm)    :: y
-    real(kind=8), dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -1751,11 +1763,18 @@ module problems
       call get_parameter_real("dens"  , dens  )
       call get_parameter_real("drat"  , drat  )
       call get_parameter_real("pres"  , pres  )
+      call get_parameter_real("lper"  , lper  )
+      call get_parameter_real("kper"  , kper  )
       call get_parameter_real("vper"  , vper  )
+      call get_parameter_real("hdel"  , hdel  )
       call get_parameter_real("gacc"  , gacc  )
       call get_parameter_real("buni"  , buni  )
       call get_parameter_real("bgui"  , bgui  )
       call get_parameter_real("angle" , angle )
+
+! calculate the density change across the interface
+!
+      damp = 5.0d-01 * (drat * dens - dens)
 
 ! reset the first execution flag
 !
@@ -1765,6 +1784,7 @@ module problems
 
 ! prepare block coordinates
 !
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
 ! set the ambient density and pressure
@@ -1791,6 +1811,10 @@ module problems
 
     end if
 
+! prepare density perturbation
+!
+    yp(1:im) = lper * cos(pi2 * kper * (x(1:im) - xmin) / xlen) + ycut
+
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
@@ -1804,6 +1828,7 @@ module problems
           else
             q(idn,1:im) = dens * drat
           end if
+          q(idn,1:im) = dens + damp * (1.0d+00 + tanh((y(j) - yp(1:im)) / hdel))
           q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
         else
           if (y(j) <= ycut) then
@@ -1821,9 +1846,11 @@ module problems
 
 ! add a random seed velocity component
 !
-        do i = 1, im
-          q(ivy,i) = q(ivy,i) + vper * randomn()
-        end do
+        if (vper /= 0.0d+00) then
+          do i = 1, im
+            q(ivy,i) = q(ivy,i) + vper * randomn()
+          end do
+        end if
 
 ! convert the primitive variables to conservative ones
 !

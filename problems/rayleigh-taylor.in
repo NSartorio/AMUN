@@ -1,7 +1,7 @@
 # problem name and parameters
 #
-problem              = "rt"
-gamma                = 1.4
+problem              = "rayleigh-taylor"
+gamma                = 1.4d+00
 
 # random number generator parameters
 #
@@ -24,20 +24,20 @@ fix_positivity       = "off"
 # mesh parameters
 #
 xblocks              =  1
-yblocks              =  3
+yblocks              =  2
 xmin                 = -2.5d-01
 xmax                 =  2.5d-01
-ymin                 = -7.5d-01
-ymax                 =  7.5d-01
-zmin                 = -5.0d-01
-zmax                 =  5.0d-01
+ymin                 = -5.0d-01
+ymax                 =  5.0d-01
 
 # refinement control
 #
 ncells               = 16
-nghosts              =  4
+nghosts              =  2
 minlev               =  1
-maxlev               =  6
+maxlev               =  5
+crefmin              =  1.0d-02
+crefmax              =  1.0d-01
 
 # boundary conditions
 #
@@ -50,7 +50,7 @@ zubndry              = "periodic"
 
 # runtime control parameters
 #
-tmax                 = 1.0d+01
+tmax                 = 3.0d+00
 cfl                  = 3.0d-01
 
 # data output control
@@ -60,4 +60,3 @@ snapshot_type        = "p"
 snapshot_interval    = 1.0d-01
 restart_number       = -1
 integrals_interval   = 10
-generate_xdmf        = "on"

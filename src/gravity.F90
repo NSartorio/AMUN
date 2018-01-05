@@ -289,7 +289,7 @@ module gravity
 ! gravitational acceleration constant
 !
     logical     , save :: first      = .true.
-    real(kind=8), save :: gacc_const = -1.0d-01
+    real(kind=8), save :: gacc_const = -1.0d+00
 !
 !-------------------------------------------------------------------------------
 !
