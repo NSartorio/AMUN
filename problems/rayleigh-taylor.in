@@ -43,8 +43,8 @@ crefmax              =  1.0d-01
 #
 xlbndry              = "periodic"
 xubndry              = "periodic"
-ylbndry              = "reflecting"
-yubndry              = "reflecting"
+ylbndry              = "hydrostatic"
+yubndry              = "hydrostatic"
 zlbndry              = "periodic"
 zubndry              = "periodic"
 
