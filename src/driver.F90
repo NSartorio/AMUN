@@ -584,15 +584,15 @@ program amun
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
-#if defined INTEL || defined PATHSCALE
+#ifdef INTEL
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* INTEL | PATHSCALE */
+#else /* INTEL */
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* INTEL | PATHSCALE */
+#endif /* INTEL */
 
   end if
 
@@ -656,15 +656,15 @@ program amun
       eh   = int(mod(eh, 24))
       ed   = min(9999,ed)
 
-#if defined INTEL || defined PATHSCALE
+#ifdef INTEL
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1,$)')                                          &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* INTEL | PATHSCALE */
+#else /* INTEL */
       write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
               ',1i2.2,"s",15x,a1)',advance="no")                               &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* INTEL | PATHSCALE */
+#endif /* INTEL */
 
     end if
 
