@@ -79,6 +79,10 @@ module interpolations
 !
   real(kind=8), save :: sgp        = 9.0d+00
 
+! PPM constant
+!
+  real(kind=8), save :: ppm_const  = 1.25d+00
+
 ! Gaussian process reconstruction coefficients vector
 !
   real(kind=8), dimension(:)    , allocatable, save :: cgp
@@ -179,6 +183,7 @@ module interpolations
     call get_parameter_real   ("limo3_rad"           , rad            )
     call get_parameter_real   ("kappa"               , kappa          )
     call get_parameter_real   ("kbeta"               , kbeta          )
+    call get_parameter_real   ("ppm_const"           , ppm_const      )
     call get_parameter_real   ("cfl"                 , cfl            )
 
 ! calculate κ = (1 - ν) / ν
@@ -215,6 +220,13 @@ module interpolations
                   call print_warning("interpolations:initialize_interpolation" &
                          , "Increase the number of ghost cells (at least 2).")
       eps = max(1.0d-12, eps)
+    case ("ppm", "PPM")
+      name_rec           =  "3rd order PPM"
+      interfaces         => interfaces_dir
+      reconstruct_states => reconstruct_ppm
+      if (verbose .and. ng < 4)                                                &
+                  call print_warning("interpolations:initialize_interpolation" &
+                         , "Increase the number of ghost cells (at least 4).")
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       interfaces         => interfaces_dir
@@ -1645,6 +1657,200 @@ module interpolations
 !-------------------------------------------------------------------------------
 !
   end subroutine reconstruct_limo3
+!
+!===============================================================================
+!
+! subroutine RECONSTRUCT_PPM:
+! --------------------------
+!
+!   Subroutine reconstructs the interface states using the third order
+!   Piecewise Parabolic Method (PPM) with new limiters. This version lacks
+!   the support for flattening important for keeping the spurious oscillations
+!   near strong shocks/discontinuties under control.
+!
+!   Arguments are described in subroutine reconstruct().
+!
+!   References:
+!
+!     [1] Colella, P., Woodward, P. R.,
+!         "The Piecewise Parabolic Method (PPM) for Gas-Dynamical Simulations",
+!         Journal of Computational Physics, 1984, vol. 54, pp. 174-201,
+!         https://dx.doi.org/10.1016/0021-9991(84)90143-8
+!     [2] Colella, P., Sekora, M. D.,
+!         "A limiter for PPM that preserves accuracy at smooth extrema",
+!         Journal of Computational Physics, 2008, vol. 227, pp. 7069-7076,
+!         https://doi.org/10.1016/j.jcp.2008.03.034
+!
+!===============================================================================
+!
+  subroutine reconstruct_ppm(n, h, f, fl, fr)
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                   , intent(in)  :: n
+    real(kind=8)              , intent(in)  :: h
+    real(kind=8), dimension(n), intent(in)  :: f
+    real(kind=8), dimension(n), intent(out) :: fl, fr
+
+! local variables
+!
+    logical      :: cm, cp, ext
+    integer      :: i, im1, ip1, im2
+    real(kind=8) :: df2c, df2m, df2p, df2s, df2l
+    real(kind=8) :: dfm, dfp, dcm, dcp
+    real(kind=8) :: alm, alp, amx, sgn, del
+
+! local arrays
+!
+    real(kind=8), dimension(n) :: fi, df2
+!
+!-------------------------------------------------------------------------------
+!
+! calculate the high-order interface interpolation; eq. (16) in [2]
+!
+    fi(1  ) = 5.0d-01 * (f(1  ) + f(2  ))
+    do i = 2, n - 2
+      fi(i) = (7.0d+00 * (f(i) + f(i+1)) - (f(i-1) + f(i+2))) / 1.2d+01
+    end do
+    fi(n-1) = 5.0d-01 * (f(n-1) + f(n  ))
+    fi(n  ) = f(n)
+
+! calculate second-order central derivative
+!
+    df2(1) = 0.0d+00
+    do i = 2, n - 1
+      df2(i) = (f(i+1) + f(i-1)) - 2.0d+00 * f(i)
+    end do
+    df2(n) = 0.0d+00
+
+! limit the interpolation; eqs. (18) and (19) in [2]
+!
+    do i = 2, n - 2
+      im1 = i - 1
+      ip1 = i + 1
+
+      if ((f(ip1) - fi(i)) * (fi(i) - f(i)) < 0.0d+00) then
+        df2c = 3.0d+00 * ((f(ip1) + f(i  )) - 2.0d+00 * fi(i))
+        df2m = df2(i  )
+        df2p = df2(ip1)
+        if (min(df2c, df2m, df2p) * max(df2c, df2m, df2p) > 0.0d+00) then
+          df2l = sign(min(ppm_const * min(abs(df2m), abs(df2p)), abs(df2c)), df2c)
+        else
+          df2l = 0.0d+00
+        end if
+        fi(i) = 5.0d-01 * (f(i) + f(ip1)) - df2l / 6.0d+00
+      end if
+    end do
+
+! iterate along the vector
+!
+    do i = 2, n - 1
+      im1 = i - 1
+      ip1 = i + 1
+
+! limit states if local extremum is detected or the interpolation is not
+! monotone
+!
+      alm = fi(im1) - f(i)
+      alp = fi(i  ) - f(i)
+      cm  = abs(alm) >= 2.0d+00 * abs(alp)
+      cp  = abs(alp) >= 2.0d+00 * abs(alm)
+      ext = .false.
+
+! check if we have local extremum here
+!
+      if (alm * alp > 0.0d+00) then
+        ext = .true.
+      else if (cm .or. cp) then
+        im2 = max(1, i - 1)
+
+        dfm = fi(im1) - fi(im2)
+        dfp = fi(ip1) - fi(i  )
+        dcm = f (i  ) - f (im1)
+        dcp = f (ip1) - f (i  )
+        if (min(abs(dfm),abs(dfp)) >= min(abs(dcm),abs(dcp))) then
+          ext = dfm * dfp < 0.0d+00
+        else
+          ext = dcm * dcp < 0.0d+00
+        end if
+      end if
+
+! limit states if the local extremum is detected
+!
+      if (ext) then
+        df2s = 6.0d+00 * (alm + alp)
+        df2m = df2(im1)
+        df2c = df2(i  )
+        df2p = df2(ip1)
+        if (min(df2s, df2c, df2m, df2p)                                        &
+                      * max(df2s, df2c, df2m, df2p) > 0.0d+00) then
+          df2l = sign(min(ppm_const * min(abs(df2m), abs(df2c), abs(df2p))     &
+                                                   , abs(df2s)), df2s)
+          if (abs(df2l) > 0.0d+00) then
+            alm = alm * df2l / df2s
+            alp = alp * df2l / df2s
+          else
+            alm = 0.0d+00
+            alp = 0.0d+00
+          end if
+        else
+          alm = 0.0d+00
+          alp = 0.0d+00
+        end if
+      else
+
+! the interpolation is not monotonic so apply additional limiter
+!
+        if (cp) then
+          sgn = sign(1.0d+00, alp)
+          amx = - 2.5d-01 * alp**2 / (alp + alm)
+          dfp = f(ip1) - f(i)
+          if (sgn * amx >= sgn * dfp) then
+            del = dfp * (dfp - alm)
+            if (del >= 0.0d+00) then
+              alp = - 2.0d+00 * (dfp + sgn * sqrt(del))
+            else
+              alp = - 2.0d+00 * alm
+            end if
+          end if
+        end if
+
+        if (cm) then
+          sgn = sign(1.0d+00, alm)
+          amx = - 2.5d-01 * alm**2 / (alp + alm)
+          dfm = f(im1) - f(i)
+          if (sgn * amx >= sgn * dfm) then
+            del = dfm * (dfm - alp)
+            if (del >= 0.0d+00) then
+              alm = - 2.0d+00 * (dfm + sgn * sqrt(del))
+            else
+              alm = - 2.0d+00 * alp
+            end if
+          end if
+        end if
+      end if
+
+! update the states
+!
+      fr(im1) = f(i) + alm
+      fl(i  ) = f(i) + alp
+
+    end do ! i = 2, n
+
+! update the interpolation of the first and last points
+!
+    fl(1  ) = fi(1)
+    fr(n-1) = fi(n)
+    fl(n  ) = fi(n)
+    fr(n  ) = f (n)
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine reconstruct_ppm
 !
 !===============================================================================
 !
