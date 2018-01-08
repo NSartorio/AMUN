@@ -1696,7 +1696,7 @@ module problems
 !
     use blocks     , only : block_data
     use constants  , only : pi2, d2r
-    use coordinates, only : xmin, xlen
+    use coordinates, only : xmin, xmax, xlen
     use coordinates, only : im, jm, km
     use coordinates, only : ax, ay, ady
     use equations  , only : prim2cons
@@ -1813,7 +1813,8 @@ module problems
 
 ! prepare density perturbation
 !
-    yp(1:im) = lper * cos(pi2 * kper * (x(1:im) - xmin) / xlen) + ycut
+    yp(1:im) = 0.5d+00 * lper * (cos(pi2 * kper * (x(1:im) - xmin) / xlen)     &
+                               + cos(pi2 * kper * (xmax - x(1:im)) / xlen)) + ycut
 
 ! iterate over all positions in the YZ plane
 !
