@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 # **The AMUN Code**
-## Copyright (C) 2008-2017 Grzegorz Kowal ##
+## Copyright (C) 2008-2018 Grzegorz Kowal ##
 --------------------------------------------------------------------------------
 
 AMUN is a parallel code to perform numerical simulations in fluid approximation
@@ -65,8 +65,9 @@ the HDF5 libraries have been installed.
 
 Compilation
 ===========
-1. Clone or unpack the code sources downloaded from
-   [Bitbucket](git@bitbucket.org:amunteam/amun-code.git).
+1. Clone the AMUN source code: `git clone https://bitbucket.org/amunteam/amun-code.git`,
+   or unpack the archive downloaded from page
+   [Downloads](https://bitbucket.org/amunteam/amun-code/downloads/).
 2. Go to directory **hosts/** and copy file **default** to a new file named
    exactly as your host name (name returned by command `hostname`).
 3. Customize your compiler and compilation options in your new host file.

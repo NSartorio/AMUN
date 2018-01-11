@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2018 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ program amun
   character(len=80)     :: fmt, tmp
 
   real(kind=8)          :: tbeg, thrs
-  real(kind=8)          :: tm_curr, tm_exec, tm_conv
+  real(kind=8)          :: tm_curr, tm_exec, tm_conv, tm_last = 0.0d+00
 
 #ifdef INTEL
 ! the type of the function SIGNAL should be defined for Intel compiler
@@ -203,7 +203,7 @@ program amun
     write (*,"(1x,78('-'))")
     write (*,"(1x,18('='),17x,a,17x,19('='))") 'A M U N'
     write (*,"(1x,16('='),4x,a,4x,16('='))")                                   &
-                                        'Copyright (C) 2008-2017 Grzegorz Kowal'
+                                        'Copyright (C) 2008-2018 Grzegorz Kowal'
     write (*,"(1x,18('='),9x,a,9x,19('='))")                                 &
                                         'under GNU GPLv3 license'
     write (*,"(1x,78('-'))")
@@ -584,15 +584,15 @@ program amun
     write(*,"(1x,a)"   ) "Evolving the system:"
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
-#if defined INTEL || defined PATHSCALE
+#ifdef INTEL
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* INTEL | PATHSCALE */
+#else /* INTEL */
     write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* INTEL | PATHSCALE */
+#endif /* INTEL */
 
   end if
 
@@ -642,30 +642,36 @@ program amun
 !
     if (thrs > trun) iterm = 100
 
-! print progress info to console
+! print progress info to console, but not too often
 !
     if (master) then
+      if (time >= tmax .or. (tm_curr - tm_last) >= 1.0d+00) then
 
 ! calculate days, hours, seconds
 !
-      ec   = int(tm_curr * (tmax - time) / max(1.0d-08, time - tbeg), kind = 4)
-      es   = max(0, int(mod(ec, 60)))
-      em   = int(mod(ec / 60, 60))
-      eh   = int(ec / 3600)
-      ed   = int(eh / 24)
-      eh   = int(mod(eh, 24))
-      ed   = min(9999,ed)
+        ec   = int(tm_curr * (tmax - time) / max(1.0d-08, time - tbeg), kind = 4)
+        es   = max(0, int(mod(ec, 60)))
+        em   = int(mod(ec / 60, 60))
+        eh   = int(ec / 3600)
+        ed   = int(eh / 24)
+        eh   = int(mod(eh, 24))
+        ed   = min(9999,ed)
 
-#if defined INTEL || defined PATHSCALE
-      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",15x,a1,$)')                                          &
+#ifdef INTEL
+        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+                ',1i2.2,"s",15x,a1,$)')                                        &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#else /* INTEL | PATHSCALE */
-      write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //    &
-              ',1i2.2,"s",15x,a1)',advance="no")                               &
+#else /* INTEL */
+        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+                ',1i2.2,"s",15x,a1)',advance="no")                             &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
-#endif /* INTEL | PATHSCALE */
+#endif /* INTEL */
 
+! update the timestamp
+!
+        tm_last = tm_curr
+
+      end if
     end if
 
 ! prepare iterm
