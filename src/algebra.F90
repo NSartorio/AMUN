@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2018 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -130,15 +130,15 @@ module algebra
 !
           if (b(2) > 0.0d+00) then
             tm   = - bh - dr
-            x(1) = b(1) / tm
-            x(2) =   tm / b(3)
-          else if (b(2) < 0.0d+00) then
-            tm   = - bh + dr
             x(1) =   tm / b(3)
             x(2) = b(1) / tm
+          else if (b(2) < 0.0d+00) then
+            tm   = - bh + dr
+            x(1) = b(1) / tm
+            x(2) =   tm / b(3)
           else
-            x(1) = dr / b(3)
-            x(2) = - x(1)
+            x(2) = dr / b(3)
+            x(1) = - x(2)
           end if
 
 ! update the number of roots
@@ -303,15 +303,15 @@ module algebra
 !
         if (a(2) > 0.0d+00) then
           tm   = bh + dr
-          x(1) = - tm
-          x(2) = - a(1) / tm
-        else if (a(2) < 0.0d+00) then
-          tm   = bh - dr
           x(1) = - a(1) / tm
           x(2) = - tm
+        else if (a(2) < 0.0d+00) then
+          tm   = bh - dr
+          x(1) = - tm
+          x(2) = - a(1) / tm
         else
-          x(1) = - dr
-          x(2) =   dr
+          x(1) =   dr
+          x(2) = - dr
         end if
 
 ! update the number of roots

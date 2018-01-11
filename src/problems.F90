@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2018 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -134,6 +134,9 @@ module problems
 
     case("blast")
       setup_problem => setup_problem_blast
+
+    case("st", "sedov-taylor", "ST", "Sedov-Taylor")
+      setup_problem => setup_problem_sedov_taylor
 
     case("implosion")
       setup_problem => setup_problem_implosion
@@ -784,6 +787,470 @@ module problems
 !
 !===============================================================================
 !
+! subroutine SETUP_PROBLEM_SEDOV_TAYLOR:
+! -------------------------------------
+!
+!   Subroutine sets the initial conditions for the spherical Sedov-Taylor
+!   blast problem.
+!
+!   Arguments:
+!
+!     pdata - pointer to the datablock structure of the currently initialized
+!             block;
+!
+!   References:
+!
+!     [1] Almgren, A. S. et al.,
+!         "CASTRO: A New Compressible Astrophysical Solver.
+!          I. Hydrodynamics and Self-Gravity",
+!         The Astrophysical Journal, 2010, vol. 715, pp. 1221-1238,
+!         http://dx.doi.org/10.1088/0004-637X/715/2/1221
+!
+!===============================================================================
+!
+  subroutine setup_problem_sedov_taylor(pdata)
+
+! include external procedures and variables
+!
+    use blocks     , only : block_data
+    use constants  , only : pi, pi4, d2r
+    use coordinates, only : im, jm, km
+    use coordinates, only : ax, ay, az, adx, ady, adz, advol
+    use equations  , only : prim2cons
+    use equations  , only : gamma
+    use equations  , only : nv
+    use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
+    use error      , only : print_error
+    use parameters , only : get_parameter_real, get_parameter_integer
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input arguments
+!
+    type(block_data), pointer, intent(inout) :: pdata
+
+! default parameter values
+!
+    real(kind=8), save :: radius   = 1.00d-02
+    real(kind=8), save :: dens     = 1.00d+00
+    real(kind=8), save :: pres     = 1.00d-05
+    real(kind=8), save :: eexp     = 1.00d+00
+    real(kind=8), save :: buni     = 0.00d+00
+    real(kind=8), save :: angle    = 0.00d+00
+#if NDIMS == 3
+    integer     , save :: nsubgrid = 10
+#endif /* NDIMS == 3 */
+
+! local saved parameters
+!
+    logical     , save :: first = .true.
+    real(kind=8), save :: dn_amb, dn_ovr
+    real(kind=8), save :: pr_amb, pr_ovr
+    real(kind=8), save :: bx, by
+    real(kind=8), save :: r2
+
+! local variables
+!
+    integer       :: i, j, k, ic, jc, kc
+    real(kind=8)  :: xl, yl, zl, xu, yu, zu, rl, ru
+    real(kind=8)  :: sn
+#if NDIMS == 3
+    real(kind=8)  :: xb, yb, zb
+    real(kind=8)  :: xt, yt, zt
+    real(kind=8)  :: fc_inc
+#else /* NDIMS == 3 */
+    real(kind=8)  :: rlu, rul
+    real(kind=8)  :: xb, yb
+    real(kind=8)  :: xt, yt
+    real(kind=8)  :: ph
+#endif /* NDIMS == 3 */
+    real(kind=8)  :: dx, dy, dz, dxh, dyh, dzh, dvol
+    real(kind=8)  :: fc_amb, fc_ovr
+
+! local arrays
+!
+    real(kind=8), dimension(nv,im) :: q, u
+    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(jm)    :: y
+    real(kind=8), dimension(km)    :: z
+
+#if NDIMS == 3
+! allocatable arrays
+!
+    real(kind=8), dimension(:), allocatable :: xm, ym, zm
+    real(kind=8), dimension(:), allocatable :: xp, yp, zp
+#endif /* NDIMS == 3 */
+!
+!-------------------------------------------------------------------------------
+!
+! quit if no adiabatic equation of state
+!
+    if (ipr <= 0) then
+      call print_error("problems::setup_problem_sedov_taylor"                  &
+                           , "Only adiabatic equation of state is supported!")
+      stop
+    end if
+
+#ifdef PROFILE
+! start accounting time for the problem setup
+!
+    call start_timer(imu)
+#endif /* PROFILE */
+
+! prepare problem constants during the first subroutine call
+!
+    if (first) then
+
+! get problem parameters
+!
+      call get_parameter_real("radius", radius)
+      call get_parameter_real("dens"  , dens  )
+      call get_parameter_real("pres"  , pres  )
+      call get_parameter_real("eexp"  , eexp  )
+      call get_parameter_real("buni"  , buni  )
+      call get_parameter_real("angle" , angle )
+
+#if NDIMS == 3
+! get the fine grid resolution
+!
+      call get_parameter_integer("nsubgrid", nsubgrid)
+
+! correct subgrid resolution if necessary
+!
+      nsubgrid = max(1, nsubgrid)
+#endif /* NDIMS == 3 */
+
+! calculate the volume of the injection region
+!
+#if NDIMS == 3
+      dvol = pi4 * radius**3 / 3.0d+00
+#else /* NDIMS == 3 */
+      dvol = pi  * radius**2
+#endif /* NDIMS == 3 */
+
+! calculate the overdense and ambient region densities and pressures
+!
+      dn_amb = dens
+      dn_ovr = dn_amb
+      pr_amb = pres
+      pr_ovr = (gamma - 1.0d+00) * eexp / dvol
+
+! calculate initial uniform field components
+!
+      if (ibx > 0) then
+        sn = sin(d2r * angle)
+        bx = buni * sqrt(1.0d+00 - sn * sn)
+        by = buni * sn
+      end if
+
+! calculate the square of radius
+!
+      r2    = radius * radius
+
+! reset the first execution flag
+!
+      first = .false.
+
+    end if ! first call
+
+! prepare block coordinates
+!
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+#if NDIMS == 3
+    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+#else /* NDIMS == 3 */
+    z(1:km) = 0.0d+00
+#endif /* NDIMS == 3 */
+
+! calculate mesh intervals and areas
+!
+    dx   = adx(pdata%meta%level)
+    dy   = ady(pdata%meta%level)
+    dz   = adz(pdata%meta%level)
+    dxh  = 0.5d+00 * dx
+    dyh  = 0.5d+00 * dy
+#if NDIMS == 3
+    dzh  = 0.5d+00 * dz
+#else /* NDIMS == 3 */
+    dzh  = 1.0d+00
+#endif /* NDIMS == 3 */
+    dvol = advol(pdata%meta%level)
+
+#if NDIMS == 3
+! allocate subgrid coordinates
+!
+    allocate(xm(nsubgrid), ym(nsubgrid), zm(nsubgrid))
+    allocate(xp(nsubgrid), yp(nsubgrid), zp(nsubgrid))
+
+! and generate them
+!
+    xm(:) = (1.0d+00 * (/(i, i = 0, nsubgrid - 1)/)) / nsubgrid
+    ym(:) = xm(:)
+    zm(:) = xm(:)
+    xm(:) = xm(:) * dx
+    ym(:) = ym(:) * dy
+    zm(:) = zm(:) * dz
+    xp(:) = (1.0d+00 * (/(i, i = 1, nsubgrid    )/)) / nsubgrid
+    yp(:) = xp(:)
+    zp(:) = xp(:)
+    xp(:) = xp(:) * dx
+    yp(:) = yp(:) * dy
+    zp(:) = zp(:) * dz
+
+! calculate the factor increment for the given subgrid
+!
+    fc_inc = dvol / nsubgrid**3
+#endif /* NDIMS == 3 */
+
+! set density and pressure of the ambient
+!
+    q(idn,:) = dn_amb
+    q(ipr,:) = pr_amb
+
+! reset velocity components
+!
+    q(ivx,:) = 0.0d+00
+    q(ivy,:) = 0.0d+00
+    q(ivz,:) = 0.0d+00
+
+! if magnetic field is present, set it to be uniform with the desired strength
+! and orientation
+!
+    if (ibx > 0) then
+
+      q(ibx,:) = bx
+      q(iby,:) = by
+      q(ibz,:) = 0.0d+00
+      q(ibp,:) = 0.0d+00
+
+    end if
+
+! iterate over all positions in the YZ plane
+!
+    do k = 1, km
+
+#if NDIMS == 3
+! calculate the corner Z coordinates
+!
+      zl = abs(z(k)) - dzh
+      zu = abs(z(k)) + dzh
+#endif /* NDIMS == 3 */
+
+      do j = 1, jm
+
+! calculate the corner Y coordinates
+!
+        yl = abs(y(j)) - dyh
+        yu = abs(y(j)) + dyh
+
+! sweep along the X coordinate
+!
+        do i = 1, im
+
+! calculate the corner X coordinates
+!
+          xl = abs(x(i)) - dxh
+          xu = abs(x(i)) + dxh
+
+! calculate the minimum and maximum corner distances from the origin
+!
+#if NDIMS == 3
+          rl = xl * xl + yl * yl + zl * zl
+          ru = xu * xu + yu * yu + zu * zu
+#else /* NDIMS == 3 */
+          rl = xl * xl + yl * yl
+          ru = xu * xu + yu * yu
+#endif /* NDIMS == 3 */
+
+! set the initial density and pressure in cells laying completely within
+! the blast radius
+!
+          if (ru <= r2) then
+
+! set density and pressure for the overpressure region
+!
+            q(idn,i) = dn_ovr
+            q(ipr,i) = pr_ovr
+
+! set the initial pressure in the cell completely outside the radius
+!
+          else if (rl >= r2) then
+
+! set density and pressure of the ambient
+!
+            q(idn,i) = dn_amb
+            q(ipr,i) = pr_amb
+
+! integrate density or pressure in cells which are crossed by the circule with
+! the given radius
+!
+          else
+
+#if NDIMS == 3
+! interpolate the factor using subgrid
+!
+            fc_ovr = 0.0d+00
+            do kc = 1, nsubgrid
+              zb = (zl + zm(kc))**2
+              zt = (zl + zp(kc))**2
+              do jc = 1, nsubgrid
+                yb = (yl + ym(jc))**2
+                yt = (yl + yp(jc))**2
+                do ic = 1, nsubgrid
+                  xb = (xl + xm(ic))**2
+                  xt = (xl + xp(ic))**2
+
+! update the integration factor depending on the subcell position
+!
+                  if ((xt + yt + zt) <= r2) then
+                    fc_ovr = fc_ovr + fc_inc
+                  else if ((xb + yb + zb) < r2) then
+                    fc_ovr = fc_ovr + 0.5d+00 * fc_inc
+                  end if
+
+                end do ! ic = 1, nsubgrid
+              end do ! jc = 1, nsubgrid
+            end do ! kc = 1, nsubgrid
+#else /* NDIMS == 3 */
+
+! calculate the distance of remaining corners
+!
+            rlu = xl * xl + yu * yu
+            rul = xu * xu + yl * yl
+
+! separate in the cases of which corners lay inside, and which outside
+! the radius
+!
+            if (min(rlu, rul) >= r2) then
+
+! only one cell corner inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xb = sqrt(r2 - yl**2) - xl
+              yb = sqrt(r2 - xl**2) - yl
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(xb**2 + yb**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * (xb * yb + (ph - sn) * r2)
+
+            else if (rlu >= r2) then
+
+! two lower corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              yb = sqrt(r2 - xl**2) - yl
+              yt = sqrt(r2 - xu**2) - yl
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(dx**2 + (yt - yb)**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * ((yt + yb) * dx + (ph - sn) * r2)
+
+            else if (rul >= r2) then
+
+! two left corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xb = sqrt(r2 - yl**2) - xl
+              xt = sqrt(r2 - yu**2) - xl
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt((xt - xb)**2 + dy**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = 0.5d+00 * ((xt + xb) * dy + (ph - sn) * r2)
+
+            else
+
+! three corners inside the radius
+!
+! calculate middle coordinates of the radius-edge crossing point
+!
+              xt = xu - sqrt(r2 - yu**2)
+              yt = yu - sqrt(r2 - xu**2)
+
+! calculate the sin(½φ), φ, and sin(φ)
+!
+              sn = 0.5d+00 * sqrt(xt**2 + yt**2) / radius
+              ph = 2.0d+00 * asin(sn)
+              sn = sin(ph)
+
+! calculate the area of cell intersection with the radius
+!
+              fc_ovr = dvol - 0.5d+00 * (xt * yt - (ph - sn) * r2)
+
+            end if
+#endif /* NDIMS == 3 */
+
+! normalize coefficients
+!
+            fc_ovr = fc_ovr / dvol
+            fc_amb = 1.0d+00 - fc_ovr
+
+! integrate density and pressure over the edge cells
+!
+            q(idn,i) = fc_ovr * dn_ovr + fc_amb * dn_amb
+            q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
+
+          end if
+
+        end do ! i = 1, im
+
+! convert the primitive variables to conservative ones
+!
+        call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
+
+! copy the conserved variables to the current block
+!
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+
+! copy the primitive variables to the current block
+!
+        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+
+      end do ! j = 1, jm
+    end do ! k = 1, km
+
+#if NDIMS == 3
+! deallocate subgrid coordinates
+!
+    deallocate(xm, ym, zm)
+    deallocate(xp, yp, zp)
+#endif /* NDIMS == 3 */
+
+#ifdef PROFILE
+! stop accounting time for the problems setup
+!
+    call stop_timer(imu)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine setup_problem_sedov_taylor
+!
+!===============================================================================
+!
 ! subroutine SETUP_PROBLEM_IMPLOSION:
 ! ----------------------------------
 !
@@ -1213,6 +1680,14 @@ module problems
 !     pdata - pointer to the datablock structure of the currently initialized
 !             block;
 !
+!   References:
+!
+!     [1] Almgren, A. S. et al.,
+!         "CASTRO: A New Compressible Astrophysical Solver.
+!          I. Hydrodynamics and Self-Gravity",
+!         The Astrophysical Journal, 2010, vol. 715, pp. 1221-1238,
+!         http://dx.doi.org/10.1088/0004-637X/715/2/1221
+!
 !===============================================================================
 !
   subroutine setup_problem_rayleigh_taylor(pdata)
@@ -1220,9 +1695,10 @@ module problems
 ! include external procedures and variables
 !
     use blocks     , only : block_data
-    use constants  , only : d2r
+    use constants  , only : pi2, d2r
+    use coordinates, only : xmin, xmax, xlen
     use coordinates, only : im, jm, km
-    use coordinates, only : ay, ady
+    use coordinates, only : ax, ay, ady
     use equations  , only : prim2cons
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
@@ -1240,12 +1716,16 @@ module problems
 
 ! default parameter values
 !
-    real(kind=8), save :: ycut   =  0.00d-00
     real(kind=8), save :: dens   =  1.00d+00
     real(kind=8), save :: drat   =  2.00d+00
-    real(kind=8), save :: pres   =  2.50d+00
-    real(kind=8), save :: vper   =  1.00d-02
-    real(kind=8), save :: gacc   = -1.00d-01
+    real(kind=8), save :: damp   =  5.00d-01
+    real(kind=8), save :: pres   =  5.00d+00
+    real(kind=8), save :: ycut   =  0.00d+00
+    real(kind=8), save :: vper   =  0.00d+00
+    real(kind=8), save :: lper   =  1.00d-02
+    real(kind=8), save :: kper   =  1.00d+00
+    real(kind=8), save :: hdel   =  5.00d-03
+    real(kind=8), save :: gacc   = -1.00d+00
     real(kind=8), save :: buni   =  1.00d+00
     real(kind=8), save :: bgui   =  0.00d+00
     real(kind=8), save :: angle  =  0.00d+00
@@ -1262,9 +1742,8 @@ module problems
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(im)    :: x
+    real(kind=8), dimension(im)    :: x, yp
     real(kind=8), dimension(jm)    :: y
-    real(kind=8), dimension(km)    :: z
 !
 !-------------------------------------------------------------------------------
 !
@@ -1284,11 +1763,18 @@ module problems
       call get_parameter_real("dens"  , dens  )
       call get_parameter_real("drat"  , drat  )
       call get_parameter_real("pres"  , pres  )
+      call get_parameter_real("lper"  , lper  )
+      call get_parameter_real("kper"  , kper  )
       call get_parameter_real("vper"  , vper  )
+      call get_parameter_real("hdel"  , hdel  )
       call get_parameter_real("gacc"  , gacc  )
       call get_parameter_real("buni"  , buni  )
       call get_parameter_real("bgui"  , bgui  )
       call get_parameter_real("angle" , angle )
+
+! calculate the density change across the interface
+!
+      damp = 5.0d-01 * (drat * dens - dens)
 
 ! reset the first execution flag
 !
@@ -1298,6 +1784,7 @@ module problems
 
 ! prepare block coordinates
 !
+    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
     y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
 
 ! set the ambient density and pressure
@@ -1324,6 +1811,11 @@ module problems
 
     end if
 
+! prepare density perturbation
+!
+    yp(1:im) = 0.5d+00 * lper * (cos(pi2 * kper * (x(1:im) - xmin) / xlen)     &
+                               + cos(pi2 * kper * (xmax - x(1:im)) / xlen)) + ycut
+
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
@@ -1337,6 +1829,7 @@ module problems
           else
             q(idn,1:im) = dens * drat
           end if
+          q(idn,1:im) = dens + damp * (1.0d+00 + tanh((y(j) - yp(1:im)) / hdel))
           q(ipr,1:im) = pres + q(idn,1:im) * gacc * y(j)
         else
           if (y(j) <= ycut) then
@@ -1354,9 +1847,11 @@ module problems
 
 ! add a random seed velocity component
 !
-        do i = 1, im
-          q(ivy,i) = q(ivy,i) + vper * randomn()
-        end do
+        if (vper /= 0.0d+00) then
+          do i = 1, im
+            q(ivy,i) = q(ivy,i) + vper * randomn()
+          end do
+        end if
 
 ! convert the primitive variables to conservative ones
 !
