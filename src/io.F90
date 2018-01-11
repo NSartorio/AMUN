@@ -4,7 +4,7 @@
 !!  Newtonian or relativistic magnetohydrodynamical simulations on uniform or
 !!  adaptive mesh.
 !!
-!!  Copyright (C) 2008-2017 Grzegorz Kowal <grzegorz@amuncode.org>
+!!  Copyright (C) 2008-2018 Grzegorz Kowal <grzegorz@amuncode.org>
 !!
 !!  This program is free software: you can redistribute it and/or modify
 !!  it under the terms of the GNU General Public License as published by
@@ -1269,12 +1269,12 @@ module io
     use coordinates    , only : minlev, maxlev, toplev
     use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
-    use equations      , only : eqsys, eos
+    use equations      , only : eqsys, eos, gamma, csnd
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
-    use mpitools       , only : nprocs, nproc
+    use mpitools       , only : nprocs, nproc, periodic
     use random         , only : nseeds, get_seeds
 
 ! local variables are not implicit by default
@@ -1290,12 +1290,21 @@ module io
     integer(hid_t)                :: gid
     integer                       :: err
 
+! local vectors
+!
+    integer, dimension(3)         :: per
+
 ! local allocatable arrays
 !
     integer(kind=4), dimension(:), allocatable :: seeds
 !
 !-------------------------------------------------------------------------------
 !
+! store the code name in order to determine the format of data
+!
+    call write_attribute(fid, 'code'   , 'AMUN')
+    call write_attribute(fid, 'version', 'v1.0')
+
 ! create a group to store the global attributes
 !
     call h5gcreate_f(fid, 'attributes', gid, err)
@@ -1314,6 +1323,10 @@ module io
 
     end if
 
+! convert periodic(:) to an integer vector
+!
+    per(:) = merge(1, 0, periodic(:))
+
 ! store string attributes
 !
     call write_attribute(gid, 'eqsys'  , eqsys        )
@@ -1321,21 +1334,22 @@ module io
 
 ! store the integer attributes
 !
-    call write_attribute(gid, 'ndims'  , NDIMS        )
-    call write_attribute(gid, 'last_id', get_last_id())
-    call write_attribute(gid, 'mblocks', get_mblocks())
-    call write_attribute(gid, 'dblocks', get_dblocks())
-    call write_attribute(gid, 'nleafs' , get_nleafs() )
-    call write_attribute(gid, 'ncells' , nc           )
-    call write_attribute(gid, 'nghosts', ng           )
-    call write_attribute(gid, 'minlev' , minlev       )
-    call write_attribute(gid, 'maxlev' , maxlev       )
-    call write_attribute(gid, 'toplev' , toplev       )
-    call write_attribute(gid, 'nprocs' , nprocs       )
-    call write_attribute(gid, 'nproc'  , nproc        )
-    call write_attribute(gid, 'nseeds' , nseeds       )
-    call write_attribute(gid, 'step'   , step         )
-    call write_attribute(gid, 'isnap'  , isnap        )
+    call write_attribute(gid, 'ndims'   , NDIMS        )
+    call write_attribute(gid, 'last_id' , get_last_id())
+    call write_attribute(gid, 'mblocks' , get_mblocks())
+    call write_attribute(gid, 'dblocks' , get_dblocks())
+    call write_attribute(gid, 'nleafs'  , get_nleafs() )
+    call write_attribute(gid, 'ncells'  , nc           )
+    call write_attribute(gid, 'nghosts' , ng           )
+    call write_attribute(gid, 'minlev'  , minlev       )
+    call write_attribute(gid, 'maxlev'  , maxlev       )
+    call write_attribute(gid, 'toplev'  , toplev       )
+    call write_attribute(gid, 'nprocs'  , nprocs       )
+    call write_attribute(gid, 'nproc'   , nproc        )
+    call write_attribute(gid, 'nseeds'  , nseeds       )
+    call write_attribute(gid, 'step'    , step         )
+    call write_attribute(gid, 'isnap'   , isnap        )
+    call write_attribute(gid, 'periodic', per(:)       )
 
 ! store the real attributes
 !
@@ -1348,6 +1362,12 @@ module io
     call write_attribute(gid, 'time', time)
     call write_attribute(gid, 'dt'  , dt  )
     call write_attribute(gid, 'dtn' , dtn )
+    if (eos == 'adi') then
+      call write_attribute(gid, 'gamma', gamma)
+    end if
+    if (eos == 'iso') then
+      call write_attribute(gid, 'csnd' , csnd )
+    end if
 
 ! store the vector attributes
 !
