@@ -324,7 +324,7 @@ module user_problem
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(nv)    :: qj
+    real(kind=8), dimension(nv)    :: qj, sc, sn
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -350,6 +350,13 @@ module user_problem
       qj(ibz) = bjet
       qj(ibp) = 0.0d+00
     end if ! ibx > 0
+
+! prepare directional vectors
+!
+    sc(  1:nv ) =  1.0d+00
+    sc(ivx:ivz) =  0.0d+00
+    sn(  1:nv ) =  1.0d+00
+    sn(ivx:ivz) = -1.0d+00
 
 ! prepare block coordinates
 !
@@ -397,8 +404,14 @@ module user_problem
 !
         if (rr <= max(rm, rjet2)) then
           do i = 1, im
-            if (x(i) <= max(dx, ljet)) then
-              q(1:nv,i) = qj(1:nv)
+            if (abs(x(i)) <= max(dx, ljet)) then
+              if (x(i) > 0.0d+00) then
+                q(1:nv,i) = qj(1:nv)
+              else if (x(i) < 0.0d+00) then
+                q(1:nv,i) = qj(1:nv) * sn(1:nv)
+              else
+                q(1:nv,i) = qj(1:nv) * sc(1:nv)
+              end if
             end if
           end do ! i = 1, im
         end if ! R < Rjet
@@ -475,7 +488,7 @@ module user_problem
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(nv)    :: qj, uj
+    real(kind=8), dimension(nv)    :: qjn, qjc, qjp, ujn, ujc, ujp, sc, sn
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -505,26 +518,37 @@ module user_problem
       state = .not. state
     end if
 
+! prepare directional vectors
+!
+    sc(  1:nv ) =  1.0d+00
+    sc(ivx:ivz) =  0.0d+00
+    sn(  1:nv ) =  1.0d+00
+    sn(ivx:ivz) = -1.0d+00
+
 ! set the conditions inside the jet radius
 !
-    qj(idn) = dn_jet
-    if (ipr > 0) qj(ipr) = pr_jet
+    qjp(idn) = dn_jet
+    if (ipr > 0) qjp(ipr) = pr_jet
     if (state) then
-      qj(ivx) = vjet * cosa
-      qj(ivy) = vjet * sina * cost
-      qj(ivz) = vjet * sina * sint
+      qjp(ivx) = vjet * cosa
+      qjp(ivy) = vjet * sina * cost
+      qjp(ivz) = vjet * sina * sint
     else
-      qj(ivx) = 0.0d+00
-      qj(ivy) = 0.0d+00
-      qj(ivz) = 0.0d+00
+      qjp(ivx) = 0.0d+00
+      qjp(ivy) = 0.0d+00
+      qjp(ivz) = 0.0d+00
     end if
     if (ibx > 0) then
-      qj(ibx) = 0.0d+00
-      qj(iby) = 0.0d+00
-      qj(ibz) = bjet
-      qj(ibp) = 0.0d+00
+      qjp(ibx) = 0.0d+00
+      qjp(iby) = 0.0d+00
+      qjp(ibz) = bjet
+      qjp(ibp) = 0.0d+00
     end if ! ibx > 0
-    call prim2cons(1, qj(1:nv), uj(1:nv))
+    qjn(1:nv) = qjp(1:nv) * sn(1:nv)
+    qjc(1:nv) = qjp(1:nv) * sc(1:nv)
+    call prim2cons(1, qjn(1:nv), ujn(1:nv))
+    call prim2cons(1, qjc(1:nv), ujc(1:nv))
+    call prim2cons(1, qjp(1:nv), ujp(1:nv))
 
 ! prepare block coordinates
 !
@@ -557,9 +581,17 @@ module user_problem
 
         if (rr <= max(rm, rjet2)) then
           do i = 1, im
-            if (x(i) <= max(dx, ljet)) then
-              q(1:nv,i) = qj(1:nv)
-              u(1:nv,i) = uj(1:nv)
+            if (abs(x(i)) <= max(dx, ljet)) then
+              if (x(i) > 0.0d+00) then
+                q(1:nv,i) = qjp(1:nv)
+                u(1:nv,i) = ujp(1:nv)
+              else if (x(i) < 0.0d+00) then
+                q(1:nv,i) = qjn(1:nv)
+                u(1:nv,i) = ujn(1:nv)
+              else
+                q(1:nv,i) = qjc(1:nv)
+                u(1:nv,i) = ujc(1:nv)
+              end if
             end if
           end do ! i = 1, im
         end if ! R < Rjet
