@@ -319,12 +319,13 @@ module user_problem
 ! local variables
 !
     integer      :: i, j, k
-    real(kind=8) :: dx, dy, dz, rm, rr
+    real(kind=8) :: dx, dy, dz, rm, rr, rc
+    real(kind=8) :: llim, rlim
+    real(kind=8) :: vx_jet, vy_jet, vz_jet
 
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(nv)    :: qj, sc, sn
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -339,24 +340,9 @@ module user_problem
 
 ! set the conditions inside the jet radius
 !
-    qj(idn) = dn_jet
-    if (ipr > 0) qj(ipr) = pr_jet
-    qj(ivx) = vjet * cosa
-    qj(ivy) = vjet * sina
-    qj(ivz) = 0.0d+00
-    if (ibx > 0) then
-      qj(ibx) = 0.0d+00
-      qj(iby) = 0.0d+00
-      qj(ibz) = bjet
-      qj(ibp) = 0.0d+00
-    end if ! ibx > 0
-
-! prepare directional vectors
-!
-    sc(  1:nv ) =  1.0d+00
-    sc(ivx:ivz) =  0.0d+00
-    sn(  1:nv ) =  1.0d+00
-    sn(ivx:ivz) = -1.0d+00
+    vx_jet = vjet * cosa
+    vy_jet = vjet * sina
+    vz_jet = 0.0d+00
 
 ! prepare block coordinates
 !
@@ -373,6 +359,11 @@ module user_problem
 #endif /* NDIMS == 3 */
     rm = dy * dy + dz * dz
 
+! calculate jet limits
+!
+    rlim = max(rm, rjet2)
+    llim = max(dx, ljet )
+
 ! iterate over all positions in the YZ plane
 !
     do k = 1, km
@@ -381,6 +372,7 @@ module user_problem
 ! calculate radius
 !
         rr = y(j) * y(j) + z(k) * z(k)
+        rc = max(sqrt(rr), 1.0d-08)
 
 ! set the ambient density, pressure, and velocity
 !
@@ -394,23 +386,36 @@ module user_problem
 ! and orientation
 !
         if (ibx > 0) then
-          q(ibx,1:im) = 0.0d+00
+          q(ibx,1:im) = bamb
           q(iby,1:im) = 0.0d+00
-          q(ibz,1:im) = bamb
+          q(ibz,1:im) = 0.0d+00
           q(ibp,1:im) = 0.0d+00
         end if ! ibx > 0
 
 ! set the jet injection
 !
-        if (rr <= max(rm, rjet2)) then
+        if (rr <= rlim) then
           do i = 1, im
-            if (abs(x(i)) <= max(dx, ljet)) then
+            if (abs(x(i)) <= llim) then
+              q(idn,i) = dn_jet
+              if (ipr > 0) q(ipr,i) = pr_jet
               if (x(i) > 0.0d+00) then
-                q(1:nv,i) = qj(1:nv)
+                q(ivx,i) =   vx_jet
+                q(ivy,i) =   vy_jet
+                q(ivz,i) =   vz_jet
               else if (x(i) < 0.0d+00) then
-                q(1:nv,i) = qj(1:nv) * sn(1:nv)
+                q(ivx,i) = - vx_jet
+                q(ivy,i) = - vy_jet
+                q(ivz,i) = - vz_jet
               else
-                q(1:nv,i) = qj(1:nv) * sc(1:nv)
+                q(ivx,i) = 0.0d+00
+                q(ivy,i) = 0.0d+00
+                q(ivz,i) = 0.0d+00
+              end if
+              if (ibx > 0) then
+                q(ibx,i) = bamb
+                q(iby,i) =   z(k) / rc
+                q(ibz,i) = - y(j) / rc
               end if
             end if
           end do ! i = 1, im
@@ -420,13 +425,10 @@ module user_problem
 !
         call prim2cons(im, q(1:nv,1:im), u(1:nv,1:im))
 
-! copy the conserved variables to the current block
-!
-        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
-
-! copy the primitive variables to the current block
+! update variables in the current block
 !
         pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
 
       end do ! j = 1, jm
     end do ! k = 1, km
@@ -481,16 +483,16 @@ module user_problem
 
 ! local variables
 !
-    logical       :: inside
-    integer       :: i, j, k
-    real(kind=8)  :: dx, dy, dz, rm, rr
-    real(kind=8)  :: tph, sint, cost
-    real(kind=8)  :: llim, rlim
+    logical      :: inside
+    integer      :: i, j, k, il, iu, is
+    real(kind=8) :: dx, dy, dz, rm, rr, rc
+    real(kind=8) :: tph, sint, cost
+    real(kind=8) :: llim, rlim
+    real(kind=8) :: vx_jet, vy_jet, vz_jet
 
 ! local arrays
 !
     real(kind=8), dimension(nv,im) :: q, u
-    real(kind=8), dimension(nv)    :: qjn, qjc, qjp, ujn, ujc, ujp, sc, sn
     real(kind=8), dimension(im)    :: x
     real(kind=8), dimension(jm)    :: y
     real(kind=8), dimension(km)    :: z
@@ -553,73 +555,80 @@ module user_problem
 !
     if (inside) then
 
-! prepare directional vectors
-!
-      sc(  1:nv ) =  1.0d+00
-      sc(ivx:ivz) =  0.0d+00
-      sn(  1:nv ) =  1.0d+00
-      sn(ivx:ivz) = -1.0d+00
-
 ! set the conditions inside the jet radius
 !
-      qjp(idn) = dn_jet
-      if (ipr > 0) qjp(ipr) = pr_jet
       if (state) then
-        qjp(ivx) = vjet * cosa
-        qjp(ivy) = vjet * sina * cost
-        qjp(ivz) = vjet * sina * sint
+        vx_jet = vjet * cosa
+        vy_jet = vjet * sina * cost
+        vz_jet = vjet * sina * sint
       else
-        qjp(ivx) = 0.0d+00
-        qjp(ivy) = 0.0d+00
-        qjp(ivz) = 0.0d+00
+        vx_jet = 0.0d+00
+        vy_jet = 0.0d+00
+        vz_jet = 0.0d+00
       end if
-      if (ibx > 0) then
-        qjp(ibx) = 0.0d+00
-        qjp(iby) = 0.0d+00
-        qjp(ibz) = bjet
-        qjp(ibp) = 0.0d+00
-      end if ! ibx > 0
-      qjn(1:nv) = qjp(1:nv) * sn(1:nv)
-      qjc(1:nv) = qjp(1:nv) * sc(1:nv)
-      call prim2cons(1, qjn(1:nv), ujn(1:nv))
-      call prim2cons(1, qjc(1:nv), ujc(1:nv))
-      call prim2cons(1, qjp(1:nv), ujp(1:nv))
 
 ! iterate over all positions in the YZ plane
 !
       do k = 1, km
         do j = 1, jm
 
-! store temporary variables
-!
-          q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
-          u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
-
 ! calculate radius
 !
           rr = y(j) * y(j) + z(k) * z(k)
+          rc = max(sqrt(rr), 1.0d-08)
 
+! update only cells within the radius
+!
           if (rr <= rlim) then
+
+! store temporary variables
+!
+            q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+            u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
+
+! iterate along the X direciton
+!
+            il = im
+            iu = 1
             do i = 1, im
               if (abs(x(i)) <= llim) then
+                il = min(i, il)
+                iu = max(i, iu)
+
+                q(idn,i) = dn_jet
+                if (ipr > 0) q(ipr,i) = pr_jet
                 if (x(i) > 0.0d+00) then
-                  q(1:nv,i) = qjp(1:nv)
-                  u(1:nv,i) = ujp(1:nv)
+                  q(ivx,i) =   vx_jet
+                  q(ivy,i) =   vy_jet
+                  q(ivz,i) =   vz_jet
                 else if (x(i) < 0.0d+00) then
-                  q(1:nv,i) = qjn(1:nv)
-                  u(1:nv,i) = ujn(1:nv)
+                  q(ivx,i) = - vx_jet
+                  q(ivy,i) = - vy_jet
+                  q(ivz,i) = - vz_jet
                 else
-                  q(1:nv,i) = qjc(1:nv)
-                  u(1:nv,i) = ujc(1:nv)
+                  q(ivx,i) = 0.0d+00
+                  q(ivy,i) = 0.0d+00
+                  q(ivz,i) = 0.0d+00
+                end if
+                if (ibx > 0) then
+                  q(ibx,i) = bamb
+                  q(iby,i) =   z(k) / rc
+                  q(ibz,i) = - y(j) / rc
                 end if
               end if
             end do ! i = 1, im
-          end if ! R < Rjet
 
-! copy variables back to the current block
+! convert primitive variables to conservative ones
 !
-          pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
-          pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+            is = iu - il + 1
+            if (is >= 1) then
+              call prim2cons(is, q(1:nv,il:iu), u(1:nv,il:iu))
+
+              pdata%q(1:nv,il:iu,j,k) = q(1:nv,il:iu)
+              pdata%u(1:nv,il:iu,j,k) = u(1:nv,il:iu)
+            end if
+
+          end if ! R < Rjet
 
         end do ! j = 1, jm
       end do ! k = 1, km
