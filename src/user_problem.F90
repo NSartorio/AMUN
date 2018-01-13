@@ -518,94 +518,91 @@ module user_problem
       state = .not. state
     end if
 
+! update the jet only of the injection is on
+!
+    if (state) then
+
 ! prepare directional vectors
 !
-    sc(  1:nv ) =  1.0d+00
-    sc(ivx:ivz) =  0.0d+00
-    sn(  1:nv ) =  1.0d+00
-    sn(ivx:ivz) = -1.0d+00
+      sc(  1:nv ) =  1.0d+00
+      sc(ivx:ivz) =  0.0d+00
+      sn(  1:nv ) =  1.0d+00
+      sn(ivx:ivz) = -1.0d+00
 
 ! set the conditions inside the jet radius
 !
-    qjp(idn) = dn_jet
-    if (ipr > 0) qjp(ipr) = pr_jet
-    if (state) then
+      qjp(idn) = dn_jet
+      if (ipr > 0) qjp(ipr) = pr_jet
       qjp(ivx) = vjet * cosa
       qjp(ivy) = vjet * sina * cost
       qjp(ivz) = vjet * sina * sint
-    else
-      qjp(ivx) = 0.0d+00
-      qjp(ivy) = 0.0d+00
-      qjp(ivz) = 0.0d+00
-    end if
-    if (ibx > 0) then
-      qjp(ibx) = 0.0d+00
-      qjp(iby) = 0.0d+00
-      qjp(ibz) = bjet
-      qjp(ibp) = 0.0d+00
-    end if ! ibx > 0
-    qjn(1:nv) = qjp(1:nv) * sn(1:nv)
-    qjc(1:nv) = qjp(1:nv) * sc(1:nv)
-    call prim2cons(1, qjn(1:nv), ujn(1:nv))
-    call prim2cons(1, qjc(1:nv), ujc(1:nv))
-    call prim2cons(1, qjp(1:nv), ujp(1:nv))
+      if (ibx > 0) then
+        qjp(ibx) = 0.0d+00
+        qjp(iby) = 0.0d+00
+        qjp(ibz) = bjet
+        qjp(ibp) = 0.0d+00
+      end if ! ibx > 0
+      qjn(1:nv) = qjp(1:nv) * sn(1:nv)
+      qjc(1:nv) = qjp(1:nv) * sc(1:nv)
+      call prim2cons(1, qjn(1:nv), ujn(1:nv))
+      call prim2cons(1, qjc(1:nv), ujc(1:nv))
+      call prim2cons(1, qjp(1:nv), ujp(1:nv))
 
 ! prepare block coordinates
 !
-    x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
-    dx = x(2) - x(1)
-    y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
-    dy = y(2) - y(1)
+      x(1:im) = pdata%meta%xmin + ax(pdata%meta%level,1:im)
+      dx = x(2) - x(1)
+      y(1:jm) = pdata%meta%ymin + ay(pdata%meta%level,1:jm)
+      dy = y(2) - y(1)
 #if NDIMS == 3
-    z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
-    dz = z(2) - z(1)
+      z(1:km) = pdata%meta%zmin + az(pdata%meta%level,1:km)
+      dz = z(2) - z(1)
 #else /* NDIMS == 3 */
-    z(1:km) = 0.0d+00
-    dz      = 0.0d+00
+      z(1:km) = 0.0d+00
+      dz      = 0.0d+00
 #endif /* NDIMS == 3 */
-    rm = dy * dy + dz * dz
+      rm = dy * dy + dz * dz
 
 ! iterate over all positions in the YZ plane
 !
-    do k = 1, km
-      do j = 1, jm
+      do k = 1, km
+        do j = 1, jm
 
-! copy the primitive variable vector
+! store temporary variables
 !
-        q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
-        u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
+          q(1:nv,1:im) = pdata%q(1:nv,1:im,j,k)
+          u(1:nv,1:im) = pdata%u(1:nv,1:im,j,k)
 
 ! calculate radius
 !
-        rr = y(j) * y(j) + z(k) * z(k)
+          rr = y(j) * y(j) + z(k) * z(k)
 
-        if (rr <= max(rm, rjet2)) then
-          do i = 1, im
-            if (abs(x(i)) <= max(dx, ljet)) then
-              if (x(i) > 0.0d+00) then
-                q(1:nv,i) = qjp(1:nv)
-                u(1:nv,i) = ujp(1:nv)
-              else if (x(i) < 0.0d+00) then
-                q(1:nv,i) = qjn(1:nv)
-                u(1:nv,i) = ujn(1:nv)
-              else
-                q(1:nv,i) = qjc(1:nv)
-                u(1:nv,i) = ujc(1:nv)
+          if (rr <= max(rm, rjet2)) then
+            do i = 1, im
+              if (abs(x(i)) <= max(dx, ljet)) then
+                if (x(i) > 0.0d+00) then
+                  q(1:nv,i) = qjp(1:nv)
+                  u(1:nv,i) = ujp(1:nv)
+                else if (x(i) < 0.0d+00) then
+                  q(1:nv,i) = qjn(1:nv)
+                  u(1:nv,i) = ujn(1:nv)
+                else
+                  q(1:nv,i) = qjc(1:nv)
+                  u(1:nv,i) = ujc(1:nv)
+                end if
               end if
-            end if
-          end do ! i = 1, im
-        end if ! R < Rjet
+            end do ! i = 1, im
+          end if ! R < Rjet
 
-! copy the primitive variables to the current block
+! copy variables back to the current block
 !
-        pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+          pdata%q(1:nv,1:im,j,k) = q(1:nv,1:im)
+          pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
 
-! copy the conserved variables to the current block
-!
-        pdata%u(1:nv,1:im,j,k) = u(1:nv,1:im)
+        end do ! j = 1, jm
+      end do ! k = 1, km
 
-      end do ! j = 1, jm
-    end do ! k = 1, km
+    end if ! injection is on
 
 #ifdef PROFILE
 ! stop accounting time for the shape update
