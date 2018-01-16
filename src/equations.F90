@@ -3835,6 +3835,10 @@ module equations
 !
   subroutine nr_iterate_srhd_adi_1dw(mm, bb, mb, en, dn, w, vv, info)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -3852,6 +3856,10 @@ module equations
     real(kind=8) :: wl, wu, fl, fu
     real(kind=8) :: f, df, dw
     real(kind=8) :: err
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::nr_iterate_srhd_adi_1dw()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3866,132 +3874,120 @@ module equations
     wl   = sqrt(mm + dn * dn) + gammaxi * pmin
     wu   = en + pmin
 
-! make sure that the upper bracket is larger than the lower one
+! calculate the value of function for the lower bracket
 !
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      info = .false.
-      return
-    end if
+    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+
+! the lower bracket gives negative function, so there is chance it bounds
+! the root
+!
+    if (fl < 0.0d+00) then
+
+! make sure that the upper bracket is larger than the lower one and
+! the function has positive value
+!
+      if (wu <= wl) wu = 2.0d+00 * wl
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
 !
-    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
-    call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
       call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+      it   = nrmax
+      keep = fl * fu > 0.0d+00
+      do while (keep)
+        it = it - 1
+        wl = wu
+        fl = fu
+        wu = 2.0d+00 * wu
+        call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+        keep = (fl * fu > 0.0d+00) .and. it > 0
+      end do
 
-      it   = it - 1
-
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      info = .false.
-      return
-    end if
+! the upper bracket was found, so proceed with determining the root
+!
+      if (it > 0 .and. fu >= 0.0d+00) then
 
 ! estimate the value of enthalpy close to the root and corresponding v²
 !
-    w    = wl - fl * (wu - wl) / (fu - fl)
+        w = wl - fl * (wu - wl) / (fu - fl)
 
 ! initialize iteration parameters
 !
-    info = .true.
-    keep = .true.
-    it   = nrmax
-    cn   = nrext
+        info = .true.
+        keep = .true.
+        it   = nrmax
+        cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
 !
-    do while(keep)
+        do while(keep)
 
 ! calculate F(W) and dF(W)/dW
 !
-      call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
+          call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
 
 ! update brackets
 !
-      if (f > fl .and. f < 0.0d+00) then
-        wl = w
-        fl = f
-      end if
-      if (f < fu .and. f > 0.0d+00) then
-        wu = w
-        fu = f
-      end if
+          if (f > fl .and. f < 0.0d+00) then
+            wl = w
+            fl = f
+          end if
+          if (f < fu .and. f > 0.0d+00) then
+            wu = w
+            fu = f
+          end if
 
-! calculate the increment dW
+! calculate the increment dW, update the solution, and estimate the error
 !
-      dw  = f / df
-
-! update the solution
-!
-      w   = w - dw
-
-! calculate the error
-!
-      err = abs(dw / w)
+          dw  = f / df
+          w   = w - dw
+          err = abs(dw / w)
 
 ! check the convergence, if the convergence is not reached, iterate until
 ! the maximum number of iteration is reached
 !
-      if (err < tol) then
-        keep = cn > 0
-        cn   = cn - 1
-      else
-        keep = it > 0
-      end if
+          if (err < tol) then
+            keep = cn > 0
+            cn   = cn - 1
+          else
+            keep = it > 0
+          end if
 
-! if new W lays out of the brackets, use the bisection method to estimate
+! if new W leaves the brackets, use the bisection method to estimate
 ! the new guess
 !
-      if (w < wl .or. w > wu) then
-        w = 0.5d+00 * (wl + wu)
-      end if
+          if (w < wl .or. w > wu) then
+            w = 0.5d+00 * (wl + wu)
+          end if
 
-! decrease the number of remaining iterations
-!
-      it = it - 1
-
-    end do ! NR iterations
-
-! calculate |V|² from W
-!
-    vv  = mm / (w * w)
+          it = it - 1
+        end do ! NR iterations
 
 ! print information about failed convergence or unphysical variables
 !
-    if (err >= tol) then
-      write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srhd_adi_1dw()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+        if (err >= tol) then
+          call print_warning(loc, "Convergence not reached!")
+          write(*,"(a,1x,1e24.16e3)") "Error: ", err
+        end if
+
+! calculate |V|² from W
+!
+        vv  = mm / (w * w)
+
+      else ! the upper brack not found
+        call print_warning(loc, "Could not find the upper bracket!")
+        info = .false.
+
+      end if
+
+    else if (fl == 0.0d+00) then ! the lower bracket is a root, so return it
+      w    = wl
+      info = .true.
+
+    else ! the root cannot be found, since it is below the lower bracket
+      call print_warning(loc, "Positive function for lower bracket!")
+      info = .false.
     end if
 
 #ifdef PROFILE
@@ -4665,8 +4661,9 @@ module equations
           call print_warning(loc,                                              &
                                "Conversion to physical primitive state" //     &
                                " resulted in negative pressure!")
-          write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
-          write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
+          write(*,"(a,9(1x,1e24.16e3))") "U                        = "         &
+                                                       , u(1:nv,i)
+          write(*,"(a,6(1x,1e24.16e3))") "D, |m|², m.B, |B|², E, W = "         &
                                                        , dn, mm, mb, bb, en, w
 
 ! set pressure to zero so we can hopefully fix it later
