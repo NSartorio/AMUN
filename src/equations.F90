@@ -4584,6 +4584,10 @@ module equations
 !
   subroutine cons2prim_srmhd_adi(n, u, q)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -4600,6 +4604,10 @@ module equations
     integer      :: i
     real(kind=8) :: mm, mb, bb, en, dn
     real(kind=8) :: w, wt, vv, vm, vs, vb, fc
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::cons2prim_srmhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4654,25 +4662,30 @@ module equations
 !
         if (q(ipr,i) <= 0.0d+00) then
 
-          write(*,*)
-          write(*,"(a,1x,a)"           ) "WARNING in"                          &
-                                       , "EQUATIONS::cons2prim_srmhd_adi()"
-          write(*,"(a,9(1x,1e24.16e3))") "Negative pressure for U = ", u(1:nv,i)
+          call print_warning(loc,                                              &
+                               "Conversion to physical primitive state" //     &
+                               " resulted in negative pressure!")
+          write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
           write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
                                                        , dn, mm, mb, bb, en, w
-          write(*,"(a,1(1x,1e24.16e3))") "Pressure corrected to ", pmin
-          q(ipr,i) = pmin
+
+! set pressure to zero so we can hopefully fix it later
+!
+          q(ipr,i) = 0.0d+00
 
         end if ! p <= 0
 
       else ! unphysical state
 
-        write(*,*)
-        write(*,"(a,1x,a)"           ) "ERROR in"                              &
-                                     , "EQUATIONS::cons2prim_srmhd_adi()"
-        write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
-        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = ", dn, mm, mb &
-                                                                  , bb, en
+        call print_warning(loc,                                                &
+                             "Conversion to physical primitive state failed!")
+        write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
+        write(*,"(a,5(1x,1e24.16e3))") "D, |m|², m.B, |B|², E = ", dn, mm, mb  &
+                                                                 , bb, en
+
+! set pressure to zero so we can hopefully fix it later
+!
+        q(ipr,i) = 0.0d+00
 
       end if ! unphysical state
 
