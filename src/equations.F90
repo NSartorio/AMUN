@@ -4665,8 +4665,9 @@ module equations
           call print_warning(loc,                                              &
                                "Conversion to physical primitive state" //     &
                                " resulted in negative pressure!")
-          write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
-          write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
+          write(*,"(a,9(1x,1e24.16e3))") "U                        = "         &
+                                                       , u(1:nv,i)
+          write(*,"(a,6(1x,1e24.16e3))") "D, |m|², m.B, |B|², E, W = "         &
                                                        , dn, mm, mb, bb, en, w
 
 ! set pressure to zero so we can hopefully fix it later
