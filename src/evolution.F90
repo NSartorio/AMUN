@@ -1990,6 +1990,7 @@ module evolution
 !
     use boundaries    , only : boundary_variables
     use equations     , only : update_primitive_variables
+    use equations     , only : fix_unphysical_cells, correct_unphysical_states
     use shapes        , only : update_shapes
 
 ! include external variables
@@ -2032,6 +2033,20 @@ module evolution
 ! update boundaries
 !
     call boundary_variables(tm, dtm)
+
+! correct unphysical states if detected
+!
+    if (fix_unphysical_cells) then
+      pdata => list_data
+      do while (associated(pdata))
+        pmeta => pdata%meta
+
+        if (pmeta%update) call correct_unphysical_states(pmeta%id              &
+                                                           , pdata%q, pdata%u)
+
+        pdata => pdata%next
+      end do
+    end if
 
 ! apply shapes in blocks which need it
 !
