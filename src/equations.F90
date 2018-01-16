@@ -158,9 +158,9 @@ module equations
   integer          , save :: nrmax   = 100
   integer          , save :: nrext   = 2
 
-! flags for reconstruction corrections
+! flags for corrections
 !
-  logical          , save :: positivity = .false.
+  logical          , save :: fix_unphysical_cells = .false.
 
 ! by default everything is private
 !
@@ -174,6 +174,7 @@ module equations
   public :: maxspeed, reset_maxspeed, get_maxspeed
   public :: eigensystem_roe
   public :: update_primitive_variables
+  public :: fix_unphysical_cells, correct_unphysical_states
   public :: gamma
   public :: csnd, csnd2
   public :: cmax, cmax2
@@ -231,7 +232,7 @@ module equations
     character(len=255)     :: name_eqsys     = ""
     character(len=255)     :: name_eos       = ""
     character(len=255)     :: name_c2p       = ""
-    character(len=255)     :: positivity_fix = "off"
+    character(len=255)     :: unphysical_fix = "off"
 !
 !-------------------------------------------------------------------------------
 !
@@ -854,17 +855,17 @@ module equations
 !
     msfac = 1.0d+00 / (gamma * msmax**2)
 
-! get the positivity fix flag
+! get the state correction flags
 !
-    call get_parameter_string("fix_positivity", positivity_fix )
+    call get_parameter_string("fix_unphysical_cells", unphysical_fix )
 
-! check additional reconstruction limiting
+! check if the correction of unphysical cells is on
 !
-    select case(trim(positivity_fix))
+    select case(trim(unphysical_fix))
     case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
-      positivity = .true.
+      fix_unphysical_cells = .true.
     case default
-      positivity = .false.
+      fix_unphysical_cells = .false.
     end select
 
 ! print information about the equation module
@@ -876,6 +877,8 @@ module equations
       if (relativistic) then
         write (*,"(4x,a,1x,a)"    ) "variable conversion    =", trim(name_c2p)
       end if
+      write (*,"(4x,a20, 3x,'=',1x,a)") "fix unphysical cells"                 &
+                                                        , trim(unphysical_fix)
 
     end if
 
@@ -1043,7 +1046,6 @@ module equations
 ! temporary variables
 !
     integer      :: i, j, k
-    real(kind=8) :: pmin
 !
 !-------------------------------------------------------------------------------
 !
@@ -1058,37 +1060,6 @@ module equations
 
       end do ! j = jb, je
     end do ! k = kb, ke
-
-! fix negative pressure is desired
-!
-    if (positivity .and. ipr > 0) then
-
-! iterate over block interior
-!
-      do k = kb, ke
-        do j = jb, je
-          do i = ib, ie
-
-! fix the cells where pressure is negative
-!
-            if (qq(ipr,i,j,k) <= 0.0d+00) then
-
-! calculate pressure from the sonic Mach number limit and local velocity
-!
-              pmin          = msfac * qq(idn,i,j,k) * sum(qq(ivx:ivz,i,j,k)**2)
-
-! update total energy and pressure
-!
-              uu(ien,i,j,k) = uu(ien,i,j,k) + gammam1i * (pmin - qq(ipr,i,j,k))
-              qq(ipr,i,j,k) = pmin
-
-            end if
-
-          end do ! i = ib, ie
-        end do ! j = jb, je
-      end do ! k = kb, ke
-
-    end if
 
 ! fill out the borders
 !
@@ -1116,6 +1087,173 @@ module equations
 !-------------------------------------------------------------------------------
 !
   end subroutine update_primitive_variables
+!
+!===============================================================================
+!
+! subroutine CORRECT_UNPHYSICAL_STATES:
+! ------------------------------------
+!
+!   Subroutine seeks for unphysical states (cells with negative density or
+!   pressure) and try to fix them by averaging their values from physical
+!   neighbours.
+!
+!   Arguments:
+!
+!     id - the block id where the states are being checked;
+!     qq - the output array of primitive variables;
+!     uu - the input array of conservative variables;
+!
+!===============================================================================
+!
+  subroutine correct_unphysical_states(id, qq, uu)
+
+! include external procedures and variables
+!
+    use coordinates, only : im, jm, km
+    use error      , only : print_warning, print_error
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! input/output arguments
+!
+    integer(kind=4)                     , intent(in)    :: id
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: qq
+    real(kind=8), dimension(nv,im,jm,km), intent(inout) :: uu
+
+! temporary variables
+!
+    character(len=255) :: msg
+    integer            :: n, p, nc, np
+    integer            :: i, il, iu
+    integer            :: j, jl, ju
+    integer            :: k, kl, ku
+
+! temporary arrays
+!
+    logical, dimension(im,jm,km) :: physical
+
+! allocatable arrays
+!
+    integer     , dimension(:,:), allocatable :: idx
+    real(kind=8), dimension(:,:), allocatable :: q, u
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::correct_unphysical_states()'
+!
+!-------------------------------------------------------------------------------
+!
+! search for negative density or pressure
+!
+    physical(:,:,:) = qq(idn,:,:,:) > 0.0d+00
+    if (ipr > 0) then
+      physical(:,:,:) = physical(:,:,:) .and. qq(ipr,:,:,:) > 0.0d+00
+    end if
+
+! apply averaging for unphysical states
+!
+    if (.not. all(physical)) then
+
+! count unphysical cells
+!
+      nc = count(.not. physical)
+
+! inform about the encountered unphysical states
+!
+      write(msg,'(i4,1x,a,1x,i6)') nc, "unphysical states in block", id
+      call print_warning(loc, trim(msg))
+
+! allocate temporary vectors for unphysical states
+!
+      allocate(q(nv,nc), u(nv,nc), idx(3,nc))
+
+! iterate over block cells
+!
+      n = 0
+      do k = 1, km
+        do j = 1, jm
+          do i = 1, im
+
+! fix unphysical states
+!
+            if (.not. physical(i,j,k)) then
+
+              n        = n + 1
+
+              idx(:,n) = (/ i, j, k /)
+
+! increase the region until we find at least two physical cells, but no more
+! than 2 cells away
+!
+              np = 0
+              p  = 1
+              do while (n < 2 .and. p < 3)
+                il = max( 1, i - p)
+                iu = min(im, i + p)
+                jl = max( 1, j - p)
+                ju = min(jm, j + p)
+                kl = max( 1, k - p)
+                ku = min(km, k + p)
+
+                np = count(physical(il:iu,jl:ju,kl:ku))
+
+                p  = p + 1
+              end do
+
+! average primitive variables
+!
+              if (np >= 2) then
+
+                do p = 1, nv
+                  q(p,n) = sum(qq(p,il:iu,jl:ju,kl:ku),                        &
+                                            physical(il:iu,jl:ju,kl:ku))       &
+                                    / np
+                end do
+
+              else
+
+! print error, since no physical cells found for averaging
+!
+                write(msg,'(a,a)')                                             &
+                              "Not sufficient number of physical cells found!" &
+                            , "Cannot correct the unphysical cell."
+                call print_error(loc, trim(msg))
+                stop
+
+              end if ! not sufficient number of physical cells for averaging
+
+            end if ! not physical
+
+          end do ! i = 1, im
+        end do ! j = 1, jm
+      end do ! k = 1, km
+
+! convert the vector of primitive variables to conservative ones
+!
+      call prim2cons(nc, q(1:nc,1:nc), u(1:nv,1:nc))
+
+! update block variables
+!
+      do n = 1, nc
+        i = idx(1,n)
+        j = idx(2,n)
+        k = idx(3,n)
+
+        qq(1:nv,i,j,k) = q(1:nv,n)
+        uu(1:nv,i,j,k) = u(1:nv,n)
+      end do
+
+! deallocate temporary vectors
+!
+      deallocate(q, u, idx)
+
+    end if ! there are unphysical cells
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine correct_unphysical_states
 !
 !===============================================================================
 !!
@@ -3337,6 +3475,10 @@ module equations
 !
   subroutine cons2prim_srhd_adi(n, u, q)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -3353,6 +3495,10 @@ module equations
     integer      :: i
     real(kind=8) :: mm, bb, mb, en, dn
     real(kind=8) :: w , vv, vm, vs
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::cons2prim_srhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3393,15 +3539,17 @@ module equations
         q(ivz,i) = u(imz,i) / w
         q(ipr,i) = w - en
 
-      else ! unphysical state
+      else ! cannot find physical solution
 
-        write(*,"(a,1x,a)"           ) "ERROR in"                              &
-                                     , "EQUATIONS::cons2prim_srhd_adi()"
-        write(*,"(a,5(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
-        write(*,"(a,3(1x,1e24.16e3))") "            D, |m|², E = ", dn, mm, en
-        stop
+        call print_warning(loc, "Conversion to physical primitive state failed!")
+        write(*,"(a,5(1x,1e24.16e3))") "U          = ", u(1:nv,i)
+        write(*,"(a,3(1x,1e24.16e3))") "D, |m|², E = ", dn, mm, en
 
-      end if ! unphysical state
+! set pressure to zero so we can hopefully fix it later
+!
+        q(ipr,i) = 0.0d+00
+
+      end if
 
     end do ! i = 1, n
 
@@ -4436,6 +4584,10 @@ module equations
 !
   subroutine cons2prim_srmhd_adi(n, u, q)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -4452,6 +4604,10 @@ module equations
     integer      :: i
     real(kind=8) :: mm, mb, bb, en, dn
     real(kind=8) :: w, wt, vv, vm, vs, vb, fc
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::cons2prim_srmhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4506,25 +4662,30 @@ module equations
 !
         if (q(ipr,i) <= 0.0d+00) then
 
-          write(*,*)
-          write(*,"(a,1x,a)"           ) "WARNING in"                          &
-                                       , "EQUATIONS::cons2prim_srmhd_adi()"
-          write(*,"(a,9(1x,1e24.16e3))") "Negative pressure for U = ", u(1:nv,i)
+          call print_warning(loc,                                              &
+                               "Conversion to physical primitive state" //     &
+                               " resulted in negative pressure!")
+          write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
           write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "        &
                                                        , dn, mm, mb, bb, en, w
-          write(*,"(a,1(1x,1e24.16e3))") "Pressure corrected to ", pmin
-          q(ipr,i) = pmin
+
+! set pressure to zero so we can hopefully fix it later
+!
+          q(ipr,i) = 0.0d+00
 
         end if ! p <= 0
 
       else ! unphysical state
 
-        write(*,*)
-        write(*,"(a,1x,a)"           ) "ERROR in"                              &
-                                     , "EQUATIONS::cons2prim_srmhd_adi()"
-        write(*,"(a,9(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
-        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = ", dn, mm, mb &
-                                                                  , bb, en
+        call print_warning(loc,                                                &
+                             "Conversion to physical primitive state failed!")
+        write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
+        write(*,"(a,5(1x,1e24.16e3))") "D, |m|², m.B, |B|², E = ", dn, mm, mb  &
+                                                                 , bb, en
+
+! set pressure to zero so we can hopefully fix it later
+!
+        q(ipr,i) = 0.0d+00
 
       end if ! unphysical state
 
