@@ -3475,6 +3475,10 @@ module equations
 !
   subroutine cons2prim_srhd_adi(n, u, q)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -3491,6 +3495,10 @@ module equations
     integer      :: i
     real(kind=8) :: mm, bb, mb, en, dn
     real(kind=8) :: w , vv, vm, vs
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::cons2prim_srhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3531,15 +3539,17 @@ module equations
         q(ivz,i) = u(imz,i) / w
         q(ipr,i) = w - en
 
-      else ! unphysical state
+      else ! cannot find physical solution
 
-        write(*,"(a,1x,a)"           ) "ERROR in"                              &
-                                     , "EQUATIONS::cons2prim_srhd_adi()"
-        write(*,"(a,5(1x,1e24.16e3))") "Unphysical state for U = ", u(1:nv,i)
-        write(*,"(a,3(1x,1e24.16e3))") "            D, |m|², E = ", dn, mm, en
-        stop
+        call print_warning(loc, "Conversion to physical primitive state failed!")
+        write(*,"(a,5(1x,1e24.16e3))") "U          = ", u(1:nv,i)
+        write(*,"(a,3(1x,1e24.16e3))") "D, |m|², E = ", dn, mm, en
 
-      end if ! unphysical state
+! set pressure to zero so we can hopefully fix it later
+!
+        q(ipr,i) = 0.0d+00
+
+      end if
 
     end do ! i = 1, n
 
