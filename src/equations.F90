@@ -158,9 +158,8 @@ module equations
   integer          , save :: nrmax   = 100
   integer          , save :: nrext   = 2
 
-! flags for reconstruction corrections
+! flags for corrections
 !
-  logical          , save :: positivity           = .false.
   logical          , save :: fix_unphysical_cells = .false.
 
 ! by default everything is private
@@ -233,7 +232,6 @@ module equations
     character(len=255)     :: name_eqsys     = ""
     character(len=255)     :: name_eos       = ""
     character(len=255)     :: name_c2p       = ""
-    character(len=255)     :: positivity_fix = "off"
     character(len=255)     :: unphysical_fix = "off"
 !
 !-------------------------------------------------------------------------------
@@ -857,19 +855,12 @@ module equations
 !
     msfac = 1.0d+00 / (gamma * msmax**2)
 
-! get the positivity fix flag
+! get the state correction flags
 !
-    call get_parameter_string("fix_positivity"      , positivity_fix )
     call get_parameter_string("fix_unphysical_cells", unphysical_fix )
 
-! check additional reconstruction limiting
+! check if the correction of unphysical cells is on
 !
-    select case(trim(positivity_fix))
-    case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
-      positivity = .true.
-    case default
-      positivity = .false.
-    end select
     select case(trim(unphysical_fix))
     case ("on", "ON", "t", "T", "y", "Y", "true", "TRUE", "yes", "YES")
       fix_unphysical_cells = .true.
@@ -1055,7 +1046,6 @@ module equations
 ! temporary variables
 !
     integer      :: i, j, k
-    real(kind=8) :: pmin
 !
 !-------------------------------------------------------------------------------
 !
@@ -1070,37 +1060,6 @@ module equations
 
       end do ! j = jb, je
     end do ! k = kb, ke
-
-! fix negative pressure is desired
-!
-    if (positivity .and. ipr > 0) then
-
-! iterate over block interior
-!
-      do k = kb, ke
-        do j = jb, je
-          do i = ib, ie
-
-! fix the cells where pressure is negative
-!
-            if (qq(ipr,i,j,k) <= 0.0d+00) then
-
-! calculate pressure from the sonic Mach number limit and local velocity
-!
-              pmin          = msfac * qq(idn,i,j,k) * sum(qq(ivx:ivz,i,j,k)**2)
-
-! update total energy and pressure
-!
-              uu(ien,i,j,k) = uu(ien,i,j,k) + gammam1i * (pmin - qq(ipr,i,j,k))
-              qq(ipr,i,j,k) = pmin
-
-            end if
-
-          end do ! i = ib, ie
-        end do ! j = jb, je
-      end do ! k = kb, ke
-
-    end if
 
 ! fill out the borders
 !
