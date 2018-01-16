@@ -127,7 +127,8 @@ driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
                    gravity.o integrals.o interpolations.o io.o mesh.o          \
                    mpitools.o operators.o parameters.o problems.o random.o     \
                    refinement.o schemes.o shapes.o sources.o user_problem.o
-equations.o      : equations.F90 algebra.o coordinates.o parameters.o timers.o
+equations.o      : equations.F90 algebra.o coordinates.o error.o parameters.o  \
+                   timers.o
 error.o          : error.F90
 evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
                    equations.o mesh.o mpitools.o parameters.o schemes.o        \
