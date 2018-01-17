@@ -1189,7 +1189,7 @@ module equations
 !
               np = 0
               p  = 1
-              do while (n < 2 .and. p < 3)
+              do while (np < 2 .and. p <= 4)
                 il = max( 1, i - p)
                 iu = min(im, i + p)
                 jl = max( 1, j - p)
