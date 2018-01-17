@@ -1165,8 +1165,8 @@ module equations
 !
       write(sid,'(i15)') id
       write(snc,'(i15)') nc
-      write(msg,'("Unphysical cells in block ID:",a," (",a," counted)")')      &
-                                                     trim(sid), trim(snc)
+      write(msg,'("Unphysical cells in block ID:",a," (",a," counted).")')     &
+                                        trim(adjustl(sid)), trim(adjustl(snc))
       call print_warning(loc, trim(msg))
 
 ! allocate temporary vectors for unphysical states
