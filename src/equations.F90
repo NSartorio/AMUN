@@ -1125,6 +1125,7 @@ module equations
 ! temporary variables
 !
     character(len=255) :: msg
+    character(len=16)  :: sid, snc
     integer            :: n, p, nc, np
     integer            :: i, il, iu
     integer            :: j, jl, ju
@@ -1162,7 +1163,10 @@ module equations
 
 ! inform about the encountered unphysical states
 !
-      write(msg,'(i4,1x,a,1x,i6)') nc, "unphysical states in block", id
+      write(sid,'(i15)') id
+      write(snc,'(i15)') nc
+      write(msg,'("Unphysical cells in block ID:",a," (",a," counted)")')      &
+                                                     trim(sid), trim(snc)
       call print_warning(loc, trim(msg))
 
 ! allocate temporary vectors for unphysical states
@@ -1184,12 +1188,12 @@ module equations
 
               idx(:,n) = (/ i, j, k /)
 
-! increase the region until we find at least two physical cells, but no more
-! than 2 cells away
+! increase the region until we find at least three physical cells, but no more
+! than 4 cells away
 !
               np = 0
               p  = 1
-              do while (np < 2 .and. p <= 4)
+              do while (np <= 2 .and. p <= 4)
                 il = max( 1, i - p)
                 iu = min(im, i + p)
                 jl = max( 1, j - p)
@@ -1204,7 +1208,7 @@ module equations
 
 ! average primitive variables
 !
-              if (np >= 2) then
+              if (np > 2) then
 
                 do p = 1, nv
                   q(p,n) = sum(qq(p,il:iu,jl:ju,kl:ku),                        &
@@ -1216,9 +1220,9 @@ module equations
 
 ! print error, since no physical cells found for averaging
 !
-                write(msg,'(a,a)')                                             &
-                              "Not sufficient number of physical cells found!" &
-                            , "Cannot correct the unphysical cell."
+                write(msg,'(a,1x,a)')                                          &
+                              "Cannot correct the unphysical cell."            &
+                            , "Not sufficient number of physical neighbors!"
                 call print_error(loc, trim(msg))
                 stop
 
