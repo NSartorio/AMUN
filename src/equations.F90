@@ -5587,6 +5587,10 @@ module equations
 !
   subroutine nr_iterate_srmhd_adi_1dw(mm, bb, mb, en, dn, w, vv, info)
 
+! include external procedures
+!
+    use error, only : print_warning
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -5604,6 +5608,10 @@ module equations
     real(kind=8) :: wl, wu, fl, fu
     real(kind=8) :: f , df, dw
     real(kind=8) :: err
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::nr_iterate_srmhd_adi_1dw()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5616,104 +5624,80 @@ module equations
 ! find the initial brackets and estimate the initial enthalpy
 !
     call nr_initial_brackets_srmhd_adi(mm, bb, mb, en, dn                      &
-                                                     , wl, wu, w, fl, fu, info)
+                                                 , wl, wu, w, fl, fu, info)
 
-! if the brackets could not be found, return the lower bracket as the solution
+! continue if brackets found
 !
-    if (.not. info) then
-      write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
-      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+    if (info) then
 
-! use the lower bracket, since it guarantees the positive pressure
+! initialize iteration parameters
 !
-      w = wl
+      info = .true.
+      keep = .true.
+      it   = nrmax
+      cn   = nrext
+
+! iterate using the Newton-Raphson method in order to find a root w of the
+! function
+!
+      do while(keep)
+
+! calculate F(W) and dF(W)/dW
+!
+        call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, w, f, df)
+
+! update brackets
+!
+        if (f > fl .and. f < 0.0d+00) then
+          wl = w
+          fl = f
+        end if
+        if (f < fu .and. f > 0.0d+00) then
+          wu = w
+          fu = f
+        end if
+
+! calculate the increment dW, update the solution, and estimate the error
+!
+        dw  = f / df
+        w   = w - dw
+        err = abs(dw / w)
+
+! check the convergence, if the convergence is not reached, iterate until
+! the maximum number of iteration is reached
+!
+        if (err < tol) then
+          keep = cn > 0
+          cn   = cn - 1
+        else
+          keep = it > 0
+        end if
+
+! if new W lays out of the brackets, use the bisection method to estimate
+! the new guess
+!
+        if (w < wl .or. w > wu) then
+          w = 0.5d+00 * (wl + wu)
+        end if
+
+! decrease the number of remaining iterations
+!
+        it = it - 1
+
+      end do ! NR iterations
+
+! let know the user if the convergence failed
+!
+      if (err >= tol) then
+        call print_warning(loc, "Convergence not reached!")
+        write(*,"(a,1x,1e24.16e3)") "Error: ", err
+      end if
 
 ! calculate |V|² from W
 !
       call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
 
-      info = .true.
-      return
-
-    end if
-
-! initialize iteration parameters
-!
-    info = .true.
-    keep = .true.
-    it   = nrmax
-    cn   = nrext
-
-! iterate using the Newton-Raphson method in order to find a root w of the
-! function
-!
-    do while(keep)
-
-! calculate F(W) and dF(W)/dW
-!
-      call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, w, f, df)
-
-! update brackets
-!
-      if (f > fl .and. f < 0.0d+00) then
-        wl = w
-        fl = f
-      end if
-      if (f < fu .and. f > 0.0d+00) then
-        wu = w
-        fu = f
-      end if
-
-! calculate the increment dW
-!
-      dw  = f / df
-
-! update the solution
-!
-      w   = w - dw
-
-! calculate the error
-!
-      err = abs(dw / w)
-
-! check the convergence, if the convergence is not reached, iterate until
-! the maximum number of iteration is reached
-!
-      if (err < tol) then
-        keep = cn > 0
-        cn   = cn - 1
-      else
-        keep = it > 0
-      end if
-
-! if new W lays out of the brackets, use the bisection method to estimate
-! the new guess
-!
-      if (w < wl .or. w > wu) then
-        w = 0.5d+00 * (wl + wu)
-      end if
-
-! decrease the number of remaining iterations
-!
-      it = it - 1
-
-    end do ! NR iterations
-
-! calculate |V|² from W
-!
-    call nr_velocity_srmhd_adi_1d(mm, bb, mb, w, vv)
-
-! let know the user if the convergence failed
-!
-    if (err >= tol) then
-      write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
-    end if
+    end if ! correct brackets
 
 #ifdef PROFILE
 ! stop accounting time for variable solver
