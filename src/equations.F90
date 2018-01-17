@@ -3522,7 +3522,7 @@ module equations
       en  = u(ien,i) + u(idn,i)
       dn  = u(idn,i)
 
-! find the exact W using an Newton-Ralphson interative method
+! find the exact W using the Newton-Ralphson interative method
 !
       call nr_iterate(mm, bb, mb, en, dn, w, vv, info)
 
@@ -3873,124 +3873,135 @@ module equations
     call start_timer(imp)
 #endif /* PROFILE */
 
+! check if the state is physical; this can save some time if unphysical state
+! is considered
+!
+    wl = sqrt(mm + dn * dn)
+    if (en > wl) then
+
 ! prepare the initial brackets
 !
-    wl   = sqrt(mm + dn * dn) + gammaxi * pmin
-    wu   = en + pmin
+      wl = wl + gammaxi * pmin
+      wu = en + pmin
 
 ! calculate the value of function for the lower bracket
 !
-    call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
+      call nr_function_srhd_adi_1d(mm, en, dn, wl, fl)
 
 ! the lower bracket gives negative function, so there is chance it bounds
 ! the root
 !
-    if (fl < 0.0d+00) then
+      if (fl < 0.0d+00) then
 
 ! make sure that the upper bracket is larger than the lower one and
 ! the function has positive value
 !
-      if (wu <= wl) wu = 2.0d+00 * wl
+        if (wu <= wl) wu = 2.0d+00 * wl
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
 !
-      call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
-      it   = nrmax
-      keep = fl * fu > 0.0d+00
-      do while (keep)
-        it = it - 1
-        wl = wu
-        fl = fu
-        wu = 2.0d+00 * wu
         call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
-        keep = (fl * fu > 0.0d+00) .and. it > 0
-      end do
+        it   = nrmax
+        keep = fl * fu > 0.0d+00
+        do while (keep)
+          it = it - 1
+          wl = wu
+          fl = fu
+          wu = 2.0d+00 * wu
+          call nr_function_srhd_adi_1d(mm, en, dn, wu, fu)
+          keep = (fl * fu > 0.0d+00) .and. it > 0
+        end do
 
 ! the upper bracket was found, so proceed with determining the root
 !
-      if (it > 0 .and. fu >= 0.0d+00) then
+        if (it > 0 .and. fu >= 0.0d+00) then
 
 ! estimate the value of enthalpy close to the root and corresponding v²
 !
-        w = wl - fl * (wu - wl) / (fu - fl)
+          w = wl - fl * (wu - wl) / (fu - fl)
 
 ! initialize iteration parameters
 !
-        info = .true.
-        keep = .true.
-        it   = nrmax
-        cn   = nrext
+          info = .true.
+          keep = .true.
+          it   = nrmax
+          cn   = nrext
 
 ! iterate using the Newton-Raphson method in order to find a root w of the
 ! function
 !
-        do while(keep)
+          do while(keep)
 
 ! calculate F(W) and dF(W)/dW
 !
-          call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
+            call nr_function_srhd_adi_1d(mm, en, dn, w, f, df)
 
 ! update brackets
 !
-          if (f > fl .and. f < 0.0d+00) then
-            wl = w
-            fl = f
-          end if
-          if (f < fu .and. f > 0.0d+00) then
-            wu = w
-            fu = f
-          end if
+            if (f > fl .and. f < 0.0d+00) then
+              wl = w
+              fl = f
+            end if
+            if (f < fu .and. f > 0.0d+00) then
+              wu = w
+              fu = f
+            end if
 
 ! calculate the increment dW, update the solution, and estimate the error
 !
-          dw  = f / df
-          w   = w - dw
-          err = abs(dw / w)
+            dw  = f / df
+            w   = w - dw
+            err = abs(dw / w)
 
 ! check the convergence, if the convergence is not reached, iterate until
 ! the maximum number of iteration is reached
 !
-          if (err < tol) then
-            keep = cn > 0
-            cn   = cn - 1
-          else
-            keep = it > 0
-          end if
+            if (err < tol) then
+              keep = cn > 0
+              cn   = cn - 1
+            else
+              keep = it > 0
+            end if
 
 ! if new W leaves the brackets, use the bisection method to estimate
 ! the new guess
 !
-          if (w < wl .or. w > wu) then
-            w = 0.5d+00 * (wl + wu)
-          end if
+            if (w < wl .or. w > wu) then
+              w = 0.5d+00 * (wl + wu)
+            end if
 
-          it = it - 1
-        end do ! NR iterations
+            it = it - 1
+          end do ! NR iterations
 
 ! print information about failed convergence or unphysical variables
 !
-        if (err >= tol) then
-          call print_warning(loc, "Convergence not reached!")
-          write(*,"(a,1x,1e24.16e3)") "Error: ", err
-        end if
+          if (err >= tol) then
+            call print_warning(loc, "Convergence not reached!")
+            write(*,"(a,1x,1e24.16e3)") "Error: ", err
+          end if
 
 ! calculate |V|² from W
 !
-        vv  = mm / (w * w)
+          vv  = mm / (w * w)
 
-      else ! the upper brack not found
-        call print_warning(loc, "Could not find the upper bracket!")
+        else ! the upper brack not found
+          call print_warning(loc, "Could not find the upper bracket!")
+          info = .false.
+
+        end if
+
+      else if (fl == 0.0d+00) then ! the lower bracket is a root, so return it
+        w    = wl
+        info = .true.
+
+      else ! the root cannot be found, since it is below the lower bracket
+        call print_warning(loc, "Positive function for lower bracket!")
         info = .false.
-
       end if
 
-    else if (fl == 0.0d+00) then ! the lower bracket is a root, so return it
-      w    = wl
-      info = .true.
-
-    else ! the root cannot be found, since it is below the lower bracket
-      call print_warning(loc, "Positive function for lower bracket!")
+    else ! the state is unphysical
+      call print_warning(loc, "The state is not physical!")
       info = .false.
     end if
 
