@@ -5506,6 +5506,10 @@ module equations
 !
         wc = wl - fl * (wu - wl) / (fu - fl)
 
+! we have good brackets and guess, so good to go
+!
+        info = .true.
+
       else ! the upper brack not found
         call print_warning(loc, "Could not find the upper bracket!")
         write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
