@@ -5363,7 +5363,8 @@ module equations
 
 ! include external procedures
 !
-    use algebra        , only : cubic_normalized, quartic
+    use algebra, only : cubic_normalized, quartic
+    use error  , only : print_warning
 
 ! local variables are not implicit by default
 !
@@ -5387,6 +5388,11 @@ module equations
 !
     real(kind=8), dimension(5) :: a
     real(kind=8), dimension(4) :: x
+
+! local parameters
+!
+    character(len=*), parameter :: loc =                                       &
+                                  'EQUATIONS::nr_initial_brackets_srmhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5450,29 +5456,19 @@ module equations
       keep = .true.
       it   = nrmax
       wl   = wu
-
       do while(keep)
-
         call nr_pressure_srmhd_adi_1d(mm, bb, mb, ec, dn, wl, f, df)
-
         dw   = f / df
         wl   = wl - dw
-
         err  = abs(dw / wl)
         it   = it - 1
         keep = (err > tol) .and. it > 0
-
       end do
-
       if (it <= 0) then
-        write(*,*)
-        write(*,"(a,1x,a)") "ERROR in"                                         &
-                          , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
-        write(*,"(a)"     ) "Could not find the lower limit for the enthalpy!"
+        call print_warning(loc,                                                &
+                         "Iterative solver failed to find the lower bracket!")
         write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
                                                           , dn, mm, mb, bb, en
-        info = .false.
-        return
       end if
 
     end if ! nr > 0
@@ -5481,71 +5477,49 @@ module equations
 !
     call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wl, fl)
 
-    if (fl > 0.0d+00) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_initial_brackets_srmhd_adi()"
-      write(*,"(a)"     ) "Lower limit positive!"
-      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
-                                                      , dn, mm, mb, bb, en, wl
-      info = .false.
-      return
-    end if
+    if (fl <= 0.0d+00) then
 
 ! make sure that the upper limit is larger than the lower one
 !
-    keep = wl >= wu
-    it   = nrmax
-    do while(keep)
-      wu   = 2.0d+00 * wu
-      it   = it - 1
-      keep = (wl >= wu) .and. it > 0
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "Could not find the upper limit for enthalpy!"
-      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
-                                                      , dn, mm, mb, bb, en, wl
-      info = .false.
-      return
-    end if
+      if (wu <= wl) wu = 2.0d+00 * wl
 
 ! check if the brackets bound the root region, if not proceed until
 ! opposite function signs are found for the brackets
 !
-    call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
-
-    keep = (fl * fu > 0.0d+00)
-    it   = nrmax
-
-    do while (keep)
-
-      wl = wu
-      fl = fu
-      wu = 2.0d+00 * wu
-
       call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+      it   = nrmax
+      keep = fl * fu > 0.0d+00
+      do while (keep)
+        it = it - 1
+        wl = wu
+        fl = fu
+        wu = 2.0d+00 * wu
+        call nr_function_srmhd_adi_1d(mm, bb, mb, en, dn, wu, fu)
+        keep = (fl * fu > 0.0d+00) .and. it > 0
+      end do
 
-      it   = it - 1
-      keep = (fl * fu > 0.0d+00) .and. it > 0
-
-    end do
-    if (it <= 0) then
-      write(*,*)
-      write(*,"(a,1x,a)") "ERROR in"                                           &
-                        , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a)"     ) "No initial brackets found!"
-      write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "               &
-                                                          , dn, mm, mb, bb, en
-      info = .false.
-      return
-    end if
+! the upper bracket was found, so proceed with determining the root
+!
+      if (it > 0 .and. fu >= 0.0d+00) then
 
 ! estimate the enthalpy value close to the root
 !
-    wc   = wl - fl * (wu - wl) / (fu - fl)
+        wc = wl - fl * (wu - wl) / (fu - fl)
+
+      else ! the upper brack not found
+        call print_warning(loc, "Could not find the upper bracket!")
+        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
+                                                          , dn, mm, mb, bb, en
+        info = .false.
+
+      end if
+
+    else ! the root cannot be found, since it is below the lower bracket
+      call print_warning(loc, "Positive function for lower bracket!")
+      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
+                                                      , dn, mm, mb, bb, en, wl
+      info = .false.
+    end if
 
 #ifdef PROFILE
 ! stop accounting time for the initial brackets
