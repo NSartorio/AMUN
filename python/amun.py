@@ -145,14 +145,27 @@ def amun_dataset(fname, vname):
   # add derived variables if possible
   #
   if (eqsys == 'hd' or eqsys == 'mhd') \
+                    and eos == 'adi' \
+                    and 'pres' in variables:
+    variables.append('eint')
+  if (eqsys == 'hd' or eqsys == 'mhd') \
                     and 'dens' in variables \
                     and 'velx' in variables \
                     and 'vely' in variables \
                     and 'velz' in variables:
     variables.append('ekin')
-  if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
-                    and 'pres' in variables:
-    variables.append('eint')
+  if (eqsys == 'mhd' or eqsys == 'srmhd') \
+                     and 'magx' in variables \
+                     and 'magy' in variables \
+                     and 'magz' in variables:
+    variables.append('emag')
+  if eqsys == 'hd' and 'ekin' in variables \
+                   and 'eint' in variables:
+    variables.append('etot')
+  if eqsys == 'mhd' and 'eint' in variables \
+                    and 'ekin' in variables \
+                    and 'emag' in variables:
+    variables.append('etot')
 
   # check if the requested variable is in the variable list
   #
@@ -194,6 +207,15 @@ def amun_dataset(fname, vname):
                                             + g['velz'][:,:,:,:]**2)
       elif vname == 'eint':
         dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:]
+      elif vname == 'etot':
+        dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:] \
+                + 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
+                                            + g['vely'][:,:,:,:]**2 \
+                                            + g['velz'][:,:,:,:]**2)
+        if eqsys == 'mhd':
+          dataset += 0.5 * (g['magx'][:,:,:,:]**2 \
+                          + g['magy'][:,:,:,:]**2 \
+                          + g['magz'][:,:,:,:]**2)
       else:
         dataset = g[vname][:,:,:,:]
       if ndims == 3:
