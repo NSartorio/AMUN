@@ -159,6 +159,8 @@ def amun_dataset(fname, vname, progress = False):
   if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
                     and 'pres' in variables:
     variables.append('eint')
+    if 'dens' in variables:
+      variables.append('temp')
   if (eqsys == 'hd' or eqsys == 'mhd') \
                     and 'dens' in variables \
                     and 'velx' in variables \
@@ -241,6 +243,8 @@ def amun_dataset(fname, vname, progress = False):
           dataset += 0.5 * (g['magx'][:,:,:,:]**2 \
                           + g['magy'][:,:,:,:]**2 \
                           + g['magz'][:,:,:,:]**2)
+      elif vname == 'temp':
+        dataset = g['pres'][:,:,:,:] / g['dens'][:,:,:,:]
       elif vname == 'lore':
         dataset = 1.0 / np.sqrt(1.0 - (g['velx'][:,:,:,:]**2 \
                                      + g['vely'][:,:,:,:]**2 \
