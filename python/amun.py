@@ -155,6 +155,7 @@ def amun_dataset(fname, vname, progress = False):
   if 'velx' in variables and 'vely' in variables and 'velz' in variables:
     variables.append('velo')
     variables.append('divv')
+    variables.append('vort')
   if 'magx' in variables and 'magy' in variables and 'magz' in variables:
     variables.append('magn')
     variables.append('divb')
@@ -272,6 +273,41 @@ def amun_dataset(fname, vname, progress = False):
           dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
                           - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
                                                     / h[i][levels[:] - 1]
+      elif vname == 'vort':
+        if ndims == 3:
+          wx = 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
+                    - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
+                                                / dy[levels[:]-1] \
+             - 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 0)  \
+                    - np.roll(g['vely'][:,:,:,:],  1, axis = 0)) \
+                                                / dz[levels[:]-1]
+          wy = 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 0)  \
+                    - np.roll(g['velx'][:,:,:,:],  1, axis = 0)) \
+                                                / dz[levels[:]-1] \
+             - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
+                    - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
+                                                / dx[levels[:]-1]
+          wz = 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
+                    - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
+                                                / dx[levels[:]-1] \
+             - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
+                    - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
+                                                / dy[levels[:]-1]
+        else:
+          wx =   0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
+                                                 / dy[levels[:]-1]
+          wy = - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
+                                                 / dx[levels[:]-1]
+          wz =   0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
+                                                 / dx[levels[:]-1] \
+               - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
+                                                 / dy[levels[:]-1]
+        dataset = np.sqrt(wx * wx + wy * wy + wz * wz)
+
       else:
         dataset = g[vname][:,:,:,:]
 
