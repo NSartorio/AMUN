@@ -152,6 +152,10 @@ def amun_dataset(fname, vname, progress = False):
 
   # add derived variables if possible
   #
+  if 'velx' in variables and 'vely' in variables and 'velz' in variables:
+    variables.append('velo')
+  if 'magx' in variables and 'magy' in variables and 'magz' in variables:
+    variables.append('magn')
   if (eqsys == 'hd' or eqsys == 'mhd') \
                     and eos == 'adi' \
                     and 'pres' in variables:
@@ -210,7 +214,15 @@ def amun_dataset(fname, vname, progress = False):
       levels  = g['levels'][()]
       coords  = g['coords'][()]
       g       = f['variables']
-      if vname == 'eint':
+      if vname == 'velo':
+        dataset = np.sqrt(g['velx'][:,:,:,:]**2 \
+                        + g['vely'][:,:,:,:]**2 \
+                        + g['velz'][:,:,:,:]**2)
+      elif vname == 'magn':
+        dataset = np.sqrt(g['magx'][:,:,:,:]**2 \
+                        + g['magy'][:,:,:,:]**2 \
+                        + g['magz'][:,:,:,:]**2)
+      elif vname == 'eint':
         dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:]
       elif vname == 'ekin':
         dataset = 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
