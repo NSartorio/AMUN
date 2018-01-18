@@ -157,6 +157,7 @@ def amun_dataset(fname, vname, progress = False):
     variables.append('divv')
   if 'magx' in variables and 'magy' in variables and 'magz' in variables:
     variables.append('magn')
+    variables.append('divb')
   if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
                     and 'pres' in variables:
     variables.append('eint')
@@ -256,6 +257,15 @@ def amun_dataset(fname, vname, progress = False):
       elif vname == 'divv':
         dataset = np.zeros(g['velx'].shape)
         fields  = [ 'velx', 'vely', 'velz' ]
+        h       = (dx, dy, dz)
+        for i in range(ndims):
+          v = fields[i]
+          dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
+                          - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
+                                                    / h[i][levels[:] - 1]
+      elif vname == 'divb':
+        dataset = np.zeros(g['magx'].shape)
+        fields  = [ 'magx', 'magy', 'magz' ]
         h       = (dx, dy, dz)
         for i in range(ndims):
           v = fields[i]
