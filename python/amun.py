@@ -230,7 +230,10 @@ def amun_dataset(fname, vname):
           iend = ibeg + cm[:]
           ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
           ie, je, ke = iend[0], iend[1], iend[2]
-          ret[kb:ke,jb:je,ib:ie] = np.repeat(np.repeat(np.repeat(dataset[ng:-ng,ng:-ng,ng:-ng,l], nn, axis = 0), nn, axis = 1), nn, axis = 2)
+          ds = dataset[ng:-ng,ng:-ng,ng:-ng,l]
+          for p in range(ndims):
+            ds = np.repeat(ds, nn, axis = p)
+          ret[kb:ke,jb:je,ib:ie] = ds
       else:
         for l in range(dblocks):
           nn = 2**(ml - levels[l])
@@ -239,7 +242,10 @@ def amun_dataset(fname, vname):
           iend = ibeg + cm[:]
           ib, jb = ibeg[0], ibeg[1]
           ie, je = iend[0], iend[1]
-          ret[jb:je,ib:ie] = np.repeat(np.repeat(dataset[0,ng:-ng,ng:-ng,l], nn, axis = 0), nn, axis = 1)
+          ds = dataset[0,ng:-ng,ng:-ng,l]
+          for p in range(ndims):
+            ds = np.repeat(ds, nn, axis = p)
+          ret[jb:je,ib:ie] = ds
     f.close()
 
   return ret
