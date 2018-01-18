@@ -167,9 +167,9 @@ def amun_dataset(fname, vname):
       g  = f['coordinates']
       levels  = g['levels'][()]
       coords  = g['coords'][()]
-      g  = f['variables']
+      g       = f['variables']
+      dataset = g[vname][:,:,:,:]
       if ndims == 3:
-        dataset = g[vname][ng:-ng,ng:-ng,ng:-ng,:]
         for l in range(dblocks):
           nn = 2**(ml - levels[l])
           cm = bm * nn
@@ -177,9 +177,8 @@ def amun_dataset(fname, vname):
           iend = ibeg + cm[:]
           ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
           ie, je, ke = iend[0], iend[1], iend[2]
-          ret[kb:ke,jb:je,ib:ie] = np.repeat(np.repeat(np.repeat(dataset[:,:,:,l], nn, axis = 0), nn, axis = 1), nn, axis = 2)
+          ret[kb:ke,jb:je,ib:ie] = np.repeat(np.repeat(np.repeat(dataset[ng:-ng,ng:-ng,ng:-ng,l], nn, axis = 0), nn, axis = 1), nn, axis = 2)
       else:
-        dataset = g[vname][0,ng:-ng,ng:-ng,:]
         for l in range(dblocks):
           nn = 2**(ml - levels[l])
           cm = bm[0:ndims] * nn
@@ -187,7 +186,7 @@ def amun_dataset(fname, vname):
           iend = ibeg + cm[:]
           ib, jb = ibeg[0], ibeg[1]
           ie, je = iend[0], iend[1]
-          ret[jb:je,ib:ie] = np.repeat(np.repeat(dataset[:,:,l], nn, axis = 0), nn, axis = 1)
+          ret[jb:je,ib:ie] = np.repeat(np.repeat(dataset[0,ng:-ng,ng:-ng,l], nn, axis = 0), nn, axis = 1)
     f.close()
 
   return ret
