@@ -123,14 +123,18 @@ def amun_dataset(fname, vname):
   g  = f['attributes'].attrs
 
   # get the set of equations used to perform the simulation
+  # and the equation of state
   #
   eqsys = g.get('eqsys')[0].astype(str)
+  eos   = g.get('eos')[0].astype(str)
 
   # get the snapshot number, the number of domain files, and the number of blocks
   #
   nr = g.get('isnap')[0]
   nc = g.get('nprocs')[0]
   nl = g.get('nleafs')[0]
+  if eos == 'adi':
+    gm = g.get('gamma')[0]
 
   # build the list of supported variables
   #
@@ -146,6 +150,9 @@ def amun_dataset(fname, vname):
                     and 'vely' in variables \
                     and 'velz' in variables:
     variables.append('ekin')
+  if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
+                    and 'pres' in variables:
+    variables.append('eint')
 
   # check if the requested variable is in the variable list
   #
@@ -185,6 +192,8 @@ def amun_dataset(fname, vname):
         dataset = 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
                                             + g['vely'][:,:,:,:]**2 \
                                             + g['velz'][:,:,:,:]**2)
+      elif vname == 'eint':
+        dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:]
       else:
         dataset = g[vname][:,:,:,:]
       if ndims == 3:
