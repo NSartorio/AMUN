@@ -156,8 +156,7 @@ def amun_dataset(fname, vname, progress = False):
     variables.append('velo')
   if 'magx' in variables and 'magy' in variables and 'magz' in variables:
     variables.append('magn')
-  if (eqsys == 'hd' or eqsys == 'mhd') \
-                    and eos == 'adi' \
+  if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
                     and 'pres' in variables:
     variables.append('eint')
   if (eqsys == 'hd' or eqsys == 'mhd') \
@@ -171,13 +170,14 @@ def amun_dataset(fname, vname, progress = False):
                      and 'magy' in variables \
                      and 'magz' in variables:
     variables.append('emag')
-  if eqsys == 'hd' and 'ekin' in variables \
-                   and 'eint' in variables:
+  if eqsys == 'hd' and 'ekin' in variables and 'eint' in variables:
     variables.append('etot')
   if eqsys == 'mhd' and 'eint' in variables \
                     and 'ekin' in variables \
                     and 'emag' in variables:
     variables.append('etot')
+  if (eqsys == 'srhd' or eqsys == 'srmhd') and 'velo' in variables:
+    variables.append('lore')
 
   # check if the requested variable is in the variable list
   #
@@ -241,6 +241,10 @@ def amun_dataset(fname, vname, progress = False):
           dataset += 0.5 * (g['magx'][:,:,:,:]**2 \
                           + g['magy'][:,:,:,:]**2 \
                           + g['magz'][:,:,:,:]**2)
+      elif vname == 'lore':
+        dataset = 1.0 / np.sqrt(1.0 - (g['velx'][:,:,:,:]**2 \
+                                     + g['vely'][:,:,:,:]**2 \
+                                     + g['velz'][:,:,:,:]**2))
       else:
         dataset = g[vname][:,:,:,:]
 
