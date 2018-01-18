@@ -35,6 +35,7 @@
 import h5py    as h5
 import numpy   as np
 import os.path as op
+import sys
 
 def amun_attribute(fname, aname):
   '''
@@ -86,7 +87,7 @@ def amun_attribute(fname, aname):
   #
   return ret
 
-def amun_dataset(fname, vname):
+def amun_dataset(fname, vname, progress = False):
   '''
       Subroutine to reads dataset from AMUN HDF5 snapshots.
 
@@ -117,6 +118,13 @@ def amun_dataset(fname, vname):
         not 'variables' in f:
     print('It seems this HDF5 file is corrupted or not compatible with the AMUN format!')
     return False
+
+  # get the file path
+  #
+  dname = op.dirname(fname)
+
+  if progress:
+    sys.stdout.write("Data file path:\n  '%s'\n" % (dname))
 
   # get attributes necessary to reconstruct the domain
   #
@@ -190,9 +198,10 @@ def amun_dataset(fname, vname):
 
   # iterate over all subdomain files
   #
-  dname = op.dirname(fname)
+  nb = 0
   for n in range(nc):
-    lname = op.join(dname, 'p%06d_%05d.h5' % (nr, n))
+    fname = 'p%06d_%05d.h5' % (nr, n)
+    lname = op.join(dname, fname)
     f = h5.File(lname, 'r')
     g  = f['attributes'].attrs
     dblocks = g.get('dblocks')[0]
@@ -222,32 +231,46 @@ def amun_dataset(fname, vname):
                           + g['magz'][:,:,:,:]**2)
       else:
         dataset = g[vname][:,:,:,:]
-      if ndims == 3:
-        for l in range(dblocks):
-          nn = 2**(ml - levels[l])
-          cm = bm * nn
-          ibeg = coords[:,l] * cm[:]
-          iend = ibeg + cm[:]
+
+      # rescale all blocks to the effective resolution
+      #
+      for l in range(dblocks):
+        nn = 2**(ml - levels[l])
+        cm = bm[0:ndims] * nn
+        ibeg = coords[0:ndims,l] * cm[0:ndims]
+        iend = ibeg + cm[0:ndims]
+        if ndims == 3:
           ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
           ie, je, ke = iend[0], iend[1], iend[2]
           ds = dataset[ng:-ng,ng:-ng,ng:-ng,l]
           for p in range(ndims):
             ds = np.repeat(ds, nn, axis = p)
           ret[kb:ke,jb:je,ib:ie] = ds
-      else:
-        for l in range(dblocks):
-          nn = 2**(ml - levels[l])
-          cm = bm[0:ndims] * nn
-          ibeg = coords[:,l] * cm[:]
-          iend = ibeg + cm[:]
+        else:
           ib, jb = ibeg[0], ibeg[1]
           ie, je = iend[0], iend[1]
           ds = dataset[0,ng:-ng,ng:-ng,l]
           for p in range(ndims):
             ds = np.repeat(ds, nn, axis = p)
           ret[jb:je,ib:ie] = ds
+        nb += 1
+
+        # print progress bar if desired
+        #
+        if progress:
+          sys.stdout.write('\r')
+          sys.stdout.write("Reading '%s' from '%s': block %d from %d" \
+                        % (vname, fname, nb, nl))
+          sys.stdout.flush()
+
     f.close()
 
+  if (progress):
+    sys.stdout.write('\n')
+    sys.stdout.flush()
+
+  # return the dataset
+  #
   return ret
 
 if __name__ == "__main__":
