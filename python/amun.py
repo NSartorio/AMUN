@@ -118,27 +118,40 @@ def amun_dataset(fname, vname):
     print('It seems this HDF5 file is corrupted or not compatible with the AMUN format!')
     return False
 
-  # build the list of supported variables
-  #
-  variables = []
-  for var in f['variables'].keys():
-    variables.append(var)
-
-  # check if the requested variable is in the variable list
-  #
-  if not vname in variables:
-    print('The requested variable cannot be extracted from the file datasets!')
-    return False
-
   # get attributes necessary to reconstruct the domain
   #
   g  = f['attributes'].attrs
+
+  # get the set of equations used to perform the simulation
+  #
+  eqsys = g.get('eqsys')[0].astype(str)
 
   # get the snapshot number, the number of domain files, and the number of blocks
   #
   nr = g.get('isnap')[0]
   nc = g.get('nprocs')[0]
   nl = g.get('nleafs')[0]
+
+  # build the list of supported variables
+  #
+  variables = []
+  for var in f['variables'].keys():
+    variables.append(var)
+
+  # add derived variables if possible
+  #
+  if (eqsys == 'hd' or eqsys == 'mhd') \
+                    and 'dens' in variables \
+                    and 'velx' in variables \
+                    and 'vely' in variables \
+                    and 'velz' in variables:
+    variables.append('ekin')
+
+  # check if the requested variable is in the variable list
+  #
+  if not vname in variables:
+    print('The requested variable cannot be extracted from the file datasets!')
+    return False
 
   # prepare array to hold data
   #
@@ -168,7 +181,12 @@ def amun_dataset(fname, vname):
       levels  = g['levels'][()]
       coords  = g['coords'][()]
       g       = f['variables']
-      dataset = g[vname][:,:,:,:]
+      if vname == 'ekin':
+        dataset = 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
+                                            + g['vely'][:,:,:,:]**2 \
+                                            + g['velz'][:,:,:,:]**2)
+      else:
+        dataset = g[vname][:,:,:,:]
       if ndims == 3:
         for l in range(dblocks):
           nn = 2**(ml - levels[l])
