@@ -154,6 +154,7 @@ def amun_dataset(fname, vname, progress = False):
   #
   if 'velx' in variables and 'vely' in variables and 'velz' in variables:
     variables.append('velo')
+    variables.append('divv')
   if 'magx' in variables and 'magy' in variables and 'magz' in variables:
     variables.append('magn')
   if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
@@ -215,6 +216,9 @@ def amun_dataset(fname, vname, progress = False):
       g  = f['coordinates']
       levels  = g['levels'][()]
       coords  = g['coords'][()]
+      dx      = g['dx'][()]
+      dy      = g['dy'][()]
+      dz      = g['dz'][()]
       g       = f['variables']
       if vname == 'velo':
         dataset = np.sqrt(g['velx'][:,:,:,:]**2 \
@@ -249,6 +253,15 @@ def amun_dataset(fname, vname, progress = False):
         dataset = 1.0 / np.sqrt(1.0 - (g['velx'][:,:,:,:]**2 \
                                      + g['vely'][:,:,:,:]**2 \
                                      + g['velz'][:,:,:,:]**2))
+      elif vname == 'divv':
+        dataset = np.zeros(g['velx'].shape)
+        fields  = [ 'velx', 'vely', 'velz' ]
+        h       = (dx, dy, dz)
+        for i in range(ndims):
+          v = fields[i]
+          dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
+                          - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
+                                                    / h[i][levels[:] - 1]
       else:
         dataset = g[vname][:,:,:,:]
 
