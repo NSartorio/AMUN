@@ -166,8 +166,8 @@ def amun_dataset(fname, vname, shrink = 1, progress = False):
   if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
                     and 'pres' in variables:
     variables.append('eint')
-    if 'dens' in variables:
-      variables.append('temp')
+  if 'dens' in variables and 'pres' in variables:
+    variables.append('temp')
   if (eqsys == 'hd' or eqsys == 'mhd') \
                     and 'dens' in variables \
                     and 'velx' in variables \
