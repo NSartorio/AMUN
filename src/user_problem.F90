@@ -413,9 +413,9 @@ module user_problem
                 q(ivz,i) = 0.0d+00
               end if
               if (ibx > 0) then
-                q(ibx,i) = bamb
-                q(iby,i) =   z(k) / rc
-                q(ibz,i) = - y(j) / rc
+                q(ibx,i) =   bamb
+                q(iby,i) =   bjet * z(k) / rc
+                q(ibz,i) = - bjet * y(j) / rc
               end if
             end if
           end do ! i = 1, im
@@ -611,9 +611,9 @@ module user_problem
                   q(ivz,i) = 0.0d+00
                 end if
                 if (ibx > 0) then
-                  q(ibx,i) = bamb
-                  q(iby,i) =   z(k) / rc
-                  q(ibz,i) = - y(j) / rc
+                  q(ibx,i) =   bamb
+                  q(iby,i) =   bjet * z(k) / rc
+                  q(ibz,i) = - bjet * y(j) / rc
                 end if
               end if
             end do ! i = 1, im
