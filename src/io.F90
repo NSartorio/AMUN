@@ -796,13 +796,17 @@ module io
 
 !! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
 !!
-! prepare the filename
+! prepare the filename using the current process number; in case the file does
+! not exist decrease it until the file corresponding to lower process number
+! is found;
 !
-    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
-
-! check if the HDF5 file exists
-!
-    inquire(file = fl, exist = info)
+    info  = .false.
+    lfile = nproc + 1
+    do while (.not. info .and. lfile > 0)
+      lfile = lfile - 1
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, lfile
+      inquire(file = fl, exist = info)
+    end do
 
 ! quit, if file does not exist
 !
@@ -1567,7 +1571,7 @@ module io
 
 ! set the seed values
 !
-    call set_seeds(lnseeds, seeds(:))
+    call set_seeds(lnseeds, seeds(:), nproc /= lnproc)
 
 ! deallocate seed array
 !
@@ -2653,7 +2657,7 @@ module io
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)    , allocatable :: lev, ref
+    integer(kind=4), dimension(:)    , allocatable :: ids, lev, ref
     integer(kind=4), dimension(:,:)  , allocatable :: cor
     real   (kind=8), dimension(:,:,:), allocatable :: bnd
 
@@ -2688,6 +2692,7 @@ module io
 
 ! allocate arrays to store coordinates
 !
+        allocate(ids(cm(1)))
         allocate(lev(cm(1)))
         allocate(ref(cm(1)))
         allocate(cor(cm(1),cm(2)))
@@ -2698,6 +2703,10 @@ module io
         l = 1
         pdata => list_data
         do while(associated(pdata))
+
+! fill in the IDs array
+!
+          ids(l)     = pdata%meta%id
 
 ! fill in the level array
 !
@@ -2728,6 +2737,7 @@ module io
 
 ! write the arrays to the HDF5 file
 !
+        call write_array(gid, 'ids'   , cm(1), ids)
         call write_array(gid, 'levels', cm(1), lev)
         call write_array(gid, 'refine', cm(1), ref)
         call write_array(gid, 'coords', cm(:), cor)
@@ -2738,6 +2748,7 @@ module io
 
 ! deallocate temporary arrays
 !
+        if (allocated(ids)) deallocate(ids)
         if (allocated(lev)) deallocate(lev)
         if (allocated(ref)) deallocate(ref)
         if (allocated(cor)) deallocate(cor)
