@@ -1236,7 +1236,7 @@ module equations
 
 ! convert the vector of primitive variables to conservative ones
 !
-      call prim2cons(nc, q(1:nc,1:nc), u(1:nv,1:nc))
+      call prim2cons(nc, q(1:nv,1:nc), u(1:nv,1:nc))
 
 ! update block variables
 !

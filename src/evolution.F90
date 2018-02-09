@@ -333,17 +333,17 @@ module evolution
 !
       call update_variables(time + dt, 0.0d+00)
 
-#ifdef DEBUG
-! check variables for NaNs
-!
-      call check_variables()
-#endif /* DEBUG */
-
 ! set all meta blocks to be updated
 !
       call set_blocks_update(.true.)
 
     end if ! toplev > 1
+
+#ifdef DEBUG
+! check variables for NaNs
+!
+    call check_variables()
+#endif /* DEBUG */
 
 #ifdef PROFILE
 ! stop accounting time for solution advance
