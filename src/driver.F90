@@ -308,9 +308,10 @@ program amun
 !
   call setup_mpi(div(:), per(:), .false.)
 
-! initialize the random number generator
+! initialize the random number generator (passes the number of OpenMP threads
+! and the current thread number)
 !
-  call initialize_random(nprocs, nproc)
+  call initialize_random(1, 0)
 
 ! initialize geometry modules and print info
 !

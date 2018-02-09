@@ -80,7 +80,7 @@ module random
 !
 !===============================================================================
 !
-  subroutine initialize_random(nprocs, nproc)
+  subroutine initialize_random(nthreads, nthread)
 
 ! obtain required variables from other modules
 !
@@ -92,7 +92,7 @@ module random
 
 ! subroutine arguments
 !
-    integer, intent(in) :: nprocs, nproc
+    integer, intent(in) :: nthreads, nthread
 
 ! local variables
 !
@@ -112,9 +112,9 @@ module random
     call start_timer(iri)
 #endif /* PROFILE */
 
-! set the processor number
+! set the thread number
 !
-    kp = nproc
+    kp = nthread
 
 ! obtain the generator type
 !
@@ -122,7 +122,7 @@ module random
 
 ! calculate the number of seeds
 !
-    nseeds = 2 * nprocs
+    nseeds = nthreads
     lseed  = nseeds - 1
 
 ! allocate seeds for random number generator
@@ -138,12 +138,8 @@ module random
         seeds(i) = 123456789 * r
       end do
     case default
-      call random_number(r)
-      do i = 0, nprocs - 1
-        seeds(i) = 123456789 * r
-      end do
-      call random_number(r)
-      do i = nprocs, lseed
+      r = 0.1234567890123456789
+      do i = 0, lseed
         seeds(i) = 123456789 * r
       end do
     end select
@@ -204,7 +200,7 @@ module random
 !
 !===============================================================================
 !
-  subroutine set_seeds(np, seed)
+  subroutine set_seeds(np, nseeds)
 
 ! declare all variables as implicit
 !
@@ -212,8 +208,8 @@ module random
 
 ! input arguments
 !
-    integer                           , intent(in) :: np
-    integer(kind=4), dimension(0:np-1), intent(in) :: seed
+    integer                       , intent(in) :: np
+    integer(kind=4), dimension(np), intent(in) :: nseeds
 
 ! local variables
 !
@@ -230,35 +226,19 @@ module random
 
 ! set the seeds only if the input array and seeds have the same sizes
 !
-    if (np == nseeds) then
-
-      seeds(0:lseed) = seed(0:lseed)
-
-    else
-
-! if the input array and seeds have different sizes, expand or shrink seeds
-!
-      select case(gentype)
-      case('random')
-        l = min(lseed, np - 1)
-        seeds(0:l) = seed(0:l)
-        if (l < lseed) then
-          do i = l + 1, lseed
-            call random_number(r)
-            seeds(i) = 123456789 * r
-          end do
-        end if
-      case default
-        l = nseeds / 2
-        do i = 0, l - 1
-          seeds(i) = seed(0)
+    l = min(lseed, np - 1)
+    seeds(0:l) = seed(1:l+1)
+    select case(gentype)
+    case('random')
+      if (l < lseed) then
+        do i = l + 1, lseed
+          call random_number(r)
+          seeds(i) = 123456789 * r
         end do
-        do i = l, lseed
-          seeds(i) = seed(np-1)
-        end do
-      end select
-
-    end if
+      end if
+    case default
+      seeds(l+1:lseed) = seeds(0)
+    end select
 
 #ifdef PROFILE
 ! stop accounting time for the random number generator
@@ -279,7 +259,7 @@ module random
 !
 !===============================================================================
 !
-  subroutine get_seeds(seed)
+  subroutine get_seeds(rseeds)
 
 ! declare all variables as implicit
 !
@@ -287,7 +267,7 @@ module random
 
 ! output arguments
 !
-    integer(kind=4), dimension(0:lseed), intent(out) :: seed
+    integer(kind=4), dimension(nseeds), intent(out) :: rseeds
 !
 !-------------------------------------------------------------------------------
 !
@@ -297,7 +277,7 @@ module random
     call start_timer(iri)
 #endif /* PROFILE */
 
-    seed(0:lseed) = seeds(0:lseed)
+    rseeds(1:nseeds) = seeds(0:lseed)
 
 #ifdef PROFILE
 ! stop accounting time for the random number generator
