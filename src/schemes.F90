@@ -456,6 +456,16 @@ module schemes
 !
         select case(trim(solver))
 
+        case("hllc", "HLLC", "hllcm", "HLLCM", "hllc-m", "HLLC-M")
+
+! set the solver name
+!
+          name_sol =  "HLLC (Mignone & Bodo 2006)"
+
+! set pointers to subroutines
+!
+          riemann => riemann_srmhd_adi_hllc
+
 ! in the case of unknown Riemann solver, revert to HLL
 !
         case default
@@ -5325,6 +5335,385 @@ module schemes
 !-------------------------------------------------------------------------------
 !
   end subroutine riemann_srmhd_adi_hll
+!
+!===============================================================================
+!
+! subroutine RIEMANN_SRMHD_ADI_HLLC:
+! ---------------------------------
+!
+!   Subroutine solves one dimensional Riemann problem using
+!   the Harten-Lax-van Leer method with contact discontinuity resolution (HLLC)
+!   by Mignone & Bodo.
+!
+!   Arguments:
+!
+!     n      - the length of input vectors;
+!     ql, qr - the array of primitive variables at the Riemann states;
+!     f      - the output array of fluxes;
+!
+!   References:
+!
+!     [1] Mignone, A. & Bodo, G.
+!         "An HLLC Riemann solver for relativistic flows - II.
+!          Magnetohydrodynamics",
+!         Monthly Notices of the Royal Astronomical Society,
+!         2006, Volume 368, Pages 1040-1054
+!
+!===============================================================================
+!
+  subroutine riemann_srmhd_adi_hllc(n, ql, qr, f)
+
+! include external procedures
+!
+    use algebra        , only : quadratic
+    use equations      , only : nv
+    use equations      , only : ivx, idn, imx, imy, imz, ien, ibx, iby, ibz, ibp
+    use equations      , only : cmax
+    use equations      , only : prim2cons, fluxspeed
+
+! local variables are not implicit by default
+!
+    implicit none
+
+! subroutine arguments
+!
+    integer                      , intent(in)    :: n
+    real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+    real(kind=8), dimension(nv,n), intent(out)   :: f
+
+! local variables
+!
+    integer                       :: i, nr
+    real(kind=8)                  :: sl, sr, srml, sm
+    real(kind=8)                  :: bx, bp, bx2
+    real(kind=8)                  :: pt, dv, fc, uu, ff, uf
+    real(kind=8)                  :: vv, vb, gi
+
+! local arrays to store the states
+!
+    real(kind=8), dimension(nv,n) :: ul, ur, fl, fr
+    real(kind=8), dimension(nv)   :: uh, us, fh, wl, wr
+    real(kind=8), dimension(n)    :: clm, clp, crm, crp
+    real(kind=8), dimension(3)    :: a, vs
+    real(kind=8), dimension(2)    :: x
+!
+!-------------------------------------------------------------------------------
+!
+#ifdef PROFILE
+! start accounting time for the Riemann solver
+!
+    call start_timer(imr)
+#endif /* PROFILE */
+
+! obtain the state values for Bx and Psi for the GLM-MHD equations
+!
+    do i = 1, n
+
+      bx        = 0.5d+00 * ((qr(ibx,i) + ql(ibx,i))                           &
+                                             - (qr(ibp,i) - ql(ibp,i)) / cmax)
+      bp        = 0.5d+00 * ((qr(ibp,i) + ql(ibp,i))                           &
+                                             - (qr(ibx,i) - ql(ibx,i)) * cmax)
+
+      ql(ibx,i) = bx
+      qr(ibx,i) = bx
+      ql(ibp,i) = bp
+      qr(ibp,i) = bp
+
+    end do ! i = 1, n
+
+! calculate the conserved variables of the left and right states
+!
+    call prim2cons(n, ql(:,:), ul(:,:))
+    call prim2cons(n, qr(:,:), ur(:,:))
+
+! calculate the physical fluxes and speeds at both states
+!
+    call fluxspeed(n, ql(:,:), ul(:,:), fl(:,:), clm(:), clp(:))
+    call fluxspeed(n, qr(:,:), ur(:,:), fr(:,:), crm(:), crp(:))
+
+! iterate over all position
+!
+    do i = 1, n
+
+! estimate the minimum and maximum speeds
+!
+      sl = min(clm(i), crm(i))
+      sr = max(clp(i), crp(i))
+
+! calculate the HLL flux
+!
+      if (sl >= 0.0d+00) then
+
+        f(1:nv,i) = fl(1:nv,i)
+
+      else if (sr <= 0.0d+00) then
+
+        f(1:nv,i) = fr(1:nv,i)
+
+      else ! sl < 0 < sr
+
+! calculate the inverse of speed difference
+!
+        srml = sr - sl
+
+! calculate vectors of the left and right-going waves
+!
+        wl(1:nv)  = sl * ul(1:nv,i) - fl(1:nv,i)
+        wr(1:nv)  = sr * ur(1:nv,i) - fr(1:nv,i)
+
+! calculate fluxes for the intermediate state
+!
+        uh(1:nv)  = (     wr(1:nv) -      wl(1:nv)) / srml
+        fh(1:nv)  = (sl * wr(1:nv) - sr * wl(1:nv)) / srml
+
+! correct the energy waves
+!
+        wl(ien)   = wl(ien) + wl(idn)
+        wr(ien)   = wr(ien) + wr(idn)
+
+! calculate Bₓ²
+!
+        bx2       = ql(ibx,i) * qr(ibx,i)
+
+! calculate the contact dicontinuity speed solving eq. (41)
+!
+        if (bx2 >= 1.0d-16) then
+
+! prepare the quadratic coefficients, (eq. 42 in [1])
+!
+          uu = sum(uh(iby:ibz) * uh(iby:ibz))
+          ff = sum(fh(iby:ibz) * fh(iby:ibz))
+          uf = sum(uh(iby:ibz) * fh(iby:ibz))
+
+          a(1) = uh(imx) - uf
+          a(2) = uu + ff - (fh(imx) + uh(ien) + uh(idn))
+          a(3) = fh(ien) + fh(idn) - uf
+
+! solve the quadratic equation
+!
+          nr   = quadratic(a(1:3), x(1:2))
+
+! if Δ < 0, just use the HLL flux
+!
+          if (nr < 1) then
+            f(1:nv,i) = fh(1:nv)
+          else
+
+! get the contact dicontinuity speed
+!
+            sm = x(1)
+
+! if the contact discontinuity speed exceeds the sonic speeds, use the HLL flux
+!
+            if ((sm <= sl) .or. (sm >= sr)) then
+              f(1:nv,i) = fh(1:nv)
+            else
+
+! substitute magnetic field components from the HLL state (eq. 37 in [1])
+!
+              us(ibx) = ql(ibx,i)
+              us(iby) = uh(iby)
+              us(ibz) = uh(ibz)
+              us(ibp) = ql(ibp,i)
+
+! calculate velocity components without Bₓ normalization (eq. 38 in [1])
+!
+              vs(1)   = sm
+              vs(2)   = (us(iby) * sm - fh(iby)) / us(ibx)
+              vs(3)   = (us(ibz) * sm - fh(ibz)) / us(ibx)
+
+! calculate v² and v.B
+!
+              vv      = sum(vs(1:3) * vs(  1:  3))
+              vb      = sum(vs(1:3) * us(ibx:ibz))
+
+! calculate inverse gamma
+!
+              gi      = 1.0d+00 - vv
+
+! calculate total pressure (eq. 40 in [1])
+!
+              pt = fh(imx) + gi * bx2 - (fh(ien) + fh(idn) - us(ibx) * vb) * sm
+
+! if the pressure is negative, use the HLL flux
+!
+              if (pt <= 0.0d+00) then
+                f(1:nv,i) = fh(1:nv)
+              else
+
+! depending in the sign of the contact dicontinuity speed, calculate the proper
+! state and corresponding flux
+!
+                if (sm > 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 43-46 in [1])
+!
+                  dv      = sl - sm
+                  fc      = (sl - ql(ivx,i)) / dv
+                  us(idn) = fc * ul(idn,i)
+                  us(imy) = (sl * ul(imy,i) - fl(imy,i)                        &
+                          - us(ibx) * (gi * us(iby) + vs(2) * vb)) / dv
+                  us(imz) = (sl * ul(imz,i) - fl(imz,i)                        &
+                          - us(ibx) * (gi * us(ibz) + vs(3) * vb)) / dv
+                  us(ien) = (sl * (ul(ien,i) + ul(idn,i))                      &
+                          - (fl(ien,i) + fl(idn,i))                            &
+                          + pt * sm - us(ibx) * vb) / dv - us(idn)
+
+! calculate normal component of momentum
+!
+                  us(imx) = (us(ien) + us(idn) + pt) * sm - us(ibx) * vb
+
+! calculate the flux (eq. 14 in [1])
+!
+                  f(1:nv,i) = fl(1:nv,i) + sl * (us(1:nv) - ul(1:nv,i))
+
+                else if (sm < 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 43-46 in [1])
+!
+                  dv      = sr - sm
+                  fc      = (sr - qr(ivx,i)) / dv
+                  us(idn) = fc * ur(idn,i)
+                  us(imy) = (sr * ur(imy,i) - fr(imy,i)                        &
+                          - us(ibx) * (gi * us(iby) + vs(2) * vb)) / dv
+                  us(imz) = (sr * ur(imz,i) - fr(imz,i)                        &
+                          - us(ibx) * (gi * us(ibz) + vs(3) * vb)) / dv
+                  us(ien) = (sr * (ur(ien,i) + ur(idn,i))                      &
+                          - (fr(ien,i) + fr(idn,i))                            &
+                          + pt * sm - us(ibx) * vb) / dv - us(idn)
+
+! calculate normal component of momentum
+!
+                  us(imx) = (us(ien) + us(idn) + pt) * sm - us(ibx) * vb
+
+! calculate the flux (eq. 14 in [1])
+!
+                  f(1:nv,i) = fr(1:nv,i) + sr * (us(1:nv) - ur(1:nv,i))
+
+                else
+
+! intermediate flux is constant across the contact discontinuity so use HLL flux
+!
+                  f(1:nv,i) = fh(1:nv)
+
+                end if ! sm == 0
+
+              end if ! p* < 0
+
+            end if ! sl < sm < sr
+
+          end if ! nr < 1
+
+        else ! Bx² > 0
+
+! prepare the quadratic coefficients (eq. 47 in [1])
+!
+          a(1) = uh(imx)
+          a(2) = - (fh(imx) + uh(ien) + uh(idn))
+          a(3) = fh(ien) + fh(idn)
+
+! solve the quadratic equation
+!
+          nr   = quadratic(a(1:3), x(1:2))
+
+! if Δ < 0, just use the HLL flux
+!
+          if (nr < 1) then
+            f(1:nv,i) = fh(1:nv)
+          else
+
+! get the contact dicontinuity speed
+!
+            sm = x(1)
+
+! if the contact discontinuity speed exceeds the sonic speeds, use the HLL flux
+!
+            if ((sm <= sl) .or. (sm >= sr)) then
+              f(1:nv,i) = fh(1:nv)
+            else
+
+! calculate total pressure (eq. 48 in [1])
+!
+              pt = fh(imx) - (fh(ien) + fh(idn)) * sm
+
+! if the pressure is negative, use the HLL flux
+!
+              if (pt <= 0.0d+00) then
+                f(1:nv,i) = fh(1:nv)
+              else
+
+! depending in the sign of the contact dicontinuity speed, calculate the proper
+! state and corresponding flux
+!
+                if (sm > 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 43-46 in [1])
+!
+                  dv      = sl - sm
+                  us(idn) = wl(idn) / dv
+                  us(imy) = wl(imy) / dv
+                  us(imz) = wl(imz) / dv
+                  us(ien) = (wl(ien) + pt * sm) / dv
+                  us(imx) = (us(ien) + pt) * sm
+                  us(ien) = us(ien) - us(idn)
+                  us(ibx) = 0.0d+00
+                  us(iby) = wl(iby) / dv
+                  us(ibz) = wl(ibz) / dv
+                  us(ibp) = ql(ibp,i)
+
+! calculate the flux (eq. 27 in [1])
+!
+                  f(1:nv,i) = fl(1:nv,i) + sl * (us(1:nv) - ul(1:nv,i))
+
+                else if (sm < 0.0d+00) then
+
+! calculate the conserved variable vector (eqs. 43-46 in [1])
+!
+                  dv      = sr - sm
+                  us(idn) = wr(idn) / dv
+                  us(imy) = wr(imy) / dv
+                  us(imz) = wr(imz) / dv
+                  us(ien) = (wr(ien) + pt * sm) / dv
+                  us(imx) = (us(ien) + pt) * sm
+                  us(ien) = us(ien) - us(idn)
+                  us(ibx) = 0.0d+00
+                  us(iby) = wr(iby) / dv
+                  us(ibz) = wr(ibz) / dv
+                  us(ibp) = qr(ibp,i)
+
+! calculate the flux (eq. 27 in [1])
+!
+                  f(1:nv,i) = fr(1:nv,i) + sr * (us(1:nv) - ur(1:nv,i))
+
+                else
+
+! intermediate flux is constant across the contact discontinuity so use HLL flux
+!
+                  f(1:nv,i) = fh(1:nv)
+
+                end if ! sm == 0
+
+              end if ! p* < 0
+
+            end if ! sl < sm < sr
+
+          end if ! nr < 1
+
+        end if ! Bx² == 0 or > 0
+
+      end if ! sl < 0 < sr
+
+    end do ! i = 1, n
+
+#ifdef PROFILE
+! stop accounting time for the Riemann solver
+!
+    call stop_timer(imr)
+#endif /* PROFILE */
+
+!-------------------------------------------------------------------------------
+!
+  end subroutine riemann_srmhd_adi_hllc
 
 !===============================================================================
 !
