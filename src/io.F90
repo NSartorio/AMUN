@@ -2653,7 +2653,7 @@ module io
 
 ! local allocatable arrays
 !
-    integer(kind=4), dimension(:)    , allocatable :: lev, ref
+    integer(kind=4), dimension(:)    , allocatable :: ids, lev, ref
     integer(kind=4), dimension(:,:)  , allocatable :: cor
     real   (kind=8), dimension(:,:,:), allocatable :: bnd
 
@@ -2688,6 +2688,7 @@ module io
 
 ! allocate arrays to store coordinates
 !
+        allocate(ids(cm(1)))
         allocate(lev(cm(1)))
         allocate(ref(cm(1)))
         allocate(cor(cm(1),cm(2)))
@@ -2698,6 +2699,10 @@ module io
         l = 1
         pdata => list_data
         do while(associated(pdata))
+
+! fill in the IDs array
+!
+          ids(l)     = pdata%meta%id
 
 ! fill in the level array
 !
@@ -2728,6 +2733,7 @@ module io
 
 ! write the arrays to the HDF5 file
 !
+        call write_array(gid, 'ids'   , cm(1), ids)
         call write_array(gid, 'levels', cm(1), lev)
         call write_array(gid, 'refine', cm(1), ref)
         call write_array(gid, 'coords', cm(:), cor)
@@ -2738,6 +2744,7 @@ module io
 
 ! deallocate temporary arrays
 !
+        if (allocated(ids)) deallocate(ids)
         if (allocated(lev)) deallocate(lev)
         if (allocated(ref)) deallocate(ref)
         if (allocated(cor)) deallocate(cor)
