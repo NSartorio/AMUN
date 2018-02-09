@@ -796,13 +796,17 @@ module io
 
 !! 1. RESTORE PARAMETERS AND META BLOCKS FROM THE FIRST FILE
 !!
-! prepare the filename
+! prepare the filename using the current process number; in case the file does
+! not exist decrease it until the file corresponding to lower process number
+! is found;
 !
-    write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, 0
-
-! check if the HDF5 file exists
-!
-    inquire(file = fl, exist = info)
+    info  = .false.
+    lfile = nproc + 1
+    do while (.not. info .and. lfile > 0)
+      lfile = lfile - 1
+      write (fl, "(a,'r',i6.6,'_',i5.5,'.h5')") trim(respath), nrest, lfile
+      inquire(file = fl, exist = info)
+    end do
 
 ! quit, if file does not exist
 !
