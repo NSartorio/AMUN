@@ -87,14 +87,17 @@ def amun_attribute(fname, aname):
   #
   return ret
 
-def amun_dataset(fname, vname, progress = False):
+def amun_dataset(fname, vname, shrink = 1, progress = False):
   '''
       Subroutine to reads dataset from AMUN HDF5 snapshots.
 
       Arguments:
 
-        fname - the AMUN HDF5 file name;
-        vname - the variable name;
+        fname    - the AMUN HDF5 file name;
+        vname    - the variable name;
+        shrink   - the shrink factor (must be the power of 2 and not larger
+                   than the block size);
+        progress - the progress bar switch;
 
       Return values:
 
@@ -163,8 +166,8 @@ def amun_dataset(fname, vname, progress = False):
   if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
                     and 'pres' in variables:
     variables.append('eint')
-    if 'dens' in variables:
-      variables.append('temp')
+  if 'dens' in variables and 'pres' in variables:
+    variables.append('temp')
   if (eqsys == 'hd' or eqsys == 'mhd') \
                     and 'dens' in variables \
                     and 'velx' in variables \
@@ -201,10 +204,21 @@ def amun_dataset(fname, vname, progress = False):
   rm = g.get('rdims')
   ng = g.get('nghosts')
   ml = g.get('maxlev')[0]
-  dm = rm[0:ndims] * bm[0:ndims] * 2**(ml - 1)
-  ret = np.zeros(dm[::-1])
 
   f.close()
+
+  # check if the shrink parameter is correct
+  #
+  sh = bm[0:ndims].min()
+  while(sh > shrink):
+    sh /= 2
+  shrink = int(sh)
+
+  # prepare dimensions of the output array and allocate it
+  #
+  dm = np.array(rm[0:ndims] * bm[0:ndims] * 2**(ml - 1) / shrink, \
+                                                      dtype = np.int32)
+  ret = np.zeros(dm[::-1])
 
   # iterate over all subdomain files
   #
@@ -348,24 +362,19 @@ def amun_dataset(fname, vname, progress = False):
       # rescale all blocks to the effective resolution
       #
       for l in range(dblocks):
-        nn = 2**(ml - levels[l])
-        cm = bm[0:ndims] * nn
+        nn   = 2**(ml - levels[l])
+        cm   = np.array(bm[0:ndims] * nn / shrink, dtype = np.int32)
         ibeg = coords[0:ndims,l] * cm[0:ndims]
         iend = ibeg + cm[0:ndims]
         if ndims == 3:
           ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
           ie, je, ke = iend[0], iend[1], iend[2]
-          ds = dataset[ng:-ng,ng:-ng,ng:-ng,l]
-          for p in range(ndims):
-            ds = np.repeat(ds, nn, axis = p)
-          ret[kb:ke,jb:je,ib:ie] = ds
+          ret[kb:ke,jb:je,ib:ie] = rebin(dataset[ng:-ng,ng:-ng,ng:-ng,l], cm)
         else:
           ib, jb = ibeg[0], ibeg[1]
           ie, je = iend[0], iend[1]
-          ds = dataset[0,ng:-ng,ng:-ng,l]
-          for p in range(ndims):
-            ds = np.repeat(ds, nn, axis = p)
-          ret[jb:je,ib:ie] = ds
+          ret[jb:je,ib:ie]       = rebin(dataset[     0,ng:-ng,ng:-ng,l], cm)
+
         nb += 1
 
         # print progress bar if desired
@@ -385,6 +394,29 @@ def amun_dataset(fname, vname, progress = False):
   # return the dataset
   #
   return ret
+
+def rebin(a, newshape):
+  '''
+      Subroutine changes the size of the input array to to new shape,
+      by copying cells or averaging them.
+  '''
+  assert len(a.shape) == len(newshape)
+
+  m = a.ndim - 1
+  if (a.shape[m] > newshape[m]):
+    if a.ndim == 3:
+      nn = [newshape[0], a.shape[0] / newshape[0],
+            newshape[1], a.shape[1] / newshape[1],
+            newshape[2], a.shape[2] / newshape[2]]
+      return a.reshape(nn).mean(5).mean(3).mean(1)
+    else:
+      nn = [newshape[0], a.shape[0] / newshape[0],
+            newshape[1], a.shape[1] / newshape[1]]
+      return a.reshape(nn).mean(3).mean(1)
+  else:
+    for n in range(a.ndim):
+      a = np.repeat(a, newshape[n] / a.shape[n], axis = n)
+    return(a)
 
 if __name__ == "__main__":
   fname = './p000030_00000.h5'
