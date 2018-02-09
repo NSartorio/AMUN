@@ -1571,7 +1571,7 @@ module io
 
 ! set the seed values
 !
-    call set_seeds(lnseeds, seeds(:))
+    call set_seeds(lnseeds, seeds(:), nproc /= lnproc)
 
 ! deallocate seed array
 !

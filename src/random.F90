@@ -200,7 +200,7 @@ module random
 !
 !===============================================================================
 !
-  subroutine set_seeds(np, nseeds)
+  subroutine set_seeds(np, nseeds, generate)
 
 ! declare all variables as implicit
 !
@@ -210,6 +210,7 @@ module random
 !
     integer                       , intent(in) :: np
     integer(kind=4), dimension(np), intent(in) :: nseeds
+    logical                       , intent(in) :: generate
 
 ! local variables
 !
@@ -230,7 +231,12 @@ module random
     seeds(0:l) = nseeds(1:l+1)
     select case(gentype)
     case('random')
-      if (l < lseed) then
+      if (generate) then
+        do i = 0, lseed
+          call random_number(r)
+          seeds(i) = 123456789 * r
+        end do
+      else
         do i = l + 1, lseed
           call random_number(r)
           seeds(i) = 123456789 * r
