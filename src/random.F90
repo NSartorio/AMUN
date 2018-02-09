@@ -227,7 +227,7 @@ module random
 ! set the seeds only if the input array and seeds have the same sizes
 !
     l = min(lseed, np - 1)
-    seeds(0:l) = seed(1:l+1)
+    seeds(0:l) = nseeds(1:l+1)
     select case(gentype)
     case('random')
       if (l < lseed) then
