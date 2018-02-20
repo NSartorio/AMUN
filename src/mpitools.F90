@@ -51,7 +51,6 @@ module mpitools
   integer(kind=4), save                 :: comm
   integer(kind=4), save                 :: nproc, nprocs, npmax, npairs
   integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
-  integer(kind=4), save, dimension(3,2) :: pneighs
   logical        , save, dimension(3)   :: periodic
   logical        , save                 :: master = .true.
 
@@ -131,7 +130,6 @@ module mpitools
     pdims(:)     =  1
     pcoords(:)   =  0
     pparity(:)   =  0
-    pneighs(:,:) = -1
     periodic(:)  = .false.
 
 #ifdef MPI
@@ -447,18 +445,6 @@ module mpitools
         end if
         stop
 
-      end if
-
-! set the neighbors
-!
-      if (pdims(1) .gt. 1) then
-        call mpi_cart_shift(comm, 0, 1, pneighs(1,1), pneighs(1,2), iret)
-      end if
-      if (pdims(2) .gt. 1) then
-        call mpi_cart_shift(comm, 1, 1, pneighs(2,1), pneighs(2,2), iret)
-      end if
-      if (pdims(3) .gt. 1) then
-        call mpi_cart_shift(comm, 2, 1, pneighs(3,1), pneighs(3,2), iret)
       end if
 
 ! set parity flag
