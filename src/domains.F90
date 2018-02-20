@@ -143,9 +143,9 @@ module domains
     use blocks         , only : metablock_set_configuration
     use blocks         , only : metablock_set_coordinates, metablock_set_bounds
     use blocks         , only : nsides
-    use boundaries     , only : bnd_type, bnd_periodic
     use coordinates    , only : xmin, ymin, zmin, xlen, ylen, zlen
     use coordinates    , only : ir, jr, kr
+    use coordinates    , only : periodic
 
 ! local variables are not implicit by default
 !
@@ -344,16 +344,16 @@ module domains
 
 ! check periodicity and reset the edge indices if box is not periodic
 !
-   if (bnd_type(1,1) /= bnd_periodic .or. bnd_type(1,2) /= bnd_periodic) then
+   if (.not. periodic(1)) then
      im( 1) = 0
      ip(ir) = 0
    end if
-   if (bnd_type(2,1) /= bnd_periodic .or. bnd_type(2,2) /= bnd_periodic) then
+   if (.not. periodic(2)) then
      jm( 1) = 0
      jp(jr) = 0
    end if
 #if NDIMS == 3
-   if (bnd_type(3,1) /= bnd_periodic .or. bnd_type(3,2) /= bnd_periodic) then
+   if (.not. periodic(3)) then
      km( 1) = 0
      kp(kr) = 0
    end if
