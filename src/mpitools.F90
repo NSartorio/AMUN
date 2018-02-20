@@ -133,7 +133,7 @@ module mpitools
 
 ! check if the MPI interface was initialized successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI interface could not be initializes! Exiting...'
       write(*,*)
       stop
@@ -145,7 +145,7 @@ module mpitools
 
 ! check if the total number of processes could be obtained
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI process ID could not be obtained! Exiting...'
       write(*,*)
       stop
@@ -157,7 +157,7 @@ module mpitools
 
 ! check if the process ID was return successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI process ID could not be obtained! Exiting...'
       write(*,*)
       stop
@@ -165,7 +165,7 @@ module mpitools
 
 ! set the master flag
 !
-    master = (nproc .eq. 0)
+    master = nproc == 0
 
 ! calculate the index of the last processor
 !
@@ -291,7 +291,7 @@ module mpitools
 
 ! check if the MPI interface was finalizes successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       if (master) then
         write(*,*) 'The MPI interface could not be finalized! Exiting...'
         write(*,*)
@@ -358,7 +358,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
       write(*,*)
     end if
@@ -416,7 +416,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
       write(*,*)
     end if
@@ -474,7 +474,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast a string variable!'
       write(*,*)
     end if
@@ -542,7 +542,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minimum value!'
       write(*,*)
     end if
@@ -609,7 +609,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minimum value!'
       write(*,*)
     end if
@@ -677,7 +677,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -744,7 +744,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -811,7 +811,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -878,7 +878,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not sum the values from all processes!'
       write(*,*)
     end if
@@ -947,7 +947,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minima for all array elements!'
       write(*,*)
     end if
@@ -1016,7 +1016,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1085,7 +1085,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1154,7 +1154,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1226,7 +1226,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1294,7 +1294,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not send the real array to another process!'
       write(*,*)
     end if
@@ -1366,7 +1366,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not send the real array to another process!'
       write(*,*)
     end if
