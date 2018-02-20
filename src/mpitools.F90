@@ -48,11 +48,8 @@ module mpitools
 
 ! MPI global variables
 !
-  integer(kind=4), save                 :: comm3d
+  integer(kind=4), save                 :: comm
   integer(kind=4), save                 :: nproc, nprocs, npmax, npairs
-  integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
-  integer(kind=4), save, dimension(3,2) :: pneighs
-  logical        , save, dimension(3)   :: periodic
   logical        , save                 :: master = .true.
 
 ! allocatable array for processor pairs
@@ -128,11 +125,6 @@ module mpitools
     nproc        =  0
     nprocs       =  1
     npmax        =  0
-    pdims(:)     =  1
-    pcoords(:)   =  0
-    pparity(:)   =  0
-    pneighs(:,:) = -1
-    periodic(:)  = .false.
 
 #ifdef MPI
 ! initialize the MPI interface
@@ -141,7 +133,7 @@ module mpitools
 
 ! check if the MPI interface was initialized successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI interface could not be initializes! Exiting...'
       write(*,*)
       stop
@@ -153,7 +145,7 @@ module mpitools
 
 ! check if the total number of processes could be obtained
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI process ID could not be obtained! Exiting...'
       write(*,*)
       stop
@@ -165,7 +157,7 @@ module mpitools
 
 ! check if the process ID was return successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       write(*,*) 'The MPI process ID could not be obtained! Exiting...'
       write(*,*)
       stop
@@ -173,7 +165,7 @@ module mpitools
 
 ! set the master flag
 !
-    master = (nproc .eq. 0)
+    master = nproc == 0
 
 ! calculate the index of the last processor
 !
@@ -245,9 +237,9 @@ module mpitools
 !
     deallocate(procs)
 
-! store the MPI pool handles
+! store the MPI communicator
 !
-    comm3d = mpi_comm_world
+    comm = mpi_comm_world
 
 ! stop time accounting for the MPI initialization
 !
@@ -299,7 +291,7 @@ module mpitools
 
 ! check if the MPI interface was finalizes successfully
 !
-    if (iret .ne. mpi_success) then
+    if (iret /= mpi_success) then
       if (master) then
         write(*,*) 'The MPI interface could not be finalized! Exiting...'
         write(*,*)
@@ -319,164 +311,6 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_mpitools
-!
-!===============================================================================
-!
-! subroutine SETUP_MPI:
-! --------------------
-!
-!   Subroutine sets the MPI geometry.
-!
-!===============================================================================
-!
-  subroutine setup_mpi(div, per, set)
-
-! include external procedures and variables
-!
-#ifdef MPI
-    use mpi, only : mpi_comm_world, mpi_success
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    integer, dimension(3), intent(in) :: div
-    logical, dimension(3), intent(in) :: per
-    logical              , intent(in) :: set
-
-! local variables
-!
-    integer :: iret
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef MPI
-! start time accounting for the MPI initialization
-!
-    call start_timer(imi)
-#endif /* MPI */
-
-! set the periodic flag
-!
-    periodic(:) = per(:)
-
-#ifdef MPI
-! if set = .true. set the MPI domain
-!
-    if (set) then
-
-! check if the total number of chunks in division corresponds to the number of
-! processes, if not try to find the best division
-!
-      if (nprocs .ne. product(div(:))) then
-
-        if (master) then
-          write(*,*) 'The number of MPI processes does not correspond to'      &
-                                            // ' the number of domain chunks!'
-          write(*,*) 'Looking for the best division...'
-        end if
-
-! try to find the best division
-!
-        pdims(:) = 1
-        iret      = 0
-
-        do while(product(pdims(:)) .lt. nprocs)
-#if NDIMS == 3
-          iret = mod(iret, 3) + 1
-#else /* NDIMS == 3 */
-          iret = mod(iret, 2) + 1
-#endif /* NDIMS == 3 */
-          pdims(iret) = 2 * pdims(iret)
-        end do
-
-! check if the best division found
-!
-        if (product(pdims(:)) .ne. nprocs) then
-
-          if (master) then
-            write(*,*) 'Improssible to find the best domain division! Exiting...'
-            write(*,*)
-          end if
-
-          call finalize_mpitools()
-          stop
-
-        end if
-
-        if (master) then
-          write(*,*) 'Found the best division:', pdims(:)
-          write(*,*)
-        end if
-
-      else
-
-! substitute div(:) to pdims(:)
-!
-        pdims(:) = div(:)
-
-      end if
-
-! set up the Cartesian geometry
-!
-      call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)            &
-                                                       , .true., comm3d, iret)
-
-      if (iret .ne. mpi_success) then
-
-        if (master) then
-          write(*,*) 'The MPI could not create the Cartesian geometry! Exiting...'
-          write(*,*)
-        end if
-        stop
-
-      end if
-
-! assign process coordinate
-!
-      call mpi_cart_coords(comm3d, nproc, 3, pcoords(:), iret)
-
-      if (iret .ne. mpi_success) then
-
-        if (master) then
-          write(*,*) 'The MPI could not assign process coordinates! Exiting...'
-          write(*,*)
-        end if
-        stop
-
-      end if
-
-! set the neighbors
-!
-      if (pdims(1) .gt. 1) then
-        call mpi_cart_shift(comm3d, 0, 1, pneighs(1,1), pneighs(1,2), iret)
-      end if
-      if (pdims(2) .gt. 1) then
-        call mpi_cart_shift(comm3d, 1, 1, pneighs(2,1), pneighs(2,2), iret)
-      end if
-      if (pdims(3) .gt. 1) then
-        call mpi_cart_shift(comm3d, 2, 1, pneighs(3,1), pneighs(3,2), iret)
-      end if
-
-! set parity flag
-!
-      pparity(1) = mod(pcoords(1), 2)
-      pparity(2) = mod(pcoords(2), 2)
-      pparity(3) = mod(pcoords(3), 2)
-
-    end if
-
-! stop time accounting for the MPI initialization
-!
-    call stop_timer(imi)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine setup_mpi
 #ifdef MPI
 !
 !===============================================================================
@@ -516,7 +350,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(ibuf, 1, mpi_integer, 0, comm3d, iret)
+    call mpi_bcast(ibuf, 1, mpi_integer, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -524,7 +358,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
       write(*,*)
     end if
@@ -574,7 +408,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(rbuf, 1, mpi_real8, 0, comm3d, iret)
+    call mpi_bcast(rbuf, 1, mpi_real8, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -582,7 +416,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast an integer variable!'
       write(*,*)
     end if
@@ -632,7 +466,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm3d, iret)
+    call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -640,7 +474,7 @@ module mpitools
     call stop_timer(imb)
 #endif /* PROFILE */
 
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not broadcast a string variable!'
       write(*,*)
     end if
@@ -694,7 +528,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -708,7 +542,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minimum value!'
       write(*,*)
     end if
@@ -761,7 +595,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -775,7 +609,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minimum value!'
       write(*,*)
     end if
@@ -829,7 +663,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -843,7 +677,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -896,7 +730,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -910,7 +744,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -963,7 +797,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -977,7 +811,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maximum value!'
       write(*,*)
     end if
@@ -1030,7 +864,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1044,7 +878,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not sum the values from all processes!'
       write(*,*)
     end if
@@ -1099,7 +933,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1113,7 +947,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the minima for all array elements!'
       write(*,*)
     end if
@@ -1168,7 +1002,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1182,7 +1016,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1237,7 +1071,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1251,7 +1085,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1306,7 +1140,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1320,7 +1154,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1376,9 +1210,9 @@ module mpitools
 #endif /* PROFILE */
 
     tbuf(:) = real(cbuf(:))
-    call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm, iret)
     tbuf(:) = aimag(cbuf(:))
-    call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1392,7 +1226,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not find the maxima for all array elements!'
       write(*,*)
     end if
@@ -1450,7 +1284,7 @@ module mpitools
     call start_timer(ims)
 #endif /* PROFILE */
 
-    call mpi_send(rbuf, n, mpi_real8, dst, tag, comm3d, iret)
+    call mpi_send(rbuf, n, mpi_real8, dst, tag, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI send
@@ -1460,7 +1294,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not send the real array to another process!'
       write(*,*)
     end if
@@ -1522,7 +1356,7 @@ module mpitools
     call start_timer(imr)
 #endif /* PROFILE */
 
-    call mpi_recv(rbuf, n, mpi_real8, src, tag, comm3d, status, iret)
+    call mpi_recv(rbuf, n, mpi_real8, src, tag, comm, status, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI receive
@@ -1532,7 +1366,7 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret .ne. mpi_success .and. master) then
+    if (iret /= mpi_success .and. master) then
       write(*,*) 'The MPI could not send the real array to another process!'
       write(*,*)
     end if
@@ -1607,7 +1441,7 @@ module mpitools
 !
     call mpi_sendrecv(sbuffer(:), ssize, mpi_real8, sproc, stag                &
                     , rbuffer(:), rsize, mpi_real8, rproc, rtag                &
-                                                       , comm3d, status, iret)
+                                                         , comm, status, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI buffer exchange

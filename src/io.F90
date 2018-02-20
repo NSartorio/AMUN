@@ -1273,12 +1273,13 @@ module io
     use coordinates    , only : minlev, maxlev, toplev
     use coordinates    , only : nc, ng, in, jn, kn, ir, jr, kr
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
+    use coordinates    , only : periodic
     use equations      , only : eqsys, eos, gamma, csnd
     use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
-    use mpitools       , only : nprocs, nproc, periodic
+    use mpitools       , only : nprocs, nproc
     use random         , only : nseeds, get_seeds
 
 ! local variables are not implicit by default
