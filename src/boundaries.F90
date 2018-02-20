@@ -110,7 +110,7 @@ module boundaries
 !
     use coordinates    , only : periodic
 #ifdef MPI
-    use mpitools       , only : pdims, pcoords, npmax
+    use mpitools       , only : npmax
 #endif /* MPI */
     use parameters     , only : get_parameter_string
 

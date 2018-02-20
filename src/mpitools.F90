@@ -50,8 +50,6 @@ module mpitools
 !
   integer(kind=4), save                 :: comm
   integer(kind=4), save                 :: nproc, nprocs, npmax, npairs
-  integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
-  logical        , save, dimension(3)   :: periodic
   logical        , save                 :: master = .true.
 
 ! allocatable array for processor pairs
@@ -127,10 +125,6 @@ module mpitools
     nproc        =  0
     nprocs       =  1
     npmax        =  0
-    pdims(:)     =  1
-    pcoords(:)   =  0
-    pparity(:)   =  0
-    periodic(:)  = .false.
 
 #ifdef MPI
 ! initialize the MPI interface
@@ -317,152 +311,6 @@ module mpitools
 !-------------------------------------------------------------------------------
 !
   end subroutine finalize_mpitools
-!
-!===============================================================================
-!
-! subroutine SETUP_MPI:
-! --------------------
-!
-!   Subroutine sets the MPI geometry.
-!
-!===============================================================================
-!
-  subroutine setup_mpi(div, per, set)
-
-! include external procedures and variables
-!
-#ifdef MPI
-    use mpi, only : mpi_comm_world, mpi_success
-#endif /* MPI */
-
-! local variables are not implicit by default
-!
-    implicit none
-
-! input arguments
-!
-    integer, dimension(3), intent(in) :: div
-    logical, dimension(3), intent(in) :: per
-    logical              , intent(in) :: set
-
-! local variables
-!
-    integer :: iret
-!
-!-------------------------------------------------------------------------------
-!
-#ifdef MPI
-! start time accounting for the MPI initialization
-!
-    call start_timer(imi)
-#endif /* MPI */
-
-! set the periodic flag
-!
-    periodic(:) = per(:)
-
-#ifdef MPI
-! if set = .true. set the MPI domain
-!
-    if (set) then
-
-! check if the total number of chunks in division corresponds to the number of
-! processes, if not try to find the best division
-!
-      if (nprocs .ne. product(div(:))) then
-
-        if (master) then
-          write(*,*) 'The number of MPI processes does not correspond to'      &
-                                            // ' the number of domain chunks!'
-          write(*,*) 'Looking for the best division...'
-        end if
-
-! try to find the best division
-!
-        pdims(:) = 1
-        iret      = 0
-
-        do while(product(pdims(:)) .lt. nprocs)
-#if NDIMS == 3
-          iret = mod(iret, 3) + 1
-#else /* NDIMS == 3 */
-          iret = mod(iret, 2) + 1
-#endif /* NDIMS == 3 */
-          pdims(iret) = 2 * pdims(iret)
-        end do
-
-! check if the best division found
-!
-        if (product(pdims(:)) .ne. nprocs) then
-
-          if (master) then
-            write(*,*) 'Improssible to find the best domain division! Exiting...'
-            write(*,*)
-          end if
-
-          call finalize_mpitools()
-          stop
-
-        end if
-
-        if (master) then
-          write(*,*) 'Found the best division:', pdims(:)
-          write(*,*)
-        end if
-
-      else
-
-! substitute div(:) to pdims(:)
-!
-        pdims(:) = div(:)
-
-      end if
-
-! set up the Cartesian geometry
-!
-      call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)            &
-                                                      , .true., comm, iret)
-
-      if (iret .ne. mpi_success) then
-
-        if (master) then
-          write(*,*) 'The MPI could not create the Cartesian geometry! Exiting...'
-          write(*,*)
-        end if
-        stop
-
-      end if
-
-! assign process coordinate
-!
-      call mpi_cart_coords(comm, nproc, 3, pcoords(:), iret)
-
-      if (iret .ne. mpi_success) then
-
-        if (master) then
-          write(*,*) 'The MPI could not assign process coordinates! Exiting...'
-          write(*,*)
-        end if
-        stop
-
-      end if
-
-! set parity flag
-!
-      pparity(1) = mod(pcoords(1), 2)
-      pparity(2) = mod(pcoords(2), 2)
-      pparity(3) = mod(pcoords(3), 2)
-
-    end if
-
-! stop time accounting for the MPI initialization
-!
-    call stop_timer(imi)
-#endif /* MPI */
-
-!-------------------------------------------------------------------------------
-!
-  end subroutine setup_mpi
 #ifdef MPI
 !
 !===============================================================================
