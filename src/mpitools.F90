@@ -48,7 +48,7 @@ module mpitools
 
 ! MPI global variables
 !
-  integer(kind=4), save                 :: comm3d
+  integer(kind=4), save                 :: comm
   integer(kind=4), save                 :: nproc, nprocs, npmax, npairs
   integer(kind=4), save, dimension(3)   :: pdims, pcoords, pparity
   integer(kind=4), save, dimension(3,2) :: pneighs
@@ -245,9 +245,9 @@ module mpitools
 !
     deallocate(procs)
 
-! store the MPI pool handles
+! store the MPI communicator
 !
-    comm3d = mpi_comm_world
+    comm = mpi_comm_world
 
 ! stop time accounting for the MPI initialization
 !
@@ -423,7 +423,7 @@ module mpitools
 ! set up the Cartesian geometry
 !
       call mpi_cart_create(mpi_comm_world, 3, pdims(:), periodic(:)            &
-                                                       , .true., comm3d, iret)
+                                                      , .true., comm, iret)
 
       if (iret .ne. mpi_success) then
 
@@ -437,7 +437,7 @@ module mpitools
 
 ! assign process coordinate
 !
-      call mpi_cart_coords(comm3d, nproc, 3, pcoords(:), iret)
+      call mpi_cart_coords(comm, nproc, 3, pcoords(:), iret)
 
       if (iret .ne. mpi_success) then
 
@@ -452,13 +452,13 @@ module mpitools
 ! set the neighbors
 !
       if (pdims(1) .gt. 1) then
-        call mpi_cart_shift(comm3d, 0, 1, pneighs(1,1), pneighs(1,2), iret)
+        call mpi_cart_shift(comm, 0, 1, pneighs(1,1), pneighs(1,2), iret)
       end if
       if (pdims(2) .gt. 1) then
-        call mpi_cart_shift(comm3d, 1, 1, pneighs(2,1), pneighs(2,2), iret)
+        call mpi_cart_shift(comm, 1, 1, pneighs(2,1), pneighs(2,2), iret)
       end if
       if (pdims(3) .gt. 1) then
-        call mpi_cart_shift(comm3d, 2, 1, pneighs(3,1), pneighs(3,2), iret)
+        call mpi_cart_shift(comm, 2, 1, pneighs(3,1), pneighs(3,2), iret)
       end if
 
 ! set parity flag
@@ -516,7 +516,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(ibuf, 1, mpi_integer, 0, comm3d, iret)
+    call mpi_bcast(ibuf, 1, mpi_integer, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -574,7 +574,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(rbuf, 1, mpi_real8, 0, comm3d, iret)
+    call mpi_bcast(rbuf, 1, mpi_real8, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -632,7 +632,7 @@ module mpitools
     call start_timer(imb)
 #endif /* PROFILE */
 
-    call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm3d, iret)
+    call mpi_bcast(sbuf, len(sbuf), mpi_character, 0, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI broadcast
@@ -694,7 +694,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -761,7 +761,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -829,7 +829,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -896,7 +896,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -963,7 +963,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, 1, mpi_integer, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1030,7 +1030,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, 1, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1099,7 +1099,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_min, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1168,7 +1168,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_max, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1237,7 +1237,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm3d, iret)
+    call mpi_allreduce(ibuf, tbuf, n, mpi_integer, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1306,7 +1306,7 @@ module mpitools
     call start_timer(imm)
 #endif /* PROFILE */
 
-    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(rbuf, tbuf, n, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1376,9 +1376,9 @@ module mpitools
 #endif /* PROFILE */
 
     tbuf(:) = real(cbuf(:))
-    call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(tbuf, rbuf, n, mpi_real8, mpi_sum, comm, iret)
     tbuf(:) = aimag(cbuf(:))
-    call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm3d, iret)
+    call mpi_allreduce(tbuf, ibuf, n, mpi_real8, mpi_sum, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI reduce
@@ -1450,7 +1450,7 @@ module mpitools
     call start_timer(ims)
 #endif /* PROFILE */
 
-    call mpi_send(rbuf, n, mpi_real8, dst, tag, comm3d, iret)
+    call mpi_send(rbuf, n, mpi_real8, dst, tag, comm, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI send
@@ -1522,7 +1522,7 @@ module mpitools
     call start_timer(imr)
 #endif /* PROFILE */
 
-    call mpi_recv(rbuf, n, mpi_real8, src, tag, comm3d, status, iret)
+    call mpi_recv(rbuf, n, mpi_real8, src, tag, comm, status, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI receive
@@ -1607,7 +1607,7 @@ module mpitools
 !
     call mpi_sendrecv(sbuffer(:), ssize, mpi_real8, sproc, stag                &
                     , rbuffer(:), rsize, mpi_real8, rproc, rtag                &
-                                                       , comm3d, status, iret)
+                                                         , comm, status, iret)
 
 #ifdef PROFILE
 ! stop time accounting for the MPI buffer exchange
