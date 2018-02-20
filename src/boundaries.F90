@@ -108,8 +108,9 @@ module boundaries
 
 ! import external procedures and variables
 !
+    use coordinates    , only : periodic
 #ifdef MPI
-    use mpitools       , only : pdims, pcoords, periodic, npmax
+    use mpitools       , only : pdims, pcoords, npmax
 #endif /* MPI */
     use parameters     , only : get_parameter_string
 
@@ -130,6 +131,10 @@ module boundaries
     character(len = 32)    :: yubndry = "periodic"
     character(len = 32)    :: zlbndry = "periodic"
     character(len = 32)    :: zubndry = "periodic"
+
+! local variables
+!
+    integer                :: n
 !
 !-------------------------------------------------------------------------------
 !
@@ -256,6 +261,13 @@ module boundaries
     case default
       bnd_type(3,2) = bnd_periodic
     end select
+
+! set domain periodicity
+!
+    do n = 1, NDIMS
+      periodic(n) = (bnd_type(n,1) == bnd_periodic) .and.                      &
+                    (bnd_type(n,2) == bnd_periodic)
+    end do
 
 #ifdef MPI
 ! allocate the exchange arrays
@@ -1083,11 +1095,11 @@ module boundaries
     use blocks         , only : ndims, nsides
     use coordinates    , only : im, jm, km
     use coordinates    , only : ax, ay, az
+    use coordinates    , only : periodic
     use equations      , only : nv
 #ifdef MPI
     use mpitools       , only : nproc
 #endif /* MPI */
-    use mpitools       , only : periodic
 
 ! local variables are not implicit by default
 !
