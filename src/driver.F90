@@ -54,7 +54,6 @@ program amun
   use mesh          , only : initialize_mesh, finalize_mesh
   use mesh          , only : generate_mesh, store_mesh_stats
   use mpitools      , only : initialize_mpitools, finalize_mpitools
-  use mpitools      , only : setup_mpi
 #ifdef MPI
   use mpitools      , only : bcast_integer_variable
   use mpitools      , only : reduce_maximum_integer, reduce_sum_real_array
@@ -85,8 +84,6 @@ program amun
 
 ! default parameters
 !
-  integer, dimension(3) :: div = 1
-  logical, dimension(3) :: per = .true.
   integer               :: nmax  = huge(1), ndat = 1
   real(kind=8)          :: tmax  = 0.0d+00, trun = 9.999d+03, tsav = 3.0d+01
   real(kind=8)          :: dtnext = 0.0d+00
@@ -95,10 +92,6 @@ program amun
 !
   logical        , save :: precise_snapshots = .false.
   character(len=255)    :: prec_snap         = "off"
-
-! temporary variables
-!
-  character(len=64)     :: lbnd, ubnd
 
 ! the termination and status flags
 !
@@ -244,26 +237,6 @@ program amun
 !
   iterm = 0
 
-! check if the domain is periodic
-!
-  lbnd = "periodic"
-  ubnd = "periodic"
-  call get_parameter_string("xlbndry" , lbnd)
-  call get_parameter_string("xubndry" , ubnd)
-  per(1) = (lbnd == "periodic") .and. (ubnd == "periodic")
-  lbnd = "periodic"
-  ubnd = "periodic"
-  call get_parameter_string("ylbndry" , lbnd)
-  call get_parameter_string("yubndry" , ubnd)
-  per(2) = (lbnd == "periodic") .and. (ubnd == "periodic")
-#if NDIMS == 3
-  lbnd = "periodic"
-  ubnd = "periodic"
-  call get_parameter_string("zlbndry" , lbnd)
-  call get_parameter_string("zubndry" , ubnd)
-  per(3) = (lbnd == "periodic") .and. (ubnd == "periodic")
-#endif /* NDIMS == 3 */
-
 ! get the execution termination parameters
 !
   call get_parameter_integer("nmax" , nmax)
@@ -303,10 +276,6 @@ program amun
     write (*,"(1x,a)"        ) "Parallelization:"
     write (*,"(4x,a,1x,i6 )" ) "MPI processes          =", nprocs
   end if
-
-! set up the MPI geometry
-!
-  call setup_mpi(div(:), per(:), .false.)
 
 ! initialize the random number generator (passes the number of OpenMP threads
 ! and the current thread number)

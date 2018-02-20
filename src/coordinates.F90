@@ -94,6 +94,10 @@ module coordinates
   real(kind=8), save :: yarea = 1.0d+00
   real(kind=8), save :: zarea = 1.0d+00
 
+! flags to indicate periodicity of boundaries
+!
+  logical, dimension(3), save :: periodic = .true.
+
 ! the block coordinates for all levels of refinement
 !
   real(kind=8), dimension(:,:), allocatable, save :: ax  , ay  , az
