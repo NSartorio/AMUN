@@ -47,6 +47,15 @@ endif
 
 #-------------------------------------------------------------------------------
 #
+# directories indicating where the source files are, where the object files
+# should be created and where to save the resulting executable file
+
+SRCSDIR := ../src
+OBJSDIR := ./obj
+DESTDIR := .
+
+#-------------------------------------------------------------------------------
+#
 # pass additional flags to the compiler
 #
 # compiler
@@ -66,102 +75,134 @@ FFLAGS  += ${CPPPREFIX}-D${OUTPUT}
 .SUFFIXES:
 .SUFFIXES: .F90 .o
 
-.F90.o:
-	$(FC) -c $(FFLAGS) $*.F90
-
 #-------------------------------------------------------------------------------
 
 name = amun
 
-default: $(name).x
+modules = algebra blocks boundaries constants coordinates domains driver       \
+          equations error evolution gravity integrals interpolations io mesh   \
+          mpitools operators parameters problems random refinement schemes     \
+          shapes sources timers user_problem utils
 
-sources = algebra.F90 blocks.F90 boundaries.F90 constants.F90 coordinates.F90  \
-          domains.F90 driver.F90 equations.F90 error.F90 evolution.F90         \
-          gravity.F90 integrals.F90 interpolations.F90 io.F90 mesh.F90         \
-          mpitools.F90 operators.F90 parameters.F90 problems.F90 random.F90    \
-          refinement.F90 schemes.F90 shapes.F90 sources.F90 timers.F90         \
-          user_problem.F90 utils.F90
+sources := $(addprefix $(SRCSDIR)/,$(addsuffix .F90, $(modules)))
+objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o, $(modules)))
 
-objects = algebra.o blocks.o boundaries.o constants.o coordinates.o domains.o  \
-          driver.o equations.o error.o evolution.o gravity.o integrals.o       \
-          interpolations.o io.o mesh.o mpitools.o operators.o parameters.o     \
-          problems.o random.o refinement.o schemes.o shapes.o sources.o        \
-          timers.o user_problem.o utils.o
+all: $(name).x
 
-$(name).x: $(objects)
-	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(name).x
+clean:
+	rm -rf $(OBJSDIR) $(DESTDIR)/$(name).x
 
-clean-bak:
-	rm -rf *.bak *~
+$(OBJSDIR)/%.o : $(SRCSDIR)/%.F90 makefile
+	$(FC) -c $(FFLAGS) -J $(OBJSDIR) $< -o $@
 
-clean-data:
-	rm -rf *.dat *.h5
+$(name).x: $(objects) | $(DESTDIR)
+	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(DESTDIR)/$(name).x
 
-clean-exec:
-	rm -rf *.x
+$(objects): | $(OBJSDIR)
 
-clean-logs:
-	rm -rf *.log
+$(OBJSDIR):
+	mkdir -p $(OBJSDIR)
 
-clean-modules:
-	rm -rf *.mod
-
-clean-objects:
-	rm -rf *.o
-
-clean: clean-bak clean-modules clean-objects
-
-clean-all: clean-bak clean-data clean-exec clean-logs clean-modules            \
-           clean-objects
+$(DESTDIR):
+	mkdir -p $(DESTDIR)
 
 #-------------------------------------------------------------------------------
+#
+# object files dependencies
+#
+algebra_deps        = constants error
+blocks_deps         = error timers
+boundaries_deps     = blocks coordinates equations error gravity               \
+                      interpolations mpitools timers user_problem
+constants_deps      =
+coordinates_deps    = parameters
+driver_deps         = blocks coordinates equations evolution gravity integrals \
+                      interpolations io mesh mpitools operators parameters     \
+                      problems random refinement schemes shapes sources        \
+                      user_problem
+equations_deps      = algebra coordinates error parameters timers
+error_deps          =
+evolution_deps      = blocks boundaries coordinates equations mesh mpitools    \
+                      parameters schemes shapes sources
+domains_deps        = blocks boundaries coordinates parameters
+gravity_deps        = parameters timers user_problem
+integrals_deps      = blocks coordinates equations error evolution mpitools    \
+                      parameters timers
+interpolations_deps = algebra blocks coordinates error parameters timers
+io_deps             = blocks coordinates equations error evolution mesh        \
+                      mpitools random refinement timers
+mesh_deps           = blocks coordinates domains equations error               \
+                      interpolations mpitools problems refinement timers
+mpitools_deps       = error timers
+operators_deps      = timers
+parameters_deps     = mpitools
+problems_deps       = blocks constants coordinates equations error parameters  \
+                      random timers user_problem
+random_deps         = mpitools parameters
+refinement_deps     = blocks coordinates equations operators parameters timers
+schemes_deps        = algebra coordinates equations interpolations timers
+shapes_deps         = blocks constants coordinates equations parameters timers \
+                      user_problem
+sources_deps        = blocks coordinates equations gravity operators           \
+                      parameters timers user_problem
+timers_deps         =
+user_problem_deps   = blocks constants coordinates equations error operators   \
+                      parameters random timers
+utils_deps          = error
 
-algebra.o        : algebra.F90 constants.o error.o
-blocks.o         : blocks.F90 error.o timers.o
-boundaries.o     : boundaries.F90 blocks.o coordinates.o equations.o error.o   \
-                   gravity.o interpolations.o mpitools.o timers.o              \
-                   user_problem.o
-constants.o      : constants.F90
-coordinates.o    : coordinates.F90 parameters.o
-driver.o         : driver.F90 blocks.o coordinates.o equations.o evolution.o   \
-                   gravity.o integrals.o interpolations.o io.o mesh.o          \
-                   mpitools.o operators.o parameters.o problems.o random.o     \
-                   refinement.o schemes.o shapes.o sources.o user_problem.o
-equations.o      : equations.F90 algebra.o coordinates.o error.o parameters.o  \
-                   timers.o
-error.o          : error.F90
-evolution.o      : evolution.F90 blocks.o boundaries.o coordinates.o           \
-                   equations.o mesh.o mpitools.o parameters.o schemes.o        \
-                   shapes.o sources.o
-domains.o        : domains.F90 blocks.o boundaries.o coordinates.o parameters.o
-gravity.o        : gravity.F90 parameters.o timers.o user_problem.o
-integrals.o      : integrals.F90 blocks.o coordinates.o equations.o error.o    \
-                   evolution.o mpitools.o parameters.o timers.o
-interpolations.o : interpolations.F90 algebra.o blocks.o coordinates.o error.o \
-                   parameters.o timers.o
-io.o             : io.F90 blocks.o coordinates.o equations.o error.o           \
-                   evolution.o mesh.o mpitools.o random.o refinement.o timers.o
-mesh.o           : mesh.F90 blocks.o coordinates.o domains.o equations.o       \
-                   error.o interpolations.o mpitools.o problems.o refinement.o \
-                   timers.o
-mpitools.o       : mpitools.F90 error.o timers.o
-operators.o      : operators.F90 timers.o
-parameters.o     : parameters.F90 mpitools.o
-problems.o       : problems.F90 blocks.o constants.o coordinates.o equations.o \
-                   error.o parameters.o random.o timers.o user_problem.o
-random.o         : random.F90 mpitools.o parameters.o
-refinement.o     : refinement.F90 blocks.o coordinates.o equations.o           \
-                   operators.o parameters.o timers.o
-schemes.o        : schemes.F90 algebra.o coordinates.o equations.o             \
-                   interpolations.o timers.o
-shapes.o         : shapes.F90 blocks.o constants.o coordinates.o equations.o   \
-                   parameters.o timers.o user_problem.o
-sources.o        : sources.F90 blocks.o coordinates.o equations.o gravity.o    \
-                   operators.o parameters.o timers.o user_problem.o
-timers.o         : timers.F90
-user_problem.o   : user_problem.F90 blocks.o constants.o coordinates.o         \
-                   equations.o error.o operators.o parameters.o random.o       \
-                   timers.o
-utils.o          : utils.F90 error.o
+$(OBJSDIR)/algebra.o        : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(algebra_deps)))
+$(OBJSDIR)/blocks.o         : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(blocks_deps)))
+$(OBJSDIR)/boundaries.o     : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(boundaries_deps)))
+$(OBJSDIR)/constants.o      : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(constants_deps)))
+$(OBJSDIR)/coordinates.o    : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(coordinates_deps)))
+$(OBJSDIR)/driver.o         : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(driver_deps)))
+$(OBJSDIR)/equations.o      : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(equations_deps)))
+$(OBJSDIR)/error.o          : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(error_deps)))
+$(OBJSDIR)/evolution.o      : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(evolution_deps)))
+$(OBJSDIR)/domains.o        : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(domains_deps)))
+$(OBJSDIR)/gravity.o        : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(gravity_deps)))
+$(OBJSDIR)/integrals.o      : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(integrals_deps)))
+$(OBJSDIR)/interpolations.o : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(interpolations_deps)))
+$(OBJSDIR)/io.o             : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(io_deps)))
+$(OBJSDIR)/mesh.o           : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(mesh_deps)))
+$(OBJSDIR)/mpitools.o       : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(mpitools_deps)))
+$(OBJSDIR)/operators.o      : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(operators_deps)))
+$(OBJSDIR)/parameters.o     : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(parameters_deps)))
+$(OBJSDIR)/problems.o       : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(problems_deps)))
+$(OBJSDIR)/random.o         : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(random_deps)))
+$(OBJSDIR)/refinement.o     : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(refinement_deps)))
+$(OBJSDIR)/schemes.o        : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(schemes_deps)))
+$(OBJSDIR)/shapes.o         : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(shapes_deps)))
+$(OBJSDIR)/sources.o        : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(sources_deps)))
+$(OBJSDIR)/timers.o         : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(timers_deps)))
+$(OBJSDIR)/user_problem.o   : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(user_problem_deps)))
+$(OBJSDIR)/utils.o          : $(addprefix $(OBJSDIR)/,$(addsuffix .o,          \
+                                $(utils_deps)))
 
 #-------------------------------------------------------------------------------
