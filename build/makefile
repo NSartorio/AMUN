@@ -53,9 +53,11 @@ endif
 #
 # generate object file dependencies
 #
+ifneq ($(wildcard makedeps),makedeps)
 $(info Generating dependencies.)
 $(shell ./mkdeps.sh $(SRCSDIR) $(OBJSDIR) > makedeps)
 $(info )
+endif
 
 #-------------------------------------------------------------------------------
 #
