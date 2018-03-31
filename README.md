@@ -68,13 +68,13 @@ Compilation
 1. Clone the AMUN source code: `git clone https://bitbucket.org/amunteam/amun-code.git`,
    or unpack the archive downloaded from page
    [Downloads](https://bitbucket.org/amunteam/amun-code/downloads/).
-2. Go to directory **hosts/** and copy file **default** to a new file named
+2. Go to directory **build/hosts/** and copy file **default** to a new file named
    exactly as your host name (name returned by command `hostname`).
 3. Customize your compiler and compilation options in your new host file.
-4. Go to directory **src/** and copy file **make.default** to **make.config**.
+4. Go up to directory **build/** and copy file **make.default** to **make.config**.
 5. Customize compilation time options in **make.config**.
-6. Compile sources by typing `make` in directory **src/**. The executable file
-   **amun.x** should be created.
+6. Compile sources by typing `make` in directory **build/**. The executable file
+   **amun.x** should be created there.
 
 
 Usage
