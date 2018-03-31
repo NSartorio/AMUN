@@ -51,16 +51,6 @@ endif
 
 #-------------------------------------------------------------------------------
 #
-# generate object file dependencies
-#
-ifneq ($(wildcard makedeps),makedeps)
-$(info Generating dependencies.)
-$(shell ./mkdeps.sh $(SRCSDIR) $(OBJSDIR) > makedeps)
-$(info )
-endif
-
-#-------------------------------------------------------------------------------
-#
 # check flag conditions
 #
 
@@ -89,17 +79,18 @@ FFLAGS  += ${CPPPREFIX}-D${OUTPUT}
 
 name    = amun
 
-modules = algebra blocks boundaries constants coordinates domains driver       \
+files   = algebra blocks boundaries constants coordinates domains driver       \
           equations error evolution gravity integrals interpolations io mesh   \
           mpitools operators parameters problems random refinement schemes     \
           shapes sources timers user_problem utils
 
-sources := $(addprefix $(SRCSDIR)/,$(addsuffix .F90, $(modules)))
-objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o,   $(modules)))
+sources := $(addprefix $(SRCSDIR)/,$(addsuffix .F90, $(files)))
+objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o,   $(files)))
+modules := $(addprefix $(OBJSDIR)/,$(addsuffix .mod, $(files)))
 
 all: $(name).x
 
-$(name).x: $(deps) $(objects) | $(DESTDIR)
+$(name).x: $(objects) | $(DESTDIR)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(DESTDIR)/$(name).x
 
 $(OBJSDIR)/%.o : $(SRCSDIR)/%.F90
@@ -113,8 +104,15 @@ $(OBJSDIR):
 $(DESTDIR):
 	mkdir -p $(DESTDIR)
 
-clean:
-	rm -rf $(OBJSDIR) $(DESTDIR)/$(name).x
+makedeps: $(sources)
+	./mkdeps.sh $(SRCSDIR) $(OBJSDIR) > makedeps
+
+.PHONY: clean
+
+clean: $(OBJSDIR)
+	rm -f $(objects) $(modules) $(DESTDIR)/$(name).x
+	rmdir $(OBJSDIR)
+	rm -f makedeps
 
 #-------------------------------------------------------------------------------
 #
