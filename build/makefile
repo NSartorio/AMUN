@@ -51,11 +51,11 @@ endif
 
 #-------------------------------------------------------------------------------
 #
-# generate new makedeps file if does not exists
+# generate object file dependencies
 #
 $(info Generating dependencies.)
 $(shell ./mkdeps.sh $(SRCSDIR) $(OBJSDIR) > makedeps)
-$(shell sleep 1)
+$(info )
 
 #-------------------------------------------------------------------------------
 #
@@ -93,7 +93,7 @@ modules = algebra blocks boundaries constants coordinates domains driver       \
           shapes sources timers user_problem utils
 
 sources := $(addprefix $(SRCSDIR)/,$(addsuffix .F90, $(modules)))
-objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o, $(modules)))
+objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o,   $(modules)))
 
 all: $(name).x
 
@@ -116,7 +116,7 @@ clean:
 
 #-------------------------------------------------------------------------------
 #
-# object files dependencies (generated using mkdeps.sh script)
+# object file dependencies (generated using mkdeps.sh script)
 #
 include makedeps
 
