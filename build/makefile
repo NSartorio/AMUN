@@ -109,10 +109,9 @@ makedeps: $(sources)
 
 .PHONY: clean
 
-clean: $(OBJSDIR)
-	rm -f $(objects) $(modules) $(DESTDIR)/$(name).x
-	rmdir $(OBJSDIR)
-	rm -f makedeps
+clean:
+	rm -f $(objects) $(modules) $(DESTDIR)/$(name).x makedeps
+	if [ -d $(OBJSDIR) ]; then rmdir $(OBJSDIR); fi
 
 #-------------------------------------------------------------------------------
 #
