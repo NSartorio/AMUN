@@ -1196,25 +1196,21 @@ module io
 !
     call write_attributes_h5(fid)
 
+! write the coordinates (data block bounds, refinement levels, etc.)
+!
+    call write_coordinates_h5(fid)
+
 ! depending on the selected type of output file write the right groups
 !
     select case(ftype)
 
     case('c')
 
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-      call write_coordinates_h5(fid)
-
 ! write the variables stored in data blocks (leafs)
 !
       call write_conservative_variables_h5(fid)
 
     case('p')
-
-! write the coordinates (data block bounds, refinement levels, etc.)
-!
-      call write_coordinates_h5(fid)
 
 ! write the variables stored in data blocks (leafs)
 !
