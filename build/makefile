@@ -70,6 +70,14 @@ FFLAGS  += ${CPPPREFIX}-DNDIMS=${NDIMS}
 #
 FFLAGS  += ${CPPPREFIX}-D${OUTPUT}
 
+# add module path to compiler options
+#
+ifeq ($(COMPILER),GNU)
+FFLAGS  += -J $(OBJSDIR)
+else
+FFLAGS  += -module $(OBJSDIR)
+endif
+
 #-------------------------------------------------------------------------------
 
 .SUFFIXES:
@@ -94,7 +102,7 @@ $(name).x: $(objects) | $(DESTDIR)
 	$(LD) $(LDFLAGS) $(objects) $(LIBS) -o $(DESTDIR)/$(name).x
 
 $(OBJSDIR)/%.o : $(SRCSDIR)/%.F90
-	$(FC) -c $(FFLAGS) -J $(OBJSDIR) $< -o $@
+	$(FC) -c $(FFLAGS) $< -o $@
 
 $(objects): | $(OBJSDIR)
 
