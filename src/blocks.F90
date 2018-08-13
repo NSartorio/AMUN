@@ -343,7 +343,7 @@ module blocks
   public :: set_last_id, get_last_id, get_mblocks, get_dblocks, get_nleafs
   public :: set_blocks_update
   public :: change_blocks_process
-  public :: set_neighbors_refine
+  public :: set_neighbors_refine, set_neighbors_update
   public :: metablock_set_id, metablock_set_process, metablock_set_level
   public :: metablock_set_configuration, metablock_set_refinement
   public :: metablock_set_position, metablock_set_coordinates

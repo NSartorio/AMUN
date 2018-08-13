@@ -695,6 +695,7 @@ module interpolations
     use coordinates    , only : im , jm , km
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+    use error          , only : print_warning
 
 ! local variables are not implicit by default
 !
@@ -768,9 +769,15 @@ module interpolations
 ! variables
 !
           if (positive) then
-            do while (q(i,j,k) <= sum(abs(dq(1:NDIMS))))
-              dq(:) = 0.5d+00 * dq(:)
-            end do
+            if (q(i,j,k) > 0.0d+00) then
+              do while (q(i,j,k) <= sum(abs(dq(1:NDIMS))))
+                dq(:) = 0.5d+00 * dq(:)
+              end do
+            else
+              call print_warning("interpolations::interfaces_tvd"              &
+                                       , "Positive variable is not positive!")
+              dq(:) = 0.0d+00
+            end if
           end if
 
 ! interpolate states
@@ -933,6 +940,7 @@ module interpolations
     use coordinates    , only : im , jm , km
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
+    use error          , only : print_warning
 
 ! local variables are not implicit by default
 !
@@ -1051,9 +1059,15 @@ module interpolations
 ! variables
 !
             if (positive) then
-              do while (q(i,j,k) <= sum(abs(dq(1:NDIMS))))
-                dq(:) = 0.5d+00 * dq(:)
-              end do
+              if (q(i,j,k) > 0.0d+00) then
+                do while (q(i,j,k) <= sum(abs(dq(1:NDIMS))))
+                  dq(:) = 0.5d+00 * dq(:)
+                end do
+              else
+                call print_warning("interpolations::interfaces_mgp"            &
+                                       , "Positive variable is not positive!")
+                dq(:) = 0.0d+00
+              end if
             end if
 
 ! interpolate states
