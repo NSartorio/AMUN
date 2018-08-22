@@ -139,7 +139,7 @@ module equations
 
 ! the lower limits for density and pressure to be treated as physical
 !
-  real(kind=8)     , save :: dmin    = 1.0d-08, pmin    = 1.0d-08
+  real(kind=8)     , save :: dmin    = 1.0d-16, pmin    = 1.0d-16
 
 ! the upper limits for the Lorentz factor and corresponding |v|²
 !
@@ -1218,13 +1218,17 @@ module equations
 
               else
 
-! print error, since no physical cells found for averaging
+! limit density or pressure to minimum value, since the averaging over
+! neighbours failed
 !
                 write(msg,'(a,1x,a)')                                          &
-                              "Cannot correct the unphysical cell."            &
-                            , "Not sufficient number of physical neighbors!"
-                call print_error(loc, trim(msg))
-                stop
+                              "Not sufficient number of physical neighbors!"   &
+                            , "Applying lower bounds for positive variables."
+                call print_warning(loc, trim(msg))
+
+                q(1:nv,n) = qq(1:nv,i,j,k)
+                q(idn ,n) = max(dmin, qq(idn,i,j,k))
+                if (ipr > 0) q(ipr,n) = max(pmin, qq(ipr,i,j,k))
 
               end if ! not sufficient number of physical cells for averaging
 
