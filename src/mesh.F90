@@ -1037,6 +1037,7 @@ module mesh
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ib, ie, jb, je, kb, ke
     use equations      , only : nv, idn, ien
+    use error          , only : print_warning
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -1137,9 +1138,15 @@ module mesh
 #endif /* NDIMS == 3 */
 
             if (p == idn .or. p == ien) then
-              do while (pdata%u(p,i,j,k) <= sum(abs(du(1:NDIMS))))
-                du(:) = 0.5d+00 * du(:)
-              end do
+              if (pdata%u(p,i,j,k) > 0.0d+00) then
+                do while (pdata%u(p,i,j,k) <= sum(abs(du(1:NDIMS))))
+                  du(:) = 0.5d+00 * du(:)
+                end do
+              else
+                call print_warning("mesh::prolong_block"                       &
+                                       , "Positive variable is not positive!")
+                du(:) = 0.0d+00
+              end if
             end if
 
             du(:) = 0.5d+00 * du(:)

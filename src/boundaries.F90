@@ -5765,6 +5765,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : faces_dp
     use equations      , only : nv, idn, ipr
+    use error          , only : print_warning
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -5842,9 +5843,15 @@ module boundaries
             dq(3) = limiter_prol(0.5d+00, dql, dqr)
 
             if (p == idn .or. p == ipr) then
-              do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
-                dq(:) = 0.5d+00 * dq(:)
-              end do
+              if (qn(p,i,j,k) > 0.0d+00) then
+                do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
+                  dq(:) = 0.5d+00 * dq(:)
+                end do
+              else
+                call print_warning("boundaries::block_face_prolong"            &
+                                       , "Positive variable is not positive!")
+                dq(:) = 0.0d+00
+              end if
             end if
 
             dq(:) = 0.5d+00 * dq(:)
@@ -6063,6 +6070,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : edges_dp
     use equations      , only : nv, idn, ipr
+    use error          , only : print_warning
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -6155,9 +6163,15 @@ module boundaries
 #endif /* NDIMS == 3 */
 
             if (p == idn .or. p == ipr) then
-              do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
-                dq(:) = 0.5d+00 * dq(:)
-              end do
+              if (qn(p,i,j,k) > 0.0d+00) then
+                do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
+                  dq(:) = 0.5d+00 * dq(:)
+                end do
+              else
+                call print_warning("boundaries::block_edge_prolong"            &
+                                       , "Positive variable is not positive!")
+                dq(:) = 0.0d+00
+              end if
             end if
 
             dq(:) = 0.5d+00 * dq(:)
@@ -6330,6 +6344,7 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : corners_dp
     use equations      , only : nv, idn, ipr
+    use error          , only : print_warning
     use interpolations , only : limiter_prol
 
 ! local variables are not implicit by default
@@ -6427,9 +6442,15 @@ module boundaries
 #endif /* NDIMS == 3 */
 
             if (p == idn .or. p == ipr) then
-              do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
-                dq(:) = 0.5d+00 * dq(:)
-              end do
+              if (qn(p,i,j,k) > 0.0d+00) then
+                do while (qn(p,i,j,k) <= sum(abs(dq(1:NDIMS))))
+                  dq(:) = 0.5d+00 * dq(:)
+                end do
+              else
+                call print_warning("boundaries::block_corner_prolong"          &
+                                       , "Positive variable is not positive!")
+                dq(:) = 0.0d+00
+              end if
             end if
 
             dq(:) = 0.5d+00 * dq(:)
