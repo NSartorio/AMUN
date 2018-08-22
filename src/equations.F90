@@ -139,7 +139,7 @@ module equations
 
 ! the lower limits for density and pressure to be treated as physical
 !
-  real(kind=8)     , save :: dmin    = 1.0d-08, pmin    = 1.0d-08
+  real(kind=8)     , save :: dmin    = 1.0d-16, pmin    = 1.0d-16
 
 ! the upper limits for the Lorentz factor and corresponding |v|²
 !
@@ -158,9 +158,12 @@ module equations
   integer          , save :: nrmax   = 100
   integer          , save :: nrext   = 2
 
-! flags for corrections
+! flag for unphysical cells correction, the maximum distance of neighbors for
+! averaging region, and the minimum number of cells for averaging
 !
   logical          , save :: fix_unphysical_cells = .false.
+  integer          , save :: ngavg   = 2
+  integer          , save :: npavg   = 4
 
 ! by default everything is private
 !
@@ -868,6 +871,16 @@ module equations
       fix_unphysical_cells = .false.
     end select
 
+! get parameters for unphysical cells correction
+!
+    call get_parameter_integer("ngavg", ngavg)
+    call get_parameter_integer("npavg", npavg)
+
+! correct the above parameters to reasonable values
+!
+    ngavg = max(1, ngavg)
+    npavg = max(2, npavg)
+
 ! print information about the equation module
 !
     if (verbose) then
@@ -879,6 +892,10 @@ module equations
       end if
       write (*,"(4x,a20, 3x,'=',1x,a)") "fix unphysical cells"                 &
                                                         , trim(unphysical_fix)
+      if (fix_unphysical_cells) then
+        write (*,"(4x,a20, 3x,'=',1x,i4)") "ngavg               ", ngavg
+        write (*,"(4x,a20, 3x,'=',1x,i4)") "npavg               ", npavg
+      end if
 
     end if
 
@@ -1193,7 +1210,7 @@ module equations
 !
               np = 0
               p  = 1
-              do while (np <= 2 .and. p <= 4)
+              do while (np <= npavg .and. p <= ngavg)
                 il = max( 1, i - p)
                 iu = min(im, i + p)
                 jl = max( 1, j - p)
@@ -1208,7 +1225,7 @@ module equations
 
 ! average primitive variables
 !
-              if (np > 2) then
+              if (np >= npavg) then
 
                 do p = 1, nv
                   q(p,n) = sum(qq(p,il:iu,jl:ju,kl:ku),                        &
@@ -1218,13 +1235,17 @@ module equations
 
               else
 
-! print error, since no physical cells found for averaging
+! limit density or pressure to minimum value, since the averaging over
+! neighbours failed
 !
                 write(msg,'(a,1x,a)')                                          &
-                              "Cannot correct the unphysical cell."            &
-                            , "Not sufficient number of physical neighbors!"
-                call print_error(loc, trim(msg))
-                stop
+                              "Not sufficient number of physical neighbors!"   &
+                            , "Applying lower bounds for positive variables."
+                call print_warning(loc, trim(msg))
+
+                q(1:nv,n) = qq(1:nv,i,j,k)
+                q(idn ,n) = max(dmin, qq(idn,i,j,k))
+                if (ipr > 0) q(ipr,n) = max(pmin, qq(ipr,i,j,k))
 
               end if ! not sufficient number of physical cells for averaging
 
