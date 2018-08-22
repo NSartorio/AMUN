@@ -418,6 +418,103 @@ def rebin(a, newshape):
       a = np.repeat(a, newshape[n] / a.shape[n], axis = n)
     return(a)
 
+
+def amun_integrals(field, filename, pathlist):
+    '''
+        get_integral: iterate over pathlist and read and merge field values from filename files in the provided paths
+    '''
+    # Initiate the return values with empty array and file number.
+    #
+    vals = array([])
+    num  = 1
+
+    # Iterate over all paths provided in the list 'pathlist'.
+    #
+    for path in pathlist:
+
+      # Iterate over all files in the current path.
+      #
+      while True:
+
+        # Generate file name.
+        #
+        dfile = path + '/' + filename + '_' + str(num).zfill(2) + '.dat'
+
+        # Check if the file exists.
+        #
+        if isfile(dfile):
+
+          # Read values from the current integrals file.
+          #
+          lvals = read_integrals(dfile, field)
+
+          # Append to the return array.
+          #
+          vals = append(vals, lvals)
+
+          # Increase the number file.
+          #
+          num = num + 1
+
+        else:
+
+          # File does not exists, so go to the next path.
+          #
+          break
+
+    # Return appended values.
+    #
+    return vals
+
+def read_integrals(filename, column):
+    '''
+        read_integrals: reads a given column from an integral file.
+    '''
+    # Open the given file and check if it is text file.
+    #
+    f = open(filename, 'r')
+
+    # Read fist line and store it in h, since it will be used to obtain the
+    # column headers.
+    #
+    l = f.readline()
+    h = l
+
+    # Read first line which is not comment in order to determine the number of
+    # columns and store the number of columns in nc.  Calculate the column width
+    # and store it in wc.
+    #
+    while l.startswith('#'):
+        l = f.readline()
+    nc = len(l.rsplit())
+    wc = int((len(l) - 9) / (nc - 1))
+
+    # Split header line into a list.
+    #
+    lh = [h[1:9].strip()]
+    for i in range(nc - 1):
+      ib = i * wc + 10
+      ie = ib + wc - 1
+      lh.append(h[ib:ie].strip())
+
+
+    ic = lh.index(column)
+
+    # Read given column.
+    #
+    if (ic > -1):
+      lc = [float(l.split()[ic])]
+      for l in f:
+        lc.append(float(l.split()[ic]))
+
+    # Close the file.
+    #
+    f.close()
+
+    # Return values.
+    #
+    return(array(lc))
+
 if __name__ == "__main__":
   fname = './p000030_00000.h5'
 

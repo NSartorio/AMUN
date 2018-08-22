@@ -1988,6 +1988,7 @@ module evolution
 
 ! include external procedures
 !
+    use blocks        , only : set_neighbors_update
     use boundaries    , only : boundary_variables
     use equations     , only : update_primitive_variables
     use equations     , only : fix_unphysical_cells, correct_unphysical_states
@@ -2037,12 +2038,28 @@ module evolution
 ! correct unphysical states if detected
 !
     if (fix_unphysical_cells) then
+
+! if an unphysical cell appeared in a block while updating its primitive
+! variables it could be propagated to its neighbors through boundary update;
+! mark all neighbors of such a block to be verified and corrected for
+! unphysical cells too
+!
+      pmeta => list_meta
+      do while (associated(pmeta))
+
+        if (pmeta%update) call set_neighbors_update(pmeta)
+
+        pmeta => pmeta%next
+      end do
+
+! verify and correct, if necessary, unphysical cells in recently updated blocks
+!
       pdata => list_data
       do while (associated(pdata))
         pmeta => pdata%meta
 
-        if (pmeta%update) call correct_unphysical_states(pmeta%id              &
-                                                           , pdata%q, pdata%u)
+        if (pmeta%update)                                                      &
+                    call correct_unphysical_states(pmeta%id, pdata%q, pdata%u)
 
         pdata => pdata%next
       end do
