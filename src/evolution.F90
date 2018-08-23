@@ -2059,7 +2059,7 @@ module evolution
         pmeta => pdata%meta
 
         if (pmeta%update)                                                      &
-                    call correct_unphysical_states(pmeta%id, pdata%q, pdata%u)
+              call correct_unphysical_states(step, pmeta%id, pdata%q, pdata%u)
 
         pdata => pdata%next
       end do

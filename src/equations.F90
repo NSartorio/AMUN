@@ -1116,18 +1116,19 @@ module equations
 !
 !   Arguments:
 !
+!     it - the time step number;
 !     id - the block id where the states are being checked;
 !     qq - the output array of primitive variables;
 !     uu - the input array of conservative variables;
 !
 !===============================================================================
 !
-  subroutine correct_unphysical_states(id, qq, uu)
+  subroutine correct_unphysical_states(it, id, qq, uu)
 
 ! include external procedures and variables
 !
-    use coordinates, only : im, jm, km
-    use error      , only : print_warning, print_error
+    use coordinates    , only : im, jm, km
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1135,14 +1136,14 @@ module equations
 
 ! input/output arguments
 !
-    integer(kind=4)                     , intent(in)    :: id
+    integer(kind=4)                     , intent(in)    :: it, id
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: qq
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: uu
 
 ! temporary variables
 !
-    character(len=255) :: msg
-    character(len=16)  :: sid, snc
+    character(len=255) :: msg, sfmt
+    character(len=16)  :: sit, sid, snc
     integer            :: n, p, nc, np
     integer            :: i, il, iu
     integer            :: j, jl, ju
@@ -1180,11 +1181,13 @@ module equations
 
 ! inform about the encountered unphysical states
 !
+      write(sit,'(i15)') it
       write(sid,'(i15)') id
       write(snc,'(i15)') nc
-      write(msg,'("Unphysical cells in block ID:",a," (",a," counted).")')     &
-                                        trim(adjustl(sid)), trim(adjustl(snc))
-      call print_warning(loc, trim(msg))
+      sfmt = '("Unphysical cells in block ID:",a," (",a," counted)'            &
+             // ' at time step ",a,".")'
+      write(msg,sfmt) trim(adjustl(sid)), trim(adjustl(snc)), trim(adjustl(sit))
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
 
 ! allocate temporary vectors for unphysical states
 !
@@ -1238,10 +1241,14 @@ module equations
 ! limit density or pressure to minimum value, since the averaging over
 ! neighbours failed
 !
-                write(msg,'(a,1x,a)')                                          &
-                              "Not sufficient number of physical neighbors!"   &
-                            , "Applying lower bounds for positive variables."
-                call print_warning(loc, trim(msg))
+                msg = "Not sufficient number of physical neighbors!"
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
+                sfmt = '("Block ID:",a,", cell position = ( ",3(i4," ")," ).")'
+                write(msg,sfmt) trim(adjustl(sid)), i, j, k
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
+                write(error_unit,"('Q = ',10(1x,1e24.16e3))") qq(1:nv,i,j,k)
+                msg = "Applying lower bounds for positive variables."
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
 
                 q(1:nv,n) = qq(1:nv,i,j,k)
                 q(idn ,n) = max(dmin, qq(idn,i,j,k))
