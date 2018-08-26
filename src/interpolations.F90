@@ -123,9 +123,9 @@ module interpolations
 
 ! include external procedures
 !
-    use error     , only : print_warning
-    use parameters, only : get_parameter_string, get_parameter_integer         &
-                         , get_parameter_real
+    use iso_fortran_env, only : error_unit
+    use parameters     , only : get_parameter_string, get_parameter_integer    &
+                              , get_parameter_real
 
 ! local variables are not implicit by default
 !
@@ -151,6 +151,10 @@ module interpolations
     character(len=255) :: name_clim       = ""
     character(len= 16) :: stmp
     real(kind=8)       :: cfl             = 0.5d+00
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'INTERPOLATIONS:initialize_interpolation()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -203,107 +207,107 @@ module interpolations
       interfaces         => interfaces_tvd
       reconstruct_states => reconstruct_tvd
       if (verbose .and. ng < 2)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 2).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 2)."
     case ("weno3", "WENO3")
       name_rec           =  "3rd order WENO"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno3
       if (verbose .and. ng < 2)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 2).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 2)."
     case ("limo3", "LIMO3", "LimO3")
       name_rec           =  "3rd order logarithmic limited"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_limo3
       if (verbose .and. ng < 2)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 2).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 2)."
       eps = max(1.0d-12, eps)
     case ("ppm", "PPM")
       name_rec           =  "3rd order PPM"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_ppm
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("weno5z", "weno5-z", "WENO5Z", "WENO5-Z")
       name_rec           =  "5th order WENO-Z (Borges et al. 2008)"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5z
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("weno5yc", "weno5-yc", "WENO5YC", "WENO5-YC")
       name_rec           =  "5th order WENO-YC (Yamaleev & Carpenter 2009)"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5yc
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("weno5ns", "weno5-ns", "WENO5NS", "WENO5-NS")
       name_rec           =  "5th order WENO-NS (Ha et al. 2013)"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_weno5ns
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crweno5z", "crweno5-z", "CRWENO5Z", "CRWENO5-Z")
       name_rec           =  "5th order Compact WENO-Z"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5z
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crweno5yc", "crweno5-yc", "CRWENO5YC", "CRWENO5-YC")
       name_rec           =  "5th order Compact WENO-YC"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5yc
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crweno5ns", "crweno5-ns", "CRWENO5NS", "CRWENO5-NS")
       name_rec           =  "5th order Compact WENO-NS"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crweno5ns
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("mp5", "MP5")
       name_rec           =  "5th order Monotonicity Preserving"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_mp5
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("mp7", "MP7")
       name_rec           =  "7th order Monotonicity Preserving"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_mp7
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crmp5", "CRMP5")
       name_rec           =  "5th order Compact Monotonicity Preserving"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crmp5
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crmp5l", "crmp5ld", "CRMP5L", "CRMP5LD")
       name_rec           =  "5th order Low-Dissipation Compact Monotonicity Preserving"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crmp5ld
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("crmp7", "CRMP7")
       name_rec           =  "7th order Compact Monotonicity Preserving"
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_crmp7
       if (verbose .and. ng < 4)                                                &
-                  call print_warning("interpolations:initialize_interpolation" &
-                         , "Increase the number of ghost cells (at least 4).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Increase the number of ghost cells (at least 4)."
     case ("gp", "GP")
       write(stmp, '(f16.1)') sgp
       write(name_rec, '("Gaussian Process (",i1,"-point, δ=",a,")")') ngp      &
@@ -320,11 +324,11 @@ module interpolations
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_gp
       if (verbose .and. 2 * ng <= ngp - 1)                                     &
-                  call print_warning("interpolations:initialize_interpolation" &
-                 , "Increase the number of ghost cells (at least (ngp+1)/2).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                 , "Increase the number of ghost cells (at least (ngp+1)/2)."
       if (verbose .and. mod(ngp,2) == 0)                                       &
-                  call print_warning("interpolations:initialize_interpolation" &
-                      , "The parameter ngp has to be integer with odd value.")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                      , "The parameter ngp has to be integer with odd value."
     case ("mgp", "MGP")
       write(stmp, '(f16.1)') sgp
       write(name_rec, &
@@ -341,15 +345,16 @@ module interpolations
 
       interfaces         => interfaces_mgp
       if (verbose .and. 2 * ng <= ngp - 1)                                     &
-                  call print_warning("interpolations:initialize_interpolation" &
-                 , "Increase the number of ghost cells (at least (ngp+1)/2).")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                 , "Increase the number of ghost cells (at least (ngp+1)/2)."
       if (verbose .and. mod(ngp,2) == 0)                                       &
-                  call print_warning("interpolations:initialize_interpolation" &
-                      , "The parameter ngp has to be integer with odd value.")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                      , "The parameter ngp has to be integer with odd value."
     case default
       if (verbose) then
-        write (*,"(1x,a)") "The selected reconstruction method is not " //     &
-                           "implemented: " // trim(sreconstruction)
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "The selected reconstruction method is not " //      &
+                          "implemented: " // trim(sreconstruction)
         stop
       end if
     end select
@@ -529,9 +534,9 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra   , only : invert
-    use constants , only : pi
-    use error     , only : print_error
+    use algebra        , only : invert
+    use constants      , only : pi
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -547,6 +552,10 @@ module interpolations
 !
     real(kind=16), dimension(:,:)  , allocatable :: cov, inv
     real(kind=16), dimension(:,:,:), allocatable :: xgp
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'INTERPOLATIONS::prepare_mgp()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -663,8 +672,8 @@ module interpolations
 ! check if the matrix was inverted successfully
 !
     if (.not. flag) then
-      call print_error("interpolations::prepare_mgp"                           &
-                                     , "Could not invert covariance matrix!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Could not invert the covariance matrix!"
       stop
     end if
 
@@ -695,7 +704,7 @@ module interpolations
     use coordinates    , only : im , jm , km
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
-    use error          , only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -717,6 +726,10 @@ module interpolations
 ! local vectors
 !
     real(kind=8), dimension(NDIMS) :: dql, dqr, dq
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'INTERPOLATIONS::interfaces_tvd()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -774,8 +787,8 @@ module interpolations
                 dq(:) = 0.5d+00 * dq(:)
               end do
             else
-              call print_warning("interpolations::interfaces_tvd"              &
-                                       , "Positive variable is not positive!")
+              write(error_unit,"('[',a,']: ',a,3i4,a)") trim(loc)              &
+                    , "Positive variable is not positive at ( ", i, j, k, " )"
               dq(:) = 0.0d+00
             end if
           end if
@@ -940,7 +953,7 @@ module interpolations
     use coordinates    , only : im , jm , km
     use coordinates    , only : ib , jb , kb , ie , je , ke
     use coordinates    , only : ibl, jbl, kbl, ieu, jeu, keu
-    use error          , only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -964,6 +977,10 @@ module interpolations
 !
     real(kind=8), dimension(NDIMS) :: dql, dqr, dq
     real(kind=8), dimension(dgp)   :: u
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'INTERPOLATIONS::interfaces_mgp()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1064,8 +1081,8 @@ module interpolations
                   dq(:) = 0.5d+00 * dq(:)
                 end do
               else
-                call print_warning("interpolations::interfaces_mgp"            &
-                                       , "Positive variable is not positive!")
+                write(error_unit,"('[',a,']: ',a,3i4,a)") trim(loc)            &
+                    , "Positive variable is not positive at ( ", i, j, k, " )"
                 dq(:) = 0.0d+00
               end if
             end if
@@ -4390,9 +4407,9 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra   , only : invert
-    use constants , only : pi
-    use error     , only : print_error
+    use algebra        , only : invert
+    use constants      , only : pi
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4408,6 +4425,10 @@ module interpolations
 !
     real(kind=16), dimension(:,:), allocatable :: cov, agp
     real(kind=16), dimension(:)  , allocatable :: xgp
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'INTERPOLATIONS::prepare_gp()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4480,8 +4501,8 @@ module interpolations
 ! check if the matrix was inverted successfully
 !
     if (.not. flag) then
-      call print_error("interpolations::prepare_gp"                            &
-                                     , "Could not invert covariance matrix!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Could not invert the covariance matrix!"
       stop
     end if
 
