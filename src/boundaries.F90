@@ -5031,8 +5031,8 @@ module boundaries
     use equations      , only : nv
     use equations      , only : idn, ipr, ivx, ivy, ivz, ibx, iby, ibz, ibp
     use equations      , only : csnd2
-    use error          , only : print_error, print_warning
     use gravity        , only : gravitational_acceleration
+    use iso_fortran_env, only : error_unit
     use user_problem   , only : boundary_user_x, boundary_user_y               &
                               , boundary_user_z
 
@@ -5060,6 +5060,10 @@ module boundaries
 ! local vectors
 !
     real(kind=8), dimension(3) :: ga
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BOUNDARIES::block_boundary_specific()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5236,11 +5240,11 @@ module boundaries
       case default
 
         if (ic == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left X boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong left X boundary type!"
         else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right X boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong right X boundary type!"
         end if
 
       end select
@@ -5415,11 +5419,11 @@ module boundaries
       case default
 
         if (jc == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left Y boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong left Y boundary type!"
         else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right Y boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong right Y boundary type!"
         end if
 
       end select
@@ -5590,11 +5594,11 @@ module boundaries
       case default
 
         if (kc == 1) then
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong left Z boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong left Z boundary type!"
         else
-          call print_error("boundaries:boundary_specific()"                    &
-                                              , "Wrong right Z boundary type!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Wrong right Z boundary type!"
         end if
 
       end select
@@ -5765,8 +5769,8 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : faces_dp
     use equations      , only : nv, idn, ipr
-    use error          , only : print_warning
     use interpolations , only : limiter_prol
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5794,6 +5798,10 @@ module boundaries
 ! local arrays
 !
     real(kind=8), dimension(3) :: dq
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BOUNDARIES::block_face_prolong()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5848,8 +5856,8 @@ module boundaries
                   dq(:) = 0.5d+00 * dq(:)
                 end do
               else
-                call print_warning("boundaries::block_face_prolong"            &
-                                       , "Positive variable is not positive!")
+                write(error_unit,"('[',a,']: ',a,3i4,a)") trim(loc)            &
+                     , "Positive variable is not positive at (", i, j, k, " )"
                 dq(:) = 0.0d+00
               end if
             end if
@@ -6070,8 +6078,8 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : edges_dp
     use equations      , only : nv, idn, ipr
-    use error          , only : print_warning
     use interpolations , only : limiter_prol
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6098,6 +6106,10 @@ module boundaries
 ! local arrays
 !
     real(kind=8), dimension(NDIMS) :: dq
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BOUNDARIES::block_edge_prolong()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6168,8 +6180,8 @@ module boundaries
                   dq(:) = 0.5d+00 * dq(:)
                 end do
               else
-                call print_warning("boundaries::block_edge_prolong"            &
-                                       , "Positive variable is not positive!")
+                write(error_unit,"('[',a,']: ',a,3i4,a)") trim(loc)            &
+                     , "Positive variable is not positive at (", i, j, k, " )"
                 dq(:) = 0.0d+00
               end if
             end if
@@ -6344,8 +6356,8 @@ module boundaries
     use coordinates    , only : im , jm , km
     use coordinates    , only : corners_dp
     use equations      , only : nv, idn, ipr
-    use error          , only : print_warning
     use interpolations , only : limiter_prol
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6377,6 +6389,10 @@ module boundaries
 ! local arrays
 !
     real(kind=8), dimension(NDIMS) :: dq
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BOUNDARIES::block_corner_prolong()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6447,8 +6463,8 @@ module boundaries
                   dq(:) = 0.5d+00 * dq(:)
                 end do
               else
-                call print_warning("boundaries::block_corner_prolong"          &
-                                       , "Positive variable is not positive!")
+                write(error_unit,"('[',a,']: ',a,3i4,a)") trim(loc)            &
+                     , "Positive variable is not positive at (", i, j, k, " )"
                 dq(:) = 0.0d+00
               end if
             end if
