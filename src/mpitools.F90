@@ -82,8 +82,9 @@ module mpitools
 
 ! include external procedures and variables
 !
+    use iso_fortran_env, only : error_unit
 #ifdef MPI
-    use mpi, only : mpi_comm_world, mpi_success
+    use mpi            , only : mpi_comm_world, mpi_success
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -99,6 +100,10 @@ module mpitools
 !
     integer(kind=4), dimension(:), allocatable :: procs
 #endif /* MPI */
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::initialize_mpitools()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -134,9 +139,8 @@ module mpitools
 ! check if the MPI interface was initialized successfully
 !
     if (iret /= mpi_success) then
-      write(*,*) 'The MPI interface could not be initializes! Exiting...'
-      write(*,*)
-      stop
+      write(error_unit,"('[', a, ']: ', a)") trim(loc)                         &
+                               , "The MPI interface could not be initializes!"
     end if
 
 ! obtain the total number of processes
@@ -146,9 +150,8 @@ module mpitools
 ! check if the total number of processes could be obtained
 !
     if (iret /= mpi_success) then
-      write(*,*) 'The MPI process ID could not be obtained! Exiting...'
-      write(*,*)
-      stop
+      write(error_unit,"('[', a, ']: ', a)") trim(loc)                         &
+                               , "The MPI process ID could not be obtained!"
     end if
 
 ! obtain the current process identifier
@@ -158,9 +161,8 @@ module mpitools
 ! check if the process ID was return successfully
 !
     if (iret /= mpi_success) then
-      write(*,*) 'The MPI process ID could not be obtained! Exiting...'
-      write(*,*)
-      stop
+      write(error_unit,"('[', a, ']: ', a)") trim(loc)                         &
+                               , "The MPI process ID could not be obtained!"
     end if
 
 ! set the master flag
@@ -264,8 +266,9 @@ module mpitools
 
 ! include external procedures and variables
 !
+    use iso_fortran_env, only : error_unit
 #ifdef MPI
-    use mpi, only : mpi_comm_world, mpi_success
+    use mpi            , only : mpi_comm_world, mpi_success
 #endif /* MPI */
 
 ! local variables are not implicit by default
@@ -277,6 +280,10 @@ module mpitools
 #ifdef MPI
     integer :: iret
 #endif /* MPI */
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::finalize_mpitools()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -291,12 +298,8 @@ module mpitools
 
 ! check if the MPI interface was finalizes successfully
 !
-    if (iret /= mpi_success) then
-      if (master) then
-        write(*,*) 'The MPI interface could not be finalized! Exiting...'
-        write(*,*)
-      end if
-      stop
+    if (iret /= mpi_success .and. master) then
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! deallocate space used for processor pairs
@@ -327,7 +330,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_integer, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_integer, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -337,6 +341,10 @@ module mpitools
 !
     integer, intent(inout) :: ibuf
     integer, intent(inout) :: iret
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::bcast_integer_variable()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -359,8 +367,7 @@ module mpitools
 #endif /* PROFILE */
 
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not broadcast an integer variable!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -385,7 +392,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -395,6 +403,10 @@ module mpitools
 !
     real(kind=8), intent(inout) :: rbuf
     integer     , intent(inout) :: iret
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::bcast_real_variable()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -417,8 +429,7 @@ module mpitools
 #endif /* PROFILE */
 
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not broadcast an integer variable!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -443,7 +454,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_character, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_character, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -453,6 +465,10 @@ module mpitools
 !
     character(len=*), intent(inout) :: sbuf
     integer         , intent(out)   :: iret
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::bcast_string_variable()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -475,8 +491,7 @@ module mpitools
 #endif /* PROFILE */
 
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not broadcast a string variable!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -501,7 +516,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_integer, mpi_min, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_integer, mpi_min, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -515,6 +531,10 @@ module mpitools
 ! local variables
 !
     integer                :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_minimum_integer()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -543,8 +563,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the minimum value!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -568,7 +587,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_min, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_min, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -582,6 +602,10 @@ module mpitools
 ! local variables
 !
     real(kind=8) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_minimum_real()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -610,8 +634,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the minimum value!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -636,7 +659,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_integer, mpi_max, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_integer, mpi_max, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -650,6 +674,10 @@ module mpitools
 ! local variables
 !
     integer                :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_maximum_integer()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -678,8 +706,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maximum value!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -703,7 +730,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_max, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_max, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -717,6 +745,10 @@ module mpitools
 ! local variables
 !
     real(kind=8) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_maximum_real()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -745,8 +777,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maximum value!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -770,7 +801,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_integer, mpi_sum, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_integer, mpi_sum, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -784,6 +816,10 @@ module mpitools
 ! local variables
 !
     integer                :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_sum_integer()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -812,8 +848,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maximum value!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -837,7 +872,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_sum, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_sum, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -851,6 +887,10 @@ module mpitools
 ! local variables
 !
     real(kind=8) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_sum_real()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -879,8 +919,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not sum the values from all processes!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -905,7 +944,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_min, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_min, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -920,6 +960,10 @@ module mpitools
 ! local variables
 !
     real(kind=8), dimension(n) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_minimum_real_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -948,8 +992,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the minima for all array elements!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -974,7 +1017,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_max, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_max, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -989,6 +1033,10 @@ module mpitools
 ! local variables
 !
     real(kind=8), dimension(n) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_maximum_real_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1017,8 +1065,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maxima for all array elements!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -1043,7 +1090,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_integer, mpi_sum, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_integer, mpi_sum, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -1058,6 +1106,10 @@ module mpitools
 ! local variables
 !
     integer, dimension(n)                :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_sum_integer_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1086,8 +1138,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maxima for all array elements!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -1112,7 +1163,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_sum, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_sum, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -1127,6 +1179,10 @@ module mpitools
 ! local variables
 !
     real(kind=8), dimension(n) :: tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_sum_real_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1155,8 +1211,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maxima for all array elements!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -1181,7 +1236,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_sum, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_sum, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -1196,6 +1252,10 @@ module mpitools
 ! local variables
 !
     real(kind=8), dimension(n)           :: rbuf, ibuf, tbuf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::reduce_sum_complex_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1227,8 +1287,7 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not find the maxima for all array elements!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), "Operation failed!"
     end if
 
 ! stop time accounting for the MPI communication
@@ -1260,7 +1319,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_success
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_success
 
 ! local variables are not implicit by default
 !
@@ -1271,6 +1331,10 @@ module mpitools
     integer                   , intent(in)  :: n, dst, tag
     real(kind=8), dimension(n), intent(in)  :: rbuf
     integer                   , intent(out) :: iret
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::send_real_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1295,8 +1359,8 @@ module mpitools
 ! check if the operation was successful
 !
     if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not send the real array to another process!'
-      write(*,*)
+      write(error_unit,"('[', a, ']: ', 2(a, i9))") trim(loc)                  &
+                    , "Could not send real array from ", nproc, " to ", dst
     end if
 
 ! stop time accounting for the MPI communication
@@ -1317,7 +1381,7 @@ module mpitools
 !   Arguments:
 !
 !     n    - the number of array elements;
-!     src  - the ID of the source process;
+!     src  - the7 ID of the source process;
 !     tag  - the tag identifying this operation;
 !     rbuf - the received real array;
 !     iret - the result flag identifying if the operation was successful;
@@ -1328,7 +1392,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use mpi, only : mpi_real8, mpi_success, mpi_status_size
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_success, mpi_status_size
 
 ! local variables are not implicit by default
 !
@@ -1343,6 +1408,10 @@ module mpitools
 ! local variables
 !
     integer :: status(mpi_status_size)
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::receive_real_array()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1366,9 +1435,9 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret /= mpi_success .and. master) then
-      write(*,*) 'The MPI could not send the real array to another process!'
-      write(*,*)
+    if (iret /= mpi_success) then
+      write(error_unit,"('[', a, ']: ', 2(a, i9))") trim(loc)                  &
+                    , "Could not receive real array from ", src, " to ", nproc
     end if
 
 ! stop time accounting for the MPI communication
@@ -1405,8 +1474,8 @@ module mpitools
 
 ! include external procedures and variables
 !
-    use error, only : print_error
-    use mpi  , only : mpi_real8, mpi_success, mpi_status_size
+    use iso_fortran_env, only : error_unit
+    use mpi            , only : mpi_real8, mpi_success, mpi_status_size
 
 ! local variables are not implicit by default
 !
@@ -1424,6 +1493,10 @@ module mpitools
 ! local variables
 !
     integer :: status(mpi_status_size)
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MPITOOLS::exchange_real_arrays()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1451,9 +1524,11 @@ module mpitools
 
 ! check if the operation was successful
 !
-    if (iret /= mpi_success)                                                   &
-      call print_error("mpitools::exchange_real_arrays"                        &
-                     , "Could not exchange real data buffers!")
+    if (iret /= mpi_success) then
+      write(error_unit,"('[', a, ']: ', 2(a, i9))") trim(loc)                  &
+                             , "Could not exchange real data buffers between " &
+                             , sproc, "and", rproc
+    end if
 
 ! stop time accounting for the MPI communication
 !
