@@ -450,7 +450,6 @@ module mesh
 #endif /* DEBUG */
     use coordinates    , only : minlev, maxlev
     use domains        , only : setup_domain
-    use error          , only : print_error
     use mpitools       , only : master, nproc, nprocs, npmax
     use problems       , only : setup_problem
     use refinement     , only : check_refinement_criterion
@@ -1037,8 +1036,8 @@ module mesh
     use coordinates    , only : ng, nh, in, jn, kn, im, jm, km
     use coordinates    , only : ib, ie, jb, je, kb, ke
     use equations      , only : nv, idn, ien
-    use error          , only : print_warning
     use interpolations , only : limiter_prol
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1068,6 +1067,10 @@ module mesh
 ! local allocatable arrays
 !
     real(kind=8), dimension(:,:,:,:), allocatable :: u
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MESH::prolong_block()'
 
 !-------------------------------------------------------------------------------
 !
@@ -1143,8 +1146,9 @@ module mesh
                   du(:) = 0.5d+00 * du(:)
                 end do
               else
-                call print_warning("mesh::prolong_block"                       &
-                                       , "Positive variable is not positive!")
+                write(error_unit,"('[',a,']: ',a,i9,a,3i4,a)") trim(loc)       &
+                           , "Positive variable is not positive for block ID:" &
+                           , pmeta%id, " at ( ", i, j, k, " )"
                 du(:) = 0.0d+00
               end if
             end if
@@ -1457,7 +1461,7 @@ module mesh
     use blocks         , only : get_nleafs
 #endif /* MPI */
     use coordinates    , only : minlev, maxlev
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 #ifdef MPI
 #ifdef DEBUG
     use mpitools       , only : nproc
@@ -1485,6 +1489,10 @@ module mesh
 !
     integer(kind=4), dimension(:), allocatable :: ibuf
 #endif /* MPI */
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MESH::check_data_block_refinement()'
 
 !-------------------------------------------------------------------------------
 !
@@ -1545,13 +1553,13 @@ module mesh
 
 #ifdef DEBUG
         else ! pmeta is a leaf
-          call print_error("mesh::check_data_block_refinement"                 &
-                                     , "Associated meta block is not a leaf!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                             , "Associated meta block is not a leaf!"
         end if ! pmeta is a leaf
 
       else ! pmeta associated
-        call print_error("mesh::check_data_block_refinement"                   &
-                    , "No meta block associated with the current data block!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                     , "No meta block associated with the current data block!"
       end if ! pmeta associated
 #endif /* DEBUG */
 
@@ -1640,8 +1648,8 @@ module mesh
 ! check if the MPI update process does not change the local refinement flags
 !
           if (pmeta%process == nproc .and. pmeta%refine /= ibuf(l)) then
-            call print_error("mesh::check_data_block_refinement"               &
-                      , "Refinement flag does not match after MPI reduction!")
+            write(error_unit,"('[',a,']: ',a)") trim(loc)                      &
+                     , "Refinement flag does not match after MPI reduction!"
           end if
 #endif /* DEBUG */
 
@@ -1662,8 +1670,8 @@ module mesh
       deallocate(ibuf)
 
     else ! buffer couldn't be allocated
-      call print_error("mesh::check_data_block_refinement"                     &
-                           , "Refinement flag buffer could not be allocated!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                     , "Refinement flag buffer could not be allocated!"
     end if ! buffer couldn't be allocated
 #endif /* MPI */
 
@@ -1775,7 +1783,7 @@ module mesh
     use coordinates    , only : im, jm, km
     use equations      , only : nv
 #endif /* MPI */
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 #ifdef MPI
     use mpitools       , only : nprocs, nproc
     use mpitools       , only : send_real_array, receive_real_array
@@ -1807,6 +1815,10 @@ module mesh
 !
     real(kind=8), dimension(nv,im,jm,km) :: rbuf
 #endif /* MPI */
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'MESH::check_children_derefinement()'
 
 !-------------------------------------------------------------------------------
 !
@@ -1867,8 +1879,8 @@ module mesh
 
 #ifdef DEBUG
                 else ! pchild is associated
-                  call print_error("mesh::check_children_derefinement"         &
-                                                 , "Children does not exist!")
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                             , "Children does not exist!"
                 end if ! pparent is associated
 #endif /* DEBUG */
 
@@ -1899,8 +1911,8 @@ module mesh
 
 #ifdef DEBUG
             else ! pparent is associated
-              call print_error("mesh::check_children_derefinement"             &
-                                        , "Current meta block has no parent!")
+              write(error_unit,"('[',a,']: ',a)") trim(loc)                    &
+                             , "Current meta block has no parent!"
             end if ! pparent is associated
 #endif /* DEBUG */
 
@@ -1981,8 +1993,8 @@ module mesh
 
 #ifdef DEBUG
                 else ! pdata associated
-                  call print_error("mesh::check_children_derefinement"         &
-                              , "Current child has no data block associated!")
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                             , "Current child has no data block associated!"
                 end if ! pdata associated
 #endif /* DEBUG */
 
