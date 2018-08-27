@@ -555,11 +555,11 @@ program amun
     write(*,'(4x,a4,5x,a4,11x,a2,12x,a6,7x,a3)') 'step', 'time', 'dt'          &
                                                  , 'blocks', 'ETA'
 #ifdef INTEL
-    write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
+    write(*,'(i8,2(1x,1es14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1,$)')                                            &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL */
-    write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
+    write(*,'(i8,2(1x,1es14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //      &
             ',1i2.2,"s",15x,a1)',advance="no")                                 &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL */
@@ -628,11 +628,11 @@ program amun
         ed   = min(9999,ed)
 
 #ifdef INTEL
-        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+        write(*,'(i8,2(1x,1es14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
                 ',1i2.2,"s",15x,a1,$)')                                        &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #else /* INTEL */
-        write(*,'(i8,2(1x,1pe14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
+        write(*,'(i8,2(1x,1es14.6),2x,i8,2x,1i4.1,"d",1i2.2,"h",1i2.2,"m"' //  &
                 ',1i2.2,"s",15x,a1)',advance="no")                             &
                         step, time, dt, get_nleafs(), ed, eh, em, es, char(13)
 #endif /* INTEL */
