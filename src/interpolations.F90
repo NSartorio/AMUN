@@ -319,7 +319,8 @@ module interpolations
 
 ! prepare matrix coefficients
 !
-      call prepare_gp()
+      call prepare_gp(iret)
+      if (iret > 0) return
 
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_gp
@@ -341,7 +342,8 @@ module interpolations
 
 ! prepare matrix coefficients
 !
-      call prepare_mgp()
+      call prepare_mgp(iret)
+      if (iret > 0) return
 
       interfaces         => interfaces_mgp
       if (verbose .and. 2 * ng <= ngp - 1)                                     &
@@ -355,7 +357,8 @@ module interpolations
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "The selected reconstruction method is not " //      &
                           "implemented: " // trim(sreconstruction)
-        stop
+        iret = 200
+        return
       end if
     end select
 
@@ -530,7 +533,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine prepare_mgp()
+  subroutine prepare_mgp(iret)
 
 ! include external procedures
 !
@@ -541,6 +544,10 @@ module interpolations
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
 
 ! local variables
 !
@@ -674,7 +681,7 @@ module interpolations
     if (.not. flag) then
       write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
                       , "Could not invert the covariance matrix!"
-      stop
+      iret = 201
     end if
 
 !-------------------------------------------------------------------------------
@@ -4406,7 +4413,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine prepare_gp()
+  subroutine prepare_gp(iret)
 
 ! include external procedures
 !
@@ -4417,6 +4424,10 @@ module interpolations
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
 
 ! local variables
 !
@@ -4506,7 +4517,7 @@ module interpolations
     if (.not. flag) then
       write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
                       , "Could not invert the covariance matrix!"
-      stop
+      iret = 202
     end if
 
 !-------------------------------------------------------------------------------
