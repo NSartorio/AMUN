@@ -88,7 +88,6 @@ module problems
 
 ! include external procedures and variables
 !
-    use error          , only : print_error
     use parameters     , only : get_parameter_string
     use user_problem   , only : setup_problem_user
 
@@ -820,7 +819,6 @@ module problems
     use equations  , only : gamma
     use equations  , only : nv
     use equations  , only : idn, ivx, ivy, ivz, ipr, ibx, iby, ibz, ibp
-    use error      , only : print_error
     use parameters , only : get_parameter_real, get_parameter_integer
 
 ! local variables are not implicit by default
@@ -885,14 +883,6 @@ module problems
 !
 !-------------------------------------------------------------------------------
 !
-! quit if no adiabatic equation of state
-!
-    if (ipr <= 0) then
-      call print_error("problems::setup_problem_sedov_taylor"                  &
-                           , "Only adiabatic equation of state is supported!")
-      stop
-    end if
-
 #ifdef PROFILE
 ! start accounting time for the problem setup
 !
@@ -1008,7 +998,7 @@ module problems
 ! set density and pressure of the ambient
 !
     q(idn,:) = dn_amb
-    q(ipr,:) = pr_amb
+    if (ipr > 0) q(ipr,:) = pr_amb
 
 ! reset velocity components
 !
@@ -1073,7 +1063,7 @@ module problems
 ! set density and pressure for the overpressure region
 !
             q(idn,i) = dn_ovr
-            q(ipr,i) = pr_ovr
+            if (ipr > 0) q(ipr,i) = pr_ovr
 
 ! set the initial pressure in the cell completely outside the radius
 !
@@ -1082,7 +1072,7 @@ module problems
 ! set density and pressure of the ambient
 !
             q(idn,i) = dn_amb
-            q(ipr,i) = pr_amb
+            if (ipr > 0) q(ipr,i) = pr_amb
 
 ! integrate density or pressure in cells which are crossed by the circule with
 ! the given radius
@@ -1211,7 +1201,7 @@ module problems
 ! integrate density and pressure over the edge cells
 !
             q(idn,i) = fc_ovr * dn_ovr + fc_amb * dn_amb
-            q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
+            if (ipr > 0) q(ipr,i) = fc_ovr * pr_ovr + fc_amb * pr_amb
 
           end if
 
