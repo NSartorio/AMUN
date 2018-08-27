@@ -34,18 +34,25 @@ module parameters
 !
   implicit none
 
+! MODULE PARAMETERS:
+! =================
+!
 ! module parameters determining the name and value field lengths, and the
 ! maximum string length
 !
-  integer, parameter         :: nlen = 32, vlen = 128, mlen = 256
+  integer, parameter        :: nlen = 64, vlen = 128, mlen = 256
 
 ! the name of the parameter file
 !
-  character(len=mlen), save  :: fname   = './params.in'
+  character(len=mlen), save :: fname   = './params.in'
+
+! a file handler to the parameter file
+!
+  integer(kind=4)    , save :: punit   = 10
 
 ! the number of parameters stored in the parameter file
 !
-  integer            , save  :: nparams = 0
+  integer            , save :: nparams = 0
 
 ! allocatable arrays to store parameter names and values
 !
@@ -132,7 +139,7 @@ module parameters
 ! print information about the file from which parameters are read
 !
     write(*,*)
-    write(*,*) 'Reading parameters from ' // trim(fname)
+    write(*,*) "Reading parameters from '" // trim(fname) // "'."
 
 ! check if the file exists
 !
@@ -153,9 +160,8 @@ module parameters
 ! if the parameter file is empty, print an error and quit the subroutine
 !
       if (nparams <= 0) then
-        write(*,*) 'The parameter file ' // trim(fname)                        &
-                                                    // ' is empty! Exiting...'
-        write(*,*)
+        write(*,*) "The parameter file '" // trim(fname)                       &
+                                          // "' is empty! Exiting..."
         iret = 110
 
         return
@@ -174,9 +180,8 @@ module parameters
 
 ! the parameter file does not exists, so print a warning and exit
 !
-      write(*,*) 'The parameter file ' // trim(fname)                          &
-                                              // ' does not exist! Exiting...'
-      write(*,*)
+      write(*,*) "The parameter file '" // trim(fname)                         &
+                                        // "' does not exist! Exiting..."
       iret = 111
 
     end if
@@ -227,6 +232,10 @@ module parameters
 !
   subroutine get_parameters_number(iret)
 
+! import external procedures
+!
+    use iso_fortran_env, only : error_unit
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -238,6 +247,10 @@ module parameters
 ! local variable to store the line content
 !
     character(len=mlen)    :: line
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'PARAMETERS::get_parameters_number()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -247,11 +260,11 @@ module parameters
 
 ! open the parameter file
 !
-    open(1, file = fname, err = 30)
+    open(newunit = punit, file = fname, err = 30)
 
 ! read the line
 !
-10  read(1, fmt = "(a)", end = 20) line
+10  read(punit, fmt = "(a)", end = 20) line
 
 ! if the line is empty or it's a comment, skip the counting
 !
@@ -268,7 +281,7 @@ module parameters
 
 ! close the file
 !
-20  close(1)
+20  close(punit)
 
 ! quit the subroutine without printing any errors since everything went fine
 !
@@ -276,9 +289,8 @@ module parameters
 
 ! print a massage if an error occurred
 !
-30  write(*,*) 'There was a problem with reading the parameters file '         &
-                                                                // trim(fname)
-    write(*,*)
+30  write(error_unit,"('[',a,']: ',a)") trim(loc)                              &
+                    , "Cannot open the parameter file '" // trim(fname) // "'!"
 
 ! set the return flag
 !
@@ -305,6 +317,10 @@ module parameters
 !
   subroutine get_parameters(iret)
 
+! import external procedures
+!
+    use iso_fortran_env, only : error_unit
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -320,6 +336,10 @@ module parameters
 ! local variables to store the line content, the parameter name and value
 !
     character(len=256)     :: line, name, value
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'PARAMETERS::get_parameters_number()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -330,11 +350,11 @@ module parameters
 
 ! open the parameter file
 !
-    open(1, file = fname, err = 30)
+    open(newunit = punit, file = fname, err = 30)
 
 ! read the line
 !
-10  read(1, fmt = "(a)", end = 20) line
+10  read(punit, fmt = "(a)", end = 20) line
 
 ! increase the line number
 !
@@ -352,10 +372,11 @@ module parameters
 ! check if the line was parsed successfuly
 !
     if (iret > 0) then
-      write (*,"(1x,a,1x,a,'.')") "Wrong parameter format in"                  &
-                                                        , trim(adjustl(fname))
-      write (*,"(1x,'Line',i4,' : ',a)") nl, trim(line)
-      write (*,*)
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Wrong parameter format in '"                          &
+                                       // trim(adjustl(fname)) // "'."
+      write (error_unit,"('[',a,']: Line',i4,' : ',a)")                        &
+                                          trim(loc), nl, trim(line)
       go to 30
     end if
 
@@ -374,7 +395,7 @@ module parameters
 
 ! close the file
 !
-20  close(1)
+20  close(punit)
 
 ! quit the subroutine without printing any errors since everything went fine
 !
@@ -382,9 +403,8 @@ module parameters
 
 ! print a massage if an error occurred
 !
-30  write(*,*) 'There was a problem with reading the parameters file '         &
-                                                                // trim(fname)
-    write(*,*)
+30  write(error_unit,"('[',a,']: ',a)") trim(loc)                              &
+                    , "Cannot open the parameter file '" // trim(fname) // "'!"
 
 ! set the return flag
 !
@@ -497,6 +517,10 @@ module parameters
 !
   subroutine get_parameter_integer(name, value)
 
+! import external procedures
+!
+    use iso_fortran_env, only : error_unit
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -509,6 +533,10 @@ module parameters
 ! local parameter counter
 !
     integer                         :: np
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'PARAMETERS::get_parameter_integer()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -524,11 +552,9 @@ module parameters
 
     return
 
-100 write(*,"(1x,'GET_PARAMETER_INTEGER:',1x,a)")                              &
-            "Wrong format of the parameter '" // trim(name) // "'"
-    write(*,"(24x,a)") "or the value is too large!"
-    write(*,*)
-    stop
+100 write(error_unit,"('[',a,']: ',a)") trim(loc)                              &
+                    , "Wrong format of the parameter '" // trim(name) //       &
+                      "' or the value is too small or too large!"
 
 !-------------------------------------------------------------------------------
 !
@@ -550,6 +576,10 @@ module parameters
 !
   subroutine get_parameter_real(name, value)
 
+! import external procedures
+!
+    use iso_fortran_env, only : error_unit
+
 ! local variables are not implicit by default
 !
     implicit none
@@ -562,6 +592,10 @@ module parameters
 ! local parameter counter
 !
     integer                         :: np
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'PARAMETERS::get_parameter_real()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -577,11 +611,9 @@ module parameters
 
     return
 
-100 write(*,"(1x,'GET_PARAMETER_REAL   :',1x,a)")                              &
-            "Wrong format of the parameter '" // trim(name) // "'"
-    write(*,"(24x,a)") "or the value is too small or too large!"
-    write(*,*)
-    stop
+100 write(error_unit,"('[',a,']: ',a)") trim(loc)                              &
+                    , "Wrong format of the parameter '" // trim(name) //       &
+                      "' or the value is too small or too large!"
 
 !-------------------------------------------------------------------------------
 !

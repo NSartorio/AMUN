@@ -1103,7 +1103,7 @@ module algebra
 !
 !===============================================================================
 !
-  subroutine tridiag(n, l, d, u, r, x)
+  subroutine tridiag(n, l, d, u, r, x, iret)
 
 ! import external procedures
 !
@@ -1118,6 +1118,7 @@ module algebra
     integer                   , intent(in)  :: n
     real(kind=8), dimension(n), intent(in)  :: l, d, u, r
     real(kind=8), dimension(n), intent(out) :: x
+    integer                   , intent(out) :: iret
 
 ! local variables
 !
@@ -1142,7 +1143,8 @@ module algebra
       if (t == 0.0d+00) then
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Could not find solution!"
-        stop
+        iret = 1
+        return
       end if
       x(i) = (r(i) - l(i) * x(j)) / t
     end do
@@ -1153,6 +1155,10 @@ module algebra
       j    = i + 1
       x(i) = x(i) - g(j) * x(j)
     end do
+
+! set return value to success
+!
+    iret = 0
 
 !-------------------------------------------------------------------------------
 !

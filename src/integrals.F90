@@ -473,8 +473,8 @@ module integrals
 ! write down the integrals and statistics to appropriate files
 !
     if (master) then
-      write(funit,"(i9,10(1x,1e18.8e3))") step, time, dtn, inarr(1:8)
-      write(sunit,"(i9,23(1x,1e18.8e3))") step, time                           &
+      write(funit,"(i9,10(1x,1es18.8e3))") step, time, dtn, inarr(1:8)
+      write(sunit,"(i9,23(1x,1es18.8e3))") step, time                          &
                                             , avarr(1), mnarr(1), mxarr(1)     &
                                             , avarr(2), mnarr(2), mxarr(2)     &
                                             , avarr(3), mnarr(3), mxarr(3)     &
