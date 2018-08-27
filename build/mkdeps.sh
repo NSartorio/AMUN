@@ -18,9 +18,7 @@ for src in $files; do
   fname=`basename $src .F90`
   output="$2/${fname}.o: $src"
   for dep in $deps; do
-    if [ $dep != "mpi" -a $dep != "hdf5" ]; then
-      output="${output} $2/$dep.o"
-    fi
+    [ -z "${files##*$dep.F90*}" ] && output="${output} $2/$dep.o"
   done
   echo $output
 done

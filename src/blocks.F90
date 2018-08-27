@@ -648,7 +648,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -657,6 +657,10 @@ module blocks
 ! subroutine arguments
 !
     type(block_meta), pointer, intent(inout) :: pmeta
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::remove_metablock()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -694,8 +698,9 @@ module blocks
 
 ! the argument contains a null pointer, so print an error
 !
-      call print_error("blocks::remove_metablock"                              &
-                                     , "Null pointer argument to meta block!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Null pointer argument to meta block!"
+
     end if
 
 !-------------------------------------------------------------------------------
@@ -779,7 +784,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -788,6 +793,10 @@ module blocks
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::remove_datablock()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -817,8 +826,8 @@ module blocks
 
 ! there is no meta block associated, so print an error
 !
-        call print_error("blocks::remove_datablock"                            &
-                            , "No meta block associated with the data block!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "No meta block associated with the data block!"
 
       end if ! %meta associated
 
@@ -834,8 +843,9 @@ module blocks
 
 ! the argument contains a null pointer, so print an error
 !
-      call print_error("blocks::remove_datablock"                              &
-                                     , "Null pointer argument to data block!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Null pointer argument to data block!"
+
     end if
 
 !-------------------------------------------------------------------------------
@@ -987,7 +997,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1000,6 +1010,10 @@ module blocks
 ! local variables
 !
     integer :: n, i, j, k
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::deallocate_metablock()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1074,8 +1088,9 @@ module blocks
 
 ! the argument contains a null pointer, so print an error
 !
-      call print_error("blocks::deallocate_metablock"                          &
-                                     , "Null pointer argument to meta block!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Null pointer argument to meta block!"
+
     end if
 
 #ifdef PROFILE
@@ -1178,7 +1193,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1187,6 +1202,10 @@ module blocks
 ! subroutine arguments
 !
     type(block_data), pointer, intent(inout) :: pdata
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::deallocate_datablock()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1238,8 +1257,8 @@ module blocks
 
 ! the argument contains a null pointer, so print an error
 !
-      call print_error("blocks::deallocate_datablock"                          &
-                                     , "Null pointer argument to data block!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Null pointer argument to data block!"
 
     end if ! pdata associated with a data block
 
@@ -1344,7 +1363,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1373,6 +1392,10 @@ module blocks
 !
     integer, dimension(0:79,nchildren)     , save :: order
     integer, dimension(0:79,nchildren)     , save :: config
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::refine_block()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2435,8 +2458,8 @@ module blocks
 ! it's impossible to refine since there is not block associated with
 ! the argument pointer
 !
-      call print_error("blocks::refine_block"                                  &
-                           , "No block associated with the argument pointer!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "No block associated with the argument pointer!"
 
     end if
 
@@ -2984,7 +3007,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -2993,6 +3016,10 @@ module blocks
 ! subroutine arguments
 !
     integer(kind=4), intent(in) :: id
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::set_last_id()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3000,8 +3027,9 @@ module blocks
 !
     if (last_id > id) then
 
-      call print_error("blocks::set_last_id"                                   &
-                             , "New last_id must be larger than the old one!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "New last_id must be larger than the old one!"
+
     else
 
 ! set the last identification number
@@ -3405,7 +3433,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3413,6 +3441,10 @@ module blocks
 
     type(block_meta), pointer, intent(inout) :: pmeta
     integer(kind=4)          , intent(in)    :: rf
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::metablock_set_refinement()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3422,8 +3454,8 @@ module blocks
 
 ! print error about wrong refine flag
 !
-      call print_error("blocks::metablock_set_refinement"                      &
-                                           , "The refinement value is wrong!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "The refinement value is wrong!"
 
     else
 
@@ -3902,7 +3934,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3912,6 +3944,10 @@ module blocks
 !
     type(block_meta), pointer, intent(in)  :: pprev
     type(block_meta), pointer, intent(out) :: pmeta
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::insert_metablock_after()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3945,8 +3981,8 @@ module blocks
 
 ! strange situation, pprev is associated, but last_meta not
 !
-        call print_error("blocks::intert_metablock_after"                      &
-                       , "Argument pprev is associated but last_meta is not!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Argument pprev is associated but last_meta is not!"
 
       end if
 
@@ -3958,8 +3994,8 @@ module blocks
 
 ! strange situation, pprev is null but list_meta is associated
 !
-        call print_error("blocks::intert_metablock_after"                      &
-                      , "Argument pprev is null but list_meta is associated!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Argument pprev is null but list_meta is associated!"
 
       else
 
@@ -4001,7 +4037,7 @@ module blocks
 
 ! import external procedures
 !
-    use error          , only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4011,6 +4047,10 @@ module blocks
 !
     type(block_meta), pointer, intent(in)  :: pnext
     type(block_meta), pointer, intent(out) :: pmeta
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'BLOCKS::insert_metablock_before()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4044,8 +4084,8 @@ module blocks
 
 ! strange situation, pnext is associated, but list_meta not
 !
-        call print_error("blocks::intert_metablock_before"                     &
-                       , "Argument pnext is associated but list_meta is not!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Argument pnext is associated but list_meta is not!"
 
       end if
 
@@ -4057,8 +4097,8 @@ module blocks
 
 ! strange situation, pnext is null but last_meta is associated
 !
-        call print_error("blocks::intert_metablock_before"                     &
-                      , "Argument pnext is null but last_meta is associated!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Argument pnext is null but last_meta is associated!"
 
       else
 
@@ -4442,7 +4482,7 @@ module blocks
 
 ! import external procedures and variables
 !
-    use error          , only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4464,9 +4504,9 @@ module blocks
     integer :: kp, kr, kc
 #endif /* NDIMS == 2 */
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "blocks::check_block_neighbors"
+    character(len=*), parameter :: loc = 'BLOCKS::check_block_neighbors()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4512,13 +4552,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                call print_warning(fname                                       &
-                                  , "Inconsistent same level neighbor edges!")
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Inconsistent same level neighbor edges!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'meta ', pmeta%id , ip, jp, 1
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'neigh', pneigh%id, ip, jr, 1
-                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
               end if ! %id fields don't match
 
@@ -4526,11 +4566,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-              call print_warning(fname                                         &
-                               , "Same level neighbor's edge not associated!")
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"('[',a,']: ',a)") trim(loc)                    &
+                              , "Same level neighbor's edge not associated!"
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                           'meta ', pmeta%id , ip, jp, 1
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                           'neigh', pneigh%id, ip, jr, 1
 
             end if ! pself associated
@@ -4559,13 +4599,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent higher level neighbor edge!")
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent higher level neighbor edge!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'meta ',  pmeta%id, ip, jp, 1
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'neigh', pneigh%id, ip, jr, 1
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'self ',  pself%id, ic, jr, 1
 
                 end if ! %id fields don't match
@@ -4574,11 +4614,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                             , "Higher level neighbor's edge not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Higher level neighbor's edge not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'meta ',  pmeta%id, ip, jp, 1
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'neigh', pneigh%id, ic, jr, 1
 
               end if ! pself associated
@@ -4617,13 +4657,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                call print_warning(fname                                       &
-                                   , "Inconsistent same level neighbor edge!")
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Inconsistent same level neighbor edge!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'meta ',  pmeta%id, ip, jp, 2
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'neigh', pneigh%id, ir, jp, 2
-                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
               end if ! %id fields don't match
 
@@ -4631,11 +4671,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-              call print_warning(fname                                         &
-                               , "Same level neighbor's edge not associated!")
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"('[',a,']: ',a)") trim(loc)                    &
+                              , "Same level neighbor's edge not associated!"
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                           'meta ', pmeta%id , ip, jp, 2
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                           'neigh', pneigh%id, ir, jp, 2
 
             end if ! pself associated
@@ -4664,13 +4704,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent higher level neighbor edge!")
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent higher level neighbor edge!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'meta ',  pmeta%id, ip, jp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'neigh', pneigh%id, ir, jp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")     &
                                               'self ',  pself%id, ir, jc, 2
 
                 end if ! %id fields don't match
@@ -4679,11 +4719,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                             , "Higher level neighbor's edge not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Higher level neighbor's edge not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'meta ',  pmeta%id, ip, jp, 2
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                             'neigh', pneigh%id, ir, jc, 2
 
               end if ! pself associated
@@ -4718,13 +4758,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-              call print_warning(fname                                         &
-                                           , "Inconsistent neighbor corners!")
-              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+              write(error_unit,"('[',a,']: ',a)") trim(loc)                    &
+                              , "Inconsistent neighbor corners!"
+              write(error_unit,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")         &
                                           'meta ',  pmeta%id, ip, jp
-              write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                  &
+              write(error_unit,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")         &
                                           'neigh', pneigh%id, ir, jr
-              write(*,"(a6,' id: ',i8)")  'self ', pself%id
+              write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
             end if ! %id fields don't match
 
@@ -4732,11 +4772,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-            call print_warning(fname                                           &
-                                        , "Neighbor's corner not associated!")
-            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+            write(error_unit,"('[',a,']: ',a)") trim(loc)                      &
+                            , "Neighbor's corner not associated!"
+            write(error_unit,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")           &
                                         'meta ',  pmeta%id, ip, jp
-            write(*,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")                    &
+            write(error_unit,"(a6,' id: ',i8,' [ ',2(i2,','),' ]')")           &
                                         'neigh', pneigh%id, ir, jr
 
           end if ! pself associated
@@ -4786,13 +4826,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor faces!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor faces!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 1
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ir, jp, kp, 1
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -4800,11 +4840,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's face not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's face not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                             'meta ', pmeta%id , ip, jp, kp, 1
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                             'neigh', pneigh%id, ir, jp, kp, 1
 
               end if ! pself associated
@@ -4834,13 +4874,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                    call print_warning(fname                                   &
-                                 , "Inconsistent higher level neighbor face!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Inconsistent higher level neighbor face!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'meta ', pmeta%id , ip, jp, kp, 1
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'neigh', pneigh%id, ir, jp, kp, 1
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'self ',  pself%id, ir, jc, kc, 1
 
                     end if ! %id fields don't match
@@ -4849,11 +4889,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                    call print_warning(fname                                   &
-                             , "Higher level neighbor's face not associated!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Higher level neighbor's face not associated!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'meta ', pmeta%id , ip, jp, kp, 1
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'neigh', pneigh%id, ir, jc, kc, 1
 
                   end if ! pself associated
@@ -4893,13 +4933,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor faces!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor faces!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ip, jr, kp, 2
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -4907,11 +4947,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's face not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's face not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'meta ', pmeta%id , ip, jp, kp, 2
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ip, jr, kp, 2
 
               end if ! pself associated
@@ -4941,13 +4981,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                    call print_warning(fname                                   &
-                                 , "Inconsistent higher level neighbor face!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Inconsistent higher level neighbor face!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'meta ', pmeta%id , ip, jp, kp, 2
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'neigh', pneigh%id, ip, jr, kp, 2
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'self ',  pself%id, ic, jr, kc, 2
 
                     end if ! %id fields don't match
@@ -4956,11 +4996,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                    call print_warning(fname                                   &
-                             , "Higher level neighbor's face not associated!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Higher level neighbor's face not associated!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'meta ', pmeta%id , ip, jp, kp, 2
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'neigh', pneigh%id, ic, jr, kc, 2
 
                   end if ! pself associated
@@ -5000,13 +5040,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor faces!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor faces!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 3
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ip, jp, kr, 3
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -5014,11 +5054,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's face not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's face not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'meta ', pmeta%id , ip, jp, kp, 3
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ip, jp, kr, 3
 
               end if ! pself associated
@@ -5048,14 +5088,14 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                    call print_warning(fname                                   &
-                                 , "Inconsistent higher level neighbor face!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
-                                            'meta ', pmeta%id , ip, jp, kp, 3
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
-                                            'neigh', pneigh%id, ip, jp, kr, 3
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
-                                            'self ',  pself%id, ic, jc, kr, 3
+                      write(error_unit,"('[',a,']: ',a)") trim(loc)            &
+                                      , "Inconsistent higher level neighbor face!"
+                      write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')") &
+                                              'meta ', pmeta%id , ip, jp, kp, 3
+                      write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')") &
+                                              'neigh', pneigh%id, ip, jp, kr, 3
+                      write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')") &
+                                              'self ',  pself%id, ic, jc, kr, 3
 
                     end if ! %id fields don't match
 
@@ -5063,11 +5103,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                    call print_warning(fname                                   &
-                             , "Higher level neighbor's face not associated!")
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Higher level neighbor's face not associated!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'meta ', pmeta%id , ip, jp, kp, 3
-                    write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                             'neigh', pneigh%id, ic, jc, kr, 3
 
                   end if ! pself associated
@@ -5109,13 +5149,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor edges!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor edges!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 1
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ip, jr, kr, 1
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -5123,11 +5163,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's edge not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's edge not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'meta ', pmeta%id , ip, jp, kp, 1
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ip, jr, kr, 1
 
               end if ! pself associated
@@ -5156,14 +5196,14 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                 , "Inconsistent higher level neighbor edge!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'meta ', pmeta%id , ip, jp, kp, 1
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'neigh', pneigh%id, ip, jr, kr, 1
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'self ',  pself%id, ic, jr, kr, 1
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Inconsistent higher level neighbor edge!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'meta ', pmeta%id , ip, jp, kp, 1
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'neigh', pneigh%id, ip, jr, kr, 1
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'self ',  pself%id, ic, jr, kr, 1
 
                   end if ! %id fields don't match
 
@@ -5171,11 +5211,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                  call print_warning(fname                                   &
-                             , "Higher level neighbor's edge not associated!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Higher level neighbor's edge not associated!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 1
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ic, jr, kr, 1
 
                 end if ! pself associated
@@ -5214,13 +5254,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor edges!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor edges!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ir, jp, kr, 2
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -5228,11 +5268,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's edge not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's edge not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'meta ', pmeta%id , ip, jp, kp, 2
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ir, jp, kr, 2
 
               end if ! pself associated
@@ -5261,14 +5301,14 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                 , "Inconsistent higher level neighbor edge!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'meta ', pmeta%id , ip, jp, kp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'neigh', pneigh%id, ir, jp, kr, 2
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
-                                          'self ',  pself%id, ir, jc, kr, 2
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Inconsistent higher level neighbor edge!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'meta ', pmeta%id , ip, jp, kp, 2
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'neigh', pneigh%id, ir, jp, kr, 2
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
+                                            'self ',  pself%id, ir, jc, kr, 2
 
                   end if ! %id fields don't match
 
@@ -5276,11 +5316,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                  call print_warning(fname                                   &
-                             , "Higher level neighbor's edge not associated!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Higher level neighbor's edge not associated!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 2
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ir, jc, kr, 2
 
                 end if ! pself associated
@@ -5319,13 +5359,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                  , "Inconsistent same level neighbor edges!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Inconsistent same level neighbor edges!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 3
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ir, jr, kp, 3
-                  write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                  write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
                 end if ! %id fields don't match
 
@@ -5333,11 +5373,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                call print_warning(fname                                       &
-                               , "Same level neighbor's edge not associated!")
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Same level neighbor's edge not associated!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'meta ', pmeta%id , ip, jp, kp, 3
-                write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ir, jr, kp, 3
 
               end if ! pself associated
@@ -5366,13 +5406,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                  call print_warning(fname                                     &
-                                 , "Inconsistent higher level neighbor edge!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                    write(error_unit,"('[',a,']: ',a)") trim(loc)              &
+                                    , "Inconsistent higher level neighbor edge!"
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                           'meta ', pmeta%id , ip, jp, kp, 3
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                           'neigh', pneigh%id, ir, jr, kp, 3
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")              &
+                    write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")   &
                                           'self ',  pself%id, ir, jr, kc, 3
 
                   end if ! %id fields don't match
@@ -5381,11 +5421,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-                  call print_warning(fname                                   &
-                             , "Higher level neighbor's edge not associated!")
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"('[',a,']: ',a)") trim(loc)                &
+                                  , "Higher level neighbor's edge not associated!"
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'meta ', pmeta%id , ip, jp, kp, 3
-                  write(*,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")            &
+                  write(error_unit,"(a6,' id: ',i8,' [ ',4(i2,','),' ]')")     &
                                           'neigh', pneigh%id, ir, jr, kc, 3
 
                 end if ! pself associated
@@ -5420,13 +5460,13 @@ module blocks
 
 ! print warning, since the blocks differ
 !
-                call print_warning(fname                                       &
-                                           , "Inconsistent neighbor corners!")
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"('[',a,']: ',a)") trim(loc)                  &
+                                , "Inconsistent neighbor corners!"
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                         'meta ',  pmeta%id, ip, jp, kp
-                write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                &
+                write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")       &
                                         'neigh', pneigh%id, ir, jr, kr
-                write(*,"(a6,' id: ',i8)")  'self ', pself%id
+                write(error_unit,"(a6,' id: ',i8)")  'self ', pself%id
 
               end if ! %id fields don't match
 
@@ -5434,11 +5474,11 @@ module blocks
 
 ! print warning, since the pointer should be associated
 !
-              call print_warning(fname                                         &
-                                        , "Neighbor's corner not associated!")
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"('[',a,']: ',a)") trim(loc)                    &
+                              , "Neighbor's corner not associated!"
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                       'meta ',  pmeta%id, ip, jp, kp
-              write(*,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")                  &
+              write(error_unit,"(a6,' id: ',i8,' [ ',3(i2,','),' ]')")         &
                                       'neigh', pneigh%id, ir, jr, kr
 
             end if ! pself associated

@@ -1107,7 +1107,7 @@ module algebra
 
 ! import external procedures
 !
-    use error, only : print_error
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1124,6 +1124,10 @@ module algebra
     integer                    :: i, j
     real(kind=8)               :: t
     real(kind=8), dimension(n) :: g
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'ALGEBRA::tridiag()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1136,7 +1140,8 @@ module algebra
       g(i) = u(j) / t
       t    = d(i) - l(i) * g(i)
       if (t == 0.0d+00) then
-        call print_error("algebra::tridiag", "solution failed!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Could not find solution!"
         stop
       end if
       x(i) = (r(i) - l(i) * x(j)) / t
