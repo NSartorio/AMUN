@@ -319,7 +319,8 @@ module interpolations
 
 ! prepare matrix coefficients
 !
-      call prepare_gp()
+      call prepare_gp(iret)
+      if (iret > 0) return
 
       interfaces         => interfaces_dir
       reconstruct_states => reconstruct_gp
@@ -341,7 +342,8 @@ module interpolations
 
 ! prepare matrix coefficients
 !
-      call prepare_mgp()
+      call prepare_mgp(iret)
+      if (iret > 0) return
 
       interfaces         => interfaces_mgp
       if (verbose .and. 2 * ng <= ngp - 1)                                     &
@@ -355,7 +357,8 @@ module interpolations
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "The selected reconstruction method is not " //      &
                           "implemented: " // trim(sreconstruction)
-        stop
+        iret = 200
+        return
       end if
     end select
 
@@ -530,7 +533,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine prepare_mgp()
+  subroutine prepare_mgp(iret)
 
 ! include external procedures
 !
@@ -541,6 +544,10 @@ module interpolations
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
 
 ! local variables
 !
@@ -674,7 +681,7 @@ module interpolations
     if (.not. flag) then
       write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
                       , "Could not invert the covariance matrix!"
-      stop
+      iret = 201
     end if
 
 !-------------------------------------------------------------------------------
@@ -2465,6 +2472,7 @@ module interpolations
 ! local variables
 !
     integer      :: i, im1, ip1, im2, ip2
+    integer      :: iret
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -2777,7 +2785,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n), iret)
 
 ! substitute the left-side values
 !
@@ -2785,7 +2793,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n), iret)
 
 ! substitute the right-side values
 !
@@ -2857,6 +2865,7 @@ module interpolations
 ! local variables
 !
     integer      :: i, im1, ip1, im2, ip2
+    integer      :: iret
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: ql, qc, qr
@@ -3172,7 +3181,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n), iret)
 
 ! substitute the left-side values
 !
@@ -3180,7 +3189,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n), iret)
 
 ! substitute the right-side values
 !
@@ -3252,6 +3261,7 @@ module interpolations
 ! local variables
 !
     integer      :: i, im1, ip1, im2, ip2
+    integer      :: iret
     real(kind=8) :: bl, bc, br, tt
     real(kind=8) :: wl, wc, wr, ww
     real(kind=8) :: df, lq, l3, zt
@@ -3587,7 +3597,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n))
+    call tridiag(n, a(1:n,1), b(1:n,1), c(1:n,1), r(1:n,1), u(1:n), iret)
 
 ! substitute the left-side values
 !
@@ -3595,7 +3605,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations for the left-side interpolation
 !
-    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n))
+    call tridiag(n, a(1:n,2), b(1:n,2), c(1:n,2), r(1:n,2), u(1:n), iret)
 
 ! substitute the right-side values
 !
@@ -3914,7 +3924,7 @@ module interpolations
 
 ! local variables
 !
-    integer :: i
+    integer :: i, iret
 
 ! local arrays for derivatives
 !
@@ -3979,7 +3989,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4016,7 +4026,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4091,7 +4101,7 @@ module interpolations
 
 ! local variables
 !
-    integer :: i
+    integer :: i, iret
 
 ! local arrays for derivatives
 !
@@ -4157,7 +4167,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4194,7 +4204,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4262,7 +4272,7 @@ module interpolations
 
 ! local variables
 !
-    integer :: i
+    integer :: i, iret
 
 ! local arrays for derivatives
 !
@@ -4333,7 +4343,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4372,7 +4382,7 @@ module interpolations
 
 ! solve the tridiagonal system of equations
 !
-    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n))
+    call tridiag(n, a(1:n), b(1:n), c(1:n), r(1:n), u(1:n), iret)
 
 ! apply the monotonicity preserving limiting
 !
@@ -4403,7 +4413,7 @@ module interpolations
 !
 !===============================================================================
 !
-  subroutine prepare_gp()
+  subroutine prepare_gp(iret)
 
 ! include external procedures
 !
@@ -4414,6 +4424,10 @@ module interpolations
 ! local variables are not implicit by default
 !
     implicit none
+
+! subroutine arguments
+!
+    integer, intent(inout) :: iret
 
 ! local variables
 !
@@ -4503,7 +4517,7 @@ module interpolations
     if (.not. flag) then
       write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
                       , "Could not invert the covariance matrix!"
-      stop
+      iret = 202
     end if
 
 !-------------------------------------------------------------------------------

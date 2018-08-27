@@ -173,12 +173,12 @@ module refinement
 !
     if (verbose) then
 
-      write (*,"(4x,a,1x,a)"    ) "refined variables      =", trim(rvars)
-      write (*,"(4x,a,1x,2e9.2)") "2nd order error limits =", crefmin, crefmax
+      write (*,"(4x,a,1x,a)"     ) "refined variables      =", trim(rvars)
+      write (*,"(4x,a,1x,2es9.2)") "2nd order error limits =", crefmin, crefmax
       if (vort_ref) &
-        write (*,"(4x,a,1x,2e9.2)") "vorticity limits       =", vortmin, vortmax
+        write (*,"(4x,a,1x,2es9.2)") "vorticity limits       =", vortmin, vortmax
       if (jabs_ref) &
-        write (*,"(4x,a,1x,2e9.2)") "current density limits =", jabsmin, jabsmax
+        write (*,"(4x,a,1x,2es9.2)") "current density limits =", jabsmin, jabsmax
 
     end if
 

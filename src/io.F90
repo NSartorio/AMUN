@@ -380,7 +380,7 @@ module io
       else
         write (*,"(4x,a21,2x,'=',1x,a)") "generate XDMF files  ", "off"
       end if
-      write (*,"(4x,a21,2x,'=',1x,e9.2)") "snapshot interval    ", hsnap
+      write (*,"(4x,a21,2x,'=',1x,es9.2)") "snapshot interval    ", hsnap
       if (hrest > 0.0d+00) then
         dd = int(hrest / 2.4d+01)
         hh = int(mod(hrest, 2.4d+01))
@@ -6843,13 +6843,13 @@ module io
         write(xdmf, "(a)") '     <Topology TopologyType="3DCoRectMesh"'        &
                               // ' Dimensions="' // trim(adjustl(stmp)) // '"/>'
         write(xdmf, "(a)") '     <Geometry GeometryType="ORIGIN_DXDYDZ">'
-        write(stmp, "(3e16.8)") pdata%meta%zmin, pdata%meta%ymin               &
-                                               , pdata%meta%xmin
+        write(stmp, "(3es16.8)") pdata%meta%zmin, pdata%meta%ymin              &
+                                                , pdata%meta%xmin
         write(xdmf, "(a)") '      <DataItem Name="Origin" NumberType="Float"'  &
                               // ' Precision="4" Dimensions="3" Format="XML">' &
                               // trim(adjustl(stmp)) // '</DataItem>'
-        write(stmp, "(3e16.8)") adz(pdata%meta%level), ady(pdata%meta%level)   &
-                                                     , adx(pdata%meta%level)
+        write(stmp, "(3es16.8)") adz(pdata%meta%level), ady(pdata%meta%level)  &
+                                                      , adx(pdata%meta%level)
         write(xdmf, "(a)") '      <DataItem Name="Spacing" NumberType="Float"' &
                               // ' Precision="4" Dimensions="3" Format="XML">' &
                               // trim(adjustl(stmp)) // '</DataItem>'
@@ -6860,11 +6860,11 @@ module io
         write(xdmf, "(a)") '     <Topology TopologyType="2DCoRectMesh"'        &
                               // ' Dimensions="' // trim(adjustl(stmp)) // '"/>'
         write(xdmf, "(a)") '     <Geometry GeometryType="ORIGIN_DXDY">'
-        write(stmp, "(2e16.8)") pdata%meta%ymin, pdata%meta%xmin
+        write(stmp, "(2es16.8)") pdata%meta%ymin, pdata%meta%xmin
         write(xdmf, "(a)") '      <DataItem Name="Origin" NumberType="Float"'  &
                               // ' Precision="4" Dimensions="2" Format="XML">' &
                               // trim(adjustl(stmp)) // '</DataItem>'
-        write(stmp, "(2e16.8)") ady(pdata%meta%level), adx(pdata%meta%level)
+        write(stmp, "(2es16.8)") ady(pdata%meta%level), adx(pdata%meta%level)
         write(xdmf, "(a)") '      <DataItem Name="Spacing" NumberType="Float"' &
                               // ' Precision="4" Dimensions="2" Format="XML">' &
                               // trim(adjustl(stmp)) // '</DataItem>'
