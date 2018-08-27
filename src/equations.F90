@@ -1116,18 +1116,19 @@ module equations
 !
 !   Arguments:
 !
+!     it - the time step number;
 !     id - the block id where the states are being checked;
 !     qq - the output array of primitive variables;
 !     uu - the input array of conservative variables;
 !
 !===============================================================================
 !
-  subroutine correct_unphysical_states(id, qq, uu)
+  subroutine correct_unphysical_states(it, id, qq, uu)
 
 ! include external procedures and variables
 !
-    use coordinates, only : im, jm, km
-    use error      , only : print_warning, print_error
+    use coordinates    , only : im, jm, km
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1135,14 +1136,14 @@ module equations
 
 ! input/output arguments
 !
-    integer(kind=4)                     , intent(in)    :: id
+    integer(kind=4)                     , intent(in)    :: it, id
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: qq
     real(kind=8), dimension(nv,im,jm,km), intent(inout) :: uu
 
 ! temporary variables
 !
-    character(len=255) :: msg
-    character(len=16)  :: sid, snc
+    character(len=255) :: msg, sfmt
+    character(len=16)  :: sit, sid, snc
     integer            :: n, p, nc, np
     integer            :: i, il, iu
     integer            :: j, jl, ju
@@ -1180,11 +1181,13 @@ module equations
 
 ! inform about the encountered unphysical states
 !
+      write(sit,'(i15)') it
       write(sid,'(i15)') id
       write(snc,'(i15)') nc
-      write(msg,'("Unphysical cells in block ID:",a," (",a," counted).")')     &
-                                        trim(adjustl(sid)), trim(adjustl(snc))
-      call print_warning(loc, trim(msg))
+      sfmt = '("Unphysical cells in block ID:",a," (",a," counted)'            &
+             // ' at time step ",a,".")'
+      write(msg,sfmt) trim(adjustl(sid)), trim(adjustl(snc)), trim(adjustl(sit))
+      write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
 
 ! allocate temporary vectors for unphysical states
 !
@@ -1238,10 +1241,14 @@ module equations
 ! limit density or pressure to minimum value, since the averaging over
 ! neighbours failed
 !
-                write(msg,'(a,1x,a)')                                          &
-                              "Not sufficient number of physical neighbors!"   &
-                            , "Applying lower bounds for positive variables."
-                call print_warning(loc, trim(msg))
+                msg = "Not sufficient number of physical neighbors!"
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
+                sfmt = '("Block ID:",a,", cell position = ( ",3(i4," ")," ).")'
+                write(msg,sfmt) trim(adjustl(sid)), i, j, k
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
+                write(error_unit,"('Q = ',10(1x,1e24.16e3))") qq(1:nv,i,j,k)
+                msg = "Applying lower bounds for positive variables."
+                write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
 
                 q(1:nv,n) = qq(1:nv,i,j,k)
                 q(idn ,n) = max(dmin, qq(idn,i,j,k))
@@ -3502,7 +3509,7 @@ module equations
 
 ! include external procedures
 !
-    use error, only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3566,9 +3573,10 @@ module equations
 
       else ! cannot find physical solution
 
-        call print_warning(loc, "Conversion to physical primitive state failed!")
-        write(*,"(a,5(1x,1e24.16e3))") "U          = ", u(1:nv,i)
-        write(*,"(a,3(1x,1e24.16e3))") "D, |m|², E = ", dn, mm, en
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Conversion to physical primitive state failed!"
+        write(error_unit,"(a,5(1x,1e24.16e3))") "U          = ", u(1:nv,i)
+        write(error_unit,"(a,3(1x,1e24.16e3))") "D, |m|², E = ", dn, mm, en
 
 ! set pressure to zero so we can hopefully fix it later
 !
@@ -3862,7 +3870,7 @@ module equations
 
 ! include external procedures
 !
-    use error, only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3998,8 +4006,9 @@ module equations
 ! print information about failed convergence or unphysical variables
 !
           if (err >= tol) then
-            call print_warning(loc, "Convergence not reached!")
-            write(*,"(a,1x,1e24.16e3)") "Error: ", err
+            write(error_unit,"('[',a,']: ',a)") trim(loc)                      &
+                            , "Convergence not reached!"
+            write(error_unit,"(a,1x,1e24.16e3)") "Error: ", err
           end if
 
 ! calculate |V|² from W
@@ -4007,7 +4016,8 @@ module equations
           vv  = mm / (w * w)
 
         else ! the upper brack not found
-          call print_warning(loc, "Could not find the upper bracket!")
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                          , "Could not find the upper bracket!"
           info = .false.
 
         end if
@@ -4017,12 +4027,14 @@ module equations
         info = .true.
 
       else ! the root cannot be found, since it is below the lower bracket
-        call print_warning(loc, "Positive function for lower bracket!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Positive function for lower bracket!"
         info = .false.
       end if
 
     else ! the state is unphysical
-      call print_warning(loc, "The state is not physical!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "The state is not physical!"
       info = .false.
     end if
 
@@ -4618,7 +4630,7 @@ module equations
 
 ! include external procedures
 !
-    use error, only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4694,13 +4706,13 @@ module equations
 !
         if (q(ipr,i) <= 0.0d+00) then
 
-          call print_warning(loc,                                              &
-                               "Conversion to physical primitive state" //     &
-                               " resulted in negative pressure!")
-          write(*,"(a,9(1x,1e24.16e3))") "U                        = "         &
-                                                       , u(1:nv,i)
-          write(*,"(a,6(1x,1e24.16e3))") "D, |m|², m.B, |B|², E, W = "         &
-                                                       , dn, mm, mb, bb, en, w
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                          , "Conversion to physical primitive state" //        &
+                            " resulted in negative pressure!"
+          write(error_unit,"(a,9(1x,1e24.16e3))") "U                        = "&
+                          , u(1:nv,i)
+          write(error_unit,"(a,6(1x,1e24.16e3))") "D, |m|², m.B, |B|², E, W = "&
+                          , dn, mm, mb, bb, en, w
 
 ! set pressure to zero so we can hopefully fix it later
 !
@@ -4710,11 +4722,12 @@ module equations
 
       else ! unphysical state
 
-        call print_warning(loc,                                                &
-                             "Conversion to physical primitive state failed!")
-        write(*,"(a,9(1x,1e24.16e3))") "U                     = ", u(1:nv,i)
-        write(*,"(a,5(1x,1e24.16e3))") "D, |m|², m.B, |B|², E = ", dn, mm, mb  &
-                                                                 , bb, en
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Conversion to physical primitive state failed!"
+        write(error_unit,"(a,9(1x,1e24.16e3))") "U                     = "     &
+                        , u(1:nv,i)
+        write(error_unit,"(a,5(1x,1e24.16e3))") "D, |m|², m.B, |B|², E = "     &
+                        , dn, mm, mb, bb, en
 
 ! set pressure to zero so we can hopefully fix it later
 !
@@ -5395,8 +5408,8 @@ module equations
 
 ! include external procedures
 !
-    use algebra, only : cubic_normalized, quartic
-    use error  , only : print_warning
+    use algebra        , only : cubic_normalized, quartic
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5423,8 +5436,7 @@ module equations
 
 ! local parameters
 !
-    character(len=*), parameter :: loc =                                       &
-                                  'EQUATIONS::nr_initial_brackets_srmhd_adi()'
+    character(len=*), parameter :: loc = 'EQUATIONS::nr_initial_brackets_srmhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5497,10 +5509,10 @@ module equations
         keep = (err > tol) .and. it > 0
       end do
       if (it <= 0) then
-        call print_warning(loc,                                                &
-                         "Iterative solver failed to find the lower bracket!")
-        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
-                                                          , dn, mm, mb, bb, en
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Iterative solver failed to find the lower bracket!"
+        write(error_unit,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "    &
+                        , dn, mm, mb, bb, en
       end if
 
     end if ! nr > 0
@@ -5543,17 +5555,19 @@ module equations
         info = .true.
 
       else ! the upper brack not found
-        call print_warning(loc, "Could not find the upper bracket!")
-        write(*,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "             &
-                                                          , dn, mm, mb, bb, en
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Could not find the upper bracket!"
+        write(error_unit,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "    &
+                        , dn, mm, mb, bb, en
         info = .false.
 
       end if
 
     else ! the root cannot be found, since it is below the lower bracket
-      call print_warning(loc, "Positive function for lower bracket!")
-      write(*,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "            &
-                                                      , dn, mm, mb, bb, en, wl
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Positive function for lower bracket!"
+      write(error_unit,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "   &
+                      , dn, mm, mb, bb, en, wl
       info = .false.
     end if
 
@@ -5599,7 +5613,7 @@ module equations
 
 ! include external procedures
 !
-    use error, only : print_warning
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5699,8 +5713,9 @@ module equations
 ! let know the user if the convergence failed
 !
       if (err >= tol) then
-        call print_warning(loc, "Convergence not reached!")
-        write(*,"(a,1x,1e24.16e3)") "Error: ", err
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Convergence not reached!"
+        write(error_unit,"(a,1x,1e24.16e3)") "Error: ", err
       end if
 
 ! calculate |V|² from W

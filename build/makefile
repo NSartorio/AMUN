@@ -88,9 +88,9 @@ endif
 name    = amun
 
 files   = algebra blocks boundaries constants coordinates domains driver       \
-          equations error evolution gravity integrals interpolations io mesh   \
+          equations evolution gravity integrals interpolations io mesh         \
           mpitools operators parameters problems random refinement schemes     \
-          shapes sources timers user_problem utils
+          shapes sources timers user_problem
 
 sources := $(addprefix $(SRCSDIR)/,$(addsuffix .F90, $(files)))
 objects := $(addprefix $(OBJSDIR)/,$(addsuffix .o,   $(files)))

@@ -197,12 +197,12 @@ module io
 ! import external procedures
 !
 #ifdef HDF5
-    use error          , only : print_error
     use hdf5           , only : hsize_t
     use hdf5           , only : H5P_DATASET_CREATE_F, H5Z_FLAG_OPTIONAL_F
     use hdf5           , only : h5open_f, h5zfilter_avail_f, h5pcreate_f
     use hdf5           , only : h5pset_deflate_f, h5pset_filter_f
 #endif /* HDF5 */
+    use iso_fortran_env, only : error_unit
     use parameters     , only : get_parameter_integer, get_parameter_real      &
                               , get_parameter_string
 
@@ -234,6 +234,10 @@ module io
 !
     integer, parameter :: H5Z_DEFLATE = 1, H5Z_ZSTANDARD = 32015
 #endif /* HDF5 */
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::initialize_io()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -295,8 +299,8 @@ module io
 ! in the case of error, print a message and quit the subroutine
 !
     if (iret < 0) then
-      call print_error("io::initialize_io"                                     &
-                            , "Cannot initialize the HDF5 Fortran interface!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot initialize the HDF5 Fortran interface!"
       return
     end if
 
@@ -307,8 +311,8 @@ module io
 ! check if the object has been created properly, if not quit
 !
     if (iret < 0) then
-      call print_error("io::initialize_io"                                     &
-                     , "Cannot create the compression property for datasets!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the compression property for datasets!"
       return
     end if
 
@@ -419,8 +423,8 @@ module io
 ! import external procedures
 !
 #ifdef HDF5
-    use error          , only : print_error
     use hdf5           , only : h5pclose_f, h5close_f
+    use iso_fortran_env, only : error_unit
 #endif /* HDF5 */
 
 ! local variables are not implicit by default
@@ -430,6 +434,10 @@ module io
 ! subroutine arguments
 !
     integer, intent(inout) :: iret
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::finalize_io()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -447,8 +455,8 @@ module io
 ! check if the object has been closed properly
 !
     if (iret < 0) then
-      call print_error("io::finalize_io"                                       &
-                      , "Cannot close the compression property for datasets!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the compression property for datasets!"
       return
     end if
 
@@ -459,8 +467,8 @@ module io
 ! check if the interface has been closed successfuly
 !
     if (iret > 0) then
-      call print_error("io::finalize_io"                                       &
-                                 , "Cannot close the HDF5 Fortran interface!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the HDF5 Fortran interface!"
       return
     end if
 #endif /* HDF5 */
@@ -764,10 +772,10 @@ module io
 ! import external procedures and variables
 !
     use blocks         , only : change_blocks_process
-    use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_RDONLY_F
     use hdf5           , only : h5fis_hdf5_f, h5fopen_f, h5fclose_f
+    use iso_fortran_env, only : error_unit
 #ifdef MPI
     use mesh           , only : redistribute_blocks
 #endif /* MPI */
@@ -787,6 +795,10 @@ module io
     integer(hid_t)     :: fid
     integer            :: err, lfile
     logical            :: info
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::read_restart_snapshot_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1045,7 +1057,7 @@ module io
 
 ! if there was any problem, print the message
 !
-    if (iret > 0) call print_error("io::read_restart_snapshot_h5", msg)
+    if (iret > 0) write(error_unit,"('[',a,']: ',a)") trim(loc), trim(msg)
 
 !-------------------------------------------------------------------------------
 !
@@ -1070,10 +1082,10 @@ module io
 
 ! import external procedures and variables
 !
-    use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
     use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
+    use iso_fortran_env, only : error_unit
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1090,6 +1102,10 @@ module io
     character(len=64) :: fl
     integer(hid_t)    :: fid
     integer           :: err
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_restart_snapshot_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1104,8 +1120,8 @@ module io
 ! if the file could not be created, print message and quit
 !
     if (err < 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                                         , "Cannot create file: " // trim(fl))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create file: " // trim(fl)
       iret = 201
       return
     end if
@@ -1133,8 +1149,8 @@ module io
 ! if the file could not be closed print message and quit
 !
     if (err > 0) then
-      call print_error("io::write_restart_snapshot_h5"                         &
-                                          , "Cannot close file: " // trim(fl))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close file: " // trim(fl)
       iret = 203
       return
     end if
@@ -1158,10 +1174,10 @@ module io
 
 ! import external procedures and variables
 !
-    use error          , only : print_error
     use hdf5           , only : hid_t
     use hdf5           , only : H5F_ACC_TRUNC_F, H5F_SCOPE_GLOBAL_F
     use hdf5           , only : h5fcreate_f, h5fflush_f, h5fclose_f
+    use iso_fortran_env, only : error_unit
     use mpitools       , only : nproc
 
 ! local variables are not implicit by default
@@ -1173,6 +1189,10 @@ module io
     character(len=64) :: fl
     integer(hid_t)    :: fid
     integer           :: err
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_snapshot_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1187,8 +1207,8 @@ module io
 ! if the file could not be created, print message and quit
 !
     if (err < 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                                         , "Cannot create file: " // trim(fl))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create file: " // trim(fl)
       return
     end if
 
@@ -1220,7 +1240,8 @@ module io
 
 ! print information about unsupported file format and quit
 !
-      call print_error("io::write_snapshot_h5", "File type is not suppoerted!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "File type is not suppoerted!"
       call h5fclose_f(fid, err)
       return
 
@@ -1237,8 +1258,8 @@ module io
 ! if the file could not be closed print message and quit
 !
     if (err > 0) then
-      call print_error("io::write_snapshot_h5"                                 &
-                                          , "Cannot close file: " // trim(fl))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close file: " // trim(fl)
       return
     end if
 
@@ -1271,10 +1292,10 @@ module io
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : periodic
     use equations      , only : eqsys, eos, gamma, csnd
-    use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
     use mpitools       , only : nprocs, nproc
     use random         , only : nseeds, get_seeds
 
@@ -1298,6 +1319,10 @@ module io
 ! local allocatable arrays
 !
     integer(kind=4), dimension(:), allocatable :: seeds
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_attributes_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1316,7 +1341,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_attributes_h5", "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
 ! return from the subroutine
 !
@@ -1407,7 +1433,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-      call print_error("io::write_attributes_h5", "Cannot close the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the group!"
 
     end if
 
@@ -1441,10 +1468,10 @@ module io
     use coordinates    , only : maxlev, toplev
     use coordinates    , only : xmin, xmax, ymin, ymax, zmin, zmax
     use coordinates    , only : initialize_coordinates, finalize_coordinates
-    use error          , only : print_error
     use evolution      , only : step, time, dt, dtn
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gopen_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
     use mpitools       , only : nprocs, nproc
     use random         , only : nseeds, set_seeds
 
@@ -1470,6 +1497,10 @@ module io
 ! allocatable arrays
 !
     integer(kind=4), dimension(:), allocatable :: seeds
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::read_attributes_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1480,7 +1511,8 @@ module io
 ! check if the group has been opened successfuly
 !
     if (ierr < 0) then
-      call print_error("io::read_attributes_h5", "Cannot open the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open the group!"
       return
     end if
 
@@ -1514,23 +1546,23 @@ module io
 ! check the number of dimensions
 !
     if (lndims /= NDIMS) then
-      call print_error("io::read_attributes_h5"                                &
-                                 , "The number of dimensions does not match!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "The number of dimensions does not match!"
       return
     end if
 
 ! check the block dimensions
 !
     if (lncells /= nc) then
-      call print_error("io::read_attributes_h5"                                &
-                                       , "The block dimensions do not match!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "The block dimensions do not match!"
     end if
 
 ! check the number of ghost layers
 !
     if (lnghost /= ng) then
-      call print_error("io::read_attributes_h5"                                &
-                               , "The number of ghost layers does not match!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "The number of ghost layers does not match!"
     end if
 
 ! prepare coordinates and rescaling factors if the maximum level has changed
@@ -1583,8 +1615,8 @@ module io
 ! check if the number of created metablocks is equal to lbmcloks
 !
     if (lmblocks /= get_mblocks()) then
-      call print_error("io::read_attributes_h5"                                &
-                                     , "Number of metablocks does not match!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Number of metablocks does not match!"
     end if
 
 ! allocate an array of pointers with the size llast_id
@@ -1602,7 +1634,8 @@ module io
 ! check if the group has been closed successfuly
 !
     if (ierr /= 0) then
-      call print_error("io::read_attributes_h5", "Cannot close the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the group!"
     end if
 
 !-------------------------------------------------------------------------------
@@ -1630,9 +1663,9 @@ module io
     use blocks         , only : block_meta, list_meta
     use blocks         , only : ndims, nchildren, nsides
     use blocks         , only : get_last_id, get_mblocks
-    use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -1677,9 +1710,9 @@ module io
 !
     type(block_meta), pointer :: pmeta
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_metablocks_h5"
+    character(len=*), parameter :: loc = 'IO::write_metablocks_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -1909,7 +1942,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error(fname, "Cannot close the group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the group!"
 
       end if
 
@@ -1917,7 +1951,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error(fname, "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
     end if
 
@@ -1952,9 +1987,9 @@ module io
     use blocks         , only : metablock_set_level, metablock_set_position
     use blocks         , only : metablock_set_coordinates, metablock_set_bounds
     use blocks         , only : metablock_set_leaf
-    use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gopen_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
     use mpitools       , only : nprocs
 
 ! local variables are not implicit by default
@@ -2000,9 +2035,9 @@ module io
 !
     type(block_meta), pointer :: pmeta
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_metablocks_h5"
+    character(len=*), parameter :: loc = 'IO::read_metablocks_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2251,7 +2286,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error(fname, "Cannot close metablock group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the metablock group!"
 
       end if
 
@@ -2259,7 +2295,8 @@ module io
 
 ! print error about the problem with opening the group
 !
-      call print_error(fname, "Cannot open metablock group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open the metablock group!"
 
     end if
 
@@ -2290,9 +2327,9 @@ module io
     use blocks         , only : get_dblocks
     use coordinates    , only : im, jm, km
     use equations      , only : nv
-    use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -2317,6 +2354,10 @@ module io
 ! local arrays
 !
     integer(hsize_t), dimension(4) :: dm
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_datablocks_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2396,7 +2437,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_datablocks_h5", "Cannot close the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the group!"
 
       end if
 
@@ -2404,7 +2446,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_datablocks_h5", "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
     end if
 
@@ -2434,9 +2477,9 @@ module io
     use blocks         , only : append_datablock, link_blocks
     use coordinates    , only : im, jm, km
     use equations      , only : nv
-    use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5gopen_f, h5gclose_f, h5lexists_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -2466,6 +2509,10 @@ module io
 !
     integer(kind=4), dimension(:)        , allocatable :: id
     real(kind=8)   , dimension(:,:,:,:,:), allocatable :: uv, qv
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::read_datablocks_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2473,15 +2520,15 @@ module io
 !
     call h5gopen_f(fid, 'attributes', gid, ierr)
     if (ierr /= 0) then
-      call print_error("io::read_datablocks_h5"                                &
-                                         , "Cannot open the attribute group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open the attribute group!"
       return
     end if
     call read_attribute(gid, 'dblocks', dblocks)
     call h5gclose_f(gid, ierr)
     if (ierr /= 0) then
-      call print_error("io::read_datablocks_h5"                                &
-                                        , "Cannot close the attribute group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close the attribute group!"
       return
     end if
 
@@ -2493,8 +2540,8 @@ module io
 !
       call h5gopen_f(fid, 'datablocks', gid, ierr)
       if (ierr /= 0) then
-        call print_error("io::read_datablocks_h5"                              &
-                                        , "Cannot open the data block group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open the data block group!"
         return
       end if
 
@@ -2597,8 +2644,8 @@ module io
 !
       call h5gclose_f(gid, ierr)
       if (ierr /= 0) then
-        call print_error("io::read_datablocks_h5"                              &
-                                       , "Cannot close the data block group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the data block group!"
         return
       end if
 
@@ -2625,14 +2672,14 @@ module io
 
 ! references to other modules
 !
-    use blocks, only : block_meta, block_data, list_data
-    use blocks, only : nsides
-    use blocks, only : get_dblocks
-    use coordinates, only : maxlev, toplev
-    use error , only : print_error
-    use hdf5  , only : hid_t, hsize_t
-    use hdf5  , only : h5gcreate_f, h5gclose_f
-    use coordinates, only : adx, ady, adz
+    use blocks         , only : block_meta, block_data, list_data
+    use blocks         , only : nsides
+    use blocks         , only : get_dblocks
+    use coordinates    , only : maxlev, toplev
+    use coordinates    , only : adx, ady, adz
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
 
 ! declare variables
 !
@@ -2661,6 +2708,10 @@ module io
 ! local pointers
 !
     type(block_data), pointer :: pdata
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_coordinates_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2763,7 +2814,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_coordinates_h5", "Cannot close the group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the group!"
 
       end if
 
@@ -2771,7 +2823,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_coordinates_h5", "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
     end if
 
@@ -2798,14 +2851,14 @@ module io
 
 ! references to other modules
 !
-    use blocks       , only : block_data, list_data
-    use blocks       , only : get_dblocks
-    use coordinates  , only : im, jm, km, in, jn, kn
-    use coordinates  , only : ib, jb, kb, ie, je, ke
-    use equations    , only : nv, pvars
-    use error        , only : print_error
-    use hdf5         , only : hid_t, hsize_t
-    use hdf5         , only : h5gcreate_f, h5gclose_f
+    use blocks         , only : block_data, list_data
+    use blocks         , only : get_dblocks
+    use coordinates    , only : im, jm, km, in, jn, kn
+    use coordinates    , only : ib, jb, kb, ie, je, ke
+    use equations      , only : nv, pvars
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -2833,6 +2886,10 @@ module io
 ! local pointers
 !
     type(block_data), pointer :: pdata
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_primitive_variables_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -2933,8 +2990,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_primitive_variables_h5"                    &
-                                                  , "Cannot close the group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the group!"
 
       end if
 
@@ -2942,8 +2999,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_primitive_variables_h5"                      &
-                                                 , "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
     end if
 
@@ -2970,14 +3027,14 @@ module io
 
 ! references to other modules
 !
-    use blocks       , only : block_data, list_data
-    use blocks       , only : get_dblocks
-    use coordinates  , only : im, jm, km, in, jn, kn
-    use coordinates  , only : ib, jb, kb, ie, je, ke
-    use equations    , only : nv, cvars
-    use error        , only : print_error
-    use hdf5         , only : hid_t, hsize_t
-    use hdf5         , only : h5gcreate_f, h5gclose_f
+    use blocks         , only : block_data, list_data
+    use blocks         , only : get_dblocks
+    use coordinates    , only : im, jm, km, in, jn, kn
+    use coordinates    , only : ib, jb, kb, ie, je, ke
+    use equations      , only : nv, cvars
+    use hdf5           , only : hid_t, hsize_t
+    use hdf5           , only : h5gcreate_f, h5gclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3005,6 +3062,10 @@ module io
 ! local pointers
 !
     type(block_data), pointer :: pdata
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'IO::write_conservative_variables_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3105,8 +3166,8 @@ module io
 
 ! print error about the problem with closing the group
 !
-        call print_error("io::write_conservative_variables_h5"                 &
-                                                  , "Cannot close the group!")
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the group!"
 
       end if
 
@@ -3114,8 +3175,8 @@ module io
 
 ! print error about the problem with creating the group
 !
-      call print_error("io::write_conservative_variables_h5"                   &
-                                                 , "Cannot create the group!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create the group!"
 
     end if
 
@@ -3147,12 +3208,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_CHARACTER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
     use hdf5           , only : h5tcopy_f, h5tset_size_f, h5tclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3171,10 +3232,9 @@ module io
     integer(hsize_t), dimension(1) :: am = (/ 1 /)
     integer                        :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                       "io::write_scalar_attribute_string_h5"
+    character(len=*), parameter :: loc = 'IO::write_scalar_attribute_string_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3182,8 +3242,8 @@ module io
 !
     call h5tcopy_f(H5T_NATIVE_CHARACTER, atype, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot copy type for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot copy type for attribute :" // trim(aname)
       return
     end if
 
@@ -3191,8 +3251,8 @@ module io
 !
     alen = len(trim(avalue))
     if (alen <= 0) then
-      call print_error(fname                                                   &
-                       , "String attribute has wrong length:" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "String attribute has wrong length:" // trim(aname)
       return
     end if
 
@@ -3200,8 +3260,8 @@ module io
 !
     call h5tset_size_f(atype, alen, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                  , "Cannot set the type size for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the type size for attribute :" // trim(aname)
       return
     end if
 
@@ -3209,8 +3269,8 @@ module io
 !
     call h5screate_simple_f(1, am, sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot create space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for attribute :" // trim(aname)
       return
     end if
 
@@ -3223,27 +3283,29 @@ module io
 !
       call h5awrite_f(aid, atype, trim(avalue), am, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                      , "Cannot write the attribute data in :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write the attribute data in :" // trim(aname)
       end if
 
 ! close the attribute
 !
       call h5aclose_f(aid, ierr)
       if (ierr /= 0) then
-        call print_error(fname, "Cannot close attribute :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                        , "Cannot close attribute :" // trim(aname)
       end if
 
     else
-      call print_error(fname, "Cannot create attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create attribute :" // trim(aname)
     end if
 
 ! release the space
 !
     call h5sclose_f(sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot close space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for attribute :" // trim(aname)
     end if
 
 !-------------------------------------------------------------------------------
@@ -3270,11 +3332,11 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3292,10 +3354,9 @@ module io
     integer(hsize_t), dimension(1) :: am = (/ 1 /)
     integer                        :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                       "io::write_scalar_attribute_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_scalar_attribute_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3303,8 +3364,8 @@ module io
 !
     call h5screate_simple_f(1, am, sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot create space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for attribute :" // trim(aname)
       return
     end if
 
@@ -3317,27 +3378,29 @@ module io
 !
       call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                      , "Cannot write the attribute data in :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write the attribute data in :" // trim(aname)
       end if
 
 ! close the attribute
 !
       call h5aclose_f(aid, ierr)
       if (ierr /= 0) then
-        call print_error(fname, "Cannot close attribute :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close attribute :" // trim(aname)
       end if
 
     else
-      call print_error(fname, "Cannot create attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create attribute :" // trim(aname)
     end if
 
 ! release the space
 !
     call h5sclose_f(sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot close space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for attribute :" // trim(aname)
     end if
 
 !-------------------------------------------------------------------------------
@@ -3364,11 +3427,11 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3386,10 +3449,9 @@ module io
     integer(hsize_t), dimension(1) :: am = (/ 1 /)
     integer                        :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                        "io::write_scalar_attribute_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_scalar_attribute_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3397,8 +3459,8 @@ module io
 !
     call h5screate_simple_f(1, am, sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot create space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for attribute :" // trim(aname)
       return
     end if
 
@@ -3411,27 +3473,29 @@ module io
 !
       call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                      , "Cannot write the attribute data in :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write the attribute data in :" // trim(aname)
       end if
 
 ! close the attribute
 !
       call h5aclose_f(aid, ierr)
       if (ierr /= 0) then
-        call print_error(fname, "Cannot close attribute :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close attribute :" // trim(aname)
       end if
 
     else
-      call print_error(fname, "Cannot create attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create attribute :" // trim(aname)
     end if
 
 ! release the space
 !
     call h5sclose_f(sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot close space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for attribute :" // trim(aname)
     end if
 
 !-------------------------------------------------------------------------------
@@ -3458,10 +3522,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : hid_t, hsize_t, H5T_NATIVE_INTEGER
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3479,10 +3543,9 @@ module io
     integer(hsize_t), dimension(1) :: am = (/ 1 /)
     integer                        :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                       "io::write_vector_attribute_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_vector_attribute_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3494,8 +3557,8 @@ module io
 !
     call h5screate_simple_f(1, am, sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot create space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for attribute :" // trim(aname)
       return
     end if
 
@@ -3508,27 +3571,29 @@ module io
 !
       call h5awrite_f(aid, H5T_NATIVE_INTEGER, avalue, am, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                      , "Cannot write the attribute data in :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write the attribute data in :" // trim(aname)
       end if
 
 ! close the attribute
 !
       call h5aclose_f(aid, ierr)
       if (ierr /= 0) then
-        call print_error(fname, "Cannot close attribute :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close attribute :" // trim(aname)
       end if
 
     else
-      call print_error(fname, "Cannot create attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create attribute :" // trim(aname)
     end if
 
 ! release the space
 !
     call h5sclose_f(sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot close space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for attribute :" // trim(aname)
     end if
 
 !-------------------------------------------------------------------------------
@@ -3555,11 +3620,11 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5acreate_f, h5awrite_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3577,10 +3642,9 @@ module io
     integer(hsize_t), dimension(1) :: am = (/ 1 /)
     integer                        :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                        "io::write_vector_attribute_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_vector_attribute_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3592,8 +3656,8 @@ module io
 !
     call h5screate_simple_f(1, am, sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                       , "Cannot create space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for attribute :" // trim(aname)
       return
     end if
 
@@ -3606,27 +3670,29 @@ module io
 !
       call h5awrite_f(aid, H5T_NATIVE_DOUBLE, avalue, am, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                      , "Cannot write the attribute data in :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write the attribute data in :" // trim(aname)
       end if
 
 ! close the attribute
 !
       call h5aclose_f(aid, ierr)
       if (ierr /= 0) then
-        call print_error(fname, "Cannot close attribute :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close attribute :" // trim(aname)
       end if
 
     else
-      call print_error(fname, "Cannot create attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create attribute :" // trim(aname)
     end if
 
 ! release the space
 !
     call h5sclose_f(sid, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot close space for attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for attribute :" // trim(aname)
     end if
 
 !-------------------------------------------------------------------------------
@@ -3657,11 +3723,11 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5aexists_by_name_f
     use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3680,10 +3746,9 @@ module io
     integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
     integer                         :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                        "io::read_scalar_attribute_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_scalar_attribute_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3691,12 +3756,13 @@ module io
 !
     call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot check if attribute exists :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot check if attribute exists :" // trim(aname)
       return
     end if
     if (.not. exists) then
-      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute does not exist :" // trim(aname)
       return
     end if
 
@@ -3704,7 +3770,8 @@ module io
 !
     call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open attribute :" // trim(aname)
       return
     end if
 
@@ -3712,14 +3779,16 @@ module io
 !
     call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot read attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read attribute :" // trim(aname)
     end if
 
 ! close the attribute
 !
     call h5aclose_f(aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close attribute :" // trim(aname)
       return
     end if
 
@@ -3747,11 +3816,11 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5aexists_by_name_f
     use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3770,10 +3839,9 @@ module io
     integer(hsize_t), dimension(1)  :: am     = (/ 1 /)
     integer                         :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                         "io::read_scalar_attribute_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_scalar_attribute_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3781,12 +3849,13 @@ module io
 !
     call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot check if attribute exists :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot check if attribute exists :" // trim(aname)
       return
     end if
     if (.not. exists) then
-      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute does not exist :" // trim(aname)
       return
     end if
 
@@ -3794,7 +3863,8 @@ module io
 !
     call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open attribute :" // trim(aname)
       return
     end if
 
@@ -3802,14 +3872,16 @@ module io
 !
     call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot read attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read attribute :" // trim(aname)
     end if
 
 ! close the attribute
 !
     call h5aclose_f(aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close attribute :" // trim(aname)
       return
     end if
 
@@ -3837,12 +3909,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
     use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
     use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3862,10 +3934,9 @@ module io
     integer(hsize_t)                :: alen
     integer                         :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                        "io::read_vector_attribute_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_vector_attribute_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3873,12 +3944,13 @@ module io
 !
     call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot check if attribute exists :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot check if attribute exists :" // trim(aname)
       return
     end if
     if (.not. exists) then
-      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute does not exist :" // trim(aname)
       return
     end if
 
@@ -3886,7 +3958,8 @@ module io
 !
     call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open attribute :" // trim(aname)
       return
     end if
 
@@ -3896,25 +3969,25 @@ module io
     if (ierr == 0) then
       call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
       if (ierr /= 1) then
-        call print_error(fname                                                 &
-                         , "Cannot get attribute dimensions :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot get attribute dimensions :" // trim(aname)
       end if
       call h5sclose_f(sid, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                        , "Cannot close the attribute space :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the attribute space :" // trim(aname)
       end if
     else
-      call print_error(fname                                                   &
-                          , "Cannot get the attribute space :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot get the attribute space :" // trim(aname)
       return
     end if
 
 ! check if the output array is large enough
 !
     if (am(1) > size(avalue)) then
-      call print_error(fname                                                   &
-                 , "Attribute too large for output argument :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute too large for output argument :" // trim(aname)
       return
     end if
 
@@ -3922,14 +3995,16 @@ module io
 !
     call h5aread_f(aid, H5T_NATIVE_INTEGER, avalue, am(:), ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot read attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read attribute :" // trim(aname)
     end if
 
 ! close the attribute
 !
     call h5aclose_f(aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close attribute :" // trim(aname)
       return
     end if
 
@@ -3957,12 +4032,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5aexists_by_name_f, h5aget_space_f
     use hdf5           , only : h5aopen_by_name_f, h5aread_f, h5aclose_f
     use hdf5           , only : h5sclose_f, h5sget_simple_extent_dims_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -3982,10 +4057,9 @@ module io
     integer(hsize_t)                :: alen
     integer                         :: ierr
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname =                                     &
-                                         "io::read_vector_attribute_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_vector_attribute_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -3993,12 +4067,13 @@ module io
 !
     call h5aexists_by_name_f(gid, '.', aname, exists, ierr)
     if (ierr /= 0) then
-      call print_error(fname                                                   &
-                        , "Cannot check if attribute exists :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot check if attribute exists :" // trim(aname)
       return
     end if
     if (.not. exists) then
-      call print_error(fname, "Attribute does not exist :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute does not exist :" // trim(aname)
       return
     end if
 
@@ -4006,7 +4081,8 @@ module io
 !
     call h5aopen_by_name_f(gid, '.', aname, aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot open attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open attribute :" // trim(aname)
       return
     end if
 
@@ -4016,25 +4092,25 @@ module io
     if (ierr == 0) then
       call h5sget_simple_extent_dims_f(sid, am, bm, ierr)
       if (ierr /= 1) then
-        call print_error(fname                                                 &
-                         , "Cannot get attribute dimensions :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot get attribute dimensions :" // trim(aname)
       end if
       call h5sclose_f(sid, ierr)
       if (ierr /= 0) then
-        call print_error(fname                                                 &
-                        , "Cannot close the attribute space :" // trim(aname))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close the attribute space :" // trim(aname)
       end if
     else
-      call print_error(fname                                                   &
-                          , "Cannot get the attribute space :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot get the attribute space :" // trim(aname)
       return
     end if
 
 ! check if the output array is large enough
 !
     if (am(1) > size(avalue)) then
-      call print_error(fname                                                   &
-                 , "Attribute too large for output argument :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Attribute too large for output argument :" // trim(aname)
       return
     end if
 
@@ -4042,14 +4118,16 @@ module io
 !
     call h5aread_f(aid, H5T_NATIVE_DOUBLE, avalue, am(:), ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot read attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read attribute :" // trim(aname)
     end if
 
 ! close the attribute
 !
     call h5aclose_f(aid, ierr)
     if (ierr /= 0) then
-      call print_error(fname, "Cannot close attribute :" // trim(aname))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close attribute :" // trim(aname)
       return
     end if
 
@@ -4082,12 +4160,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4112,9 +4190,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_1d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_1d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4132,7 +4210,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4150,7 +4229,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4172,7 +4252,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4186,7 +4267,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4194,7 +4276,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4208,7 +4291,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4237,12 +4321,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4263,9 +4347,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_2d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_2d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4279,7 +4363,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4297,7 +4382,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4319,7 +4405,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4333,7 +4420,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4341,7 +4429,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4355,7 +4444,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4384,12 +4474,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4410,9 +4500,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_3d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_3d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4426,7 +4516,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4444,7 +4535,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4466,7 +4558,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4480,7 +4573,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4488,7 +4582,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4502,7 +4597,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4531,12 +4627,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4557,9 +4653,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_4d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_4d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4573,7 +4669,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4591,7 +4688,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4613,7 +4711,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4627,7 +4726,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4635,7 +4735,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4649,7 +4750,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4678,12 +4780,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4704,9 +4806,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_5d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::write_5d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4720,7 +4822,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4738,7 +4841,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4761,7 +4865,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4775,7 +4880,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4783,7 +4889,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4797,7 +4904,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4826,12 +4934,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4856,9 +4964,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_1d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_1d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -4876,7 +4984,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -4894,7 +5003,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -4916,7 +5026,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -4930,7 +5041,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -4938,7 +5050,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -4952,7 +5065,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -4981,12 +5095,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5007,9 +5121,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_2d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_2d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5023,7 +5137,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5041,7 +5156,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -5063,7 +5179,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -5077,7 +5194,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -5085,7 +5203,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -5099,7 +5218,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -5128,12 +5248,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5154,9 +5274,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_3d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_3d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5170,7 +5290,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5188,7 +5309,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -5210,7 +5332,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -5224,7 +5347,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -5232,7 +5356,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -5246,7 +5371,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -5275,12 +5401,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5301,9 +5427,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_4d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_4d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5317,7 +5443,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5335,7 +5462,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -5357,7 +5485,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -5371,7 +5500,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -5379,7 +5509,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -5393,7 +5524,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -5422,12 +5554,12 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error, print_warning
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5screate_simple_f, h5sclose_f
     use hdf5           , only : h5dcreate_f, h5dwrite_f, h5dclose_f
     use hdf5           , only : h5pset_chunk_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5448,9 +5580,9 @@ module io
 !
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::write_5d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::write_5d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5464,7 +5596,8 @@ module io
 
 ! print error about the problem with creating the space
 !
-      call print_error(fname, "Cannot create space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create space for dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5482,7 +5615,8 @@ module io
 
 ! print error about the problem with setting the chunk size
 !
-      call print_warning(fname, "Cannot set the size of the chunk!")
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot set the size of the chunk!"
 
     end if
 
@@ -5505,7 +5639,8 @@ module io
 
 ! print error about the problem with writing down the dataset
 !
-        call print_error(fname, "Cannot write dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot write dataset: " // trim(name)
 
       end if
 
@@ -5519,7 +5654,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+        write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
+                        , "Cannot close dataset: " // trim(name)
 
       end if
 
@@ -5527,7 +5663,8 @@ module io
 
 ! print error about the problem with creating the dataset
 !
-      call print_error(fname, "Cannot create dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot create dataset: " // trim(name)
 
     end if
 
@@ -5541,7 +5678,8 @@ module io
 
 ! print error about the problem with closing the space
 !
-      call print_error(fname, "Cannot close space for dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close space for dataset: " // trim(name)
 
     end if
 
@@ -5574,10 +5712,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5595,9 +5733,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_1d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_1d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5611,7 +5749,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5629,7 +5768,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -5643,7 +5783,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -5672,10 +5813,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5693,9 +5834,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_2d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_2d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5709,7 +5850,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5727,7 +5869,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -5741,7 +5884,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -5770,10 +5914,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5791,9 +5935,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_3d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_3d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5807,7 +5951,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5825,7 +5970,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -5839,7 +5985,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -5868,10 +6015,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5889,9 +6036,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_4d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_4d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5905,7 +6052,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -5923,7 +6071,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -5937,7 +6086,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -5966,10 +6116,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_INTEGER
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -5987,9 +6137,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_5d_array_integer_h5"
+    character(len=*), parameter :: loc = 'IO::read_5d_array_integer_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6003,7 +6153,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6021,7 +6172,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6035,7 +6187,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -6064,10 +6217,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6085,9 +6238,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_1d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_1d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6101,7 +6254,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6119,7 +6273,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6133,7 +6288,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -6162,10 +6318,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6183,9 +6339,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_2d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_2d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6199,7 +6355,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6217,7 +6374,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6231,7 +6389,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -6260,10 +6419,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6281,9 +6440,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_3d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_3d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6297,7 +6456,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6315,7 +6475,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6329,7 +6490,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -6358,10 +6520,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6379,9 +6541,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_4d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_4d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6395,7 +6557,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6413,7 +6576,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6427,7 +6591,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
@@ -6456,10 +6621,10 @@ module io
 
 ! import procedures and variables from other modules
 !
-    use error          , only : print_error
     use hdf5           , only : H5T_NATIVE_DOUBLE
     use hdf5           , only : hid_t, hsize_t
     use hdf5           , only : h5dopen_f, h5dread_f, h5dclose_f
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -6477,9 +6642,9 @@ module io
     integer(hid_t) :: did
     integer        :: iret
 
-! subroutine name string
+! local parameters
 !
-    character(len=*), parameter :: fname = "io::read_5d_array_double_h5"
+    character(len=*), parameter :: loc = 'IO::read_5d_array_double_h5()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -6493,7 +6658,8 @@ module io
 
 ! print error about the problem with opening the data space
 !
-      call print_error(fname, "Cannot open dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot open dataset: " // trim(name)
 
 ! quit the subroutine
 !
@@ -6511,7 +6677,8 @@ module io
 
 ! print error about the problem with reading the dataset
 !
-      call print_error(fname, "Cannot read dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot read dataset: " // trim(name)
 
     end if
 
@@ -6525,7 +6692,8 @@ module io
 
 ! print error about the problem with closing the dataset
 !
-        call print_error(fname, "Cannot close dataset: " // trim(name))
+      write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
+                      , "Cannot close dataset: " // trim(name)
 
     end if
 
