@@ -4781,6 +4781,7 @@ module equations
 ! include external procedures
 !
     use algebra        , only : quadratic, quartic
+    use iso_fortran_env, only : error_unit
 
 ! local variables are not implicit by default
 !
@@ -4795,7 +4796,7 @@ module equations
 
 ! local variables
 !
-    integer      :: i, nr
+    integer      :: i, nr, iret
     real(kind=8) :: bb, vs
     real(kind=8) :: bx, by, bz, pm, pt
     real(kind=8) :: rh, v1, v2
@@ -4810,6 +4811,10 @@ module equations
 !
     real(kind=8), dimension(5) :: a
     real(kind=8), dimension(4) :: x
+
+! local parameters
+!
+    character(len=*), parameter :: loc = 'EQUATIONS::fluxspeed_srmhd_adi()'
 !
 !-------------------------------------------------------------------------------
 !
@@ -5005,12 +5010,15 @@ module equations
 
 #ifdef DEBUG
           if (max(abs(cm(i)), abs(cp(i))) >= 1.0d+00) then
-            write(*,*)
-            write(*,*) 'Estimation returned unphysical speeds!'
-            write(*,"('A = ',5(1pe24.16))") a(1:5)
-            write(*,"('N = ',1i2)"        ) nr
-            write(*,"('X = ',4(1pe24.16))") x(1:4)
-            stop
+            write(error_unit,"('[',a,']: ',a)") trim(loc)                      &
+                            , "Estimation returned unphysical speeds!"
+            write(error_unit,"('[',a,']: ',a,5(1es24.16))") trim(loc)          &
+                            , "A = ", a(1:5)
+            write(error_unit,"('[',a,']: ',a,1i2)") trim(loc)                  &
+                            , "N = ", nr
+            write(error_unit,"('[',a,']: ',a,4(1es24.16))") trim(loc)          &
+                            , "X = ", x(1:4)
+            iret = 300
           end if
 #endif /* DEBUG */
 
@@ -5023,12 +5031,15 @@ module equations
           cp(i) =   1.0d+00
 
 #ifdef DEBUG
-          write(*,*)
-          write(*,*) 'Speed estimation failed!'
-          write(*,"('A = ',5(1pe24.16))") a(1:5)
-          write(*,"('N = ',1i2)"        ) nr
-          write(*,"('X = ',4(1pe24.16))") x(1:4)
-          stop
+          write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
+                          , "Estimation returned unphysical speeds!"
+          write(error_unit,"('[',a,']: ',a,5(1es24.16))") trim(loc)            &
+                          , "A = ", a(1:5)
+          write(error_unit,"('[',a,']: ',a,1i2)") trim(loc)                    &
+                          , "N = ", nr
+          write(error_unit,"('[',a,']: ',a,4(1es24.16))") trim(loc)            &
+                          , "X = ", x(1:4)
+          iret = 300
 #endif /* DEBUG */
 
         end if
