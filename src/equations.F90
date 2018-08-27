@@ -1246,7 +1246,7 @@ module equations
                 sfmt = '("Block ID:",a,", cell position = ( ",3(i4," ")," ).")'
                 write(msg,sfmt) trim(adjustl(sid)), i, j, k
                 write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
-                write(error_unit,"('Q = ',10(1x,1e24.16e3))") qq(1:nv,i,j,k)
+                write(error_unit,"('Q = ',10(1x,1es24.16e3))") qq(1:nv,i,j,k)
                 msg = "Applying lower bounds for positive variables."
                 write(error_unit,"('[', a, ']: ', a)") trim(loc), trim(msg)
 
@@ -3575,8 +3575,8 @@ module equations
 
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Conversion to physical primitive state failed!"
-        write(error_unit,"(a,5(1x,1e24.16e3))") "U          = ", u(1:nv,i)
-        write(error_unit,"(a,3(1x,1e24.16e3))") "D, |m|², E = ", dn, mm, en
+        write(error_unit,"(a,5(1x,1es24.16e3))") "U          = ", u(1:nv,i)
+        write(error_unit,"(a,3(1x,1es24.16e3))") "D, |m|², E = ", dn, mm, en
 
 ! set pressure to zero so we can hopefully fix it later
 !
@@ -4008,7 +4008,7 @@ module equations
           if (err >= tol) then
             write(error_unit,"('[',a,']: ',a)") trim(loc)                      &
                             , "Convergence not reached!"
-            write(error_unit,"(a,1x,1e24.16e3)") "Error: ", err
+            write(error_unit,"(a,1x,1es24.16e3)") "Error: ", err
           end if
 
 ! calculate |V|² from W
@@ -4233,17 +4233,17 @@ module equations
 !
       if (w < wl) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
-        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+        write(*,"(a,1x,2es24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (vv < 0.0d+00 .or. vv >= 1.0d+00) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
-        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |v|²: ", vv
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+        write(*,"(a,1x,1es24.16e3)") "Unphysical speed |v|²: ", vv
         info = .false.
         return
       end if
@@ -4272,9 +4272,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwv()"
+      write(*,"(a,1x,1es24.16e3)") "Convergence not reached: ", err
     end if
 
 #ifdef PROFILE
@@ -4465,17 +4465,17 @@ module equations
 !
       if (w < wl) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
-        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+        write(*,"(a,1x,2es24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (uu < 0.0d+00) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
-        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |u|²: ", uu
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+        write(*,"(a,1x,1es24.16e3)") "Unphysical speed |u|²: ", uu
         info = .false.
         return
       end if
@@ -4508,9 +4508,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srhd_adi_2dwu()"
+      write(*,"(a,1x,1es24.16e3)") "Convergence not reached: ", err
     end if
 
 #ifdef PROFILE
@@ -4709,9 +4709,9 @@ module equations
           write(error_unit,"('[',a,']: ',a)") trim(loc)                        &
                           , "Conversion to physical primitive state" //        &
                             " resulted in negative pressure!"
-          write(error_unit,"(a,9(1x,1e24.16e3))") "U                        = "&
+          write(error_unit,"(a,9(1x,1es24.16e3))") "U                        = "&
                           , u(1:nv,i)
-          write(error_unit,"(a,6(1x,1e24.16e3))") "D, |m|², m.B, |B|², E, W = "&
+          write(error_unit,"(a,6(1x,1es24.16e3))") "D, |m|², m.B, |B|², E, W = "&
                           , dn, mm, mb, bb, en, w
 
 ! set pressure to zero so we can hopefully fix it later
@@ -4724,9 +4724,9 @@ module equations
 
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Conversion to physical primitive state failed!"
-        write(error_unit,"(a,9(1x,1e24.16e3))") "U                     = "     &
+        write(error_unit,"(a,9(1x,1es24.16e3))") "U                     = "     &
                         , u(1:nv,i)
-        write(error_unit,"(a,5(1x,1e24.16e3))") "D, |m|², m.B, |B|², E = "     &
+        write(error_unit,"(a,5(1x,1es24.16e3))") "D, |m|², m.B, |B|², E = "     &
                         , dn, mm, mb, bb, en
 
 ! set pressure to zero so we can hopefully fix it later
@@ -5522,7 +5522,7 @@ module equations
       if (it <= 0) then
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Iterative solver failed to find the lower bracket!"
-        write(error_unit,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "    &
+        write(error_unit,"(a,5(1x,1es24.16e3))") " D, |m|², m.B, |B|², E = "   &
                         , dn, mm, mb, bb, en
       end if
 
@@ -5568,7 +5568,7 @@ module equations
       else ! the upper brack not found
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Could not find the upper bracket!"
-        write(error_unit,"(a,5(1x,1e24.16e3))") " D, |m|², m.B, |B|², E = "    &
+        write(error_unit,"(a,5(1x,1es24.16e3))") " D, |m|², m.B, |B|², E = "   &
                         , dn, mm, mb, bb, en
         info = .false.
 
@@ -5577,7 +5577,7 @@ module equations
     else ! the root cannot be found, since it is below the lower bracket
       write(error_unit,"('[',a,']: ',a)") trim(loc)                            &
                       , "Positive function for lower bracket!"
-      write(error_unit,"(a,6(1x,1e24.16e3))") " D, |m|², m.B, |B|², E, W = "   &
+      write(error_unit,"(a,6(1x,1es24.16e3))") " D, |m|², m.B, |B|², E, W = "  &
                       , dn, mm, mb, bb, en, wl
       info = .false.
     end if
@@ -5726,7 +5726,7 @@ module equations
       if (err >= tol) then
         write(error_unit,"('[',a,']: ',a)") trim(loc)                          &
                         , "Convergence not reached!"
-        write(error_unit,"(a,1x,1e24.16e3)") "Error: ", err
+        write(error_unit,"(a,1x,1es24.16e3)") "Error: ", err
       end if
 
 ! calculate |V|² from W
@@ -5815,10 +5815,10 @@ module equations
 !
     if (.not. info) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
-      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"           ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1es24.16e3)") "Using the lower bracket as solution: ", wl
 
 ! use the lower bracket, since it guarantees the positive pressure
 !
@@ -5899,17 +5899,17 @@ module equations
 !
       if (w < wl) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+        write(*,"(a,1x,2es24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (vv < 0.0d+00 .or. vv >= 1.0d+00) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |v|²: ", vv
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+        write(*,"(a,1x,1es24.16e3)") "Unphysical speed |v|²: ", vv
         info = .false.
         return
       end if
@@ -5938,9 +5938,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwv()"
+      write(*,"(a,1x,1es24.16e3)") "Convergence not reached: ", err
     end if
 
 #ifdef PROFILE
@@ -6017,10 +6017,10 @@ module equations
 !
     if (.not. info) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
-      write(*,"(a,1x)"          ) "The solution lays in unphysical regime."
-      write(*,"(a,1x,1e24.16e3)") "Using the lower bracket as solution: ", wl
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srmhd_adi_1dw()"
+      write(*,"(a,1x)"           ) "The solution lays in unphysical regime."
+      write(*,"(a,1x,1es24.16e3)") "Using the lower bracket as solution: ", wl
 
 ! use the lower bracket, since it guarantees the positive pressure
 !
@@ -6105,17 +6105,17 @@ module equations
 !
       if (w < wl) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-        write(*,"(a,1x,2e24.16e3)") "Enthalpy smaller than the limit: ", w, wl
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+        write(*,"(a,1x,2es24.16e3)") "Enthalpy smaller than the limit: ", w, wl
         info = .false.
         return
       end if
       if (uu < 0.0d+00) then
         write(*,*)
-        write(*,"(a,1x,a)"        ) "ERROR in"                                 &
-                                  , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-        write(*,"(a,1x,1e24.16e3)") "Unphysical speed |u|²: ", uu
+        write(*,"(a,1x,a)"         ) "ERROR in"                                &
+                                   , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+        write(*,"(a,1x,1es24.16e3)") "Unphysical speed |u|²: ", uu
         info = .false.
         return
       end if
@@ -6148,9 +6148,9 @@ module equations
 !
     if (err >= tol) then
       write(*,*)
-      write(*,"(a,1x,a)"        ) "WARNING in"                                 &
-                                , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
-      write(*,"(a,1x,1e24.16e3)") "Convergence not reached: ", err
+      write(*,"(a,1x,a)"         ) "WARNING in"                                &
+                                 , "EQUATIONS::nr_iterate_srmhd_adi_2dwu()"
+      write(*,"(a,1x,1es24.16e3)") "Convergence not reached: ", err
     end if
 
 #ifdef PROFILE

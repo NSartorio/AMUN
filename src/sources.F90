@@ -152,9 +152,9 @@ module sources
 !
     if (verbose) then
 
-      write (*,"(4x,a,1x,a)    ") "glm source terms       =", trim(tglm)
-      write (*,"(4x,a,1x,1e9.2)") "viscosity              =", viscosity
-      write (*,"(4x,a,1x,1e9.2)") "resistivity            =", resistivity
+      write (*,"(4x,a,1x,a)     ") "glm source terms       =", trim(tglm)
+      write (*,"(4x,a,1x,1es9.2)") "viscosity              =", viscosity
+      write (*,"(4x,a,1x,1es9.2)") "resistivity            =", resistivity
 
     end if
 
