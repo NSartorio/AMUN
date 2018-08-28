@@ -194,7 +194,7 @@ module user_problem
       write (*,sfmts) "problem name  ", trim(problem_name)
       sfmts = "(6x,a24)"
       write (*,sfmts)          "jet parameters:         "
-      sfmtf = "(8x,a10,9x,'=',1pe12.4,2x,a)"
+      sfmtf = "(8x,a10,9x,'=',1es12.4,2x,a)"
       write (*,sfmtf) "rjet      ", rjet  , "(jet radius)"
       write (*,sfmtf) "ljet      ", ljet  , "(jet length)"
       write (*,sfmtf) "dn_jet    ", dn_jet, "(jet density)"
