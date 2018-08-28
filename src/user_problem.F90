@@ -253,7 +253,7 @@ module user_problem
       write (*,sfmts) "problem name  ", trim(problem_name)
       sfmts = "(6x,a12,9x)"
       write (*,sfmts)          "parameters: "
-      sfmtf = "(8x,a10,9x,'=',1pe12.4)"
+      sfmtf = "(8x,a10,9x,'=',1es12.4)"
       sfmti = "(8x,a10,9x,'=',1i12)"
       write (*,sfmtf) "dens      ", dens
       write (*,sfmtf) "bamp      ", bamp

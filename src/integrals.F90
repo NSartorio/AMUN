@@ -614,7 +614,7 @@ module integrals
                                             , avarr(5), mnarr(5), mxarr(5)     &
                                             , avarr(6), mnarr(6), mxarr(6)     &
                                             , avarr(7), mnarr(7), mxarr(7)
-      write(runit,"(i9, 19e18.8e3)") step, time, inarr(11:28)
+      write(runit,"(i9, 19es18.8e3)") step, time, inarr(11:28)
     end if
 
 #ifdef PROFILE
