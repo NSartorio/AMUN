@@ -537,7 +537,7 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra        , only : invert
+    use algebra        , only : max_real_kind, invert
     use constants      , only : pi
     use iso_fortran_env, only : error_unit
 
@@ -551,14 +551,14 @@ module interpolations
 
 ! local variables
 !
-    logical       :: flag
-    integer       :: i, j, i1, j1, k1, i2, j2, k2
-    real(kind=16) :: sig, fc, fx, fy, fz, xl, xr, yl, yr, zl, zr
+    logical                  :: flag
+    integer                  :: i, j, i1, j1, k1, i2, j2, k2
+    real(kind=max_real_kind) :: sig, fc, fx, fy, fz, xl, xr, yl, yr, zl, zr
 
 ! local arrays for derivatives
 !
-    real(kind=16), dimension(:,:)  , allocatable :: cov, inv
-    real(kind=16), dimension(:,:,:), allocatable :: xgp
+    real(kind=max_real_kind), dimension(:,:)  , allocatable :: cov, inv
+    real(kind=max_real_kind), dimension(:,:,:), allocatable :: xgp
 
 ! local parameters
 !
@@ -4417,7 +4417,7 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra        , only : invert
+    use algebra        , only : max_real_kind, invert
     use constants      , only : pi
     use iso_fortran_env, only : error_unit
 
@@ -4431,14 +4431,14 @@ module interpolations
 
 ! local variables
 !
-    logical       :: flag
-    integer       :: i, j, ip, jp
-    real(kind=16) :: sig, zl, zr, fc
+    logical                  :: flag
+    integer                  :: i, j, ip, jp
+    real(kind=max_real_kind) :: sig, zl, zr, fc
 
 ! local arrays for derivatives
 !
-    real(kind=16), dimension(:,:), allocatable :: cov, agp
-    real(kind=16), dimension(:)  , allocatable :: xgp
+    real(kind=max_real_kind), dimension(:,:), allocatable :: cov, agp
+    real(kind=max_real_kind), dimension(:)  , allocatable :: xgp
 
 ! local parameters
 !
