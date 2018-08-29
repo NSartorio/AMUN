@@ -2102,11 +2102,9 @@ module evolution
 
 ! include external procedures
 !
-    use coordinates   , only : im, jm, km
-    use equations     , only : nv, pvars, cvars
-#ifdef IBM
-    use, intrinsic :: ieee_arithmetic
-#endif /* IBM */
+    use coordinates    , only : im, jm, km
+    use equations      , only : nv, pvars, cvars
+    use ieee_arithmetic, only : ieee_is_nan
 
 ! include external variables
 !
@@ -2146,21 +2144,12 @@ module evolution
         do j = 1, jm
           do i = 1, im
             do p = 1, nv
-#ifdef IBM
               if (ieee_is_nan(pdata%u(p,i,j,k))) then
                 print *, 'U NaN:', cvars(p), pdata%meta%id, i, j, k
               end if
               if (ieee_is_nan(pdata%q(p,i,j,k))) then
                 print *, 'Q NaN:', pvars(p), pdata%meta%id, i, j, k
               end if
-#else /* IBM */
-              if (isnan(pdata%u(p,i,j,k))) then
-                print *, 'U NaN:', cvars(p), pdata%meta%id, i, j, k
-              end if
-              if (isnan(pdata%q(p,i,j,k))) then
-                print *, 'Q NaN:', pvars(p), pdata%meta%id, i, j, k
-              end if
-#endif /* IBM */
             end do ! p = 1, nv
           end do ! i = 1, im
         end do ! j = 1, jm
