@@ -50,9 +50,19 @@ module gravity
 !
   logical, save :: gravity_enabled = .false.
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine gacc_iface(t, dt, x, y, z, acc)
+      real(kind=8)              , intent(in)  :: t, dt
+      real(kind=8)              , intent(in)  :: x, y, z
+      real(kind=8), dimension(3), intent(out) :: acc
+    end subroutine
+  end interface
+
 ! pointer to the gravitational acceleration subroutine
 !
-  procedure(gacc_none), pointer, save :: gravitational_acceleration => null()
+  procedure(gacc_iface), pointer, save :: gravitational_acceleration => null()
 
 ! by default everything is private
 !

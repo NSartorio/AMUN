@@ -47,9 +47,18 @@ module problems
   integer, save :: imi, imu
 #endif /* PROFILE */
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine setup_problem_iface(pdata)
+      use blocks, only : block_data
+      type(block_data), pointer, intent(inout) :: pdata
+    end subroutine
+  end interface
+
 ! pointer to the problem setup subroutine
 !
-  procedure(setup_problem_blast), pointer, save :: setup_problem => null()
+  procedure(setup_problem_iface), pointer, save :: setup_problem => null()
 
 ! by default everything is private
 !
