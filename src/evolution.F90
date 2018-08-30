@@ -47,9 +47,16 @@ module evolution
   integer     , save :: imi, ima, imt, imu, imf, iui, imv
 #endif /* PROFILE */
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine evolve_iface()
+    end subroutine
+  end interface
+
 ! pointer to the temporal integration subroutine
 !
-  procedure(evolve_euler), pointer, save :: evolve => null()
+  procedure(evolve_iface), pointer, save :: evolve => null()
 
 ! evolution parameters
 !

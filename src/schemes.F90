@@ -53,13 +53,31 @@ module schemes
 !
   logical            , save :: states_4vec = .false.
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine update_flux_iface(dx, q, f)
+      use coordinates    , only : im, jm, km
+      use equations      , only : nv
+      real(kind=8), dimension(NDIMS)            , intent(in)  :: dx
+      real(kind=8), dimension(      nv,im,jm,km), intent(in)  :: q
+      real(kind=8), dimension(NDIMS,nv,im,jm,km), intent(out) :: f
+    end subroutine
+    subroutine riemann_iface(n, ql, qr, f)
+      use equations, only : nv
+      integer                      , intent(in)    :: n
+      real(kind=8), dimension(nv,n), intent(inout) :: ql, qr
+      real(kind=8), dimension(nv,n), intent(out)   :: f
+    end subroutine
+  end interface
+
 ! pointer to the flux update procedure
 !
-  procedure(update_flux_hd_iso), pointer, save :: update_flux => null()
+  procedure(update_flux_iface), pointer, save :: update_flux => null()
 
 ! pointer to the Riemann solver
 !
-  procedure(riemann_hd_iso_hll), pointer, save :: riemann     => null()
+  procedure(riemann_iface)    , pointer, save :: riemann     => null()
 
 ! by default everything is private
 !

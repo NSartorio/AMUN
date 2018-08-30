@@ -47,13 +47,35 @@ module interpolations
   integer            , save :: imi, imr, imf, imc
 #endif /* PROFILE */
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine interfaces_iface(positive, h, q, qi)
+      use coordinates, only : im , jm , km
+      logical                                  , intent(in)  :: positive
+      real(kind=8), dimension(NDIMS)           , intent(in)  :: h
+      real(kind=8), dimension(im,jm,km)        , intent(in)  :: q
+      real(kind=8), dimension(im,jm,km,2,NDIMS), intent(out) :: qi
+    end subroutine
+    subroutine reconstruct_iface(n, h, f, fl, fr)
+      integer                   , intent(in)  :: n
+      real(kind=8)              , intent(in)  :: h
+      real(kind=8), dimension(n), intent(in)  :: f
+      real(kind=8), dimension(n), intent(out) :: fl, fr
+    end subroutine
+    function limiter_iface(x, a, b) result(c)
+      real(kind=8), intent(in) :: x, a, b
+      real(kind=8)             :: c
+    end function
+  end interface
+
 ! pointers to the reconstruction and limiter procedures
 !
-  procedure(interfaces_tvd)    , pointer, save :: interfaces         => null()
-  procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_tvd        => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
+  procedure(interfaces_iface)  , pointer, save :: interfaces         => null()
+  procedure(reconstruct_iface) , pointer, save :: reconstruct_states => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_tvd        => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_prol       => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_clip       => null()
 
 ! module parameters
 !
