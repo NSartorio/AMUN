@@ -61,26 +61,72 @@ module equations
   integer            , save :: imi, imc, imf, imm, imp, imb
 #endif /* PROFILE */
 
+! the number of independent variables
+!
+  integer(kind=4)  , save :: nv  = 0
+
+! interfaces for procedure pointers
+!
+  interface
+    subroutine prim2cons_iface(n, q, u)
+      import                                     :: nv
+      integer                      , intent(in)  :: n
+      real(kind=8), dimension(nv,n), intent(in)  :: q
+      real(kind=8), dimension(nv,n), intent(out) :: u
+    end subroutine
+    subroutine cons2prim_iface(n, u, q)
+      import                                     :: nv
+      integer                      , intent(in)  :: n
+      real(kind=8), dimension(nv,n), intent(in)  :: u
+      real(kind=8), dimension(nv,n), intent(out) :: q
+    end subroutine
+    subroutine fluxspeed_iface(n, q, u, f, cm, cp)
+      import                                              :: nv
+      integer                               , intent(in)  :: n
+      real(kind=8), dimension(nv,n)         , intent(in)  :: q, u
+      real(kind=8), dimension(nv,n)         , intent(out) :: f
+      real(kind=8), dimension(n)  , optional, intent(out) :: cm, cp
+    end subroutine
+    function maxspeed_iface(qq) result(maxspeed)
+      use coordinates, only : im, jm, km
+      import                                           :: nv
+      real(kind=8), dimension(nv,im,jm,km), intent(in) :: qq
+      real(kind=8) :: maxspeed
+    end function
+    subroutine esystem_roe_iface(x, y, q, c, r, l)
+      import                                        :: nv
+      real(kind=8)                  , intent(in)    :: x, y
+      real(kind=8), dimension(nv)   , intent(in)    :: q
+      real(kind=8), dimension(nv)   , intent(inout) :: c
+      real(kind=8), dimension(nv,nv), intent(inout) :: l, r
+    end subroutine
+    subroutine nr_iterate_iface(mm, bb, mb, en, dn, w, vv, info)
+      real(kind=8), intent(in)    :: mm, bb, mb, en, dn
+      real(kind=8), intent(inout) :: w, vv
+      logical     , intent(out)   :: info
+    end subroutine
+  end interface
+
 ! pointers to the conversion procedures
 !
-  procedure(prim2cons_hd_iso)  , pointer, save :: prim2cons       => null()
-  procedure(cons2prim_hd_iso)  , pointer, save :: cons2prim       => null()
+  procedure(prim2cons_iface)  , pointer, save :: prim2cons       => null()
+  procedure(cons2prim_iface)  , pointer, save :: cons2prim       => null()
 
 ! pointer to the flux procedure
 !
-  procedure(fluxspeed_hd_iso)  , pointer, save :: fluxspeed       => null()
+  procedure(fluxspeed_iface)  , pointer, save :: fluxspeed       => null()
 
 ! pointer to the maxspeed procedure
 !
-  procedure(maxspeed_hd_iso)   , pointer, save :: maxspeed        => null()
+  procedure(maxspeed_iface)   , pointer, save :: maxspeed        => null()
 
 ! pointer to the Roe eigensystem procedure
 !
-  procedure(esystem_roe_hd_iso), pointer, save :: eigensystem_roe => null()
+  procedure(esystem_roe_iface), pointer, save :: eigensystem_roe => null()
 
 ! pointer to the variable conversion method
 !
-  procedure(nr_iterate_srhd_adi_1dw), pointer, save :: nr_iterate => null()
+  procedure(nr_iterate_iface) , pointer, save :: nr_iterate => null()
 
 ! the system of equations and the equation of state
 !
@@ -90,10 +136,6 @@ module equations
 ! the variable conversion method
 !
   character(len=32), save :: c2p   = "1Dw"
-
-! the number of independent variables
-!
-  integer(kind=4)  , save :: nv  = 0
 
 ! direction indices
 !

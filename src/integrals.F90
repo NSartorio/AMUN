@@ -53,8 +53,8 @@ module integrals
 !   sunit - a file handler to the statistics file;
 !   iintd - the number of steps between subsequent intervals storing;
 !
-  integer(kind=4), save :: funit = 7
-  integer(kind=4), save :: sunit = 8
+  integer(kind=4), save :: funit = 11
+  integer(kind=4), save :: sunit = 12
   integer(kind=4), save :: iintd = 1
 
 ! by default everything is private
@@ -142,18 +142,13 @@ module integrals
 
 ! create a new integrals file
 !
-#ifdef GNU
-      open (newunit = funit, file = fname, form = 'formatted'                  &
-                                       , status = 'replace')
-#endif /* GNU */
 #ifdef INTEL
       open (newunit = funit, file = fname, form = 'formatted'                  &
                                        , status = 'replace', buffered = 'yes')
-#endif /* INTEL */
-#ifdef IBM
-      open (unit = funit, file = fname, form = 'formatted'                     &
+#else /* INTEL */
+      open (newunit = funit, file = fname, form = 'formatted'                  &
                                        , status = 'replace')
-#endif /* IBM */
+#endif /* INTEL */
 
 ! write the integral file header
 !
@@ -168,18 +163,13 @@ module integrals
 
 ! create a new statistics file
 !
-#ifdef GNU
-      open (newunit = sunit, file = fname, form = 'formatted'                  &
-                                       , status = 'replace')
-#endif /* GNU */
 #ifdef INTEL
       open (newunit = sunit, file = fname, form = 'formatted'                  &
                                        , status = 'replace', buffered = 'yes')
-#endif /* INTEL */
-#ifdef IBM
-      open (unit = sunit, file = fname, form = 'formatted'                     &
+#else /* INTEL */
+      open (newunit = sunit, file = fname, form = 'formatted'                  &
                                        , status = 'replace')
-#endif /* IBM */
+#endif /* INTEL */
 
 ! write the integral file header
 !

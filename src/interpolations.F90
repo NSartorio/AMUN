@@ -47,13 +47,35 @@ module interpolations
   integer            , save :: imi, imr, imf, imc
 #endif /* PROFILE */
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine interfaces_iface(positive, h, q, qi)
+      use coordinates, only : im , jm , km
+      logical                                  , intent(in)  :: positive
+      real(kind=8), dimension(NDIMS)           , intent(in)  :: h
+      real(kind=8), dimension(im,jm,km)        , intent(in)  :: q
+      real(kind=8), dimension(im,jm,km,2,NDIMS), intent(out) :: qi
+    end subroutine
+    subroutine reconstruct_iface(n, h, f, fl, fr)
+      integer                   , intent(in)  :: n
+      real(kind=8)              , intent(in)  :: h
+      real(kind=8), dimension(n), intent(in)  :: f
+      real(kind=8), dimension(n), intent(out) :: fl, fr
+    end subroutine
+    function limiter_iface(x, a, b) result(c)
+      real(kind=8), intent(in) :: x, a, b
+      real(kind=8)             :: c
+    end function
+  end interface
+
 ! pointers to the reconstruction and limiter procedures
 !
-  procedure(interfaces_tvd)    , pointer, save :: interfaces         => null()
-  procedure(reconstruct)       , pointer, save :: reconstruct_states => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_tvd        => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_prol       => null()
-  procedure(limiter_zero)      , pointer, save :: limiter_clip       => null()
+  procedure(interfaces_iface)  , pointer, save :: interfaces         => null()
+  procedure(reconstruct_iface) , pointer, save :: reconstruct_states => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_tvd        => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_prol       => null()
+  procedure(limiter_iface)     , pointer, save :: limiter_clip       => null()
 
 ! module parameters
 !
@@ -537,7 +559,7 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra        , only : invert
+    use algebra        , only : max_real_kind, invert
     use constants      , only : pi
     use iso_fortran_env, only : error_unit
 
@@ -551,14 +573,14 @@ module interpolations
 
 ! local variables
 !
-    logical       :: flag
-    integer       :: i, j, i1, j1, k1, i2, j2, k2
-    real(kind=16) :: sig, fc, fx, fy, fz, xl, xr, yl, yr, zl, zr
+    logical                  :: flag
+    integer                  :: i, j, i1, j1, k1, i2, j2, k2
+    real(kind=max_real_kind) :: sig, fc, fx, fy, fz, xl, xr, yl, yr, zl, zr
 
 ! local arrays for derivatives
 !
-    real(kind=16), dimension(:,:)  , allocatable :: cov, inv
-    real(kind=16), dimension(:,:,:), allocatable :: xgp
+    real(kind=max_real_kind), dimension(:,:)  , allocatable :: cov, inv
+    real(kind=max_real_kind), dimension(:,:,:), allocatable :: xgp
 
 ! local parameters
 !
@@ -4417,7 +4439,7 @@ module interpolations
 
 ! include external procedures
 !
-    use algebra        , only : invert
+    use algebra        , only : max_real_kind, invert
     use constants      , only : pi
     use iso_fortran_env, only : error_unit
 
@@ -4431,14 +4453,14 @@ module interpolations
 
 ! local variables
 !
-    logical       :: flag
-    integer       :: i, j, ip, jp
-    real(kind=16) :: sig, zl, zr, fc
+    logical                  :: flag
+    integer                  :: i, j, ip, jp
+    real(kind=max_real_kind) :: sig, zl, zr, fc
 
 ! local arrays for derivatives
 !
-    real(kind=16), dimension(:,:), allocatable :: cov, agp
-    real(kind=16), dimension(:)  , allocatable :: xgp
+    real(kind=max_real_kind), dimension(:,:), allocatable :: cov, agp
+    real(kind=max_real_kind), dimension(:)  , allocatable :: xgp
 
 ! local parameters
 !
