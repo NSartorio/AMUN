@@ -29,9 +29,17 @@
 !
 module algebra
 
+! include external procedures
+!
+  use iso_fortran_env, only : real32, real64, real128
+
 ! module variables are not implicit by default
 !
   implicit none
+
+! maximum real kind
+!
+  integer, parameter :: max_real_kind = max(real32, real64, real128)
 
 ! by default everything is private
 !
@@ -39,6 +47,7 @@ module algebra
 
 ! declare public subroutines
 !
+  public :: max_real_kind
   public :: quadratic, quadratic_normalized
   public :: cubic, cubic_normalized
   public :: quartic
@@ -1194,17 +1203,17 @@ module algebra
 
 ! input/output arguments
 !
-    integer                      , intent(in)  :: n
-    real(kind=16), dimension(n,n), intent(in)  :: m
-    real(kind=16), dimension(n,n), intent(out) :: r
-    logical                      , intent(out) :: f
+    integer                                 , intent(in)  :: n
+    real(kind=max_real_kind), dimension(n,n), intent(in)  :: m
+    real(kind=max_real_kind), dimension(n,n), intent(out) :: r
+    logical                                 , intent(out) :: f
 
 ! local variables
 !
-    logical                         :: flag = .true.
-    integer                         :: i, j, k, l
-    real(kind=16)                   :: t
-    real(kind=16), dimension(n,2*n) :: g
+    logical                                    :: flag = .true.
+    integer                                    :: i, j, k, l
+    real(kind=max_real_kind)                   :: t
+    real(kind=max_real_kind), dimension(n,2*n) :: g
 !
 !-------------------------------------------------------------------------------
 !

@@ -47,9 +47,19 @@ module shapes
   integer, save :: imi, imu
 #endif /* PROFILE */
 
+! interfaces for procedure pointers
+!
+  abstract interface
+    subroutine update_shapes_iface(pdata, time, dt)
+      use blocks, only : block_data
+      type(block_data), pointer, intent(inout) :: pdata
+      real(kind=8)             , intent(in)    :: time, dt
+    end subroutine
+  end interface
+
 ! pointer to the shape update subroutine
 !
-  procedure(update_shapes_none), pointer, save :: update_shapes => null()
+  procedure(update_shapes_iface), pointer, save :: update_shapes => null()
 
 ! by default everything is private
 !
