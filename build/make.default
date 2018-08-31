@@ -9,7 +9,7 @@
 #   SIGNALS      - support for signals for proper shutdown with restart file
 #
 COMPILER     = GNU
-DEBUG        = Y
+DEBUG        = N
 PROFILE      = N
 STATIC       = N
 SIGNALS      = N
@@ -36,3 +36,7 @@ NDIMS        = 2
 
 #
 #-------------------------------------------------------------------------------
+#
+# path for temporary files during compilation (uncomment if you wish to use it)
+#
+#OBJSDIR := /tmp/${USER}/amun-code/obj
