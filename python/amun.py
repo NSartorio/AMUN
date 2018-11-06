@@ -37,6 +37,51 @@ import numpy   as np
 import os.path as op
 import sys
 
+def amun_compatible(fname):
+  '''
+      Subroutine checks if the HDF5 file is AMUN compatible.
+
+      Arguments:
+
+        fname - the HDF5 file name;
+
+      Return values:
+
+        ret   - True or False;
+
+      Examples:
+
+        comp = amun_compatible('p000010_00000.h5')
+
+  '''
+  try:
+    f = h5.File(fname, 'r')
+
+    # check if the file is written in the AMUN format or at least contains
+    # necessary groups
+    #
+    ret = True
+    if 'code' in f.attrs:
+      if f.attrs['code'].astype(str) != "AMUN":
+        print("'%s' contains attribute 'code'", \
+              " but it is not set to 'AMUN'!" % fname)
+        ret = False
+    elif not 'attributes'  in f or \
+         not 'coordinates' in f or \
+         not 'variables'   in f:
+      print("'%s' misses one of these groups: ", \
+            "'attributes', 'coordinates' or 'variables'!" % fname)
+      ret = False
+
+    f.close()
+
+  except:
+    print("It seems '%s' is not an HDF5 file!" % fname)
+    ret = False
+
+  return ret
+
+
 def amun_attribute(fname, aname):
   '''
       Subroutine to reads global attributes from AMUN HDF5 snapshots.
