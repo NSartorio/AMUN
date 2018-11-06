@@ -84,16 +84,16 @@ def amun_compatible(fname):
 
 def amun_attribute(fname, aname):
   '''
-      Subroutine to reads global attributes from AMUN HDF5 snapshots.
+      Subroutine to read global attributes from AMUN HDF5 snapshots.
 
       Arguments:
 
-        fname - the AMUN HDF5 file name;
+        fname - the HDF5 file name;
         aname - the attribute name;
 
       Return values:
 
-        ret   - the value read from the attribute;
+        ret   - the value of the attribute;
 
       Examples:
 
@@ -103,26 +103,23 @@ def amun_attribute(fname, aname):
   if not amun_compatible(fname):
     return False
 
-  # open the file
-  #
-  f = h5.File(fname, 'r')
+  try:
+    f = h5.File(fname, 'r')
+    g = f['attributes']
 
-  # open the group of attributes
-  #
-  g  = f['attributes'].attrs
+    if aname in g.attrs:
+      attr = g.attrs[aname]
+      if attr.dtype.type is np.string_:
+        ret = np.squeeze(attr).astype(str)
+      else:
+        ret = np.squeeze(attr)
 
-  # get attribute's value
-  #
-  ret = g.get(aname)
-  if len(ret) == 1:
-    ret = ret[0]
+    f.close()
 
-  # close the file
-  #
-  f.close()
+  except:
+    print("Attribute '%s' cannot be retrieved from '%s'!" % (aname, fname))
+    ret = False
 
-  # return the value of attribute
-  #
   return ret
 
 
