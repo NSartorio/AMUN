@@ -100,19 +100,12 @@ def amun_attribute(fname, aname):
         time = amun_attribute('p000010_00000.h5', 'time')
 
   '''
+  if not amun_compatible(fname):
+    return False
+
   # open the file
   #
   f = h5.File(fname, 'r')
-
-  # check if the file is written in the AMUN format
-  #
-  if f.attrs.get('code')[0].astype(str) != "AMUN" or \
-        not 'attributes' in f or \
-        not 'coordinates' in f or \
-        not 'variables' in f:
-    print('It seems this HDF5 file is corrupted or not compatible with the AMUN format!')
-    f.close()
-    return False
 
   # open the group of attributes
   #
@@ -131,6 +124,7 @@ def amun_attribute(fname, aname):
   # return the value of attribute
   #
   return ret
+
 
 def amun_dataset(fname, vname, shrink = 1, progress = False):
   '''
@@ -153,19 +147,12 @@ def amun_dataset(fname, vname, shrink = 1, progress = False):
         dn = amun_dataset('p000010_00000.h5', 'dens')
 
   '''
+  if not amun_compatible(fname):
+    return False
+
   # open the file
   #
-
   f = h5.File(fname, 'r')
-
-  # check if the file is written in the AMUN format
-  #
-  if f.attrs.get('code')[0].astype(str) != "AMUN" or \
-        not 'attributes' in f or \
-        not 'coordinates' in f or \
-        not 'variables' in f:
-    print('It seems this HDF5 file is corrupted or not compatible with the AMUN format!')
-    return False
 
   # get the file path
   #
