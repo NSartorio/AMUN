@@ -465,29 +465,6 @@ def amun_dataset(fname, vname, shrink = 1, progress = False):
   #
   return ret
 
-def rebin(a, newshape):
-  '''
-      Subroutine changes the size of the input array to to new shape,
-      by copying cells or averaging them.
-  '''
-  assert len(a.shape) == len(newshape)
-
-  m = a.ndim - 1
-  if (a.shape[m] > newshape[m]):
-    if a.ndim == 3:
-      nn = [newshape[0], a.shape[0] / newshape[0],
-            newshape[1], a.shape[1] / newshape[1],
-            newshape[2], a.shape[2] / newshape[2]]
-      return a.reshape(nn).mean(5).mean(3).mean(1)
-    else:
-      nn = [newshape[0], a.shape[0] / newshape[0],
-            newshape[1], a.shape[1] / newshape[1]]
-      return a.reshape(nn).mean(3).mean(1)
-  else:
-    for n in range(a.ndim):
-      a = np.repeat(a, newshape[n] / a.shape[n], axis = n)
-    return(a)
-
 
 def amun_integrals(field, filename, pathlist):
     '''
@@ -535,6 +512,7 @@ def amun_integrals(field, filename, pathlist):
     # Return appended values.
     #
     return vals
+
 
 def read_integrals(filename, column):
     '''
@@ -584,6 +562,31 @@ def read_integrals(filename, column):
     # Return values.
     #
     return(array(lc))
+
+
+def rebin(a, newshape):
+  '''
+      Subroutine changes the size of the input array to to new shape,
+      by copying cells or averaging them.
+  '''
+  assert len(a.shape) == len(newshape)
+
+  m = a.ndim - 1
+  if (a.shape[m] > newshape[m]):
+    if a.ndim == 3:
+      nn = [newshape[0], a.shape[0] / newshape[0],
+            newshape[1], a.shape[1] / newshape[1],
+            newshape[2], a.shape[2] / newshape[2]]
+      return a.reshape(nn).mean(5).mean(3).mean(1)
+    else:
+      nn = [newshape[0], a.shape[0] / newshape[0],
+            newshape[1], a.shape[1] / newshape[1]]
+      return a.reshape(nn).mean(3).mean(1)
+  else:
+    for n in range(a.ndim):
+      a = np.repeat(a, newshape[n] / a.shape[n], axis = n)
+    return(a)
+
 
 if __name__ == "__main__":
   fname = './p000030_00000.h5'
