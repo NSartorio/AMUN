@@ -123,7 +123,7 @@ def amun_attribute(fname, aname):
   return ret
 
 
-def amun_coordinates(fname, iname):
+def amun_coordinate(fname, iname):
   '''
       Subroutine to read coordinate items from AMUN HDF5 snapshots.
 
@@ -138,7 +138,7 @@ def amun_coordinates(fname, iname):
 
       Examples:
 
-        bounds = amun_coordinates('p000010_00000.h5', 'bounds')
+        bounds = amun_coordinate('p000010_00000.h5', 'bounds')
 
   '''
   if not amun_compatible(fname):
