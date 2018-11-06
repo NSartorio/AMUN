@@ -123,6 +123,47 @@ def amun_attribute(fname, aname):
   return ret
 
 
+def amun_coordinates(fname, iname):
+  '''
+      Subroutine to read coordinate items from AMUN HDF5 snapshots.
+
+      Arguments:
+
+        fname - the HDF5 file name;
+        iname - the item name;
+
+      Return values:
+
+        ret   - the values of the item;
+
+      Examples:
+
+        bounds = amun_coordinates('p000010_00000.h5', 'bounds')
+
+  '''
+  if not amun_compatible(fname):
+    return False
+
+  try:
+    f = h5.File(fname, 'r')
+    g = f['coordinates']
+
+    if iname in g:
+      item = g[iname]
+      if item.dtype.type is np.string_:
+        ret = np.squeeze(item).astype(str)
+      else:
+        ret = np.squeeze(item)
+
+    f.close()
+
+  except:
+    print("Coordinate item '%s' cannot be retrieved from '%s'!" % (iname, fname))
+    ret = False
+
+  return ret
+
+
 def amun_dataset(fname, vname, shrink = 1, progress = False):
   '''
       Subroutine to reads dataset from AMUN HDF5 snapshots.
