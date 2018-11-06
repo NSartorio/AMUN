@@ -166,11 +166,11 @@ def amun_coordinate(fname, iname):
 
 def amun_dataset(fname, vname, shrink = 1, progress = False):
   '''
-      Subroutine to reads dataset from AMUN HDF5 snapshots.
+      Subroutine to read datasets from AMUN HDF5 snapshots.
 
       Arguments:
 
-        fname    - the AMUN HDF5 file name;
+        fname    - the HDF5 file name;
         vname    - the variable name;
         shrink   - the shrink factor (must be the power of 2 and not larger
                    than the block size);
@@ -188,281 +188,268 @@ def amun_dataset(fname, vname, shrink = 1, progress = False):
   if not amun_compatible(fname):
     return False
 
-  # open the file
-  #
-  f = h5.File(fname, 'r')
+  try:
+    dname = op.dirname(fname)
 
-  # get the file path
-  #
-  dname = op.dirname(fname)
+    if progress:
+      sys.stdout.write("Data file path:\n  '%s'\n" % (dname))
 
-  if progress:
-    sys.stdout.write("Data file path:\n  '%s'\n" % (dname))
+    # get attributes necessary to reconstruct the domain
+    #
+    eqsys = amun_attribute(fname, 'eqsys')
+    eos   = amun_attribute(fname, 'eos')
+    nr    = amun_attribute(fname, 'isnap')
+    nc    = amun_attribute(fname, 'nprocs')
+    nl    = amun_attribute(fname, 'nleafs')
+    if eos == 'adi':
+      gm  = amun_attribute(fname, 'gamma')
 
-  # get attributes necessary to reconstruct the domain
-  #
-  g  = f['attributes'].attrs
+    # prepare array to hold data
+    #
+    bm    = amun_attribute(fname, 'dims')
+    if bm[2] > 1:
+      ndims = 3
+    else:
+      ndims = 2
+    rm    = amun_attribute(fname, 'rdims')
+    ng    = amun_attribute(fname, 'nghosts')
+    ml    = amun_attribute(fname, 'maxlev')
 
-  # get the set of equations used to perform the simulation
-  # and the equation of state
-  #
-  eqsys = g.get('eqsys')[0].astype(str)
-  eos   = g.get('eos')[0].astype(str)
-
-  # get the snapshot number, the number of domain files, and the number of blocks
-  #
-  nr = g.get('isnap')[0]
-  nc = g.get('nprocs')[0]
-  nl = g.get('nleafs')[0]
-  if eos == 'adi':
-    gm = g.get('gamma')[0]
-
-  # build the list of supported variables
-  #
-  variables = []
-  for var in f['variables'].keys():
-    variables.append(var)
-
-  # add derived variables if possible
-  #
-  if 'velx' in variables and 'vely' in variables and 'velz' in variables:
-    variables.append('velo')
-    variables.append('divv')
-    variables.append('vort')
-  if 'magx' in variables and 'magy' in variables and 'magz' in variables:
-    variables.append('magn')
-    variables.append('divb')
-    variables.append('curr')
-  if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
-                    and 'pres' in variables:
-    variables.append('eint')
-  if 'dens' in variables and 'pres' in variables:
-    variables.append('temp')
-  if (eqsys == 'hd' or eqsys == 'mhd') \
-                    and 'dens' in variables \
-                    and 'velx' in variables \
-                    and 'vely' in variables \
-                    and 'velz' in variables:
-    variables.append('ekin')
-  if (eqsys == 'mhd' or eqsys == 'srmhd') \
-                     and 'magx' in variables \
-                     and 'magy' in variables \
-                     and 'magz' in variables:
-    variables.append('emag')
-  if eqsys == 'hd' and 'ekin' in variables and 'eint' in variables:
-    variables.append('etot')
-  if eqsys == 'mhd' and 'eint' in variables \
-                    and 'ekin' in variables \
-                    and 'emag' in variables:
-    variables.append('etot')
-  if (eqsys == 'srhd' or eqsys == 'srmhd') and 'velo' in variables:
-    variables.append('lore')
-
-  # check if the requested variable is in the variable list
-  #
-  if not vname in variables:
-    print('The requested variable cannot be extracted from the file datasets!')
-    return False
-
-  # prepare array to hold data
-  #
-  bm = g.get('dims')
-  if bm[2] > 1:
-    ndims = 3
-  else:
-    ndims = 2
-  rm = g.get('rdims')
-  ng = g.get('nghosts')
-  ml = g.get('maxlev')[0]
-
-  f.close()
-
-  # check if the shrink parameter is correct
-  #
-  sh = bm[0:ndims].min()
-  while(sh > shrink):
-    sh /= 2
-  shrink = int(sh)
-
-  # prepare dimensions of the output array and allocate it
-  #
-  dm = np.array(rm[0:ndims] * bm[0:ndims] * 2**(ml - 1) / shrink, \
-                                                      dtype = np.int32)
-  ret = np.zeros(dm[::-1])
-
-  # iterate over all subdomain files
-  #
-  nb = 0
-  for n in range(nc):
-    fname = 'p%06d_%05d.h5' % (nr, n)
-    lname = op.join(dname, fname)
-    f = h5.File(lname, 'r')
-    g  = f['attributes'].attrs
-    dblocks = g.get('dblocks')[0]
-    if dblocks > 0:
-      g  = f['coordinates']
-      levels  = g['levels'][()]
-      coords  = g['coords'][()]
-      dx      = g['dx'][()]
-      dy      = g['dy'][()]
-      dz      = g['dz'][()]
-      g       = f['variables']
-      if vname == 'velo':
-        dataset = np.sqrt(g['velx'][:,:,:,:]**2 \
-                        + g['vely'][:,:,:,:]**2 \
-                        + g['velz'][:,:,:,:]**2)
-      elif vname == 'magn':
-        dataset = np.sqrt(g['magx'][:,:,:,:]**2 \
-                        + g['magy'][:,:,:,:]**2 \
-                        + g['magz'][:,:,:,:]**2)
-      elif vname == 'eint':
-        dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:]
-      elif vname == 'ekin':
-        dataset = 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
-                                            + g['vely'][:,:,:,:]**2 \
-                                            + g['velz'][:,:,:,:]**2)
-      elif vname == 'emag':
-        dataset = 0.5 * (g['magx'][:,:,:,:]**2 \
-                       + g['magy'][:,:,:,:]**2 \
-                       + g['magz'][:,:,:,:]**2)
-      elif vname == 'etot':
-        dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:] \
-                + 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
-                                            + g['vely'][:,:,:,:]**2 \
-                                            + g['velz'][:,:,:,:]**2)
-        if eqsys == 'mhd':
-          dataset += 0.5 * (g['magx'][:,:,:,:]**2 \
-                          + g['magy'][:,:,:,:]**2 \
-                          + g['magz'][:,:,:,:]**2)
-      elif vname == 'temp':
-        dataset = g['pres'][:,:,:,:] / g['dens'][:,:,:,:]
-      elif vname == 'lore':
-        dataset = 1.0 / np.sqrt(1.0 - (g['velx'][:,:,:,:]**2 \
-                                     + g['vely'][:,:,:,:]**2 \
-                                     + g['velz'][:,:,:,:]**2))
-      elif vname == 'divv':
-        dataset = np.zeros(g['velx'].shape)
-        fields  = [ 'velx', 'vely', 'velz' ]
-        h       = (dx, dy, dz)
-        for i in range(ndims):
-          v = fields[i]
-          dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
-                          - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
-                                                    / h[i][levels[:] - 1]
-      elif vname == 'divb':
-        dataset = np.zeros(g['magx'].shape)
-        fields  = [ 'magx', 'magy', 'magz' ]
-        h       = (dx, dy, dz)
-        for i in range(ndims):
-          v = fields[i]
-          dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
-                          - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
-                                                    / h[i][levels[:] - 1]
-      elif vname == 'vort':
-        if ndims == 3:
-          wx = 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
-                    - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
-                                                / dy[levels[:]-1] \
-             - 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 0)  \
-                    - np.roll(g['vely'][:,:,:,:],  1, axis = 0)) \
-                                                / dz[levels[:]-1]
-          wy = 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 0)  \
-                    - np.roll(g['velx'][:,:,:,:],  1, axis = 0)) \
-                                                / dz[levels[:]-1] \
-             - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
-                    - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
-                                                / dx[levels[:]-1]
-          wz = 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
-                    - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
-                                                / dx[levels[:]-1] \
-             - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
-                    - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
-                                                / dy[levels[:]-1]
-        else:
-          wx =   0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
-                      - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
-                                                 / dy[levels[:]-1]
-          wy = - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
-                      - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
-                                                 / dx[levels[:]-1]
-          wz =   0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
-                      - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
-                                                 / dx[levels[:]-1] \
-               - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
-                      - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
-                                                 / dy[levels[:]-1]
-        dataset = np.sqrt(wx * wx + wy * wy + wz * wz)
-      elif vname == 'curr':
-        if ndims == 3:
-          wx = 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 1)  \
-                    - np.roll(g['magz'][:,:,:,:],  1, axis = 1)) \
-                                                / dy[levels[:]-1] \
-             - 0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 0)  \
-                    - np.roll(g['magy'][:,:,:,:],  1, axis = 0)) \
-                                                / dz[levels[:]-1]
-          wy = 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 0)  \
-                    - np.roll(g['magx'][:,:,:,:],  1, axis = 0)) \
-                                                / dz[levels[:]-1] \
-             - 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 2)  \
-                    - np.roll(g['magz'][:,:,:,:],  1, axis = 2)) \
-                                                / dx[levels[:]-1]
-          wz = 0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 2)  \
-                    - np.roll(g['magy'][:,:,:,:],  1, axis = 2)) \
-                                                / dx[levels[:]-1] \
-             - 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 1)  \
-                    - np.roll(g['magx'][:,:,:,:],  1, axis = 1)) \
-                                                / dy[levels[:]-1]
-        else:
-          wx =   0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 1)  \
-                      - np.roll(g['magz'][:,:,:,:],  1, axis = 1)) \
-                                                 / dy[levels[:]-1]
-          wy = - 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 2)  \
-                      - np.roll(g['magz'][:,:,:,:],  1, axis = 2)) \
-                                                 / dx[levels[:]-1]
-          wz =   0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 2)  \
-                      - np.roll(g['magy'][:,:,:,:],  1, axis = 2)) \
-                                                 / dx[levels[:]-1] \
-               - 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 1)  \
-                      - np.roll(g['magx'][:,:,:,:],  1, axis = 1)) \
-                                                 / dy[levels[:]-1]
-        dataset = np.sqrt(wx * wx + wy * wy + wz * wz)
-      else:
-        dataset = g[vname][:,:,:,:]
-
-      # rescale all blocks to the effective resolution
-      #
-      for l in range(dblocks):
-        nn   = 2**(ml - levels[l])
-        cm   = np.array(bm[0:ndims] * nn / shrink, dtype = np.int32)
-        ibeg = coords[0:ndims,l] * cm[0:ndims]
-        iend = ibeg + cm[0:ndims]
-        if ndims == 3:
-          ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
-          ie, je, ke = iend[0], iend[1], iend[2]
-          ret[kb:ke,jb:je,ib:ie] = rebin(dataset[ng:-ng,ng:-ng,ng:-ng,l], cm)
-        else:
-          ib, jb = ibeg[0], ibeg[1]
-          ie, je = iend[0], iend[1]
-          ret[jb:je,ib:ie]       = rebin(dataset[     0,ng:-ng,ng:-ng,l], cm)
-
-        nb += 1
-
-        # print progress bar if desired
-        #
-        if progress:
-          sys.stdout.write('\r')
-          sys.stdout.write("Reading '%s' from '%s': block %d from %d" \
-                        % (vname, fname, nb, nl))
-          sys.stdout.flush()
-
+    # build the list of supported variables
+    #
+    variables = []
+    f = h5.File(fname, 'r')
+    for var in f['variables'].keys():
+      variables.append(var)
     f.close()
 
-  if (progress):
-    sys.stdout.write('\n')
-    sys.stdout.flush()
+    # add derived variables if possible
+    #
+    if 'velx' in variables and 'vely' in variables and 'velz' in variables:
+      variables.append('velo')
+      variables.append('divv')
+      variables.append('vort')
+    if 'magx' in variables and 'magy' in variables and 'magz' in variables:
+      variables.append('magn')
+      variables.append('divb')
+      variables.append('curr')
+    if (eqsys == 'hd' or eqsys == 'mhd') and eos == 'adi' \
+                      and 'pres' in variables:
+      variables.append('eint')
+    if 'dens' in variables and 'pres' in variables:
+      variables.append('temp')
+    if (eqsys == 'hd' or eqsys == 'mhd') \
+                      and 'dens' in variables \
+                      and 'velx' in variables \
+                      and 'vely' in variables \
+                      and 'velz' in variables:
+      variables.append('ekin')
+    if (eqsys == 'mhd' or eqsys == 'srmhd') \
+                       and 'magx' in variables \
+                       and 'magy' in variables \
+                       and 'magz' in variables:
+      variables.append('emag')
+    if eqsys == 'hd' and 'ekin' in variables and 'eint' in variables:
+      variables.append('etot')
+    if eqsys == 'mhd' and 'eint' in variables \
+                      and 'ekin' in variables \
+                      and 'emag' in variables:
+      variables.append('etot')
+    if (eqsys == 'srhd' or eqsys == 'srmhd') and 'velo' in variables:
+      variables.append('lore')
 
-  # return the dataset
-  #
+    # check if the requested variable is in the variable list
+    #
+    if not vname in variables:
+      print('The requested variable cannot be extracted from the file datasets!')
+      return False
+
+    # check if the shrink parameter is correct
+    #
+    sh = bm[0:ndims].min()
+    while(sh > shrink):
+      sh /= 2
+    shrink = int(sh)
+
+    # prepare dimensions of the output array and allocate it
+    #
+    dm = np.array(rm[0:ndims] * bm[0:ndims] * 2**(ml - 1) / shrink, \
+                                                        dtype = np.int32)
+    ret = np.zeros(dm[::-1])
+
+    # iterate over all subdomain files
+    #
+    nb = 0
+    for n in range(nc):
+      fname = 'p%06d_%05d.h5' % (nr, n)
+      lname = op.join(dname, fname)
+      dblocks = amun_attribute(lname, 'dblocks')
+      if dblocks > 0:
+        levels = amun_coordinate(lname, 'levels')
+        coords = amun_coordinate(lname, 'coords')
+        dx     = amun_coordinate(lname, 'dx')
+        dy     = amun_coordinate(lname, 'dy')
+        dz     = amun_coordinate(lname, 'dz')
+        f = h5.File(lname, 'r')
+        g       = f['variables']
+        if vname == 'velo':
+          dataset = np.sqrt(g['velx'][:,:,:,:]**2 \
+                          + g['vely'][:,:,:,:]**2 \
+                          + g['velz'][:,:,:,:]**2)
+        elif vname == 'magn':
+          dataset = np.sqrt(g['magx'][:,:,:,:]**2 \
+                          + g['magy'][:,:,:,:]**2 \
+                          + g['magz'][:,:,:,:]**2)
+        elif vname == 'eint':
+          dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:]
+        elif vname == 'ekin':
+          dataset = 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
+                                              + g['vely'][:,:,:,:]**2 \
+                                              + g['velz'][:,:,:,:]**2)
+        elif vname == 'emag':
+          dataset = 0.5 * (g['magx'][:,:,:,:]**2 \
+                         + g['magy'][:,:,:,:]**2 \
+                         + g['magz'][:,:,:,:]**2)
+        elif vname == 'etot':
+          dataset = 1.0 / (gm - 1.0) * g['pres'][:,:,:,:] \
+                  + 0.5 * g['dens'][:,:,:,:] * (g['velx'][:,:,:,:]**2 \
+                                              + g['vely'][:,:,:,:]**2 \
+                                              + g['velz'][:,:,:,:]**2)
+          if eqsys == 'mhd':
+            dataset += 0.5 * (g['magx'][:,:,:,:]**2 \
+                            + g['magy'][:,:,:,:]**2 \
+                            + g['magz'][:,:,:,:]**2)
+        elif vname == 'temp':
+          dataset = g['pres'][:,:,:,:] / g['dens'][:,:,:,:]
+        elif vname == 'lore':
+          dataset = 1.0 / np.sqrt(1.0 - (g['velx'][:,:,:,:]**2 \
+                                       + g['vely'][:,:,:,:]**2 \
+                                       + g['velz'][:,:,:,:]**2))
+        elif vname == 'divv':
+          dataset = np.zeros(g['velx'].shape)
+          fields  = [ 'velx', 'vely', 'velz' ]
+          h       = (dx, dy, dz)
+          for i in range(ndims):
+            v = fields[i]
+            dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
+                            - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
+                                                      / h[i][levels[:] - 1]
+        elif vname == 'divb':
+          dataset = np.zeros(g['magx'].shape)
+          fields  = [ 'magx', 'magy', 'magz' ]
+          h       = (dx, dy, dz)
+          for i in range(ndims):
+            v = fields[i]
+            dataset += 0.5 * (np.roll(g[v][:,:,:,:], -1, axis = 2)  \
+                            - np.roll(g[v][:,:,:,:],  1, axis = 2)) \
+                                                      / h[i][levels[:] - 1]
+        elif vname == 'vort':
+          if ndims == 3:
+            wx = 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
+                                                  / dy[levels[:]-1] \
+               - 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 0)  \
+                      - np.roll(g['vely'][:,:,:,:],  1, axis = 0)) \
+                                                  / dz[levels[:]-1]
+            wy = 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 0)  \
+                      - np.roll(g['velx'][:,:,:,:],  1, axis = 0)) \
+                                                  / dz[levels[:]-1] \
+               - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
+                                                  / dx[levels[:]-1]
+            wz = 0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
+                                                  / dx[levels[:]-1] \
+               - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
+                                                  / dy[levels[:]-1]
+          else:
+            wx =   0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 1)  \
+                        - np.roll(g['velz'][:,:,:,:],  1, axis = 1)) \
+                                                   / dy[levels[:]-1]
+            wy = - 0.5 * (np.roll(g['velz'][:,:,:,:], -1, axis = 2)  \
+                        - np.roll(g['velz'][:,:,:,:],  1, axis = 2)) \
+                                                   / dx[levels[:]-1]
+            wz =   0.5 * (np.roll(g['vely'][:,:,:,:], -1, axis = 2)  \
+                        - np.roll(g['vely'][:,:,:,:],  1, axis = 2)) \
+                                                   / dx[levels[:]-1] \
+                 - 0.5 * (np.roll(g['velx'][:,:,:,:], -1, axis = 1)  \
+                        - np.roll(g['velx'][:,:,:,:],  1, axis = 1)) \
+                                                   / dy[levels[:]-1]
+          dataset = np.sqrt(wx * wx + wy * wy + wz * wz)
+        elif vname == 'curr':
+          if ndims == 3:
+            wx = 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['magz'][:,:,:,:],  1, axis = 1)) \
+                                                  / dy[levels[:]-1] \
+               - 0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 0)  \
+                      - np.roll(g['magy'][:,:,:,:],  1, axis = 0)) \
+                                                  / dz[levels[:]-1]
+            wy = 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 0)  \
+                      - np.roll(g['magx'][:,:,:,:],  1, axis = 0)) \
+                                                  / dz[levels[:]-1] \
+               - 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['magz'][:,:,:,:],  1, axis = 2)) \
+                                                  / dx[levels[:]-1]
+            wz = 0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 2)  \
+                      - np.roll(g['magy'][:,:,:,:],  1, axis = 2)) \
+                                                  / dx[levels[:]-1] \
+               - 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 1)  \
+                      - np.roll(g['magx'][:,:,:,:],  1, axis = 1)) \
+                                                  / dy[levels[:]-1]
+          else:
+            wx =   0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 1)  \
+                        - np.roll(g['magz'][:,:,:,:],  1, axis = 1)) \
+                                                   / dy[levels[:]-1]
+            wy = - 0.5 * (np.roll(g['magz'][:,:,:,:], -1, axis = 2)  \
+                        - np.roll(g['magz'][:,:,:,:],  1, axis = 2)) \
+                                                   / dx[levels[:]-1]
+            wz =   0.5 * (np.roll(g['magy'][:,:,:,:], -1, axis = 2)  \
+                        - np.roll(g['magy'][:,:,:,:],  1, axis = 2)) \
+                                                   / dx[levels[:]-1] \
+                 - 0.5 * (np.roll(g['magx'][:,:,:,:], -1, axis = 1)  \
+                        - np.roll(g['magx'][:,:,:,:],  1, axis = 1)) \
+                                                   / dy[levels[:]-1]
+          dataset = np.sqrt(wx * wx + wy * wy + wz * wz)
+        else:
+          dataset = g[vname][:,:,:,:]
+
+        f.close()
+
+        # rescale all blocks to the effective resolution
+        #
+        for l in range(dblocks):
+          nn   = 2**(ml - levels[l])
+          cm   = np.array(bm[0:ndims] * nn / shrink, dtype = np.int32)
+          ibeg = coords[0:ndims,l] * cm[0:ndims]
+          iend = ibeg + cm[0:ndims]
+          if ndims == 3:
+            ib, jb, kb = ibeg[0], ibeg[1], ibeg[2]
+            ie, je, ke = iend[0], iend[1], iend[2]
+            ret[kb:ke,jb:je,ib:ie] = rebin(dataset[ng:-ng,ng:-ng,ng:-ng,l], cm)
+          else:
+            ib, jb = ibeg[0], ibeg[1]
+            ie, je = iend[0], iend[1]
+            ret[jb:je,ib:ie]       = rebin(dataset[     0,ng:-ng,ng:-ng,l], cm)
+
+          nb += 1
+
+          # print progress bar if desired
+          #
+          if progress:
+            sys.stdout.write('\r')
+            sys.stdout.write("Reading '%s' from '%s': block %d from %d" \
+                          % (vname, fname, nb, nl))
+            sys.stdout.flush()
+
+    if (progress):
+      sys.stdout.write('\n')
+      sys.stdout.flush()
+
+  except:
+    print("Dataset '%s' cannot be retrieved from '%s'!" % (vname, fname))
+    ret = False
+
   return ret
 
 
