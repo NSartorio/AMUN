@@ -561,17 +561,17 @@ def rebin(a, newshape):
   m = a.ndim - 1
   if (a.shape[m] > newshape[m]):
     if a.ndim == 3:
-      nn = [newshape[0], a.shape[0] / newshape[0],
-            newshape[1], a.shape[1] / newshape[1],
-            newshape[2], a.shape[2] / newshape[2]]
+      nn = [newshape[0], int(a.shape[0] / newshape[0]),
+            newshape[1], int(a.shape[1] / newshape[1]),
+            newshape[2], int(a.shape[2] / newshape[2])]
       return a.reshape(nn).mean(5).mean(3).mean(1)
     else:
-      nn = [newshape[0], a.shape[0] / newshape[0],
-            newshape[1], a.shape[1] / newshape[1]]
+      nn = [newshape[0], int(a.shape[0] / newshape[0]),
+            newshape[1], int(a.shape[1] / newshape[1])]
       return a.reshape(nn).mean(3).mean(1)
   else:
     for n in range(a.ndim):
-      a = np.repeat(a, newshape[n] / a.shape[n], axis = n)
+      a = np.repeat(a, int(newshape[n] / a.shape[n]), axis = n)
     return(a)
 
 
